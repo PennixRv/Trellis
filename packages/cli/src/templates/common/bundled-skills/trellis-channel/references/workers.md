@@ -7,6 +7,12 @@ and translates its output back into channel events.
 
 ## Spawn
 
+The direct `--agent` examples in this reference are for non-governed Trellis
+projects. When the parent skill proves the
+`codex-only-analysis-channel` profile, do not spawn `implement` or `check`
+workers from this reference; load `codex-workflow-dispatch` and use its
+governed analysis/review lifecycle instead.
+
 ```bash
 trellis channel create impl-task --by dispatcher --cwd /path/to/repo
 trellis channel spawn impl-task --provider codex --as codex-impl --timeout 30m

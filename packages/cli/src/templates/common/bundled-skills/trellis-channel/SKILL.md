@@ -9,6 +9,20 @@ description: Use Trellis channel for live multi-agent collaboration, spawned wor
 
 Typical user signals: "和 codex/claude 讨论", "brainstorm with another agent", "spawn an implement/check worker", "let agent review", "open an issue board / changelog forum", "look at this thread", "channel is stuck / no output", "progress was truncated", "how do I write that channel command".
 
+## Profile Routing Gate
+
+Before selecting any workflow pattern, inspect `.trellis/codex-workflow.json` when it exists. Treat the project as governed only when all of these predicates match:
+
+- `distribution.profile` is exactly `codex-only-analysis-channel`;
+- `dispatch.backend` is exactly `trellis-channel`;
+- `dispatch.native_agents` is `disabled`;
+- `dispatch.main_implementation_only` is `true`; and
+- `dispatch.worker_report_policy` is `runtime-outbox`.
+
+When the governed profile matches, immediately load `codex-workflow-dispatch`. Do not use the direct implement/check worker pattern below. A request to "spawn an implement/check worker" must be routed to the governed analysis/review dispatch flow or explicitly refused; the main session retains implementation, task facts, acceptance decisions, and Git ownership, while workers return candidate analysis reports only.
+
+When the profile is absent, malformed, or does not match all predicates, keep the ordinary Trellis channel patterns below. Do not infer governed mode from a partial or historical configuration.
+
 This skill is an index. Load only the reference file for the current job — do not preload all of them.
 
 ## First Commands

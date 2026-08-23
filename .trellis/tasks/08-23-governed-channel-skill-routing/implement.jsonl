@@ -1,0 +1,4 @@
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"TypeScript and template quality rules for the CLI package."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Vitest regression structure and test isolation rules."}
+{"file":".trellis/spec/cli/unit-test/integration-patterns.md","reason":"Template distribution and integration-test patterns."}
+{"file":".trellis/spec/guides/cross-platform-thinking-guide.md","reason":"The bundled skill is rendered to every supported platform."}
