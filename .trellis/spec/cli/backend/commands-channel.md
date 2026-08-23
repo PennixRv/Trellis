@@ -1281,3 +1281,84 @@ commands/channel/
 - **events.jsonl rotation** — triggers when single file > 100MB OR > 100k events. Schema split + reader-merge is the open design question.
 - **Event attribution + pass-through metadata** — keep `by` as a lightweight alias, add `origin: "cli"|"api"|"worker"` for the write entrypoint, and store business identity/context in `meta` without teaching Trellis user/org semantics.
 - **GUI frontend** consuming `events.jsonl` via fs.watch (Electron) or polling. CLI render rules in `messages.ts` translate directly.
+
+## Codex app-server handshake
+
+### Scope / Trigger
+
+`packages/cli/src/commands/channel/adapters/index.ts` owns the Codex app-server startup handshake. This is a
+protocol boundary: the adapter must not infer server readiness from a fixed delay, worker prompt, or a later
+`thread/start` response.
+
+### Signatures
+
+```ts
+interface CodexCtx {
+  pending: Map<number, "initialize" | "thread/start" | "turn/start" | "other">;
+  responseWaiters: Map<number, CodexResponseWaiter>;
+  threadId?: string;
+}
+
+encodeCodexRequestWithResponse(ctx, method, params, label, timeoutMs?):
+  { id: number; line: string; response: Promise<unknown> }
+cancelCodexResponse(ctx, id, error): void
+```
+
+`responseWaiters` is limited to handshake requests. `parseCodexLine` is the only response decoder that removes a
+waiter, clears its timer, and resolves or rejects its promise. `cancelCodexResponse` is the corresponding child-exit
+and child-error path.
+
+### Contract
+
+The required request/notification order is:
+
+```text
+initialize request
+  -> successful initialize response
+  -> initialized notification (no id)
+  -> thread/start request
+  -> successful thread/start response containing a thread id
+  -> adapter ready
+```
+
+`initialize` error, malformed result, bounded timeout, or child exit must fail the handshake and must not send
+`initialized` or `thread/start`. `thread/start` error, malformed result, bounded timeout, or child exit must leave
+the adapter not ready. The response waiter is only for handshake requests; ordinary `turn/start` requests continue
+through the existing pending-request parser without a second readiness mechanism.
+
+### Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| initialize success object | Send one `initialized` notification, then send `thread/start` |
+| initialize JSON-RPC error | Reject handshake; do not send `initialized` or `thread/start` |
+| initialize timeout, child exit, or child error | Reject and clean the waiter; do not send `thread/start` |
+| thread/start success with a thread id | Persist the id through the existing parse side effect; mark ready |
+| thread/start error, malformed result, timeout, child exit, or child error | Reject handshake and remain not ready |
+| any terminal response path | Remove its `pending` and `responseWaiters` entries and clear the waiter timer |
+| fixed sleep used to order requests | Forbidden; ordering must be response-driven |
+
+### Good / Base / Bad Cases
+
+- Good: an object initialization result resolves the registered waiter; the adapter emits one id-less
+  `initialized` notification, then waits for a `thread/start` response that contains a thread id.
+- Base: `capabilities: {}` remains the minimum stable payload. This contract does not add experimental capabilities,
+  permissions, MCP access, or a second readiness flag.
+- Bad: a non-object initialization result, JSON-RPC error, timeout, or child failure advances to `thread/start`; a
+  terminal path leaves a pending id or timer behind; a test passes only because wall-clock time exceeded 150 ms.
+
+### Tests Required
+
+- Strict fake app-server test asserts the exact four-step successful order and verifies `initialized` has no `id`.
+- Error, timeout, malformed-result, child-exit, and child-error tests prove no premature `thread/start` and no ready
+  state; each terminal path asserts that response waiter and pending maps are empty.
+- Existing Codex progress, turn, server-request, and sandbox tests continue to pass.
+- A released build must be installed before the real channel capability sentinel is used as the parent workflow gate;
+  a passing unit test alone does not prove Bash, context-mode, or report-write availability.
+
+### Wrong vs Correct
+
+**Wrong**: send `initialize`, sleep for 150ms, and send `thread/start` regardless of the initialize response.
+
+**Correct**: register a bounded response waiter before writing `initialize`, send `initialized` only after a successful
+response, then register and await `thread/start`; child exit and timeout clean the corresponding waiter and fail closed.

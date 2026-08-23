@@ -1,0 +1,30 @@
+{
+  "id": "issue-155-codex-channel-handshake",
+  "name": "issue-155-codex-channel-handshake",
+  "title": "Issue 155 Codex channel handshake remediation",
+  "description": "Repair the Codex channel adapter handshake so thread startup is gated on an acknowledged app-server initialization.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "cli-channel-codex-handshake",
+  "package": "cli",
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-08-23",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "root_audit_issue": "155",
+    "baseline_commit": "fd4bb6480cffa32c7c3a05042da0ee8b351a5e8c",
+    "actual_target_paths": "packages/cli/src/commands/channel/adapters/codex.ts,packages/cli/src/commands/channel/adapters/index.ts,packages/cli/test/commands/channel-codex-adapter.test.ts,.trellis/spec/cli/backend/commands-channel.md"
+  }
+}

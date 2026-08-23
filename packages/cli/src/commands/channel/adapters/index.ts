@@ -28,9 +28,10 @@ import {
 import {
   buildCodexArgs,
   buildCodexThreadStartParams,
+  cancelCodexResponse,
   createCodexCtx,
   encodeCodexInterruptMessage,
-  encodeCodexRequest,
+  encodeCodexRequestWithResponse,
   encodeCodexUserMessage,
   parseCodexLine,
   type CodexCtx,
@@ -132,7 +133,7 @@ const codexAdapter: WorkerAdapter<CodexCtx> = {
   },
   async handshake({ child, ctx, view }) {
     // 1. initialize
-    const init = encodeCodexRequest(
+    const init = encodeCodexRequestWithResponse(
       ctx,
       "initialize",
       {
@@ -142,24 +143,36 @@ const codexAdapter: WorkerAdapter<CodexCtx> = {
       "initialize",
     );
     child.stdin.write(init.line);
-    // 2. wait briefly so initialize lands first
-    await sleep(150);
-    const ts = encodeCodexRequest(
+    const initResult = await awaitCodexResponse(
+      child,
+      ctx,
+      init.id,
+      init.response,
+      "initialize",
+    );
+    if (!isObject(initResult)) {
+      throw new Error("Codex initialize returned an invalid result");
+    }
+
+    // 2. complete the app-server handshake before starting a thread
+    child.stdin.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method: "initialized",
+        params: {},
+      }) + "\n",
+    );
+
+    const ts = encodeCodexRequestWithResponse(
       ctx,
       "thread/start",
       buildCodexThreadStartParams(view.cwd, view.systemPrompt, view.sandbox),
       "thread/start",
     );
     child.stdin.write(ts.line);
-    // 3. wait for thread/start response to populate threadId
-    const deadline = Date.now() + 30_000;
-    while (!ctx.threadId && Date.now() < deadline) {
-      await sleep(50);
-    }
+    await awaitCodexResponse(child, ctx, ts.id, ts.response, "thread/start");
     if (!ctx.threadId) {
-      throw new Error(
-        "Codex thread/start did not produce a threadId within 30s",
-      );
+      throw new Error("Codex thread/start returned no threadId");
     }
   },
   isReady(ctx) {
@@ -208,6 +221,66 @@ export function getAdapter(provider: Provider): WorkerAdapter<AdapterCtx> {
   return a as WorkerAdapter<AdapterCtx>;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
+function awaitCodexResponse(
+  child: WorkerChild,
+  ctx: CodexCtx,
+  id: number,
+  response: Promise<unknown>,
+  label: string,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = (): void => {
+      child.removeListener("exit", onExit);
+      child.removeListener("error", onError);
+    };
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn();
+    };
+    const onExit = (
+      code: number | null,
+      signal: NodeJS.Signals | null,
+    ): void => {
+      const detail = signal ?? (code === null ? "unknown" : `code ${code}`);
+      cancelCodexResponse(
+        ctx,
+        id,
+        new Error(
+          `Codex ${label} response interrupted by child exit (${detail})`,
+        ),
+      );
+      finish(() =>
+        reject(
+          new Error(
+            `Codex ${label} response interrupted by child exit (${detail})`,
+          ),
+        ),
+      );
+    };
+    const onError = (error: Error): void => {
+      cancelCodexResponse(ctx, id, error);
+      finish(() => reject(error));
+    };
+
+    if (child.exitCode !== null || child.signalCode !== null) {
+      onExit(child.exitCode, child.signalCode);
+      return;
+    }
+    child.once("exit", onExit);
+    child.once("error", onError);
+    response.then(
+      (result) => finish(() => resolve(result)),
+      (error: unknown) =>
+        finish(() =>
+          reject(error instanceof Error ? error : new Error(String(error))),
+        ),
+    );
+  });
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
