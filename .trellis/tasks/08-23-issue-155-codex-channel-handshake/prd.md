@@ -60,7 +60,7 @@ separate worker-tool availability failure.
       `detect_changes` is run against `main` before the component commit.
 - [x] The channel code-spec records the strict ordering, cleanup, and failure
       behavior, and all changed task/spec documents pass structural checks.
-- [ ] The component commit contains only this task's adapter, test, and
+- [x] The component commit contains only this task's adapter, test, and
       contract changes. Package publication and installation remain subject to
       the repository's CI-only release process and separate runtime acceptance.
 

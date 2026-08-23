@@ -49,9 +49,11 @@ also states that requests before initialization receive `Not initialized`.
 - Every checked success or terminal path leaves both `pending` and
   `responseWaiters` empty.
 
-## Remaining Gate
+## Commit And Remaining Gate
 
-The next required action is a scoped component commit after one final review.
-The root audit must then independently determine the CI-only release route and
-run its fresh-host worker capability sentinel. These local checks do not close
-the root worker-capability finding.
+The verified component change was committed as
+`109c9626c0c8ec7fc081cb7e53dca319c11896dd`
+(`fix(channel): gate Codex thread startup on initialization`). The root audit
+must now independently determine the CI-only release route and run its
+fresh-host worker capability sentinel. These local checks do not close the root
+worker-capability finding.
