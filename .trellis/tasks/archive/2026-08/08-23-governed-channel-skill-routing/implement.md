@@ -8,7 +8,7 @@
 4. [x] Add a focused Vitest regression covering the source and resolved bundled-skill output for every platform context.
 5. [x] Run the focused test, CLI lint, typecheck, and the relevant template/configurator tests.
 6. [x] Run build/template distribution checks so the source is present in `dist` and a temporary initialized project receives the guarded skill.
-7. [ ] Update Issue 144 only after all gates pass, commit the component repository, and report the exact commit to the root repository. Do not modify the root submodule Gitlink in this component task.
+7. [x] Update Issue 144 only after all gates pass, commit the component repository, and report the exact commit to the root repository. Do not modify the root submodule Gitlink in this component task.
 
 ## Validation commands
 
@@ -28,7 +28,9 @@ pnpm --filter @mindfoldhq/trellis build
 - `npx --yes pnpm@10.32.1 --filter @mindfoldhq/trellis exec vitest run test/configurators/platforms.test.ts test/templates/trellis-channel-routing.test.ts`: passed, 59/59.
 - `npx --yes pnpm@10.32.1 build`: passed; source and `dist` skill hashes match.
 - A temporary Git project initialized with the built CLI received the guarded Codex skill; its `SKILL.md` hash matches the source.
-- Full `npx --yes pnpm@10.32.1 test`: 1659 passed, 1 skipped, 2 failed in existing marketplace mirror tests because `marketplace/workflows/native/workflow.md` and `marketplace/workflows/tdd/workflow.md` are absent from this component checkout. These failures do not touch the changed files.
+- Initial full `npx --yes pnpm@10.32.1 test` before the commit hook initialized the marketplace submodule: 1659 passed, 1 skipped, 2 failed because the two marketplace mirror files were not checked out.
+- The commit hook initialized the pinned marketplace submodule and reran the full suite: 1661 passed, 0 skipped, 0 failed.
+- Component commit: `2ac1d551` (`fix(cli): route governed channel skill safely`).
 
 ## Gates and stop conditions
 
