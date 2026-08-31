@@ -327,6 +327,37 @@ describe("spawnWorker / interrupt APIs", () => {
     });
   });
 
+  it("keeps a failed stop outcome observable", async () => {
+    await createChannel({ channel: "c", by: "main" });
+    const runtime: WorkerRuntime = {
+      ...fakeRuntime,
+      stop: vi.fn(async () => ({
+        outcome: "failed" as const,
+        message: "worker still alive",
+      })),
+    };
+
+    await expect(
+      spawnWorker(
+        {
+          channel: "c",
+          cwd: env.projectDir,
+          by: "main",
+          workerId: "w",
+          systemPrompt: "x",
+          meta: [] as unknown as Record<string, unknown>,
+        },
+        runtime,
+      ),
+    ).rejects.toMatchObject({
+      name: "AggregateError",
+      errors: [
+        expect.objectContaining({ message: "meta must be a plain JSON object" }),
+        expect.objectContaining({ message: "worker still alive" }),
+      ],
+    });
+  });
+
   it("requestInterrupt appends a durable-only interrupt_requested event", async () => {
     await createChannel({ channel: "c", by: "main" });
     const evt = await requestInterrupt({

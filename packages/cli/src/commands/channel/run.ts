@@ -50,6 +50,10 @@ export async function channelRun(opts: RunOptions): Promise<void> {
     origin: "run",
   });
 
+  // Capture the barrier before spawning. A provider may fail or finish while
+  // the supervisor is starting; taking it after spawn would hide that event.
+  const sinceSeq = await readLastSeq(name);
+
   let workerName: string | null = null;
   let succeeded = false;
   try {
@@ -64,10 +68,6 @@ export async function channelRun(opts: RunOptions): Promise<void> {
       jsonls: opts.jsonls,
     });
     workerName = spawned.worker;
-    // Establish the barrier before delivering the prompt. A very fast worker
-    // may emit `done` before `channelSend` returns; waiting from the post-send
-    // EOF would miss that terminal event.
-    const sinceSeq = await readLastSeq(name);
 
     await channelSend(name, {
       as: "main",
