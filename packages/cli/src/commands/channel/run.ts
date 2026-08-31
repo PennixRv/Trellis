@@ -19,7 +19,7 @@ import { channelRm } from "./rm.js";
 import { channelSend } from "./send.js";
 import { channelSpawn } from "./spawn.js";
 import { channelDir, eventsPath } from "./store/paths.js";
-import type { ChannelEvent } from "./store/events.js";
+import { readLastSeq, type ChannelEvent } from "./store/events.js";
 import { watchEvents } from "./store/watch.js";
 
 export interface RunOptions {
@@ -64,6 +64,10 @@ export async function channelRun(opts: RunOptions): Promise<void> {
       jsonls: opts.jsonls,
     });
     workerName = spawned.worker;
+    // Establish the barrier before delivering the prompt. A very fast worker
+    // may emit `done` before `channelSend` returns; waiting from the post-send
+    // EOF would miss that terminal event.
+    const sinceSeq = await readLastSeq(name);
 
     await channelSend(name, {
       as: "main",
@@ -73,7 +77,7 @@ export async function channelRun(opts: RunOptions): Promise<void> {
       stdin: opts.stdin,
     });
 
-    await waitForDone(name, workerName, timeoutMs);
+    await waitForDone(name, workerName, timeoutMs, sinceSeq);
     await printFinalMessage(name, workerName);
     succeeded = true;
   } finally {
@@ -102,6 +106,7 @@ async function waitForDone(
   channelName: string,
   workerName: string,
   timeoutMs: number,
+  sinceSeq: number,
 ): Promise<void> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), timeoutMs);
@@ -112,7 +117,7 @@ async function waitForDone(
         self: "main",
         from: [workerName],
       },
-      { signal: abort.signal },
+      { signal: abort.signal, sinceSeq },
     )) {
       if (ev.kind === "done") return;
       if (ev.kind === "error") {

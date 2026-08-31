@@ -40,6 +40,34 @@ are left intact. New reusable behavior belongs in core; CLI-local files should
 only handle terminal UX, process supervision, pid/cursor sidecars, and
 migration glue.
 
+### Runtime barriers and spawn compensation
+
+Any caller that waits for an event emitted after an operation starts must
+capture `readLastSeq(channel, project)` before starting that operation and pass
+the result as `sinceSeq` to `watchEvents`. The watcher must scan from the
+beginning when `sinceSeq` is present, then filter `seq <= sinceSeq`; starting at
+the current byte EOF is not an equivalent barrier because the event may be
+committed between the operation and watcher construction.
+
+`spawnWorker` starts the injected runtime before appending `spawned`. If that
+durable append or the immediate registry projection fails, and the injected
+runtime exposes `stop`, core must call:
+
+```ts
+await runtime.stop({ workerId, reason: "shutdown" });
+```
+
+`stopped` and `already-stopped` preserve the original failure. A thrown stop
+failure or `outcome: "failed"` must remain observable together with the
+original failure (for example through `AggregateError`). A runtime without
+`stop` remains backward-compatible but cannot provide this compensation; new
+runtime implementations should expose it.
+
+The `channel run` command captures its barrier before delivering the prompt.
+The `channel wait` command captures its barrier immediately after resolving
+the existing channel and before creating its async watcher. These rules are
+required for fast workers and are covered by core and CLI regression tests.
+
 ---
 
 ## 2. Signatures
