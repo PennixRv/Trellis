@@ -20,7 +20,7 @@ integration via env wiring and storage layout).
 
 ### Current Core / CLI Boundary
 
-`@mindfoldhq/trellis-core/channel` owns reusable channel domain behavior:
+`@pennixrv/trellis-core/channel` owns reusable channel domain behavior:
 event schemas, reducers, durable mutation APIs, idempotency, worker registry,
 inbox policy, and public SDK contracts.
 
@@ -327,7 +327,7 @@ isCreateEvent(ev): ev is CreateChannelEvent
 isThreadEvent(ev): ev is ThreadChannelEvent
 metadataFromCreateEvent(ev?): ChannelMetadata
   // Internal legacy compatibility helper only. Do not export from
-  // @mindfoldhq/trellis-core/channel and do not call from CLI renderers.
+  // @pennixrv/trellis-core/channel and do not call from CLI renderers.
 
 watchEvents(name, filter: WatchFilter, opts?: {signal?, fromStart?, sinceSeq?, project?}): AsyncGenerator<ChannelEvent>
   // Default: from EOF (live tail). fromStart: from byte 0. sinceSeq: skip seq <= N.
@@ -408,7 +408,7 @@ type ChannelEventKind = "create" | "join" | "leave" | "message" | "thread" | "co
 
 **Author identity (`by`) shape**: `"main"`, `"<worker-name>"`, `"supervisor:<worker>"`, or `"cli:<command>"` (e.g. `cli:kill`).
 
-**Worker lifecycle / inbox / delivery contracts** (owned by `@mindfoldhq/trellis-core`):
+**Worker lifecycle / inbox / delivery contracts** (owned by `@pennixrv/trellis-core`):
 
 - `reduceWorkerRegistry(events, channel?)` is the SOT worker projection. Worker
   lifecycle (`starting`/`running`/`done`/`error`/`killed`/`crashed`) and turn
@@ -466,7 +466,7 @@ type ChannelEventKind = "create" | "join" | "leave" | "message" | "thread" | "co
 
 #### 1. Scope / Trigger
 
-- Trigger: `@mindfoldhq/trellis-core` mutation APIs need replay safety for
+- Trigger: `@pennixrv/trellis-core` mutation APIs need replay safety for
   daemon/API callers that may retry a logical command after a crash or lost
   receipt.
 - This is an event-log storage contract: the physical `events.jsonl` append
