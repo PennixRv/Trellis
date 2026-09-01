@@ -1,0 +1,9 @@
+{
+  "version": "0.6.17",
+  "description": "First PennixRv Trellis fork release with safer channel startup lifecycle handling.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fork release:**\n- Publishes the Trellis CLI and Core packages under the `@pennixrv` scope.\n\n**Bug fixes:**\n- Channel startup now records its event barrier before spawning the runtime and cleans up correctly on startup failures, preventing early events from being missed or runs from lingering.",
+  "migrations": [],
+  "notes": "No file migration required. Existing projects can upgrade normally."
+}
