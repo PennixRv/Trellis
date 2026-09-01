@@ -20,14 +20,14 @@
 </p>
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@mindfoldhq/trellis"><img src="https://img.shields.io/npm/v/@mindfoldhq/trellis.svg?style=flat-square&color=2563eb" alt="npm version" /></a>
-<a href="https://www.npmjs.com/package/@mindfoldhq/trellis"><img src="https://img.shields.io/npm/dw/@mindfoldhq/trellis?style=flat-square&color=cb3837&label=downloads" alt="npm downloads" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-16a34a.svg?style=flat-square" alt="license" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/stargazers"><img src="https://img.shields.io/github/stars/mindfold-ai/Trellis?style=flat-square&color=eab308" alt="stars" /></a>
+<a href="https://www.npmjs.com/package/@pennixrv/trellis"><img src="https://img.shields.io/npm/v/@pennixrv/trellis.svg?style=flat-square&color=2563eb" alt="npm version" /></a>
+<a href="https://www.npmjs.com/package/@pennixrv/trellis"><img src="https://img.shields.io/npm/dw/@pennixrv/trellis?style=flat-square&color=cb3837&label=downloads" alt="npm downloads" /></a>
+<a href="https://github.com/PennixRv/Trellis/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-16a34a.svg?style=flat-square" alt="license" /></a>
+<a href="https://github.com/PennixRv/Trellis/stargazers"><img src="https://img.shields.io/github/stars/PennixRv/Trellis?style=flat-square&color=eab308" alt="stars" /></a>
 <a href="https://docs.trytrellis.app/zh"><img src="https://img.shields.io/badge/docs-trytrellis.app-0f766e?style=flat-square" alt="docs" /></a>
 <a href="https://discord.com/invite/tWcCZ3aRHc"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/issues"><img src="https://img.shields.io/github/issues/mindfold-ai/Trellis?style=flat-square&color=e67e22" alt="open issues" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/pulls"><img src="https://img.shields.io/github/issues-pr/mindfold-ai/Trellis?style=flat-square&color=9b59b6" alt="open PRs" /></a>
+<a href="https://github.com/PennixRv/Trellis/issues"><img src="https://img.shields.io/github/issues/PennixRv/Trellis?style=flat-square&color=e67e22" alt="open issues" /></a>
+<a href="https://github.com/PennixRv/Trellis/pulls"><img src="https://img.shields.io/github/issues-pr/PennixRv/Trellis?style=flat-square&color=9b59b6" alt="open PRs" /></a>
 <a href="https://deepwiki.com/mindfold-ai/Trellis"><img src="https://img.shields.io/badge/Ask-DeepWiki-blue?style=flat-square" alt="Ask DeepWiki" /></a>
 <a href="https://chatgpt.com/?q=Explain+the+project+mindfold-ai/Trellis+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
 </p>
@@ -55,7 +55,7 @@
 
 ```bash
 # 1. 安装 Trellis
-npm install -g @mindfoldhq/trellis@latest
+npm install -g @pennixrv/trellis@latest
 
 # 2. 在仓库中初始化
 trellis init -u your-name
@@ -150,12 +150,12 @@ Trellis 管理的全部项目级表面。请新开一个 agent 会话进行对�
 
 ## Star 历史
 
-[![Star History Chart](https://star-history.dera.page/svg?repos=mindfold-ai/Trellis&type=Date)](https://star-history.dera.page/#mindfold-ai/Trellis&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=PennixRv/Trellis&type=Date)](https://star-history.dera.page/#PennixRv/Trellis&Date)
 
 ## 社区与资源
 
 - [官方文档](https://docs.trytrellis.app/zh)
-- [GitHub Issues](https://github.com/mindfold-ai/Trellis/issues)
+- [GitHub Issues](https://github.com/PennixRv/Trellis/issues)
 - [Discord](https://discord.com/invite/tWcCZ3aRHc)
 - [技术博客](https://docs.trytrellis.app/zh/blog)
 
@@ -168,7 +168,7 @@ Trellis 管理的全部项目级表面。请新开一个 agent 会话进行对�
 </p>
 
 <p align="center">
-<a href="https://github.com/mindfold-ai/Trellis">官方仓库</a> •
-<a href="https://github.com/mindfold-ai/Trellis/blob/main/LICENSE">AGPL-3.0 License</a> •
-由 <a href="https://github.com/mindfold-ai">Mindfold</a> 构建
+<a href="https://github.com/PennixRv/Trellis">Fork 仓库</a> •
+<a href="https://github.com/PennixRv/Trellis/blob/main/LICENSE">AGPL-3.0 License</a> •
+基于 <a href="https://github.com/mindfold-ai/Trellis">Mindfold Trellis</a> 演化
 </p>

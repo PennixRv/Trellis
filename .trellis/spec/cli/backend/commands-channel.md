@@ -20,7 +20,7 @@ integration via env wiring and storage layout).
 
 ### Current Core / CLI Boundary
 
-`@mindfoldhq/trellis-core/channel` owns reusable channel domain behavior:
+`@pennixrv/trellis-core/channel` owns reusable channel domain behavior:
 event schemas, reducers, durable mutation APIs, idempotency, worker registry,
 inbox policy, and public SDK contracts.
 
@@ -39,6 +39,34 @@ from the last parseable record rather than resetting to 1
 are left intact. New reusable behavior belongs in core; CLI-local files should
 only handle terminal UX, process supervision, pid/cursor sidecars, and
 migration glue.
+
+### Runtime barriers and spawn compensation
+
+Any caller that waits for an event emitted after an operation starts must
+capture `readLastSeq(channel, project)` before starting that operation and pass
+the result as `sinceSeq` to `watchEvents`. The watcher must scan from the
+beginning when `sinceSeq` is present, then filter `seq <= sinceSeq`; starting at
+the current byte EOF is not an equivalent barrier because the event may be
+committed between the operation and watcher construction.
+
+`spawnWorker` starts the injected runtime before appending `spawned`. If that
+durable append or the immediate registry projection fails, and the injected
+runtime exposes `stop`, core must call:
+
+```ts
+await runtime.stop({ workerId, reason: "shutdown" });
+```
+
+`stopped` and `already-stopped` preserve the original failure. A thrown stop
+failure or `outcome: "failed"` must remain observable together with the
+original failure (for example through `AggregateError`). A runtime without
+`stop` remains backward-compatible but cannot provide this compensation; new
+runtime implementations should expose it.
+
+The `channel run` command captures its barrier before delivering the prompt.
+The `channel wait` command captures its barrier immediately after resolving
+the existing channel and before creating its async watcher. These rules are
+required for fast workers and are covered by core and CLI regression tests.
 
 ---
 
@@ -299,7 +327,7 @@ isCreateEvent(ev): ev is CreateChannelEvent
 isThreadEvent(ev): ev is ThreadChannelEvent
 metadataFromCreateEvent(ev?): ChannelMetadata
   // Internal legacy compatibility helper only. Do not export from
-  // @mindfoldhq/trellis-core/channel and do not call from CLI renderers.
+  // @pennixrv/trellis-core/channel and do not call from CLI renderers.
 
 watchEvents(name, filter: WatchFilter, opts?: {signal?, fromStart?, sinceSeq?, project?}): AsyncGenerator<ChannelEvent>
   // Default: from EOF (live tail). fromStart: from byte 0. sinceSeq: skip seq <= N.
@@ -380,7 +408,7 @@ type ChannelEventKind = "create" | "join" | "leave" | "message" | "thread" | "co
 
 **Author identity (`by`) shape**: `"main"`, `"<worker-name>"`, `"supervisor:<worker>"`, or `"cli:<command>"` (e.g. `cli:kill`).
 
-**Worker lifecycle / inbox / delivery contracts** (owned by `@mindfoldhq/trellis-core`):
+**Worker lifecycle / inbox / delivery contracts** (owned by `@pennixrv/trellis-core`):
 
 - `reduceWorkerRegistry(events, channel?)` is the SOT worker projection. Worker
   lifecycle (`starting`/`running`/`done`/`error`/`killed`/`crashed`) and turn
@@ -438,7 +466,7 @@ type ChannelEventKind = "create" | "join" | "leave" | "message" | "thread" | "co
 
 #### 1. Scope / Trigger
 
-- Trigger: `@mindfoldhq/trellis-core` mutation APIs need replay safety for
+- Trigger: `@pennixrv/trellis-core` mutation APIs need replay safety for
   daemon/API callers that may retry a logical command after a crash or lost
   receipt.
 - This is an event-log storage contract: the physical `events.jsonl` append

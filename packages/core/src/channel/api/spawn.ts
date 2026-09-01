@@ -46,23 +46,47 @@ export async function spawnWorker(
   };
   const handle = await runtime.start(startInput);
 
-  const inboxPolicy = input.inboxPolicy ?? DEFAULT_INBOX_POLICY;
-  await appendEvent(
-    input.channel,
-    {
-      kind: "spawned",
-      by: input.by,
-      as: input.workerId,
-      inboxPolicy,
-      ...(input.provider ?? handle.provider
-        ? { provider: input.provider ?? handle.provider }
-        : {}),
-      ...(handle.pid !== undefined ? { pid: handle.pid } : {}),
-      ...(input.agent !== undefined ? { agent: input.agent } : {}),
-      ...(input.meta !== undefined ? { meta: input.meta } : {}),
-    },
-    ref.project,
-  );
+  try {
+    const inboxPolicy = input.inboxPolicy ?? DEFAULT_INBOX_POLICY;
+    await appendEvent(
+      input.channel,
+      {
+        kind: "spawned",
+        by: input.by,
+        as: input.workerId,
+        inboxPolicy,
+        ...(input.provider ?? handle.provider
+          ? { provider: input.provider ?? handle.provider }
+          : {}),
+        ...(handle.pid !== undefined ? { pid: handle.pid } : {}),
+        ...(input.agent !== undefined ? { agent: input.agent } : {}),
+        ...(input.meta !== undefined ? { meta: input.meta } : {}),
+      },
+      ref.project,
+    );
+  } catch (error) {
+    if (runtime.stop) {
+      let result;
+      try {
+        result = await runtime.stop({
+          workerId: input.workerId,
+          reason: "shutdown",
+        });
+      } catch (stopError) {
+        throw new AggregateError(
+          [error, stopError],
+          `spawnWorker: failed to persist spawned event and stop worker '${input.workerId}'`,
+        );
+      }
+      if (result.outcome === "failed") {
+        throw new AggregateError(
+          [error, new Error(result.message ?? "runtime stop failed")],
+          `spawnWorker: failed to persist spawned event and stop worker '${input.workerId}'`,
+        );
+      }
+    }
+    throw error;
+  }
 
   const events = await readChannelEvents(input.channel, ref.project);
   const registry = reduceWorkerRegistry(events, ref);
