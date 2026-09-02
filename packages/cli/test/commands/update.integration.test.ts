@@ -58,7 +58,7 @@ import {
 } from "../../src/commands/update.js";
 import { VERSION } from "../../src/constants/version.js";
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../../src/constants/paths.js";
-import { computeHash } from "../../src/utils/template-hash.js";
+import { computeHash, loadHashes } from "../../src/utils/template-hash.js";
 import { workflowMdTemplate } from "../../src/templates/trellis/index.js";
 import {
   COPILOT_INSTRUCTIONS_BLOCK_END,
@@ -1294,6 +1294,12 @@ describe("update() integration", () => {
     await update({ force: true });
 
     expect(fs.existsSync(statusLinePath)).toBe(true);
+    expect(fs.readFileSync(statusLinePath, "utf-8")).toBe(
+      "# existing local statusline\n",
+    );
+    expect(loadHashes(tmpDir)).not.toHaveProperty(
+      ".claude/hooks/statusline.py",
+    );
     const updatedSettings = JSON.parse(
       fs.readFileSync(settingsPath, "utf-8"),
     ) as Record<string, unknown>;
@@ -1344,11 +1350,40 @@ describe("update() integration", () => {
 
     expect(fs.existsSync(statusLinePath)).toBe(true);
     expect(fs.readFileSync(statusLinePath, "utf-8")).toBe(hookContentBefore);
+    expect(loadHashes(tmpDir)).toHaveProperty(
+      ".claude/hooks/statusline.py",
+    );
     // Byte-identical, not just deep-equal: init's injectStatusLine must
     // produce exactly what preserveExistingClaudeStatusLine re-derives
     // (statusLine appended last). Any drift — even key order — makes update
     // flag a phantom settings.json change on every fresh opted-in project.
     expect(fs.readFileSync(settingsPath, "utf-8")).toBe(settingsBefore);
+  });
+
+  it("#22c repairs a legacy statusline hash omission without adopting custom hooks", async () => {
+    await init({ yes: true, force: true, claude: true, withStatusline: true });
+
+    const statusLinePath = path.join(
+      tmpDir,
+      ".claude",
+      "hooks",
+      "statusline.py",
+    );
+    const hashFile = hashFilePath();
+    const hashes = removeHashEntry(
+      readHashesV2(hashFile),
+      ".claude/hooks/statusline.py",
+    );
+    writeHashesV2(hashFile, hashes);
+
+    const hookContent = fs.readFileSync(statusLinePath, "utf-8");
+    await update({ force: true });
+
+    expect(fs.readFileSync(statusLinePath, "utf-8")).toBe(hookContent);
+    expect(loadHashes(tmpDir)).toHaveProperty(
+      ".claude/hooks/statusline.py",
+      computeHash(hookContent),
+    );
   });
 
   // --- Breaking-change migration gate (v0.5.0-beta.0+) ---

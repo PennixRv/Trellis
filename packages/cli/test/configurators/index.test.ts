@@ -12,6 +12,7 @@ import {
   isManagedRootDir,
   resolveCliFlag,
 } from "../../src/configurators/index.js";
+import { resolveBundledSkills } from "../../src/configurators/shared.js";
 import { AI_TOOLS, type AITool } from "../../src/types/ai-tools.js";
 import { COPILOT_INSTRUCTIONS_PATH } from "../../src/templates/copilot/index.js";
 
@@ -506,5 +507,26 @@ describe("collectPlatformTemplates", () => {
       ),
     ).toBe(false);
     expect(result?.has(".kimi-code/settings.json")).toBe(false);
+  });
+
+  it("includes every bundled skill file in every platform collector", () => {
+    for (const id of PLATFORM_IDS) {
+      const result = collectPlatformTemplates(id);
+      const bundled = resolveBundledSkills(AI_TOOLS[id].templateContext);
+      if (bundled.length === 0) continue;
+
+      expect(result, `${id} should expose bundled skill templates`).toBeInstanceOf(
+        Map,
+      );
+      for (const skillFile of bundled) {
+        const suffix = `/${skillFile.relativePath}`;
+        expect(
+          [...(result?.keys() ?? [])].some(
+            (key) => key === skillFile.relativePath || key.endsWith(suffix),
+          ),
+          `${id} should include ${skillFile.relativePath}`,
+        ).toBe(true);
+      }
+    }
   });
 });

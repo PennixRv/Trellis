@@ -59,9 +59,14 @@ import {
   collectPlatformTemplates,
 } from "../configurators/index.js";
 import { replacePythonCommandLiterals } from "../configurators/shared.js";
+import {
+  CLAUDE_STATUSLINE_PATH,
+  isClaudeStatuslineManaged,
+} from "../configurators/claude.js";
 import { preserveCodexAgentModelKeys } from "../configurators/codex.js";
 import { printZcodeSetupHint } from "../configurators/zcode.js";
 import { ensureGitattributes } from "../configurators/workflow.js";
+import { getStatuslineHook } from "../templates/claude/index.js";
 import { pruneOrphanManifestKeys } from "../utils/manifest-prune.js";
 import {
   fetchRegistrySpecTemplates,
@@ -855,6 +860,7 @@ async function collectRegistrySpecTemplates(
 
 async function collectTemplateFiles(
   cwd: string,
+  hashes: TemplateHashes,
   extraPlatforms?: Set<AITool>,
   /**
    * Bypass `update.skip` when collecting templates. Enable this for breaking
@@ -931,6 +937,9 @@ async function collectTemplateFiles(
   }
 
   preserveExistingClaudeStatusLine(cwd, files);
+  if (platforms.has("claude-code") && isClaudeStatuslineManaged(cwd, hashes)) {
+    files.set(CLAUDE_STATUSLINE_PATH, getStatuslineHook());
+  }
 
   for (const [filePath, content] of await collectRegistrySpecTemplates(cwd)) {
     files.set(filePath, content);
@@ -2243,6 +2252,7 @@ export async function update(options: UpdateOptions): Promise<void> {
   // Collect templates (used for both migration classification and change analysis)
   const templates = await collectTemplateFiles(
     cwd,
+    hashes,
     codexUpgradeNeeded ? new Set<AITool>(["codex"]) : undefined,
     breakingBypass,
   );

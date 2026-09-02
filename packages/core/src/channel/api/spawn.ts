@@ -64,6 +64,19 @@ export async function spawnWorker(
       },
       ref.project,
     );
+
+    const events = await readChannelEvents(input.channel, ref.project);
+    const registry = reduceWorkerRegistry(events, ref);
+    const state = registry.workers.find(
+      (w) => w.workerId === input.workerId,
+    );
+    if (!state) {
+      // Should never happen — we just appended the spawned event.
+      throw new Error(
+        `spawnWorker: worker '${input.workerId}' missing from registry after spawn`,
+      );
+    }
+    return state;
   } catch (error) {
     if (runtime.stop) {
       let result;
@@ -87,17 +100,4 @@ export async function spawnWorker(
     }
     throw error;
   }
-
-  const events = await readChannelEvents(input.channel, ref.project);
-  const registry = reduceWorkerRegistry(events, ref);
-  const state = registry.workers.find(
-    (w) => w.workerId === input.workerId,
-  );
-  if (!state) {
-    // Should never happen — we just appended the spawned event.
-    throw new Error(
-      `spawnWorker: worker '${input.workerId}' missing from registry after spawn`,
-    );
-  }
-  return state;
 }

@@ -15,6 +15,7 @@ import {
   type WorkerRuntime,
   type WorkerState,
 } from "../../src/channel/index.js";
+import * as eventStore from "../../src/channel/internal/store/events.js";
 import { appendEvent } from "../../src/channel/internal/store/events.js";
 import { setupChannelTmp, type TmpEnv } from "./setup.js";
 
@@ -355,6 +356,34 @@ describe("spawnWorker / interrupt APIs", () => {
         expect.objectContaining({ message: "meta must be a plain JSON object" }),
         expect.objectContaining({ message: "worker still alive" }),
       ],
+    });
+  });
+
+  it("stops a started runtime when the spawned state cannot be projected", async () => {
+    await createChannel({ channel: "c", by: "main" });
+    const projectionError = new Error("projection failed");
+    const stop = vi.fn(async () => ({ outcome: "stopped" as const }));
+    const runtime: WorkerRuntime = { ...fakeRuntime, stop };
+    vi.spyOn(eventStore, "readChannelEvents").mockRejectedValueOnce(
+      projectionError,
+    );
+
+    await expect(
+      spawnWorker(
+        {
+          channel: "c",
+          cwd: env.projectDir,
+          by: "main",
+          workerId: "w",
+          systemPrompt: "x",
+        },
+        runtime,
+      ),
+    ).rejects.toBe(projectionError);
+
+    expect(stop).toHaveBeenCalledWith({
+      workerId: "w",
+      reason: "shutdown",
     });
   });
 
