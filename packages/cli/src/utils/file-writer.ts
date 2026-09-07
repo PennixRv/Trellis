@@ -10,6 +10,7 @@ export type WriteMode = "ask" | "force" | "skip" | "append";
 
 export interface WriteOptions {
   mode: WriteMode;
+  executable?: boolean;
 }
 
 interface PromptAnswer {
@@ -114,7 +115,7 @@ function appendToFile(
 export async function writeFile(
   filePath: string,
   content: string,
-  options?: { executable?: boolean },
+  options?: Partial<WriteOptions>,
 ): Promise<boolean> {
   const exists = fs.existsSync(filePath);
   const displayPath = getRelativePath(filePath);
@@ -142,10 +143,9 @@ export async function writeFile(
   // Non-TTY (CI, pipes, scripted runs): never prompt — fall back to skip
   // rather than crash with ERR_USE_AFTER_CLOSE if a CLI flag forgot to call
   // setWriteMode. Layer-level safety net for the init.ts mapping.
+  const requestedMode = options?.mode ?? globalWriteMode;
   const mode =
-    globalWriteMode === "ask" && !process.stdin.isTTY
-      ? "skip"
-      : globalWriteMode;
+    requestedMode === "ask" && !process.stdin.isTTY ? "skip" : requestedMode;
 
   if (mode === "force") {
     writeFileAtomic(filePath, content);

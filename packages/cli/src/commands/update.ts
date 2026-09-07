@@ -80,6 +80,8 @@ import {
 import { loadSpecRegistryConfig } from "../utils/registry-config.js";
 import {
   cleanupEmptyDirs,
+  getManagedMarkdownBlock,
+  mergeManagedMarkdownBlock,
   TRELLIS_BLOCK_END,
   TRELLIS_BLOCK_START,
 } from "../utils/managed-paths.js";
@@ -136,87 +138,12 @@ const PROTECTED_PATHS = [
   `${DIR_NAMES.WORKFLOW}/.current-task`,
 ];
 
-function getManagedBlock(
-  content: string,
-  startMarker: string,
-  endMarker: string,
-): string | null {
-  const start = content.indexOf(startMarker);
-  if (start === -1) {
-    return null;
-  }
-
-  const end = content.indexOf(endMarker, start);
-  if (end === -1) {
-    return null;
-  }
-
-  return content.slice(start, end + endMarker.length);
-}
-
 function getTrellisManagedBlock(content: string): string | null {
-  return getManagedBlock(content, TRELLIS_BLOCK_START, TRELLIS_BLOCK_END);
-}
-
-function replaceManagedBlock(
-  existingContent: string,
-  templateContent: string,
-  startMarker: string,
-  endMarker: string,
-): string | null {
-  const existingStart = existingContent.indexOf(startMarker);
-  if (existingStart === -1) {
-    return null;
-  }
-
-  const existingEnd = existingContent.indexOf(endMarker, existingStart);
-  if (existingEnd === -1) {
-    return null;
-  }
-
-  const templateBlock = getManagedBlock(
-    templateContent,
-    startMarker,
-    endMarker,
+  return getManagedMarkdownBlock(
+    content,
+    TRELLIS_BLOCK_START,
+    TRELLIS_BLOCK_END,
   );
-  if (!templateBlock) {
-    return null;
-  }
-
-  return (
-    existingContent.slice(0, existingStart) +
-    templateBlock +
-    existingContent.slice(existingEnd + endMarker.length)
-  );
-}
-
-function mergeManagedBlockContent(
-  existingContent: string,
-  templateContent: string,
-  startMarker: string,
-  endMarker: string,
-): string {
-  const replaced = replaceManagedBlock(
-    existingContent,
-    templateContent,
-    startMarker,
-    endMarker,
-  );
-  if (replaced !== null) {
-    return replaced;
-  }
-
-  const templateBlock = getManagedBlock(
-    templateContent,
-    startMarker,
-    endMarker,
-  );
-  if (!templateBlock) {
-    return templateContent;
-  }
-
-  const trimmed = existingContent.replace(/\s+$/, "");
-  return `${trimmed}\n\n${templateBlock}\n`;
 }
 
 function buildManagedBlockTemplate(
@@ -232,11 +159,13 @@ function buildManagedBlockTemplate(
   }
 
   const existingContent = fs.readFileSync(fullPath, "utf-8");
-  return mergeManagedBlockContent(
-    existingContent,
-    templateContent,
-    startMarker,
-    endMarker,
+  return (
+    mergeManagedMarkdownBlock(
+      existingContent,
+      templateContent,
+      startMarker,
+      endMarker,
+    ) ?? templateContent
   );
 }
 
@@ -286,7 +215,7 @@ function isSafeUntrackedCopilotInstructionsMerge(
   }
 
   if (
-    getManagedBlock(
+    getManagedMarkdownBlock(
       existingContent,
       COPILOT_INSTRUCTIONS_BLOCK_START,
       COPILOT_INSTRUCTIONS_BLOCK_END,
@@ -295,14 +224,13 @@ function isSafeUntrackedCopilotInstructionsMerge(
     return false;
   }
 
-  return (
-    mergeManagedBlockContent(
-      existingContent,
-      getCopilotInstructions(),
-      COPILOT_INSTRUCTIONS_BLOCK_START,
-      COPILOT_INSTRUCTIONS_BLOCK_END,
-    ) === newContent
+  const merged = mergeManagedMarkdownBlock(
+    existingContent,
+    getCopilotInstructions(),
+    COPILOT_INSTRUCTIONS_BLOCK_START,
+    COPILOT_INSTRUCTIONS_BLOCK_END,
   );
+  return merged !== null && merged === newContent;
 }
 
 /**

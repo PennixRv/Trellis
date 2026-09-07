@@ -109,19 +109,26 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
     );
   });
 
-  it("#R1.3 init --skip-existing on pre-existing AGENTS.md: file NOT in manifest (PR #271 case)", async () => {
-    // User's pre-existing AGENTS.md must not be hashed when init skips it.
-    fs.writeFileSync(path.join(tmpDir, "AGENTS.md"), "my own AGENTS.md\n");
+  it("#R1.3 init merges a pre-existing AGENTS.md and uninstall preserves its content", async () => {
+    const userContent = "my own AGENTS.md\n";
+    const agentsPath = path.join(tmpDir, "AGENTS.md");
+    fs.writeFileSync(agentsPath, userContent);
 
     await init({ yes: true, claude: true, skipExisting: true });
 
     const hashes = loadHashes(tmpDir);
-    expect(hashes).not.toHaveProperty("AGENTS.md");
+    expect(hashes).toHaveProperty("AGENTS.md");
+    expect(fs.readFileSync(agentsPath, "utf-8")).toBe(
+      `${userContent.trimEnd()}\n\n${agentsMdContent}`,
+    );
+
+    await uninstall({ yes: true });
+    expect(fs.readFileSync(agentsPath, "utf-8")).toBe(userContent);
   });
 
-  it("#R1.3b init does not hash pre-existing AGENTS.md even when content is byte-identical", async () => {
-    // A byte-identical file still might be user-owned. The init manifest must
-    // track actual writes, not ownership inferred from content equality.
+  it("#R1.3b leaves a byte-identical pre-existing AGENTS.md untracked", async () => {
+    // A byte-identical file may still be user-owned. No write happened, so
+    // the manifest must not infer ownership from content equality.
     fs.writeFileSync(path.join(tmpDir, "AGENTS.md"), agentsMdContent);
 
     await init({ yes: true, claude: true, force: true });
@@ -149,18 +156,6 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
     // The user's session JSONL survives.
     expect(fs.existsSync(userSession)).toBe(true);
     expect(fs.readFileSync(userSession, "utf-8")).toBe("user-chat-data\n");
-  });
-
-  it("#R1.5 init --skip-existing → uninstall preserves user's AGENTS.md", async () => {
-    fs.writeFileSync(path.join(tmpDir, "AGENTS.md"), "my own AGENTS.md\n");
-
-    await init({ yes: true, claude: true, skipExisting: true });
-    await uninstall({ yes: true });
-
-    expect(fs.existsSync(path.join(tmpDir, "AGENTS.md"))).toBe(true);
-    expect(fs.readFileSync(path.join(tmpDir, "AGENTS.md"), "utf-8")).toBe(
-      "my own AGENTS.md\n",
-    );
   });
 
   // ----- R1.6: Trellis-written AGENTS.md with user content outside the block -----
@@ -225,9 +220,7 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
     await update({});
 
     // The orphan entry is silently pruned; user file is untouched.
-    expect(loadHashes(tmpDir)).not.toHaveProperty(
-      ".codex/sessions/user.jsonl",
-    );
+    expect(loadHashes(tmpDir)).not.toHaveProperty(".codex/sessions/user.jsonl");
     expect(fs.existsSync(userFile)).toBe(true);
   });
 
@@ -326,11 +319,11 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
     try {
       vi.spyOn(process, "cwd").mockReturnValue(fakeHome);
 
-      const exitSpy = vi
-        .spyOn(process, "exit")
-        .mockImplementation(((code?: number) => {
-          throw new Error(`process.exit(${code ?? 0})`);
-        }) as never);
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(((
+        code?: number,
+      ) => {
+        throw new Error(`process.exit(${code ?? 0})`);
+      }) as never);
 
       await withFakeHome(fakeHome, async () => {
         await expect(init({ yes: true, force: true })).rejects.toThrow(
@@ -350,16 +343,14 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
     // Set up a valid trellis project, then pretend its cwd is the homedir.
     await init({ yes: true, claude: true, force: true });
 
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(((code?: number) => {
-        throw new Error(`process.exit(${code ?? 0})`);
-      }) as never);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((
+      code?: number,
+    ) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as never);
 
     await withFakeHome(tmpDir, async () => {
-      await expect(uninstall({ yes: true })).rejects.toThrow(
-        "process.exit(1)",
-      );
+      await expect(uninstall({ yes: true })).rejects.toThrow("process.exit(1)");
     });
     expect(exitSpy).toHaveBeenCalledWith(1);
 

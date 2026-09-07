@@ -58,6 +58,7 @@ import {
 } from "../../src/commands/update.js";
 import { VERSION } from "../../src/constants/version.js";
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../../src/constants/paths.js";
+import { agentsMdContent } from "../../src/templates/markdown/index.js";
 import { computeHash, loadHashes } from "../../src/utils/template-hash.js";
 import {
   subnodeAgentTemplate,
@@ -486,16 +487,21 @@ describe("update() integration", () => {
     expect(classified.conflict).toHaveLength(0);
     expect(classified.auto).toHaveLength(1);
 
-    await executeMigrations(classified, tmpDir, { force: true, skipAll: false }, currentTemplates);
+    await executeMigrations(
+      classified,
+      tmpDir,
+      { force: true, skipAll: false },
+      currentTemplates,
+    );
 
     // No duplicate/leftover `.pi/skills/` directory should survive.
     expect(fs.existsSync(projectFile(".pi/skills"))).toBe(false);
 
     // `.agents/skills/` must end up with the correct, current, neutral
     // content — not the stale Pi-flavored bytes from the deleted legacy dir.
-    expect(
-      readProjectFile(".agents/skills/trellis-update-spec/SKILL.md"),
-    ).toBe(neutralContent);
+    expect(readProjectFile(".agents/skills/trellis-update-spec/SKILL.md")).toBe(
+      neutralContent,
+    );
   });
 
   it("#2 dry run makes no file changes even when changes exist", async () => {
@@ -769,6 +775,19 @@ describe("update() integration", () => {
     const newFile = targetFull + ".new";
     expect(fs.existsSync(newFile)).toBe(true);
     expect(fs.readFileSync(newFile, "utf-8")).toBe(templateContent);
+  });
+
+  it("preserves malformed AGENTS.md markers and offers the template as a sidecar", async () => {
+    await setupProject();
+
+    const agentsPath = projectFile(FILE_NAMES.AGENTS);
+    const malformed = "# Project Notes\n\n<!-- TRELLIS:START -->\nUnfinished\n";
+    fs.writeFileSync(agentsPath, malformed);
+
+    await update({ createNew: true });
+
+    expect(fs.readFileSync(agentsPath, "utf-8")).toBe(malformed);
+    expect(fs.readFileSync(`${agentsPath}.new`, "utf-8")).toBe(agentsMdContent);
   });
 
   it("#8 updates version file after successful update", async () => {
@@ -1377,9 +1396,7 @@ describe("update() integration", () => {
 
     expect(fs.existsSync(statusLinePath)).toBe(true);
     expect(fs.readFileSync(statusLinePath, "utf-8")).toBe(hookContentBefore);
-    expect(loadHashes(tmpDir)).toHaveProperty(
-      ".claude/hooks/statusline.py",
-    );
+    expect(loadHashes(tmpDir)).toHaveProperty(".claude/hooks/statusline.py");
     // Byte-identical, not just deep-equal: init's injectStatusLine must
     // produce exactly what preserveExistingClaudeStatusLine re-derives
     // (statusLine appended last). Any drift — even key order — makes update

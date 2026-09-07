@@ -55,6 +55,7 @@ import {
   COPILOT_INSTRUCTIONS_PATH,
   getCopilotInstructions,
 } from "../../src/templates/copilot/index.js";
+import { agentsMdContent } from "../../src/templates/markdown/index.js";
 import { execSync } from "node:child_process";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -148,6 +149,34 @@ describe("init() integration", () => {
         ),
       ),
     ).toBe(true);
+  });
+
+  it("merges a pre-existing AGENTS.md into one managed block", async () => {
+    const userContent = "# Local Instructions\n\nKeep this section.\n";
+    fs.writeFileSync(path.join(tmpDir, FILE_NAMES.AGENTS), userContent);
+
+    await init({ yes: true });
+    await init({ yes: true });
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, FILE_NAMES.AGENTS),
+      "utf-8",
+    );
+    expect(content).toBe(`${userContent.trimEnd()}\n\n${agentsMdContent}`);
+    expect(content.match(/<!-- TRELLIS:START -->/g)).toHaveLength(1);
+    expect(content.match(/<!-- TRELLIS:END -->/g)).toHaveLength(1);
+  });
+
+  it("preserves malformed AGENTS.md markers and creates a merge sidecar", async () => {
+    const malformed =
+      "# Local Instructions\n\n<!-- TRELLIS:START -->\nUnfinished\n";
+    const agentsPath = path.join(tmpDir, FILE_NAMES.AGENTS);
+    fs.writeFileSync(agentsPath, malformed);
+
+    await init({ yes: true });
+
+    expect(fs.readFileSync(agentsPath, "utf-8")).toBe(malformed);
+    expect(fs.readFileSync(`${agentsPath}.new`, "utf-8")).toBe(agentsMdContent);
   });
 
   it("#1a writes .gitattributes with the journal merge=union rule (#415)", async () => {

@@ -99,10 +99,12 @@ trellis channel wait subnode-example --as main --from "$SUBNODE_ID" \
 
 Where the host exposes a live wait continuation, capture the same barrier,
 establish one event waiter before triggering the worker, and continue that same
-waiter until terminal state. Do not create a second waiter or treat an empty
-transport slice as completion. `channel messages`, worker inspection, and
-status/list commands remain valid on-demand diagnostics, but do not use
-high-frequency repeated queries as the coordinator's supervision loop.
+waiter until terminal state. Until it resolves, times out, or errors, the next
+host operation is only that continuation: do not create another waiter or run
+shell/CLI diagnostics, including `channel messages`, worker inspection, or
+status/list commands. Do not treat an empty transport slice as completion.
+After the waiter returns, use those commands only for an on-demand diagnosis,
+not as a high-frequency supervision loop.
 
 ## Coordinator Review
 

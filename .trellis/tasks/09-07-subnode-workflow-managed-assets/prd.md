@@ -24,6 +24,8 @@
 - 维持普通 inline 工作默认；不新增自动 retry、以高频状态查询代替事件等待的监督循环、第二 waiter、全局 ledger、worktree、dashboard、provider
   特判或 Codex native agent。
 - 与 Pennix marketplace workflow、真实 Codex host 验收和用户级 Skill 清理保持有序依赖；本 task 不假称它们已完成。
+- 将仅依赖活动 Trellis task 的研究记录职责从用户级 `pennix-skills` 迁入 bundled
+  `trellis-research-record`；用户级只保留原生初始化入口，不复制 task 工件合同。
 
 ## 非目标
 

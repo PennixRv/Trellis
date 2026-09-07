@@ -50,7 +50,7 @@ For a Git-tracked project, commit the durable project contract:
   metadata, not hand-edited configuration; keeping them lets another clone
   distinguish Trellis-owned templates from local changes safely;
 - the Trellis-managed files in selected platform directories, plus the
-  root-level `AGENTS.md` managed block when Trellis created it.
+  root-level `AGENTS.md` managed block when Trellis created or merged it.
 
 Do not commit local or ephemeral state. The generated `.trellis/.gitignore`
 already excludes `.developer`, `.current-task`, `.runtime/`, `.ralph-state.json`,
