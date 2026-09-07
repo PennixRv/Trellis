@@ -194,7 +194,8 @@ describe("trellis template constants", () => {
     expect(workflow).toContain("`report.json`");
     expect(workflow).toContain("[workflow-state:planning]");
     expect(workflow).toContain("[workflow-state:in_progress]");
-    expect(workflow).toContain("Do not poll");
+    expect(workflow).toContain("rather than high-frequency polling");
+    expect(workflow).not.toContain("Do not poll");
     expect(workflow).not.toContain("Channel-driven sub-agent dispatch is default");
   });
 

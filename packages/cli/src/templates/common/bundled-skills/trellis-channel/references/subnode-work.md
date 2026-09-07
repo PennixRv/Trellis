@@ -16,11 +16,11 @@ Before spawning, the coordinator must use an active task (`planning` or
 `in_progress`), define one stable `work_id` and
 `subnode_id`, then prepare a brief-draft JSON with the question, independence
 reason, scope, protected targets, lens, evidence method, source snapshot,
-dependencies, stop conditions, deadline, `channel_ref`, `retry_of` (null unless
-this is an explicit manual retry), and `counter_of` (null unless this is
-intentional counterwork). A retry names an existing, different subnode in the
-same task and `work_id`; counterwork may be initialized independently. The
-helper supplies the immutable task identity and report path.
+dependencies, stop conditions, deadline, and `channel_ref`. Set `retry_of`
+only for an explicit manual retry and `counter_of` only for intentional
+counterwork. A retry names an existing, different subnode in the same task and
+`work_id`; counterwork may be initialized independently. The helper supplies
+the immutable task identity and report path.
 
 ```bash
 TASK=.trellis/tasks/09-07-example
@@ -74,7 +74,8 @@ complete report is:
 ```
 
 For `blocked`, `incomplete`, or `error`, include the same base fields plus a
-non-empty `completed_scope` list and a non-empty `blocker` string. Never use
+`completed_scope` list (empty when no assigned scope started) and a non-empty
+`blocker` string. Never use
 `accepted`, `rejected`, or `deferred` as a report status.
 
 ## Dispatch And Wait

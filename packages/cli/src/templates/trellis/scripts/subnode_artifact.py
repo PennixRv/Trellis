@@ -232,17 +232,13 @@ def _validate_brief_data(
     _require_text_list(brief.get("stop_conditions"), "brief.stop_conditions")
     _require_text(brief.get("deadline"), "brief.deadline", max_len=128)
     _validate_channel_ref(brief.get("channel_ref"))
-    if "retry_of" not in brief:
-        _fail("brief.retry_of must be present; use null when this is not a retry")
-    if "counter_of" not in brief:
-        _fail("brief.counter_of must be present; use null when this is not counterwork")
     _validate_retry_target(
-        brief["retry_of"],
+        brief.get("retry_of"),
         task_dir,
         work_id,
         subnode_id,
     )
-    counter_of = brief["counter_of"]
+    counter_of = brief.get("counter_of")
     if counter_of is not None:
         counter_id = _require_id(counter_of, "brief.counter_of")
         if counter_id == subnode_id:
@@ -339,7 +335,11 @@ def _validate_report_data(
     if status == "complete" and not evidence:
         _fail("a complete report requires at least one evidence item")
     if status != "complete":
-        _require_text_list(report.get("completed_scope"), "report.completed_scope")
+        _require_text_list(
+            report.get("completed_scope"),
+            "report.completed_scope",
+            allow_empty=True,
+        )
         _require_text(report.get("blocker"), "report.blocker")
     return evidence
 

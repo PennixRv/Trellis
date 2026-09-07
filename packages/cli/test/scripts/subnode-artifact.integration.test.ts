@@ -88,8 +88,6 @@ function writeDraft(
       scope: "project",
       worker_handle: "primary",
     },
-    retry_of: null,
-    counter_of: null,
     ...overrides,
   };
   const output = path.join(repo, fileName);
@@ -185,8 +183,6 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
       work_id: "dependency-audit",
       subnode_id: "primary",
       role_id: "subnode",
-      retry_of: null,
-      counter_of: null,
       report_path:
         ".trellis/tasks/task-a/subnodes/dependency-audit/primary/report.json",
     });
@@ -250,52 +246,54 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     ).toBe(true);
   });
 
-  it("requires explicit retry and counter relations in every brief", () => {
-    const missingRetry = writeDraft(tmp, "missing-retry.json");
-    const retryDraft = JSON.parse(fs.readFileSync(missingRetry, "utf-8"));
-    delete retryDraft.retry_of;
-    fs.writeFileSync(missingRetry, JSON.stringify(retryDraft) + "\n");
-
-    const retryResult = run(
+  it("allows relation-free briefs and early terminal reports", () => {
+    const init = run(
       tmp,
       "init",
       "--task",
       ".trellis/tasks/task-a",
       "--work-id",
-      "relation-check",
+      "early-error",
       "--subnode-id",
-      "missing-retry",
+      "primary",
       "--draft",
-      missingRetry,
+      writeDraft(tmp, "early-error.json"),
     );
-    expect(retryResult.status).toBe(1);
-    expect(retryResult.stderr).toContain("brief.retry_of must be present");
+    expect(init.status, init.stderr).toBe(0);
 
-    const missingCounter = writeDraft(tmp, "missing-counter.json");
-    const counterDraft = JSON.parse(fs.readFileSync(missingCounter, "utf-8"));
-    delete counterDraft.counter_of;
-    fs.writeFileSync(missingCounter, JSON.stringify(counterDraft) + "\n");
+    const dir = artifactDir(tmp, "early-error", "primary");
+    const brief = JSON.parse(fs.readFileSync(path.join(dir, "brief.json"), "utf-8"));
+    expect(brief).not.toHaveProperty("retry_of");
+    expect(brief).not.toHaveProperty("counter_of");
 
-    const counterResult = run(
-      tmp,
-      "init",
-      "--task",
-      ".trellis/tasks/task-a",
-      "--work-id",
-      "relation-check",
-      "--subnode-id",
-      "missing-counter",
-      "--draft",
-      missingCounter,
+    const reportPath = path.join(dir, "report.json");
+    fs.writeFileSync(
+      reportPath,
+      JSON.stringify({
+        schema_version: 1,
+        task_id: brief.task_id,
+        work_id: brief.work_id,
+        subnode_id: brief.subnode_id,
+        role_id: brief.role_id,
+        status: "error",
+        scope: brief.scope,
+        lens: brief.lens,
+        evidence: [],
+        findings: [],
+        uncertainties: [],
+        corrections: [],
+        completed_scope: [],
+        blocker: "The worker failed before inspecting the assigned scope.",
+      }) + "\n",
     );
-    expect(counterResult.status).toBe(1);
-    expect(counterResult.stderr).toContain("brief.counter_of must be present");
-    expect(
-      fs.existsSync(artifactDir(tmp, "relation-check", "missing-retry")),
-    ).toBe(false);
-    expect(
-      fs.existsSync(artifactDir(tmp, "relation-check", "missing-counter")),
-    ).toBe(false);
+    expect(run(tmp, "validate", "--report", reportPath).status).toBe(0);
+
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
+    delete report.completed_scope;
+    fs.writeFileSync(reportPath, JSON.stringify(report) + "\n");
+    const missingScope = run(tmp, "validate", "--report", reportPath);
+    expect(missingScope.status).toBe(1);
+    expect(missingScope.stderr).toContain("report.completed_scope");
   });
 
   it("permits a manual retry only when its prior sibling brief exists", () => {
