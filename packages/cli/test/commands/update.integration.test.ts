@@ -59,7 +59,10 @@ import {
 import { VERSION } from "../../src/constants/version.js";
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../../src/constants/paths.js";
 import { computeHash, loadHashes } from "../../src/utils/template-hash.js";
-import { workflowMdTemplate } from "../../src/templates/trellis/index.js";
+import {
+  subnodeAgentTemplate,
+  workflowMdTemplate,
+} from "../../src/templates/trellis/index.js";
 import {
   COPILOT_INSTRUCTIONS_BLOCK_END,
   COPILOT_INSTRUCTIONS_BLOCK_START,
@@ -256,6 +259,30 @@ describe("update() integration", () => {
     // No backup directory created
     const entries = fs.readdirSync(path.join(tmpDir, DIR_NAMES.WORKFLOW));
     expect(entries.filter((e) => e.startsWith(".backup-")).length).toBe(0);
+  });
+
+  it("backfills a missing managed subnode role through the normal update path", async () => {
+    await setupProject();
+    const subnodePath = projectFile(`${PATHS.AGENTS}/subnode.md`);
+    fs.rmSync(subnodePath);
+    // Model a project created before this asset existed, not a user deletion:
+    // recorded deletions are intentionally respected by update().
+    writeHashesV2(
+      hashFilePath(),
+      removeHashEntry(
+        readHashesV2(hashFilePath()),
+        `${PATHS.AGENTS}/subnode.md`,
+      ) as Record<string, string>,
+    );
+    fs.writeFileSync(versionFilePath(), "0.6.17");
+
+    await update({});
+
+    expect(fs.readFileSync(subnodePath, "utf-8")).toBe(subnodeAgentTemplate);
+    const hashes = readHashesV2(hashFilePath());
+    expect(hashes[`${PATHS.AGENTS}/subnode.md`]).toBe(
+      computeHash(subnodeAgentTemplate),
+    );
   });
 
   it("#1b current OpenCode templates are not classified as deprecated", async () => {

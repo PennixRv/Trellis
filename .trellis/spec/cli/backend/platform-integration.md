@@ -621,7 +621,7 @@ The native hook path calls this resolver with `platform="codex"`,
 - Black-box the shared hook for valid, unknown, malformed, concurrent, and
   non-Trellis subagents; assert the output envelope, marker, ordering, and
   environment-override isolation.
-- Cover `auto` default, explicit `inline`, legacy `sub-agent`, and invalid
+- Cover `inline` default, explicit `auto`, legacy `sub-agent`, and invalid
   configuration across JSONL seeding, effective workflow platform, and the
   Codex workflow-state banner.
 - Assert `configureCodex()` and `collectPlatformTemplates("codex")` remain
@@ -1376,7 +1376,7 @@ Lightweight tasks may be PRD-only. Complex tasks must have `prd.md`, `design.md`
 
 ### Lifecycle
 
-1. **Create** — `task.py create` writes `task.json` with `status = planning`, creates the default `prd.md`, and creates empty `implement.jsonl` / `check.jsonl` when a sub-agent-capable platform is detected. Curation instructions are printed to the console, never written into the files.
+1. **Create** — `task.py create` writes `task.json` with `status = planning`, creates the default `prd.md`, and creates empty `implement.jsonl` / `check.jsonl` when a sub-agent-capable platform is detected. Codex counts only when `codex.dispatch_mode: auto` (or the `sub-agent` alias) is explicitly selected; its default inline mode does not seed JSONL. Curation instructions are printed to the console, never written into the files.
 2. **Plan** — AI updates `prd.md`. If the task is complex, AI also writes `design.md` and `implement.md`; if sub-agent/spec context is needed, AI curates jsonl entries.
 3. **Review / start** — the user reviews the planning artifacts. `task.py start` is valid when the task's artifact gate is satisfied.
 4. **Consume** — hook, prelude, Pi extension, and OpenCode plugin read context in the same order: jsonl entries, `prd.md`, `design.md` if present, `implement.md` if present.

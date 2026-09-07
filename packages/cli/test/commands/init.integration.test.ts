@@ -95,6 +95,9 @@ describe("init() integration", () => {
     expect(fs.existsSync(path.join(tmpDir, PATHS.WORKSPACE))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, PATHS.TASKS))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, PATHS.SPEC))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, PATHS.AGENTS, "subnode.md"))).toBe(
+      true,
+    );
 
     // Default platforms: cursor + claude
     expect(fs.existsSync(path.join(tmpDir, ".cursor"))).toBe(true);
