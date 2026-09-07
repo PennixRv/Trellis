@@ -128,6 +128,36 @@ describe("uninstall() integration", () => {
     }
   });
 
+  it("#3a removes an opted-in Claude statusline and its setting", async () => {
+    await init({
+      yes: true,
+      claude: true,
+      force: true,
+      withStatusline: true,
+    });
+
+    const statusLinePath = path.join(
+      tmpDir,
+      ".claude",
+      "hooks",
+      "statusline.py",
+    );
+    const settingsPath = path.join(tmpDir, ".claude", "settings.json");
+    expect(loadHashes(tmpDir)).toHaveProperty(
+      ".claude/hooks/statusline.py",
+    );
+
+    await uninstall({ yes: true });
+
+    expect(fs.existsSync(statusLinePath)).toBe(false);
+    if (fs.existsSync(settingsPath)) {
+      const settings = JSON.parse(
+        fs.readFileSync(settingsPath, "utf-8"),
+      ) as Record<string, unknown>;
+      expect(settings).not.toHaveProperty("statusLine");
+    }
+  });
+
   it("#4 dry-run does not modify anything", async () => {
     await init({ yes: true, claude: true, force: true });
 

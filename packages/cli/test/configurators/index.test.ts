@@ -12,6 +12,7 @@ import {
   isManagedRootDir,
   resolveCliFlag,
 } from "../../src/configurators/index.js";
+import { resolveBundledSkills } from "../../src/configurators/shared.js";
 import { AI_TOOLS, type AITool } from "../../src/types/ai-tools.js";
 import { COPILOT_INSTRUCTIONS_PATH } from "../../src/templates/copilot/index.js";
 
@@ -77,6 +78,7 @@ describe("isManagedPath", () => {
     expect(isManagedPath(".github/hooks/trellis.json")).toBe(true);
     expect(isManagedPath(".pi/extensions/trellis/index.ts")).toBe(true);
     expect(isManagedPath(".pi/prompts/trellis-continue.md")).toBe(true);
+    expect(isManagedPath(".dsh/skills/trellis-start/SKILL.md")).toBe(true);
   });
 
   // Positive: exact match (startsWith(d + "/") = false, === d = true)
@@ -91,6 +93,7 @@ describe("isManagedPath", () => {
     expect(isManagedPath(".devin/workflows")).toBe(true);
     expect(isManagedPath(".github/prompts")).toBe(true);
     expect(isManagedPath(".github/hooks")).toBe(true);
+    expect(isManagedPath(".dsh")).toBe(true);
     expect(isManagedPath(".trellis")).toBe(true);
   });
 
@@ -114,6 +117,7 @@ describe("isManagedPath", () => {
     expect(isManagedPath(".github/prompts-backup")).toBe(false);
     expect(isManagedPath(".github/copilot-backup")).toBe(false);
     expect(isManagedPath(".github/hooks-backup")).toBe(false);
+    expect(isManagedPath(".dsh-backup")).toBe(false);
   });
 
   // Boundary: empty string
@@ -492,6 +496,10 @@ describe("collectPlatformTemplates", () => {
     expect(
       result?.has(".kimi-code/skills/trellis-research/SKILL.md"),
     ).toBe(true);
+    // Custom sub-agent definitions
+    expect(result?.has(".kimi-code/agents/trellis-implement.md")).toBe(true);
+    expect(result?.has(".kimi-code/agents/trellis-check.md")).toBe(true);
+    expect(result?.has(".kimi-code/agents/trellis-research.md")).toBe(true);
     // No project-level hooks/settings for Kimi
     expect(
       [...(result?.keys() ?? [])].some((key) =>
@@ -499,5 +507,26 @@ describe("collectPlatformTemplates", () => {
       ),
     ).toBe(false);
     expect(result?.has(".kimi-code/settings.json")).toBe(false);
+  });
+
+  it("includes every bundled skill file in every platform collector", () => {
+    for (const id of PLATFORM_IDS) {
+      const result = collectPlatformTemplates(id);
+      const bundled = resolveBundledSkills(AI_TOOLS[id].templateContext);
+      if (bundled.length === 0) continue;
+
+      expect(result, `${id} should expose bundled skill templates`).toBeInstanceOf(
+        Map,
+      );
+      for (const skillFile of bundled) {
+        const suffix = `/${skillFile.relativePath}`;
+        expect(
+          [...(result?.keys() ?? [])].some(
+            (key) => key === skillFile.relativePath || key.endsWith(suffix),
+          ),
+          `${id} should include ${skillFile.relativePath}`,
+        ).toBe(true);
+      }
+    }
   });
 });

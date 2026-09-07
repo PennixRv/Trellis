@@ -163,7 +163,7 @@ Concrete edit list for the standard flow (post-`docs-promote.sh`, both languages
 
 ### First dual-package GA promote
 
-0.6.0 was the first GA where both `@mindfoldhq/trellis` (CLI) and `@mindfoldhq/trellis-core` (SDK) ship in lockstep. `bump-versions.js promote` rewrites both `package.json` files and the CLI's `dependencies["@mindfoldhq/trellis-core"]` from `workspace:*` to the exact version at release time. `release-preflight verify-packed-cli` exists specifically to catch a divergence here — always run it before `pnpm release:promote`.
+0.6.0 was the first GA where both `@pennixrv/trellis` (CLI) and `@pennixrv/trellis-core` (SDK) ship in lockstep. `bump-versions.js promote` rewrites both `package.json` files and the CLI's `dependencies["@pennixrv/trellis-core"]` from `workspace:*` to the exact version at release time. `release-preflight verify-packed-cli` exists specifically to catch a divergence here — always run it before `pnpm release:promote`.
 
 ### Stale navbar Changelog `href` gotcha
 
@@ -173,7 +173,7 @@ The 0.6.0 cycle shipped 24 betas + 1 RC, and the navbar `Changelog` href in `doc
 
 The 0.6.0 GA prep flow ran a 10-agent pre-ship verify before `pnpm release:promote` and it caught 2 RED blockers that would have shipped:
 
-1. `@mindfoldhq/trellis@beta` left in a bundled-skill markdown table after the lifecycle flip
+1. `@pennixrv/trellis@beta` left in a bundled-skill markdown table after the lifecycle flip
 2. Manifest's `**Bundled skills**` section listed 3 of the 4 actually-shipping bundled skills
 
 Both blockers were prose-only (no code defect); both would have only embarrassed-not-broken users. Still, the adversarial verify earned its keep — recommend running an equivalent check on every future GA. The 10 angles (bundled skills + manifest + changelogs en/zh + docs.json + root content + preflight + tests + dogfood + npm-ready) generalize to any subsequent minor.

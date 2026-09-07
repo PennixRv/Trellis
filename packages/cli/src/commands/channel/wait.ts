@@ -1,4 +1,4 @@
-import { parseChannelKinds } from "./store/events.js";
+import { parseChannelKinds, readLastSeq } from "./store/events.js";
 import { resolveExistingChannelRef } from "./store/paths.js";
 import {
   normalizeThreadKey,
@@ -31,6 +31,11 @@ export async function channelWait(
   const ref = resolveExistingChannelRef(channelName, {
     scope: parseChannelScope(opts.scope),
   });
+  // Capture a durable barrier before constructing the watcher. Events that
+  // arrive after this read are replayed by `sinceSeq`, including events
+  // written during watcher setup; this avoids the EOF race where a fast
+  // worker finishes before the async generator starts tailing.
+  const sinceSeq = await readLastSeq(channelName, ref.project);
   const fromList = parseCsv(opts.from);
 
   if (opts.all && (!fromList || fromList.length === 0)) {
@@ -60,6 +65,7 @@ export async function channelWait(
     for await (const ev of watchEvents(channelName, filter, {
       signal: abort.signal,
       project: ref.project,
+      sinceSeq,
     })) {
       console.log(JSON.stringify(ev));
       if (!pending) return;

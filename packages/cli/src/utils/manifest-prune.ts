@@ -34,16 +34,18 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  CLAUDE_STATUSLINE_PATH,
+  isClaudeStatuslineManaged,
+} from "../configurators/claude.js";
 import { collectPlatformTemplates } from "../configurators/index.js";
 import { FILE_NAMES } from "../constants/paths.js";
 import { getAllMigrations } from "../migrations/index.js";
 import { saveHashes } from "./template-hash.js";
 import { toPosix } from "./posix.js";
+import { TRELLIS_BLOCK_END, TRELLIS_BLOCK_START } from "./managed-paths.js";
 import type { AITool } from "../types/ai-tools.js";
 import type { TemplateHashes } from "../types/migration.js";
-
-const TRELLIS_BLOCK_START = "<!-- TRELLIS:START -->";
-const TRELLIS_BLOCK_END = "<!-- TRELLIS:END -->";
 
 export interface PruneResult {
   /** Manifest keys removed (POSIX-style relative paths). */
@@ -59,7 +61,11 @@ export interface PruneResult {
  *   - every migration manifest's from/to path (preserve so legitimate
  *     pending migrations can find their source/target)
  */
-function buildKnownKeys(configuredPlatforms: readonly AITool[]): Set<string> {
+function buildKnownKeys(
+  cwd: string,
+  configuredPlatforms: readonly AITool[],
+  hashes: TemplateHashes,
+): Set<string> {
   const known = new Set<string>();
   for (const id of configuredPlatforms) {
     const templates = collectPlatformTemplates(id);
@@ -67,6 +73,16 @@ function buildKnownKeys(configuredPlatforms: readonly AITool[]): Set<string> {
     for (const key of templates.keys()) {
       known.add(toPosix(key));
     }
+  }
+  // Claude's statusline is an opt-in file intentionally absent from the
+  // parameterless collector. Keep it only when the manifest already proves
+  // ownership, or the legacy recovery check proves the file is byte-identical
+  // to Trellis' template. A settings field alone never adopts custom content.
+  if (
+    configuredPlatforms.includes("claude-code") &&
+    isClaudeStatuslineManaged(cwd, hashes)
+  ) {
+    known.add(CLAUDE_STATUSLINE_PATH);
   }
   // Preserve any path referenced by a migration: legitimate pending
   // rename/delete operations need to resolve their `from` (and the target's
@@ -129,7 +145,7 @@ export function pruneOrphanManifestKeys(
   options: PruneOptions = {},
 ): PruneResult {
   const persist = options.persist ?? true;
-  const known = buildKnownKeys(configuredPlatforms);
+  const known = buildKnownKeys(cwd, configuredPlatforms, hashes);
   const pruned: string[] = [];
   const kept: TemplateHashes = {};
 

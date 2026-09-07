@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { AI_TOOLS } from "../types/ai-tools.js";
 import { getClaudeTemplatePath } from "../templates/extract.js";
@@ -26,6 +26,74 @@ const EXCLUDE_PATTERNS = [
   ".ts", // TypeScript source — dev-only; not part of user-shipped templates
   "__pycache__",
 ];
+
+/** The only Claude template installed by the opt-in `--with-statusline` flag. */
+export const CLAUDE_STATUSLINE_PATH = ".claude/hooks/statusline.py";
+
+function getClaudeStatuslineCommand(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const command = (value as Record<string, unknown>).command;
+  return typeof command === "string" ? command : null;
+}
+
+/**
+ * Whether the project has opted into Trellis' Claude statusline.
+ *
+ * The project setting is the durable opt-in signal. A custom Claude
+ * `statusLine` command remains project-owned and is not adopted by Trellis.
+ */
+export function isClaudeStatuslineEnabled(cwd: string): boolean {
+  const settingsPath = path.join(cwd, ".claude", "settings.json");
+  if (!existsSync(settingsPath)) return false;
+
+  try {
+    const settings = JSON.parse(
+      readFileSync(settingsPath, "utf-8"),
+    ) as Record<string, unknown>;
+    const command = getClaudeStatuslineCommand(settings.statusLine);
+    if (!command) return false;
+
+    const lastToken = command.trim().split(/\s+/).at(-1);
+    if (!lastToken) return false;
+    const normalized = lastToken
+      .replace(/^['"]|['"]$/g, "")
+      .replaceAll("\\", "/");
+    return (
+      normalized === CLAUDE_STATUSLINE_PATH ||
+      normalized.endsWith(`/${CLAUDE_STATUSLINE_PATH}`)
+    );
+  } catch {
+    // Invalid local JSON is handled by the normal update conflict path.
+    return false;
+  }
+}
+
+/**
+ * Whether Trellis owns the enabled statusline file.
+ *
+ * Normal installs prove ownership through the template-hash manifest. The
+ * byte-identical fallback repairs projects affected by the former update
+ * pruning bug without claiming a user-modified statusline.
+ */
+export function isClaudeStatuslineManaged(
+  cwd: string,
+  hashes: Readonly<Record<string, string>>,
+): boolean {
+  if (!isClaudeStatuslineEnabled(cwd)) return false;
+  if (hashes[CLAUDE_STATUSLINE_PATH] !== undefined) return true;
+
+  const statuslinePath = path.join(cwd, ...CLAUDE_STATUSLINE_PATH.split("/"));
+  try {
+    return (
+      existsSync(statuslinePath) &&
+      readFileSync(statuslinePath, "utf-8") === getStatuslineHook()
+    );
+  } catch {
+    return false;
+  }
+}
 
 function shouldExclude(filename: string): boolean {
   for (const pattern of EXCLUDE_PATTERNS) {
@@ -149,7 +217,7 @@ export async function configureClaude(
       `.claude/${settings.targetPath}`,
       resolvePlaceholders(injectStatusLine(settings.content)),
     );
-    files.set(".claude/hooks/statusline.py", getStatuslineHook());
+    files.set(CLAUDE_STATUSLINE_PATH, getStatuslineHook());
   }
 
   await writeTemplateMap(cwd, files);

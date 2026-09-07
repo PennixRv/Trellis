@@ -3,7 +3,7 @@
 How Trellis indexes, searches, and extracts dialogue from on-disk session files
 written by Claude Code, Codex, OpenCode, Pi Agent, and ZCode.
 
-The retrieval engine lives in `@mindfoldhq/trellis-core/mem` (`packages/core/src/mem/`);
+The retrieval engine lives in `@pennixrv/trellis-core/mem` (`packages/core/src/mem/`);
 `packages/cli/src/commands/mem.ts` is a thin CLI wrapper over it. See "Package
 boundary" below before "Subcommand surface".
 
@@ -44,11 +44,11 @@ invoked from the `tl` Commander wire.
 
 ## Package boundary
 
-`mem` is split between `@mindfoldhq/trellis-core` and the CLI. See
+`mem` is split between `@pennixrv/trellis-core` and the CLI. See
 `trellis-core-sdk.md` for the general rule; the `mem`-specific split:
 
 **Core owns** (`packages/core/src/mem/`, public surface at the
-`@mindfoldhq/trellis-core/mem` subpath — **not** the root barrel):
+`@pennixrv/trellis-core/mem` subpath — **not** the root barrel):
 
 - persisted-session readers / adapters for Claude Code, Codex, OpenCode, Pi,
   and ZCode (`adapters/{claude,codex,opencode,pi,zcode}.ts`)
@@ -73,7 +73,7 @@ invoked from the `tl` Commander wire.
 The CLI imports core through the public subpath only:
 
 ```ts
-import { searchMemSessions } from "@mindfoldhq/trellis-core/mem";
+import { searchMemSessions } from "@pennixrv/trellis-core/mem";
 ```
 
 Core search/context/extract results carry a `warnings` array. List/projects
@@ -86,7 +86,7 @@ or exits.
 ## Subcommand surface
 
 Entry point: `commands/mem.ts:runMem` dispatches on `argv.cmd` after
-`commands/mem.ts:parseArgv`, then calls the matching core `@mindfoldhq/trellis-core/mem`
+`commands/mem.ts:parseArgv`, then calls the matching core `@pennixrv/trellis-core/mem`
 API and renders the result. The cross-cutting `--platform / --since / --until /
 --cwd / --global / --limit` flags are parsed by the CLI and translated into a
 core `MemFilter`.
@@ -945,7 +945,7 @@ discriminated union, which they do; trust the compiler here.
 
 ## Runtime validation (no zod)
 
-`core/mem/` does **not** use `zod` — `@mindfoldhq/trellis-core` keeps a
+`core/mem/` does **not** use `zod` — `@pennixrv/trellis-core` keeps a
 zero-dependency surface (see `trellis-core-sdk.md`). External platform shapes
 are modeled as loose TypeScript `interface`s with every field optional, and
 the adapters guard fields at the point of use with plain `typeof` / `Array.isArray`
@@ -1087,7 +1087,7 @@ When adding a feature to `mem`:
 
 ## Public API surface
 
-### Core — `@mindfoldhq/trellis-core/mem`
+### Core — `@pennixrv/trellis-core/mem`
 
 The reusable retrieval API, importable by the CLI, daemons, and future SDK
 consumers. Exposed only on the `/mem` subpath — **not** the root barrel.
@@ -1119,7 +1119,7 @@ stderr, emits the OpenCode-unavailable notice, and owns exit codes.
 ## Reference
 
 - `packages/core/src/mem/` — retrieval engine (adapters, search, context, phase, projects)
-- `packages/core/src/mem/index.ts` — `@mindfoldhq/trellis-core/mem` public surface
+- `packages/core/src/mem/index.ts` — `@pennixrv/trellis-core/mem` public surface
 - `packages/cli/src/commands/mem.ts` — CLI wrapper (`runMem`, argv parsing, rendering)
 - `packages/core/test/mem/` — core retrieval tests (helpers, adapters, phase, cross-day, api)
 - `packages/cli/test/commands/mem-helpers.test.ts` — CLI argv / formatting tests

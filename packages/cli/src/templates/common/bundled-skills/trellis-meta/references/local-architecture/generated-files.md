@@ -10,6 +10,7 @@ This page only describes files that are visible and editable inside the user pro
 .trellis/
 ├── workflow.md
 ├── config.yaml
+├── .gitignore
 ├── .developer
 ├── .version
 ├── .template-hashes.json
@@ -24,6 +25,7 @@ This page only describes files that are visible and editable inside the user pro
 | --- | --- | --- |
 | `.trellis/workflow.md` | Yes | Local workflow documentation and AI routing rules. |
 | `.trellis/config.yaml` | Yes | Project configuration, hooks, packages, journal line limits, and related settings. |
+| `.trellis/.gitignore` | No | Generated ignore rules for local Trellis state. Track it, but do not normally edit it. |
 | `.trellis/spec/` | Yes | Project specs, intended to be updated regularly by users and AI. |
 | `.trellis/tasks/` | Yes | Task material and research artifacts, maintained by the task workflow. |
 | `.trellis/workspace/` | Yes | Session records, usually written by `add_session.py`. |
@@ -32,6 +34,37 @@ This page only describes files that are visible and editable inside the user pro
 | `.trellis/.developer` | Carefully | Current developer identity. |
 | `.trellis/.version` | No | Trellis version record used by update/migration logic. |
 | `.trellis/.template-hashes.json` | No | Template hash record. Do not hand-write business rules here. |
+
+## Git Tracking
+
+`trellis init` and `trellis update` are the single project-asset generation
+path. Do not add a second project initializer for Trellis files or platform
+integration files: use those commands to create or refresh the generated
+assets, then review and commit the resulting project changes normally.
+
+For a Git-tracked project, commit the durable project contract:
+
+- `.trellis/workflow.md`, `config.yaml`, `scripts/`, `spec/`, `tasks/`, and
+  `workspace/`;
+- `.trellis/.version` and `.trellis/.template-hashes.json`. They are generated
+  metadata, not hand-edited configuration; keeping them lets another clone
+  distinguish Trellis-owned templates from local changes safely;
+- the Trellis-managed files in selected platform directories, plus the
+  root-level `AGENTS.md` managed block when Trellis created it.
+
+Do not commit local or ephemeral state. The generated `.trellis/.gitignore`
+already excludes `.developer`, `.current-task`, `.runtime/`, `.ralph-state.json`,
+agent runtime files, atomic-update files, backups, and Python caches. Platform
+session history, caches, logs, and credentials are platform-owned rather than
+Trellis templates; apply the platform's own ignore rules or the repository's
+security policy to them. If workspace journals contain data that the project
+policy forbids in Git, add a project-specific ignore rule rather than changing
+the shared Trellis template for every project.
+
+Generated does not mean disposable: `workflow.md`, specs, tasks, journals, and
+the template-hash receipt are ordinary project artifacts. Conversely, Trellis
+does not infer or broadly ignore all platform directories because doing so
+would hide user-owned files that it must preserve.
 
 ## Platform Directories
 
@@ -72,7 +105,7 @@ Editable by default:
 Do not edit by default:
 
 - Global npm install directory
-- `node_modules/@mindfoldhq/trellis`
+- `node_modules/@pennixrv/trellis`
 - Trellis GitHub repository source code
 - Concrete state files under `.trellis/.runtime/**`
 - Hash contents inside `.trellis/.template-hashes.json`
