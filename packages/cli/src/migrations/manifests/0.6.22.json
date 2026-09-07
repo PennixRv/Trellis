@@ -1,0 +1,9 @@
+{
+  "version": "0.6.22",
+  "description": "Aligns the Pennix Marketplace source used by the Trellis fork.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Maintenance:**\n- Aligns the fork's Marketplace submodule with the Pennix-controlled source and the pinned `codex-subnode-channel` workflow release.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can continue using their selected workflow; new Pennix setup pins the compatible Marketplace release."
+}
