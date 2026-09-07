@@ -6605,7 +6605,7 @@ print(json.dumps({
     const ctx = parsed.hookSpecificOutput.additionalContext;
     expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
     expect(ctx).not.toContain("<sub-agent-notice>");
-    expect(ctx).toContain("<codex-mode>auto:");
+    expect(ctx).toContain("<codex-mode>inline:");
     expect(ctx.indexOf("</codex-mode>")).toBeLessThan(
       ctx.indexOf("<workflow-state>"),
     );
@@ -6852,13 +6852,12 @@ print(json.dumps({
     }
   });
 
-  it("[issue-373] task.py create does NOT seed jsonl for Codex inline mode", () => {
+  it("[issue-373] task.py create does NOT seed jsonl for Codex default inline mode", () => {
     setupTaskRepo();
     fs.mkdirSync(path.join(tmpDir, ".codex"), { recursive: true });
-    writeConfigYaml("codex:\n  dispatch_mode: inline\n");
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "codex inline task" --description "regression fixture" --slug codex-inline-task --assignee test-dev`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "codex default inline task" --description "regression fixture" --slug codex-default-inline-task --assignee test-dev`,
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
@@ -6868,7 +6867,7 @@ print(json.dumps({
       "tasks",
       fs
         .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
-        .find((d) => d.includes("codex-inline-task")) as string,
+        .find((d) => d.includes("codex-default-inline-task")) as string,
     );
     expect(fs.existsSync(path.join(taskDir, "implement.jsonl"))).toBe(false);
     expect(fs.existsSync(path.join(taskDir, "check.jsonl"))).toBe(false);
@@ -7629,6 +7628,7 @@ print(len(entries))
       path.join(".trellis", "workflow.md"),
       templateWorkflowMd(),
     );
+    writeConfigYaml("codex:\n  dispatch_mode: auto\n");
     const contextScript = path.join(
       tmpDir,
       ".trellis",
@@ -7895,7 +7895,7 @@ print(len(entries))
     writeProjectFile(path.join(".trellis", "config.yaml"), content);
   }
 
-  it("[issue-codex-dispatch-mode] codex breadcrumb defaults to native auto dispatch when config absent", () => {
+  it("[issue-codex-dispatch-mode] codex breadcrumb defaults to inline dispatch when config is absent", () => {
     setupTaskRepo();
     writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
     const codexHookPath = writeCodexInjectHook();
@@ -7916,8 +7916,8 @@ print(len(entries))
       ),
     ) as { hookSpecificOutput: { additionalContext: string } };
     const ctx = parsed.hookSpecificOutput.additionalContext;
-    expect(ctx).toContain("DISPATCH the trellis-implement");
-    expect(ctx).not.toContain("MAIN SESSION edits code");
+    expect(ctx).toContain("MAIN SESSION edits code");
+    expect(ctx).not.toContain("DISPATCH the trellis-implement");
   });
 
   it("[issue-codex-dispatch-mode] codex breadcrumb routes to plain status when codex.dispatch_mode=sub-agent", () => {
@@ -8078,9 +8078,9 @@ print(len(entries))
     ) as Record<string, string>;
     expect(result.codex_inline).toBe("in_progress-inline");
     expect(result.codex_subagent).toBe("in_progress");
-    // Default for Codex is native auto dispatch; only explicit inline swaps
-    // to the main-session breadcrumb.
-    expect(result.codex_missing).toBe("in_progress");
+    // Default for Codex is main-session inline execution; explicit auto or
+    // the legacy sub-agent alias selects native dispatch instead.
+    expect(result.codex_missing).toBe("in_progress-inline");
     expect(result.claude_inline).toBe("in_progress");
   });
 
@@ -8166,7 +8166,7 @@ print(len(entries))
         .filter((l) => l.startsWith("{"))
         .pop() ?? "{}",
     ) as Record<string, string>;
-    expect(result.codex_default).toBe("codex-sub-agent");
+    expect(result.codex_default).toBe("codex-inline");
     expect(result.codex_explicit_auto).toBe("codex-sub-agent");
     expect(result.codex_explicit_subagent).toBe("codex-sub-agent");
     expect(result.codex_inline).toBe("codex-inline");
@@ -8199,7 +8199,7 @@ print(len(entries))
       "[workflow-state:in_progress]\nDISPATCH the trellis-implement.\n[/workflow-state:in_progress]\n[workflow-state:in_progress-inline]\nMAIN SESSION inline edit.\n[/workflow-state:in_progress-inline]\n",
     );
 
-    // Default (no config.yaml) → native auto-dispatch banner.
+    // Default (no config.yaml) → main-session inline banner.
     const defaultRun = JSON.parse(
       runPython(
         codexHookPath,
@@ -8207,7 +8207,7 @@ print(len(entries))
       ),
     ) as { hookSpecificOutput: { additionalContext: string } };
     expect(defaultRun.hookSpecificOutput.additionalContext).toContain(
-      "<codex-mode>auto: implement/check work defaults to Trellis sub-agents; native Codex context injection is preferred and child-side loading is the fallback. The main session still coordinates, clarifies, updates specs, commits, and finishes.</codex-mode>",
+      "<codex-mode>inline: the main session implements/checks directly; do not dispatch implement/check sub-agents.</codex-mode>",
     );
 
     // Legacy sub-agent alias → the auto-dispatch banner.

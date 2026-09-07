@@ -21,12 +21,15 @@ import {
   taskScript,
   getContextScript,
   addSessionScript,
+  subnodeArtifactScript,
+  workspaceNoteScript,
   workflowMdTemplate,
   gitignoreTemplate,
   getAllScripts,
   getAllAgents,
   implementAgentTemplate,
   checkAgentTemplate,
+  subnodeAgentTemplate,
   configYamlTemplate,
 } from "../../src/templates/trellis/index.js";
 
@@ -50,6 +53,8 @@ describe("trellis template constants", () => {
     taskScript,
     getContextScript,
     addSessionScript,
+    subnodeArtifactScript,
+    workspaceNoteScript,
     workflowMdTemplate,
     gitignoreTemplate,
   };
@@ -164,6 +169,35 @@ describe("trellis template constants", () => {
     }
   });
 
+  it("marketplace Codex subnode workflow keeps delivery inline and evidence durable", () => {
+    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
+      ? process.cwd()
+      : path.resolve(process.cwd(), "../..");
+    const index = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "marketplace/index.json"), "utf-8"),
+    ) as { templates: { id: string; type: string; path: string }[] };
+    expect(index.templates).toContainEqual(
+      expect.objectContaining({
+        id: "codex-subnode-channel",
+        type: "workflow",
+        path: "workflows/codex-subnode-channel/workflow.md",
+      }),
+    );
+
+    const workflow = fs.readFileSync(
+      path.join(repoRoot, "marketplace/workflows/codex-subnode-channel/workflow.md"),
+      "utf-8",
+    );
+    expect(workflow).toContain("The main session delivers by default");
+    expect(workflow).toContain("`brief.json`");
+    expect(workflow).toContain("`worklog.md`");
+    expect(workflow).toContain("`report.json`");
+    expect(workflow).toContain("[workflow-state:planning]");
+    expect(workflow).toContain("[workflow-state:in_progress]");
+    expect(workflow).toContain("Do not poll");
+    expect(workflow).not.toContain("Channel-driven sub-agent dispatch is default");
+  });
+
   it("[codex-native-subagents] workflow.md preserves the dispatch prompt for Codex native fallback", () => {
     // The in_progress breadcrumb instructs the main agent to prefix
     // dispatch prompts with "Active task: <path>". Codex uses native
@@ -242,17 +276,17 @@ describe("trellis template constants", () => {
     expect(hookAutoBlock).toContain("SubagentStart");
   });
 
-  it("[codex-native-subagents] template mode helpers default to auto and fail invalid values closed to inline", () => {
+  it("[codex-native-subagents] template mode helpers default to inline and require explicit native dispatch", () => {
     const scripts = getAllScripts();
     const config = scripts.get("common/config.py") ?? "";
     const workflowPhase = scripts.get("common/workflow_phase.py") ?? "";
     const taskStore = scripts.get("common/task_store.py") ?? "";
 
-    expect(config).toContain('DEFAULT_CODEX_DISPATCH_MODE = "auto"');
+    expect(config).toContain('DEFAULT_CODEX_DISPATCH_MODE = "inline"');
     expect(config).toContain('if mode == "sub-agent":');
     expect(config).toContain('return "auto"');
     expect(config).toContain("using inline");
-    expect(workflowPhase).toContain('mode = "auto"');
+    expect(workflowPhase).toContain('mode = "inline"');
     expect(workflowPhase).toContain('return "codex-sub-agent" if mode == "auto" else "codex-inline"');
     expect(taskStore).toContain('get_codex_dispatch_mode(repo_root) == "auto"');
   });
@@ -262,7 +296,7 @@ describe("trellis template constants", () => {
     // hosts, so its main-session dispatch guidance must not recursively apply
     // to a sub-agent that is already doing the requested work.
     const block = inProgressBreadcrumb();
-    expect(block).toContain("Main-session default");
+    expect(block).toContain("only when `codex.dispatch_mode: auto` is explicitly selected");
     expect(block).toContain("Sub-agent self-exemption");
     expect(block).toContain("already running as `trellis-implement`");
     expect(block).toContain("do NOT spawn another `trellis-implement`");
@@ -391,16 +425,18 @@ describe("getAllScripts", () => {
 // =============================================================================
 
 describe("getAllAgents", () => {
-  it("ships implement and check agents", () => {
+  it("ships implement, check, and subnode agents", () => {
     const agents = getAllAgents();
     expect(agents.has("implement.md")).toBe(true);
     expect(agents.has("check.md")).toBe(true);
+    expect(agents.has("subnode.md")).toBe(true);
   });
 
   it("values match exported constants", () => {
     const agents = getAllAgents();
     expect(agents.get("implement.md")).toBe(implementAgentTemplate);
     expect(agents.get("check.md")).toBe(checkAgentTemplate);
+    expect(agents.get("subnode.md")).toBe(subnodeAgentTemplate);
   });
 
   it("each agent body starts with `---` frontmatter and a matching name field", () => {

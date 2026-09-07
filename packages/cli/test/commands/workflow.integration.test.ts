@@ -55,6 +55,18 @@ const TDD_CONTENT = [
   "",
 ].join("\n");
 
+/** Codex subnode content stub returned by the marketplace fetch mock. */
+const CODEX_SUBNODE_CONTENT = [
+  "# Codex Subnode Channel Workflow",
+  "",
+  "The main session delivers by default.",
+  "",
+  "[workflow-state:planning]",
+  "A subnode is explicit independent evidence.",
+  "[/workflow-state:planning]",
+  "",
+].join("\n");
+
 function stubMarketplaceFetch(): void {
   const index = {
     version: 1,
@@ -65,6 +77,13 @@ function stubMarketplaceFetch(): void {
         name: "TDD Workflow",
         description: "red/green/refactor",
         path: "workflows/tdd/workflow.md",
+      },
+      {
+        id: "codex-subnode-channel",
+        type: "workflow",
+        name: "Codex Subnode Channel",
+        description: "main-session delivery with explicit independent evidence",
+        path: "workflows/codex-subnode-channel/workflow.md",
       },
     ],
   };
@@ -77,6 +96,9 @@ function stubMarketplaceFetch(): void {
       }
       if (url.endsWith("workflows/tdd/workflow.md")) {
         return new Response(TDD_CONTENT, { status: 200 });
+      }
+      if (url.endsWith("workflows/codex-subnode-channel/workflow.md")) {
+        return new Response(CODEX_SUBNODE_CONTENT, { status: 200 });
       }
       return new Response("", { status: 404 });
     }),
@@ -122,6 +144,20 @@ describe("trellis workflow integration", () => {
 
     const hashes = loadHashes(tmpDir);
     expect(hashes[PATHS.WORKFLOW_GUIDE_FILE]).toBeUndefined();
+  });
+
+  it("init --workflow codex-subnode-channel resolves a marketplace workflow", async () => {
+    stubMarketplaceFetch();
+    await init({
+      yes: true,
+      workflow: "codex-subnode-channel",
+    } as Record<string, unknown>);
+
+    const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
+    expect(fs.readFileSync(wfPath, "utf-8")).toBe(
+      replacePythonCommandLiterals(CODEX_SUBNODE_CONTENT),
+    );
+    expect(loadHashes(tmpDir)[PATHS.WORKFLOW_GUIDE_FILE]).toBeUndefined();
   });
 
   it("init --workflow-source resolves custom workflow marketplace content", async () => {

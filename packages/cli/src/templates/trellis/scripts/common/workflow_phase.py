@@ -181,7 +181,7 @@ def resolve_effective_platform(platform: str, config: dict) -> str:
     if label:
         return label
     if platform == "codex":
-        mode = "auto"
+        mode = "inline"
         codex_cfg = config.get("codex") if isinstance(config, dict) else None
         if codex_cfg is not None:
             if not isinstance(codex_cfg, dict):

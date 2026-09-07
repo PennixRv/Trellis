@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cli/backend/index.md", "reason": "Managed CLI templates and scripts must follow backend contract"}
+{"file": ".trellis/tasks/09-07-subnode-workflow-managed-assets/design.md", "reason": "Approved asset and boundary design"}

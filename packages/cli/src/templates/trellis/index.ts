@@ -70,6 +70,10 @@ export const initDeveloperScript = readTemplate("scripts/init_developer.py");
 export const taskScript = readTemplate("scripts/task.py");
 export const getContextScript = readTemplate("scripts/get_context.py");
 export const addSessionScript = readTemplate("scripts/add_session.py");
+export const subnodeArtifactScript = readTemplate(
+  "scripts/subnode_artifact.py",
+);
+export const workspaceNoteScript = readTemplate("scripts/workspace_note.py");
 
 // Configuration files
 export const workflowMdTemplate = readTemplate("workflow.md");
@@ -83,6 +87,7 @@ export const gitattributesTemplate = readTemplate("gitattributes.txt");
 // and refreshed by `trellis update`.
 export const implementAgentTemplate = readTemplate("agents/implement.md");
 export const checkAgentTemplate = readTemplate("agents/check.md");
+export const subnodeAgentTemplate = readTemplate("agents/subnode.md");
 
 /**
  * Get all script templates as a map of relative path to content
@@ -122,6 +127,8 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("task.py", taskScript);
   scripts.set("get_context.py", getContextScript);
   scripts.set("add_session.py", addSessionScript);
+  scripts.set("subnode_artifact.py", subnodeArtifactScript);
+  scripts.set("workspace_note.py", workspaceNoteScript);
 
   return scripts;
 }
@@ -138,5 +145,6 @@ export function getAllAgents(): Map<string, string> {
   const agents = new Map<string, string>();
   agents.set("implement.md", implementAgentTemplate);
   agents.set("check.md", checkAgentTemplate);
+  agents.set("subnode.md", subnodeAgentTemplate);
   return agents;
 }
