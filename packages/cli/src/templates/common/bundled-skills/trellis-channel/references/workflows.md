@@ -3,15 +3,6 @@
 Use these patterns by intent. Prefer durable channels for multi-round work and
 `channel run` for one-shot questions.
 
-## Routing precondition
-
-The parent `trellis-channel` skill's Profile Routing Gate is mandatory. The
-patterns in this file are ordinary Trellis patterns unless the project proves
-the complete `codex-only-analysis-channel` profile. In that governed profile,
-load `codex-workflow-dispatch` first and do not select Pattern B or any direct
-`--agent implement` / `--agent check` route. The main session owns
-implementation and Git; governed workers provide analysis/review evidence.
-
 ## Pattern A: Multi-round Brainstorm
 
 Use when the user says "和 codex/claude 讨论一下", "brainstorm", or "拉一个 agent
@@ -55,11 +46,7 @@ Every probe should request concrete file paths, commands, schema, rejected
 alternatives, and release-blocking issues. Reject hedging when a decision is
 needed.
 
-## Pattern B: Implement / Check Agent (Non-Governed Projects Only)
-
-Do not use this pattern when the Profile Routing Gate matches
-`codex-only-analysis-channel`; it is retained for ordinary Trellis projects
-without that governed contract.
+## Pattern B: Implement / Check Agent
 
 Use when the user asks to dispatch implementation or review work.
 

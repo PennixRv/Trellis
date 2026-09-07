@@ -26,32 +26,33 @@ function renderedFile(platform: (typeof PLATFORM_IDS)[number], relativePath: str
   return resolved.content;
 }
 
-describe("trellis-channel governed profile routing", () => {
-  it("places the governed profile gate before ordinary workflow routing", () => {
+describe("trellis-channel routing", () => {
+  it("routes independent evidence to the durable subnode contract", () => {
     const skill = sourceFile("SKILL.md");
-    const workflows = sourceFile("references/workflows.md");
+    const subnode = sourceFile("references/subnode-work.md");
 
-    expect(skill).toContain("distribution.profile");
-    expect(skill).toContain("codex-only-analysis-channel");
-    expect(skill).toContain("dispatch.backend");
-    expect(skill).toContain("codex-workflow-dispatch");
-    expect(skill).toContain("main session retains implementation");
-    expect(workflows).toContain("Routing precondition");
-    expect(workflows).toContain("Pattern B: Implement / Check Agent (Non-Governed Projects Only)");
-    expect(workflows).toContain("do not select Pattern B");
+    expect(skill).toContain("references/subnode-work.md");
+    expect(subnode).toContain("brief.json");
+    expect(subnode).toContain("worklog.md");
+    expect(subnode).toContain("report.json");
+    expect(subnode).toContain("Do not use a terminal Channel message as the report transport.");
+    expect(skill).not.toContain("codex-workflow-dispatch");
+    expect(skill).not.toContain("codex-only-analysis-channel");
   });
 
-  it("preserves the same routing guard in every platform's bundled output", () => {
+  it("preserves the same routing references in every platform's bundled output", () => {
     const source = {
       skill: sourceFile("SKILL.md"),
       workflows: sourceFile("references/workflows.md"),
       workers: sourceFile("references/workers.md"),
+      subnode: sourceFile("references/subnode-work.md"),
     };
 
     for (const platform of PLATFORM_IDS) {
       expect(renderedFile(platform, "SKILL.md"), platform).toBe(source.skill);
       expect(renderedFile(platform, "references/workflows.md"), platform).toBe(source.workflows);
       expect(renderedFile(platform, "references/workers.md"), platform).toBe(source.workers);
+      expect(renderedFile(platform, "references/subnode-work.md"), platform).toBe(source.subnode);
     }
   });
 
