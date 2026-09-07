@@ -7,7 +7,6 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -52,10 +51,14 @@ function setupRepo(tmp: string): void {
 }
 
 function run(repo: string, ...args: string[]) {
-  return spawnSync("python3", [".trellis/scripts/subnode_artifact.py", ...args], {
-    cwd: repo,
-    encoding: "utf-8",
-  });
+  return spawnSync(
+    "python3",
+    [".trellis/scripts/subnode_artifact.py", ...args],
+    {
+      cwd: repo,
+      encoding: "utf-8",
+    },
+  );
 }
 
 function writeDraft(
@@ -116,9 +119,6 @@ function writeCompleteReport(
   const dir = artifactDir(repo, workId, subnodeId);
   const briefPath = path.join(dir, "brief.json");
   const brief = JSON.parse(fs.readFileSync(briefPath, "utf-8"));
-  const briefDigest = createHash("sha256")
-    .update(fs.readFileSync(briefPath))
-    .digest("hex");
   const reportPath = path.join(dir, "report.json");
   fs.writeFileSync(
     reportPath,
@@ -128,7 +128,6 @@ function writeCompleteReport(
       work_id: brief.work_id,
       subnode_id: brief.subnode_id,
       role_id: brief.role_id,
-      brief_digest: briefDigest,
       status: "complete",
       scope: brief.scope,
       lens: brief.lens,
@@ -136,7 +135,8 @@ function writeCompleteReport(
         {
           id: evidenceId,
           locator,
-          summary: "Directly observed source supporting the reported conclusion.",
+          summary:
+            "Directly observed source supporting the reported conclusion.",
         },
       ],
       findings: ["The evidence is independently reviewable."],
@@ -176,7 +176,9 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     expect(init.status, init.stderr).toBe(0);
 
     const dir = artifactDir(tmp, "dependency-audit", "primary");
-    const brief = JSON.parse(fs.readFileSync(path.join(dir, "brief.json"), "utf-8"));
+    const brief = JSON.parse(
+      fs.readFileSync(path.join(dir, "brief.json"), "utf-8"),
+    );
     expect(brief).toMatchObject({
       schema_version: 1,
       task_id: "task-a",
@@ -185,7 +187,8 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
       role_id: "subnode",
       retry_of: null,
       counter_of: null,
-      report_path: ".trellis/tasks/task-a/subnodes/dependency-audit/primary/report.json",
+      report_path:
+        ".trellis/tasks/task-a/subnodes/dependency-audit/primary/report.json",
     });
     expect(fs.readFileSync(path.join(dir, "worklog.md"), "utf-8")).toContain(
       "# Subnode Worklog",
@@ -287,12 +290,81 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     );
     expect(counterResult.status).toBe(1);
     expect(counterResult.stderr).toContain("brief.counter_of must be present");
-    expect(fs.existsSync(artifactDir(tmp, "relation-check", "missing-retry"))).toBe(
-      false,
+    expect(
+      fs.existsSync(artifactDir(tmp, "relation-check", "missing-retry")),
+    ).toBe(false);
+    expect(
+      fs.existsSync(artifactDir(tmp, "relation-check", "missing-counter")),
+    ).toBe(false);
+  });
+
+  it("permits a manual retry only when its prior sibling brief exists", () => {
+    const primary = run(
+      tmp,
+      "init",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "retry-audit",
+      "--subnode-id",
+      "primary",
+      "--draft",
+      writeDraft(tmp, "retry-primary.json"),
     );
-    expect(fs.existsSync(artifactDir(tmp, "relation-check", "missing-counter"))).toBe(
-      false,
+    expect(primary.status, primary.stderr).toBe(0);
+
+    const retry = run(
+      tmp,
+      "init",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "retry-audit",
+      "--subnode-id",
+      "retry-1",
+      "--draft",
+      writeDraft(tmp, "retry-1.json", {
+        retry_of: "primary",
+        channel_ref: {
+          name: "subnode-task-a",
+          scope: "project",
+          worker_handle: "retry-1",
+        },
+      }),
     );
+    expect(retry.status, retry.stderr).toBe(0);
+
+    const retryBrief = JSON.parse(
+      fs.readFileSync(
+        path.join(artifactDir(tmp, "retry-audit", "retry-1"), "brief.json"),
+        "utf-8",
+      ),
+    );
+    expect(retryBrief.retry_of).toBe("primary");
+    const reportPath = writeCompleteReport(
+      tmp,
+      "retry-audit",
+      "retry-1",
+      "retry-source",
+      "README.md",
+    );
+    const validate = run(tmp, "validate", "--report", reportPath);
+    expect(validate.status, validate.stderr).toBe(0);
+
+    const missing = run(
+      tmp,
+      "init",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "missing-retry",
+      "--subnode-id",
+      "retry-1",
+      "--draft",
+      writeDraft(tmp, "missing-retry-target.json", { retry_of: "primary" }),
+    );
+    expect(missing.status).toBe(1);
+    expect(missing.stderr).toContain("existing subnode brief");
   });
 
   it("rejects traversal and a report that pretends to be an accepted disposition", () => {
@@ -340,28 +412,37 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     expect(validate.stderr).toContain("report.status");
   });
 
-  it.skipIf(process.platform === "win32")("rejects a symlinked artifact directory", () => {
-    const outside = path.join(tmp, "outside");
-    fs.mkdirSync(outside);
-    const subnodes = path.join(tmp, ".trellis", "tasks", "task-a", "subnodes");
-    fs.symlinkSync(outside, subnodes, "dir");
-    const draft = writeDraft(tmp, "draft.json");
-    const init = run(
-      tmp,
-      "init",
-      "--task",
-      ".trellis/tasks/task-a",
-      "--work-id",
-      "audit",
-      "--subnode-id",
-      "primary",
-      "--draft",
-      draft,
-    );
-    expect(init.status).toBe(1);
-    expect(init.stderr).toContain("symlink");
-    expect(fs.readdirSync(outside)).toEqual([]);
-  });
+  it.skipIf(process.platform === "win32")(
+    "rejects a symlinked artifact directory",
+    () => {
+      const outside = path.join(tmp, "outside");
+      fs.mkdirSync(outside);
+      const subnodes = path.join(
+        tmp,
+        ".trellis",
+        "tasks",
+        "task-a",
+        "subnodes",
+      );
+      fs.symlinkSync(outside, subnodes, "dir");
+      const draft = writeDraft(tmp, "draft.json");
+      const init = run(
+        tmp,
+        "init",
+        "--task",
+        ".trellis/tasks/task-a",
+        "--work-id",
+        "audit",
+        "--subnode-id",
+        "primary",
+        "--draft",
+        draft,
+      );
+      expect(init.status).toBe(1);
+      expect(init.stderr).toContain("symlink");
+      expect(fs.readdirSync(outside)).toEqual([]);
+    },
+  );
 
   it("requires intentional independent evidence for counterwork", () => {
     const primaryDraft = writeDraft(tmp, "primary.json");

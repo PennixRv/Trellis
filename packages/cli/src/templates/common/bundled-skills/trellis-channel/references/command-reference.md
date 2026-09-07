@@ -41,6 +41,7 @@ trellis channel create <name>
 ```
 
 Behavior:
+
 - Appends a `create` event; immutable `type` (cannot mutate forum↔chat after).
 - `--ephemeral` channels are hidden from `channel list` by default and are
   the sweep target for `channel prune --ephemeral`.
@@ -59,6 +60,7 @@ trellis channel list
 ```
 
 Behavior:
+
 - Default scope: current cwd's project. `--all-projects` scans every bucket.
 - Pretty mode prints `NAME WORKERS EVENTS LAST KIND TYPE TASK`, sorted by
   recency, with a footer noting hidden ephemeral count.
@@ -80,6 +82,7 @@ trellis channel send <name> [text]
 ```
 
 Behavior:
+
 - Body precedence: positional `[text]` → `--stdin` → `--text-file`.
 - `--to` with one entry stores a string; multiple stores an array; omitted
   means broadcast.
@@ -110,11 +113,23 @@ trellis channel messages <name>
 ```
 
 Behavior:
+
 - Auto-detects forum channels: with no filters it renders the thread board
   instead of the event stream. `--thread` / `--action` are forum-only and
   error against chat channels.
 - `--kind` is validated against `CHANNEL_EVENT_KINDS` (single value, not
   CSV — that's the `wait` side).
+
+### `barrier <name>`
+
+```bash
+trellis channel barrier <name>
+  [--scope project|global]
+```
+
+Prints the channel's current durable event sequence as one integer. It does not
+append an event. Capture it after `create` and before an operation that can
+emit the event you intend to wait for, then pass it to `wait --after-seq`.
 
 ### `wait <name>`
 
@@ -123,6 +138,7 @@ trellis channel wait <name>
   --as <agent>                            # REQUIRED — self for filter ctx
   [--scope project|global]
   [--timeout <Ns|Nm|Nh|Nms>]              # parsed by parseDuration
+  [--after-seq <integer>]                 # replay only events after barrier
   [--from <a,b>]                          # author CSV
   [--kind <k1,k2>]                        # CSV, OR semantics
   [--thread <key>]                        # forum filter
@@ -133,11 +149,15 @@ trellis channel wait <name>
 ```
 
 Behavior:
+
 - Streams matching events as JSON, one per line.
 - Default `--to` filter is the caller's own agent (broadcast events still
   match — broadcast + explicit-to-me).
 - `--all` requires `--from` and blocks until every listed agent has produced
   a matching event.
+- Without `--after-seq`, the command captures its current event sequence before
+  constructing its watcher and ignores prior events. With `--after-seq`, it
+  replays matching events whose sequence is greater than that supplied barrier.
 - **Timeout exits 124** and prints `timeout: still waiting on ...` to stderr
   when `--all` was in play.
 
@@ -199,6 +219,7 @@ trellis channel interrupt <name> [text]
 ```
 
 Behavior:
+
 - Appends an `interrupt` event with `reason: "user"` and a replacement
   instruction body; supervisor performs provider-level interrupt where
   supported (Claude `/interrupt`, Codex turn cancel).
@@ -235,6 +256,7 @@ trellis channel spawn <name>
 ```
 
 Behavior:
+
 - Provider is validated against the adapter registry
   (`packages/cli/src/commands/channel/adapters/`); current: `claude`,
   `codex`.
@@ -262,6 +284,7 @@ trellis channel run [name?]
 ```
 
 Behavior:
+
 - One-shot. Auto-generates `run-<hex>` if `name` omitted.
 - Creates an ephemeral channel (`createMode=run`), spawns a single worker,
   sends the prompt, waits for `done`, prints the final assistant text to
@@ -281,6 +304,7 @@ trellis channel kill <name>
 ```
 
 Behavior:
+
 - Default path: SIGTERM → 8 s grace → SIGKILL escalation; the CLI writes a
   `killed` event when SIGKILL was needed so the log stays truthful.
 - Cleans `pid`, `worker-pid`, `config`, `spawnlock` sidecar files; keeps
@@ -294,6 +318,7 @@ trellis channel rm <name>
 ```
 
 Behavior:
+
 - Kills any live workers, then deletes the entire channel directory.
 - Prints `Removed channel '<name>'`.
 
@@ -309,6 +334,7 @@ trellis channel prune
 ```
 
 Behavior:
+
 - Filter flags are mutually exclusive — error otherwise.
 - Default is dry-run; `--yes` flips to real delete.
 - Without `--scope`, scans **every** project bucket (intentional, repo-wide
@@ -341,6 +367,7 @@ trellis channel post <name> <action>
 ```
 
 Behavior:
+
 - `<action>` is free-form on the CLI surface; conventional values include
   `opened`, `comment`, `status`, `labels`, `assignees`, `summary`,
   `processed`.
@@ -358,6 +385,7 @@ trellis channel forum <name>
 ```
 
 Behavior:
+
 - Lists threads (reduced state). `--status` filters by current thread
   status. `--raw` prints one JSON per thread.
 
@@ -374,6 +402,7 @@ trellis channel thread rename <name> <old-thread> <new-thread>
 ```
 
 Behavior:
+
 - `thread <name> <key>` shows one thread's timeline:
   header `<thread> [<status>] <title>`, then description / labels /
   assignees / summary / timeline lines. `--raw` switches to raw events.
@@ -408,6 +437,7 @@ trellis channel context list <name>
 ```
 
 Behavior:
+
 - `add` / `delete` append a `context` event and print the event JSON.
 - `list` projects current context entries; pretty output is
   `file <path>` / `raw <truncated text>` lines, `(no context)` when empty.
@@ -426,6 +456,7 @@ trellis channel title clear <name>
 ```
 
 Behavior:
+
 - Appends a `title` event projecting a stable display title onto the
   channel. Output: event JSON.
 
@@ -433,10 +464,10 @@ Behavior:
 
 ## Hidden / Internal
 
-| Command | Purpose |
-|---|---|
-| `channel __supervisor <channel> <worker> <config>` | Forked entry point invoked by `spawn`. Do not invoke directly. |
-| `channel __parse-trace <adapter> <file>` | Dev helper — replays a recorded stream-json / wire trace through the matching adapter and prints the resulting channel events. Adapter is validated against the provider registry. |
+| Command                                            | Purpose                                                                                                                                                                            |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `channel __supervisor <channel> <worker> <config>` | Forked entry point invoked by `spawn`. Do not invoke directly.                                                                                                                     |
+| `channel __parse-trace <adapter> <file>`           | Dev helper — replays a recorded stream-json / wire trace through the matching adapter and prints the resulting channel events. Adapter is validated against the provider registry. |
 
 ---
 
@@ -477,4 +508,3 @@ Forum channels are event-sourced; use the CLI reducers
   pipe); diagnostic notes go to stderr.
 - **Errors** go through `chalk.red("Error:")` to stderr and `exit 1`.
 - **`wait` timeout** specifically exits **124**.
-

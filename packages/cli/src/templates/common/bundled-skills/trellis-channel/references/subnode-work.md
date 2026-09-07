@@ -16,9 +16,11 @@ Before spawning, the coordinator must use an active task (`planning` or
 `in_progress`), define one stable `work_id` and
 `subnode_id`, then prepare a brief-draft JSON with the question, independence
 reason, scope, protected targets, lens, evidence method, source snapshot,
-dependencies, stop conditions, deadline, `channel_ref`, `retry_of: null`, and
-`counter_of` (null unless this is intentional counterwork). The helper supplies
-the immutable task identity and report path.
+dependencies, stop conditions, deadline, `channel_ref`, `retry_of` (null unless
+this is an explicit manual retry), and `counter_of` (null unless this is
+intentional counterwork). A retry names an existing, different subnode in the
+same task and `work_id`; counterwork may be initialized independently. The
+helper supplies the immutable task identity and report path.
 
 ```bash
 TASK=.trellis/tasks/09-07-example
@@ -45,8 +47,8 @@ Do not use a terminal Channel message as the report transport. The short final
 message names the already-written `report.json` and its status; the durable
 JSON file carries the reviewable result.
 
-The subnode copies identity, scope, and lens from `brief.json`, then uses the
-SHA-256 digest of the exact `brief.json` bytes. The minimal complete report is:
+The subnode copies identity, scope, and lens from `brief.json`. The minimal
+complete report is:
 
 ```json
 {
@@ -55,7 +57,6 @@ SHA-256 digest of the exact `brief.json` bytes. The minimal complete report is:
   "work_id": "work-id-from-brief",
   "subnode_id": "subnode-id-from-brief",
   "role_id": "subnode",
-  "brief_digest": "sha256-of-brief-json-bytes",
   "status": "complete",
   "scope": ["exact scope copied from brief"],
   "lens": "exact lens copied from brief",
@@ -78,10 +79,13 @@ non-empty `completed_scope` list and a non-empty `blocker` string. Never use
 
 ## Dispatch And Wait
 
-Inspect the installed role first, then use one native Channel lifecycle:
+Inspect the installed role first, then capture a durable event barrier before
+the worker can emit a terminal event. The CLI waits once and replays matching
+events committed after that barrier:
 
 ```bash
 trellis channel create subnode-example --by main --cwd "$PWD"
+BARRIER="$(trellis channel barrier subnode-example)"
 trellis channel spawn subnode-example --agent subnode --provider codex \
   --as "$SUBNODE_ID" --cwd "$PWD" --timeout 30m
 
@@ -90,13 +94,15 @@ printf '%s\n' "Read $TASK/subnodes/$WORK_ID/$SUBNODE_ID/brief.json and perform o
       --stdin --delivery-mode requireRunningWorker
 
 trellis channel wait subnode-example --as main --from "$SUBNODE_ID" \
-  --kind done,error --timeout 30m
+  --kind done,error --after-seq "$BARRIER" --timeout 30m
 ```
 
-Where the host exposes a live wait continuation, establish one waiter and
-continue that same waiter until terminal state. Do not poll messages, create a
-second waiter, or treat an empty transport slice as completion. The normal CLI
-surface uses the documented single `send` followed by native `wait` pattern.
+Where the host exposes a live wait continuation, capture the same barrier,
+establish one event waiter before triggering the worker, and continue that same
+waiter until terminal state. Do not create a second waiter or treat an empty
+transport slice as completion. `channel messages`, worker inspection, and
+status/list commands remain valid on-demand diagnostics, but do not use
+high-frequency repeated queries as the coordinator's supervision loop.
 
 ## Coordinator Review
 
@@ -139,5 +145,15 @@ python3 .trellis/scripts/subnode_artifact.py validate-counter \
 ```
 
 The coordinator compares the two reports and retains the comparison as part of
-its own disposition. No scheduler, polling loop, automatic retry, worktree,
-global ledger, or provider-specific transport is introduced by this workflow.
+its own disposition.
+
+## Manual Retry
+
+A retry is a fresh, explicitly approved subnode after a recorded failed or
+incomplete attempt. It uses a new `subnode_id`, preserves the old artifacts,
+and sets `retry_of` to that prior subnode ID in its brief. The coordinator must
+record why it is retrying and check the new report independently; neither the
+helper nor Channel decides when to retry.
+
+No scheduler, high-frequency polling loop, automatic retry, worktree, global
+ledger, or provider-specific transport is introduced by this workflow.

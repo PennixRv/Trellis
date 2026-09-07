@@ -26,7 +26,7 @@ import {
 } from "./threads.js";
 import { channelTitleClear, channelTitleSet } from "./title.js";
 import { runSupervisor } from "./supervisor.js";
-import { channelWait, parseDuration } from "./wait.js";
+import { channelBarrier, channelWait, parseDuration } from "./wait.js";
 import { parseCsv } from "./store/schema.js";
 import { parseInboxPolicy } from "@pennixrv/trellis-core/channel";
 
@@ -172,11 +172,35 @@ export function registerChannelCommand(program: Command): void {
     );
 
   channel
+    .command("barrier <name>")
+    .description(
+      "Print the current durable event sequence without appending an event",
+    )
+    .option("--scope <scope>", "channel scope: project | global")
+    .action(async (name: string, raw: Record<string, unknown>) => {
+      const opts = raw as { scope?: string };
+      try {
+        console.log(await channelBarrier(name, { scope: opts.scope }));
+      } catch (err) {
+        console.error(
+          chalk.red("Error:"),
+          err instanceof Error ? err.message : err,
+        );
+        process.exit(1);
+      }
+    });
+
+  channel
     .command("wait <name>")
     .description("Block until an event matching the filter arrives, or timeout")
     .requiredOption("--as <agent>", "agent name waiting")
     .option("--scope <scope>", "channel scope: project | global")
     .option("--timeout <duration>", "max wait (e.g. 30s, 2m, 1h)")
+    .option(
+      "--after-seq <sequence>",
+      "replay only events after this durable sequence barrier",
+      parseNonNegativeInteger,
+    )
     .option("--from <agents>", "only wake on events from these agents (CSV)")
     .option(
       "--kind <kind[,kind...]>",
@@ -197,6 +221,7 @@ export function registerChannelCommand(program: Command): void {
       const opts = raw as {
         as: string;
         timeout?: string;
+        afterSeq?: number;
         from?: string;
         kind?: string;
         scope?: string;
@@ -210,6 +235,7 @@ export function registerChannelCommand(program: Command): void {
         await channelWait(name, {
           as: opts.as,
           timeoutMs: parseDuration(opts.timeout),
+          afterSeq: opts.afterSeq,
           from: opts.from,
           kind: opts.kind,
           scope: opts.scope,

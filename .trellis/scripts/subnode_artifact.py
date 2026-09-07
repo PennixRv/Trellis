@@ -9,7 +9,6 @@ dispatches workers, decides acceptance, or mutates task state.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
@@ -169,6 +168,42 @@ def _validate_channel_ref(value: Any) -> None:
     _require_text(value.get("worker_handle"), "channel_ref.worker_handle", max_len=128)
 
 
+def _validate_retry_target(
+    retry_of: Any,
+    task_dir: Path,
+    work_id: str,
+    subnode_id: str,
+) -> str | None:
+    """Validate the coordinator's explicit, already-created retry source."""
+    if retry_of is None:
+        return None
+    retry_id = _require_id(retry_of, "brief.retry_of")
+    if retry_id == subnode_id:
+        _fail("brief.retry_of must name a different subnode")
+    target_dir = _node_dir(task_dir, work_id, retry_id)
+    _assert_no_subpath_symlinks(task_dir, target_dir)
+    target_brief_path = target_dir / "brief.json"
+    if not target_brief_path.exists():
+        _fail("brief.retry_of must identify an existing subnode brief in this task and work_id")
+    target_brief, _raw = _read_json_object(
+        target_brief_path,
+        MAX_DRAFT_BYTES,
+        "brief.retry_of target brief",
+    )
+    expected_task_id = _task_id(task_dir)
+    if target_brief.get("schema_version") != SCHEMA_VERSION:
+        _fail("brief.retry_of target brief has an unsupported schema_version")
+    if target_brief.get("task_id") != expected_task_id:
+        _fail("brief.retry_of target brief does not belong to this task")
+    if target_brief.get("work_id") != work_id:
+        _fail("brief.retry_of target brief does not belong to this work_id")
+    if target_brief.get("subnode_id") != retry_id:
+        _fail("brief.retry_of target brief identity does not match its artifact directory")
+    if target_brief.get("role_id") != "subnode":
+        _fail("brief.retry_of target brief.role_id must be subnode")
+    return retry_id
+
+
 def _validate_brief_data(
     brief: dict[str, Any],
     task_dir: Path,
@@ -198,11 +233,15 @@ def _validate_brief_data(
     _require_text(brief.get("deadline"), "brief.deadline", max_len=128)
     _validate_channel_ref(brief.get("channel_ref"))
     if "retry_of" not in brief:
-        _fail("brief.retry_of must be present and null")
-    if brief["retry_of"] is not None:
-        _fail("brief.retry_of must be null; subnodes are not retry workers")
+        _fail("brief.retry_of must be present; use null when this is not a retry")
     if "counter_of" not in brief:
         _fail("brief.counter_of must be present; use null when this is not counterwork")
+    _validate_retry_target(
+        brief["retry_of"],
+        task_dir,
+        work_id,
+        subnode_id,
+    )
     counter_of = brief["counter_of"]
     if counter_of is not None:
         counter_id = _require_id(counter_of, "brief.counter_of")
@@ -280,16 +319,12 @@ def _validate_evidence(value: Any) -> set[tuple[str, str]]:
 def _validate_report_data(
     report: dict[str, Any],
     brief: dict[str, Any],
-    brief_raw: bytes,
 ) -> set[tuple[str, str]]:
     if report.get("schema_version") != SCHEMA_VERSION:
         _fail(f"report.schema_version must be {SCHEMA_VERSION}")
     for field in ("task_id", "work_id", "subnode_id", "role_id"):
         if report.get(field) != brief.get(field):
             _fail(f"report.{field} does not match brief.{field}")
-    digest = hashlib.sha256(brief_raw).hexdigest()
-    if report.get("brief_digest") != digest:
-        _fail("report.brief_digest does not match immutable brief.json")
     if report.get("scope") != brief.get("scope"):
         _fail("report.scope does not match brief.scope")
     if report.get("lens") != brief.get("lens"):
@@ -315,7 +350,7 @@ def _validate_report_file(
 ) -> tuple[dict[str, Any], set[tuple[str, str]], dict[str, Any], Path]:
     report_path, node_dir, _task_dir = _resolve_artifact_file(value, "report.json", repo_root)
     brief_path = node_dir / "brief.json"
-    brief, brief_raw, _brief_path, _brief_node, _brief_task = _validate_brief_file(
+    brief, _brief_raw, _brief_path, _brief_node, _brief_task = _validate_brief_file(
         str(brief_path), repo_root
     )
     expected_report = _relative_to_repo(report_path, repo_root)
@@ -323,7 +358,7 @@ def _validate_report_file(
         _fail("brief.report_path does not point to the report being validated")
     report, raw = _read_json_object(report_path, MAX_REPORT_BYTES, "report")
     _reject_obvious_secrets(raw, "report")
-    evidence = _validate_report_data(report, brief, brief_raw)
+    evidence = _validate_report_data(report, brief)
     return report, evidence, brief, node_dir
 
 

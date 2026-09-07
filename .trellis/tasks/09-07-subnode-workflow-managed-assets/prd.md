@@ -10,21 +10,26 @@
 - 新增 `.trellis/agents/subnode.md`，其行为合同是：业务/审查目标和权威 task/Issue 只读；只在 coordinator
   分配的专属 task 目录写 `worklog.md` 与 `report.json`；禁止实施、Git、再分派、生命周期控制和事实晋升。
 - 新增受管理的 `subnode_artifact.py`，提供 `init`、`validate`、`validate-counter`。它必须校验 task containment、
-  identity、brief digest、报告边界、大小、明显 secret、状态和关联，但不裁决技术结论、运行 worker 或解析终端消息。
+  identity、报告边界、大小、明显 secret、状态和关联，但不裁决技术结论、运行 worker 或解析终端消息。
 - `report.json.status` 仅接受 `complete`、`blocked`、`incomplete`、`error`；`complete` 仅表示节点产物完成，
   禁止将 `accepted`、`rejected`、`done` 等项目验收语义写入报告。
+- 新增最小的 Channel CLI 序号屏障：`channel barrier` 读取当前持久化序号，`channel wait --after-seq` 重放
+  屏障之后的匹配事件。它只复用现有 `readLastSeq`/`sinceSeq`，不改变 event schema、store 或 watcher。
+- `retry_of` 是 coordinator 显式决定的人工重试关联：只能指向同一 task/work 下已有的不同 subnode brief；不得由
+  helper、worker 或 Channel 自动派发或重试。报告不复制这个 coordinator-owned 关联。
 - 新增 `workspace_note.py`，将受限 note 原子追加到 developer workspace 的 `working-notes.md`，不创建/读取 task，
   不触碰 journal、index、Git、Channel 或 prompt 注入。
 - 将 bundled `trellis-channel` 从根仓库专属的 `parallel-work`、terminal wrapper、历史命名和 `--sandbox read-only`
   示例中迁出，新增按需 `subnode-work.md`；Channel 仍是 worker lifecycle/event audit 的唯一控制面。
-- 维持普通 inline 工作默认；不新增自动 retry、轮询、第二 watcher、全局 ledger、worktree、dashboard、provider
+- 维持普通 inline 工作默认；不新增自动 retry、以高频状态查询代替事件等待的监督循环、第二 waiter、全局 ledger、worktree、dashboard、provider
   特判或 Codex native agent。
 - 与 Pennix marketplace workflow、真实 Codex host 验收和用户级 Skill 清理保持有序依赖；本 task 不假称它们已完成。
 
 ## 非目标
 
-- 不修改 Channel event schema、spawn/wait/interrupt/cleanup 实现、provider adapter、worker guard 或
-  `TEMPLATE_INDEX_URL`。为恢复已批准的 inline 默认而收敛 config、workflow、Hook breadcrumb 与 task
+- 不修改 Channel event schema、store watcher、spawn/interrupt/cleanup 实现、provider adapter、worker guard 或
+  `TEMPLATE_INDEX_URL`。本 task 允许在 CLI `wait` 上增加对既有序号屏障的参数传递，并新增只读屏障查询命令。
+  为恢复已批准的 inline 默认而收敛 config、workflow、Hook breadcrumb 与 task
   manifest seeding 属于本 task；不新增或扩展 native Codex dispatch。
 - 不创建 marketplace fork、不执行真实 provider worker、不修改用户安装副本；发布后的根仓库 adoption 与
   `pennix-skills` 清理由各自 task 负责。
@@ -32,14 +37,14 @@
 ## 验收标准
 
 - [ ] init/update 的 managed template registry 能生成并安全更新 role、两个脚本和 bundled Skill reference。
-- [ ] helper 的单元/CLI 测试覆盖 containment、符号链接、重复 init、schema/identity/digest、大小/secret、
-  status、correction、retry、counter 和 workspace note 的非侵入边界。
+- [ ] helper 的单元/CLI 测试覆盖 containment、符号链接、重复 init、schema/identity、大小/secret、
+      status、correction、retry、counter 和 workspace note 的非侵入边界。
 - [ ] bundled Channel 文档不再引用 `parallel-work`、终端 JSON transport 或 `--sandbox read-only`，并对 live
-  continuation 与纯 CLI wait 明确分支。
+      continuation 与纯 CLI 屏障/`wait --after-seq` 明确分支；按需 `messages`/状态查询可用于诊断，不能替代事件等待。
 - [ ] 当前 Channel、template、workflow 与 TypeScript/Python 测试继续通过，且 GitNexus impact/detect-changes
-  或可用的本地等价检查已记录。
-- [ ] 以当前官方资料、源码、测试和 release preflight 核验后完成一个可追溯的新 Trellis release；未验证的
-  Codex host 行为保持 deferred。
+      或可用的本地等价检查已记录。
+- [ ] 以当前官方资料、源码、测试、真实 Codex host 子节点验收和 release preflight 核验后完成一个可追溯的新
+      Trellis release。
 
 ## 证据与约束
 

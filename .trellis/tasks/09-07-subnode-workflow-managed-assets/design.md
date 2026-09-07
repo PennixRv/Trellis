@@ -7,8 +7,9 @@
 而不是 `pennix-skills`、一个新的 runtime service 或项目 workflow。
 
 预计修改：template registry、agent template、两个 Python managed scripts、bundled `trellis-channel` 的 route/reference、
-相应 template/script/regression tests、release metadata。明确不修改 Channel runtime 及其 event schema；若该边界内的
-重构需要发生，将用现有 Channel tests 证明其行为未变。
+最小 Channel CLI 屏障表面、相应 template/script/regression tests、release metadata。CLI 只将既有持久化序号传给既有
+`sinceSeq` watcher；明确不修改 Channel event schema、store watcher、supervisor 或 provider runtime。若该边界内的重构
+需要发生，将用现有 Channel tests 证明其行为未变。
 
 ## Assets
 
@@ -34,10 +35,11 @@ tasks/<task>/subnodes/<work-id>/<subnode-id>/
 `brief.json` 固定 `schema_version`、`task_id`、`work_id`、`subnode_id`、`role_id`、问题、独立性理由、scope、
 protected targets、lens、evidence method、source snapshot、dependencies、stop conditions、deadline、channel reference、
 report path、retry/counter relation。helper 以 task root 解析 containment，拒绝 traversal、symlink、重复初始化和 identity
-冲突；不把 `source_snapshot` 解释为读路径白名单。
+冲突；人工 retry 只能关联同 task/work 下已有、不同 identity 的 brief，counterwork 仍可独立初始化。关系保持在
+coordinator-owned brief，不复制到报告。helper 不把 `source_snapshot` 解释为读路径白名单，也不从运行态推断是否应该重试。
 
 `validate` 只接受报告的产物状态 `complete|blocked|incomplete|error`。`complete` 需要可复查 evidence，所有状态需与
-brief identity/digest/scope/lens 一致。报告永远是待核验工件；主协调器 task disposition 才可记录
+brief identity/scope/lens 一致。报告永远是待核验工件；主协调器 task disposition 才可记录
 `accepted|rejected|deferred` 与 `report_validation` / `source_recheck` / `protected_target_check` / optional
 `counter_comparison`。
 
@@ -53,9 +55,11 @@ bounded summary 和 optional source locator。它不以 task 或 Channel 为输�
 一个冻结 brief、稳定 report path、原生 Channel create/spawn/send/wait 和主协调器的独立核验。终端消息是短状态与
 路径提示，不运输 JSON 报告。
 
-工具面存在 live continuation 时必须先建立且只续接同一个 waiter；纯 CLI 按 documented send 后单次 native wait。
-reference 不虚构一段同时适用于两类表面的 shell pre-wait，也不引入 polling/second waiter。写入约束是 role/brief/
-helper/coordinator checks 组成的行为合同，而非 sandbox 安全承诺，因此不会传递 `--sandbox`。
+工具面存在 live continuation 时，协调器在触发 worker 前建立且只续接同一个 event waiter。纯 CLI 在 channel 已创建后、
+spawn/first send 前执行 `channel barrier`，并以一次 `wait --after-seq <barrier>` 重放屏障后的事件；因此 fast terminal
+event 不会落在 send 与 wait 建立之间的空窗。`messages`、worker/status 等查询保留为按需诊断工具，不能由主协调器高频
+循环调用来替代等待。reference 不虚构一段同时适用于两类表面的 shell pre-wait，也不引入第二 waiter。写入约束是
+role/brief/helper/coordinator checks 组成的行为合同，而非 sandbox 安全承诺，因此不会传递 `--sandbox`。
 
 ## Compatibility And Rollback
 

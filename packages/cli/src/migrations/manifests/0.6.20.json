@@ -1,0 +1,9 @@
+{
+  "version": "0.6.20",
+  "description": "Repairs managed Codex subnode completion waiting and removes an unnecessary report digest requirement.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Bug fixes:**\n- Adds channel barrier and channel wait --after-seq so coordinators can replay a fast subnode terminal event after dispatch.\n- Removes the unnecessary brief_digest requirement from subnode reports while preserving brief and report identity checks.\n- Validates explicit retry_of targets against an already-created sibling brief.",
+  "migrations": [],
+  "notes": "No migration required. Existing projects can upgrade normally."
+}

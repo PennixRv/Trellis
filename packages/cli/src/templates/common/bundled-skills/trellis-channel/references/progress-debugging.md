@@ -1,7 +1,7 @@
 # Progress And Debugging
 
 Pretty output is for operators. Raw output is the audit log. Subcommands
-(`forum`, `thread`, `messages`, `context`) are the audit *interface* — reach
+(`forum`, `thread`, `messages`, `context`) are the audit _interface_ — reach
 for them before grepping `events.jsonl` by hand.
 
 ## Pretty vs `--raw`
@@ -120,7 +120,18 @@ inspect the worker log for the subprocess.
 
 ## Wait Semantics (Quick Reference)
 
-`channel wait` watches `events.jsonl` from EOF and wakes on:
+Without `--after-seq`, `channel wait` captures the current durable sequence,
+then watches matching later events. For an operation that can finish before the
+wait command starts, capture a barrier before that operation and pass it back:
+
+```bash
+BARRIER="$(trellis channel barrier T)"
+# spawn or trigger work that may emit a terminal event
+trellis channel wait T --as main --from check --kind done,error \
+  --after-seq "$BARRIER" --timeout 15m
+```
+
+It wakes on:
 
 - `message`
 - `done`
@@ -133,7 +144,7 @@ Useful filters:
 ```bash
 trellis channel wait T --as main --from check --kind done --timeout 15m
 trellis channel wait T --as main --from check,check-cx --kind done --all --timeout 15m
-trellis channel wait T --as worker --tag interrupt --timeout 1h
+trellis channel wait T --as worker --kind message --timeout 1h
 trellis channel wait T --as main --thread release-note --action status --timeout 10m
 ```
 
@@ -192,16 +203,16 @@ diffing against `<worker>.inbox-cursor` while debugging the supervisor.
 
 ## Common Failures
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `trellis: command not found` | CLI not installed globally | `npm install -g @pennixrv/trellis` |
-| `wait` exits immediately | wrong filter or identity collision | use distinct `--as`, inspect raw messages |
-| zsh errors on message text | shell interpreted punctuation | use `--stdin` or `--text-file` |
-| progress line is cut off | pretty output truncation | use `messages --raw --kind progress` |
-| worker never speaks | provider startup / prompt / MCP delay | inspect `<worker>.log`, `ps`, raw events |
-| channel not found in another cwd | project bucket mismatch | `cd` to project, use `--scope global`, or `list --all-projects` |
-| ghost worker in list | supervisor died without cleanup | `trellis channel kill <name> --as <worker> --force` |
-| forum thread looks scrambled | parsed `events.jsonl` directly | use `forum`, `thread`, `messages --thread` |
+| Symptom                          | Cause                                 | Fix                                                             |
+| -------------------------------- | ------------------------------------- | --------------------------------------------------------------- |
+| `trellis: command not found`     | CLI not installed globally            | `npm install -g @pennixrv/trellis`                              |
+| `wait` exits immediately         | wrong filter or identity collision    | use distinct `--as`, inspect raw messages                       |
+| zsh errors on message text       | shell interpreted punctuation         | use `--stdin` or `--text-file`                                  |
+| progress line is cut off         | pretty output truncation              | use `messages --raw --kind progress`                            |
+| worker never speaks              | provider startup / prompt / MCP delay | inspect `<worker>.log`, `ps`, raw events                        |
+| channel not found in another cwd | project bucket mismatch               | `cd` to project, use `--scope global`, or `list --all-projects` |
+| ghost worker in list             | supervisor died without cleanup       | `trellis channel kill <name> --as <worker> --force`             |
+| forum thread looks scrambled     | parsed `events.jsonl` directly        | use `forum`, `thread`, `messages --thread`                      |
 
 ## Storage Layout
 

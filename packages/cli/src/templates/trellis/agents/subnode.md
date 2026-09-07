@@ -50,8 +50,7 @@ sandbox claim.
    **pending coordinator review**, never accepted/rejected/deferred.
 5. A complete report includes independently checkable evidence. A non-complete
    report explains completed scope and the blocker or error. Include the exact
-   identity, scope, lens, and SHA-256 digest of `brief.json` required by the
-   artifact helper.
+   identity, scope, and lens required by the artifact helper.
 6. Send one short terminal Channel message with the status and report path.
    Do not place the report JSON in Channel text.
 
