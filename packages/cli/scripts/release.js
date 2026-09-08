@@ -135,8 +135,7 @@ function main() {
 
   run("node scripts/check-manifest-continuity.js");
   docsGuard(type);
-  run("pnpm --filter @pennixrv/trellis-core test");
-  run("pnpm --filter @pennixrv/trellis-core build");
+  run("pnpm build");
   run("pnpm test");
 
   // Exclude .trellis/ from the pre-release sweep: dirty task/workspace files
