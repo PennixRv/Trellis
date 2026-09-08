@@ -1,6 +1,6 @@
 ---
 name: trellis-research-record
-description: Record verified research, audit, or review findings that affect an active Trellis task in its task artifacts. Use when the work produces reusable facts, alternatives, uncertainty, or a decision basis; do not use for routine navigation or transient observations.
+description: Record task-relevant verified research, audit, or review findings in active Trellis task artifacts. Use when material facts, candidates, uncertainty, or a decision basis should persist; do not use for routine navigation or transient observations.
 ---
 
 # Trellis Research Record
