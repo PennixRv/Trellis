@@ -9,3 +9,6 @@
 3. Commit, push, and tag the Marketplace release.
 4. Advance the parent Gitlink, perform only required existing release metadata
    updates, run project release checks, then commit, tag, push, and verify.
+5. If the existing release guard identifies a prior published manifest gap,
+   backfill the verified non-migrating manifest before retrying the normal
+   release flow; do not bypass the guard or extend its known-gap list.
