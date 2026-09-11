@@ -53,6 +53,9 @@ export const commonTaskStore = readTemplate("scripts/common/task_store.py");
 export const commonSessionContext = readTemplate(
   "scripts/common/session_context.py",
 );
+export const commonContinuationRecord = readTemplate(
+  "scripts/common/continuation_record.py",
+);
 export const commonPackagesContext = readTemplate(
   "scripts/common/packages_context.py",
 );
@@ -116,6 +119,7 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("common/task_context.py", commonTaskContext);
   scripts.set("common/task_store.py", commonTaskStore);
   scripts.set("common/session_context.py", commonSessionContext);
+  scripts.set("common/continuation_record.py", commonContinuationRecord);
   scripts.set("common/packages_context.py", commonPackagesContext);
   scripts.set("common/workflow_phase.py", commonWorkflowPhase);
   scripts.set("common/trellis_config.py", commonTrellisConfig);

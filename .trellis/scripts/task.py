@@ -74,6 +74,13 @@ from common.task_context import (
     cmd_list_context,
     curated_entry_count,
 )
+from common.continuation_record import (
+    STATUS_WITHHELD,
+    ContinuationError,
+    clear as clear_continuity,
+    seal as seal_continuity,
+    status as continuity_status,
+)
 
 
 # =============================================================================
@@ -347,6 +354,32 @@ def cmd_current(args: argparse.Namespace) -> int:
         return 0
 
     return 1
+
+
+def cmd_continuity(args: argparse.Namespace) -> int:
+    """Read or explicitly mutate the current task's Continuation Record."""
+    repo_root = get_repo_root()
+    try:
+        if args.continuity_command == "status":
+            result = continuity_status(repo_root)
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            return 0
+        if not getattr(args, "explicit_user_request", False):
+            print(colored("Error: continuity writes require --explicit-user-request", Colors.RED), file=sys.stderr)
+            return 2
+        if args.continuity_command == "seal":
+            request = Path(args.request)
+            if request.is_absolute() or ".." in request.parts:
+                print(colored("Error: continuity request must be project-relative", Colors.RED), file=sys.stderr)
+                return 2
+            result = seal_continuity(repo_root, repo_root / request, args.expected)
+        else:
+            result = clear_continuity(repo_root, args.expected)
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
+    except (ContinuationError, OSError) as exc:
+        print(json.dumps({"status": STATUS_WITHHELD, "reason": str(exc)}, ensure_ascii=False, sort_keys=True))
+        return 2
 
 
 # =============================================================================
@@ -697,6 +730,19 @@ def main() -> int:
     p_current.add_argument("--json", action="store_true",
                            help="Output machine-readable JSON")
 
+    # continuity
+    p_continuity = subparsers.add_parser("continuity", help="Read or explicitly update the current task Continuation Record")
+    continuity_sub = p_continuity.add_subparsers(dest="continuity_command", required=True)
+    continuity_status_parser = continuity_sub.add_parser("status", help="Show read-only Continuation Record status")
+    continuity_status_parser.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+    continuity_seal = continuity_sub.add_parser("seal", help="Write a Continuation Record from an explicit request")
+    continuity_seal.add_argument("--request", required=True, type=Path, help="Project-relative bounded request JSON")
+    continuity_seal.add_argument("--expected", required=True, help="absent or the current record digest")
+    continuity_seal.add_argument("--explicit-user-request", action="store_true", help="Required write confirmation")
+    continuity_clear = continuity_sub.add_parser("clear", help="Clear the current Continuation Record")
+    continuity_clear.add_argument("--expected", required=True, help="The current record digest or absent")
+    continuity_clear.add_argument("--explicit-user-request", action="store_true", help="Required write confirmation")
+
     # finish
     subparsers.add_parser("finish", help="Clear active task")
 
@@ -777,6 +823,7 @@ def main() -> int:
         "list-context": cmd_list_context,
         "start": cmd_start,
         "current": cmd_current,
+        "continuity": cmd_continuity,
         "finish": cmd_finish,
         "set-branch": cmd_set_branch,
         "set-base-branch": cmd_set_base_branch,

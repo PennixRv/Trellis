@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from .active_task import resolve_context_key
+from .continuation_record import status as continuity_status
 from .config import get_git_packages
 from .git import run_git
 from .packages_context import get_packages_section
@@ -558,6 +559,8 @@ def get_context_json(repo_root: Path | None = None) -> dict:
     if pkg_git_info:
         result["packageGit"] = pkg_git_info
 
+    result["continuity"] = continuity_status(repo_root)
+
     return result
 
 
@@ -644,6 +647,8 @@ def get_context_text(repo_root: Path | None = None) -> str:
             lines.append("[!] This task has prd.md - read it for task details")
     else:
         lines.append("(none)")
+    continuity = continuity_status(repo_root)
+    lines.append(f"Continuation Record: {continuity['status']}")
     lines.append("")
 
     # Active tasks
@@ -796,6 +801,8 @@ def get_context_record_json(repo_root: Path | None = None) -> dict:
 
     if pkg_git_info:
         result["packageGit"] = pkg_git_info
+
+    result["continuity"] = continuity_status(repo_root)
 
     return result
 
