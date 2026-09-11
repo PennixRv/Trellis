@@ -6155,6 +6155,30 @@ print(json.dumps({
     expect(output).not.toContain("session-fallback");
   });
 
+  it("[session-isolation] a known session with a missing, empty, or malformed pointer never borrows a sole foreign session", () => {
+    setupTaskRepo();
+    const sessionsDir = path.join(tmpDir, ".trellis", ".runtime", "sessions");
+    for (const [sessionId, ownContent] of [
+      ["missing", null],
+      ["empty", JSON.stringify({ current_task: "" })],
+      ["malformed", "{"],
+    ] as const) {
+      fs.rmSync(sessionsDir, { recursive: true, force: true });
+      writeSessionContext("codex_source", ".trellis/tasks/issue-106");
+      if (ownContent) {
+        writeProjectFile(
+          path.join(".trellis", ".runtime", "sessions", `codex_${sessionId}.json`),
+          ownContent,
+        );
+      }
+
+      const { output, status } = runTaskCurrent({ CODEX_THREAD_ID: sessionId });
+      expect(status).toBe(1);
+      expect(output).toContain("Current task: (none)");
+      expect(output).toContain("Source: none");
+    }
+  });
+
   it("[issue #469] finish removes only the exact matched session file", () => {
     setupTaskRepo();
     writeSessionContext("codex_exact", ".trellis/tasks/issue-106");
@@ -6180,7 +6204,7 @@ print(json.dumps({
     ).toBe(true);
   });
 
-  it("[issue #469] finish removes the sole fallback session file", () => {
+  it("[session-isolation] finish leaves a sole foreign session file untouched", () => {
     setupTaskRepo();
     writeSessionContext("codex_previous-thread", ".trellis/tasks/issue-106");
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
@@ -6201,8 +6225,8 @@ print(json.dumps({
       },
     );
 
-    expect(output).toContain("Source: session-fallback:codex_previous-thread");
-    expect(fs.existsSync(fallbackPath)).toBe(false);
+    expect(output).toContain("No current task set");
+    expect(fs.existsSync(fallbackPath)).toBe(true);
 
     const current = runTaskCurrent({ CODEX_THREAD_ID: "current-thread" });
     expect(current.status).toBe(1);
@@ -6335,6 +6359,28 @@ print(json.dumps({
       JSON.stringify(inputData),
     );
   }
+
+  it("[session-isolation] Codex workflow state does not inherit a foreign sole session", () => {
+    setupTaskRepo();
+    writeSessionContext("codex_source", ".trellis/tasks/issue-106");
+    const hookPath = path.join(".codex", "hooks", "inject-workflow-state.py");
+    writeProjectFile(
+      hookPath,
+      expectTemplateContent(injectWorkflowStateScript, "inject-workflow-state"),
+    );
+
+    const parsed = JSON.parse(
+      runPython(
+        hookPath,
+        JSON.stringify({ cwd: tmpDir, session_id: "target" }),
+      ),
+    ) as {
+      hookSpecificOutput: { additionalContext: string };
+    };
+
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("Status: no_task");
+    expect(parsed.hookSpecificOutput.additionalContext).not.toContain("issue-106");
+  });
 
   it("[workflow-state] missing/empty workflow.md degrades to generic line (post-R5: no fallback dict)", () => {
     setupTaskRepo();
@@ -7897,7 +7943,7 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] codex breadcrumb defaults to inline dispatch when config is absent", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext("codex_workflow-a", ".trellis/tasks/issue-106");
     const codexHookPath = writeCodexInjectHook();
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
@@ -7922,7 +7968,7 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] codex breadcrumb routes to plain status when codex.dispatch_mode=sub-agent", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext("codex_workflow-a", ".trellis/tasks/issue-106");
     const codexHookPath = writeCodexInjectHook();
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
@@ -7948,7 +7994,7 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] codex breadcrumb routes to inline tag when codex.dispatch_mode=inline", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext("codex_workflow-a", ".trellis/tasks/issue-106");
     const codexHookPath = writeCodexInjectHook();
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
@@ -7975,7 +8021,7 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] non-codex platform ignores codex.dispatch_mode=inline", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext("claude_workflow-a", ".trellis/tasks/issue-106");
     // Hook installed under .claude/ — _detect_platform returns "claude".
     const claudeHookPath = path.join(
       ".claude",

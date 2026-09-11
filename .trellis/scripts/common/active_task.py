@@ -653,12 +653,12 @@ def resolve_active_task(
 ) -> ActiveTask:
     """Resolve the active task from session runtime state only.
 
-    A stale session task is returned as stale. Missing context identity or a
-    missing/empty session context falls back to single-session inference: if
-    exactly one session file exists in the runtime, return its task with
-    source_type="session-fallback" — covers pull-based platform sub-agents
-    (copilot, gemini, qoder) that don't inherit the parent's session id. ≥2
-    files or 0 files yield ActiveTask(None) — refuses to guess across windows.
+    A stale session task is returned as stale. A known context identity is
+    authoritative: a missing or empty context for that identity returns no
+    task. When context identity is unavailable, single-session inference may
+    cover pull-based platform sub-agents (copilot, gemini, qoder) that don't
+    inherit the parent's session id. ≥2 files or 0 files yield
+    ActiveTask(None) — refuses to guess across windows.
     """
     context_key = resolve_context_key(
         platform_input,
@@ -671,6 +671,7 @@ def resolve_active_task(
         active = _active_from_ref(task_ref, repo_root, "session", context_key)
         if active:
             return active
+        return ActiveTask(None, "none", context_key)
 
     if allow_single_session_fallback:
         fallback = _resolve_single_session_fallback(repo_root)
