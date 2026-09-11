@@ -10,6 +10,7 @@ Usage:
     python3 task.py list-context <dir>          # List jsonl entries
     python3 task.py start <dir>                 # Set active task, record current branch
     python3 task.py current [--source] [--json] # Show active task
+    python3 task.py ownership <operation> ...   # Manage formal handoff task ownership
     python3 task.py finish                      # Clear active task
     python3 task.py set-branch <dir> <branch>   # Set git branch
     python3 task.py set-base-branch <dir> <branch>  # Set PR target branch
@@ -80,6 +81,17 @@ from common.continuation_record import (
     clear as clear_continuity,
     seal as seal_continuity,
     status as continuity_status,
+)
+from common.ownership_record import (
+    OwnershipError,
+    archive as archive_ownership,
+    assert_task_mutation_allowed,
+    claim as claim_ownership,
+    consume as consume_ownership,
+    quiesce as quiesce_ownership,
+    retire as retire_ownership,
+    seal as seal_ownership,
+    status as ownership_status,
 )
 
 
@@ -198,6 +210,12 @@ def cmd_start(args: argparse.Namespace) -> int:
         print("Hint: Use task name (e.g., 'my-task') or full path (e.g., '.trellis/tasks/01-31-my-task')")
         return 1
 
+    try:
+        assert_task_mutation_allowed(repo_root, full_path)
+    except (OwnershipError, OSError) as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 2
+
     # Context-manifest gate (#573): a seeded-but-uncurated implement/check
     # manifest means every sub-agent dispatched for this task runs with zero
     # spec context, and nothing downstream surfaces that to the main session.
@@ -282,15 +300,22 @@ def cmd_start(args: argparse.Namespace) -> int:
 def cmd_finish(args: argparse.Namespace) -> int:
     """Clear active task."""
     repo_root = get_repo_root()
-    active = clear_active_task(repo_root)
+    active = resolve_active_task(repo_root)
     current = active.task_path
 
     if not current:
         print(colored("No current task set", Colors.YELLOW))
         return 0
 
+    try:
+        assert_task_mutation_allowed(repo_root, repo_root / current)
+    except (OwnershipError, OSError) as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 2
+
     # Resolve task.json path before clearing
     task_json_path = repo_root / current / FILE_TASK_JSON
+    clear_active_task(repo_root)
 
     print(colored(f"✓ Cleared current task (was: {current})", Colors.GREEN))
     print(f"Source: {active.source}")
@@ -379,6 +404,54 @@ def cmd_continuity(args: argparse.Namespace) -> int:
         return 0
     except (ContinuationError, OSError) as exc:
         print(json.dumps({"status": STATUS_WITHHELD, "reason": str(exc)}, ensure_ascii=False, sort_keys=True))
+        return 2
+
+
+def cmd_ownership(args: argparse.Namespace) -> int:
+    """Manage the task-bound formal handoff ownership record."""
+    repo_root = get_repo_root()
+    if args.ownership_command == "status":
+        try:
+            result = ownership_status(repo_root, args.task_id, args.handoff_id, args.core_digest)
+        except (OwnershipError, OSError) as exc:
+            print(json.dumps({"status": "withheld", "reason": str(exc)}, ensure_ascii=False, sort_keys=True))
+            return 2
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
+    if not getattr(args, "explicit_user_request", False):
+        print(colored("Error: ownership writes require --explicit-user-request", Colors.RED), file=sys.stderr)
+        return 2
+    try:
+        command = args.ownership_command
+        if command == "quiesce":
+            result = quiesce_ownership(
+                repo_root, args.task, args.handoff_id, args.core_digest, args.source_session_id
+            )
+        elif command == "seal":
+            result = seal_ownership(
+                repo_root, args.task_id, args.handoff_id, args.core_digest, args.expected_generation
+            )
+        elif command == "retire":
+            result = retire_ownership(
+                repo_root, args.task_id, args.handoff_id, args.core_digest,
+                args.expected_generation, args.archive_observation,
+            )
+        elif command == "claim":
+            result = claim_ownership(
+                repo_root, args.task_id, args.task, args.handoff_id, args.core_digest, args.expected_generation
+            )
+        elif command == "consume":
+            result = consume_ownership(
+                repo_root, args.task_id, args.handoff_id, args.core_digest, args.expected_generation
+            )
+        else:
+            result = archive_ownership(
+                repo_root, args.task_id, args.handoff_id, args.core_digest, args.expected_generation
+            )
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
+    except (OwnershipError, OSError) as exc:
+        print(json.dumps({"status": "withheld", "reason": str(exc)}, ensure_ascii=False, sort_keys=True))
         return 2
 
 
@@ -743,6 +816,45 @@ def main() -> int:
     continuity_clear.add_argument("--expected", required=True, help="The current record digest or absent")
     continuity_clear.add_argument("--explicit-user-request", action="store_true", help="Required write confirmation")
 
+    # ownership
+    p_ownership = subparsers.add_parser("ownership", help="Manage formal handoff task ownership")
+    ownership_sub = p_ownership.add_subparsers(dest="ownership_command", required=True)
+
+    def add_ownership_common(parser, *, expected=False):
+        parser.add_argument("--task-id", required=True, help="Task id bound to the handoff")
+        parser.add_argument("--handoff-id", required=True, help="Immutable handoff id")
+        parser.add_argument("--core-digest", required=True, help="Immutable handoff core digest")
+        if expected:
+            parser.add_argument("--expected-generation", required=True, type=int)
+        parser.add_argument("--explicit-user-request", action="store_true", help="Required write confirmation")
+
+    ownership_quiesce = ownership_sub.add_parser("quiesce", help="Begin source handoff quiescence")
+    ownership_quiesce.add_argument("--task", required=True, help="Current task path")
+    ownership_quiesce.add_argument("--source-session-id", required=True)
+    add_ownership_common(ownership_quiesce)
+
+    ownership_seal = ownership_sub.add_parser("seal", help="Seal the source ownership boundary")
+    add_ownership_common(ownership_seal, expected=True)
+
+    ownership_retire = ownership_sub.add_parser("retire", help="Retire source and expose handoff")
+    ownership_retire.add_argument("--archive-observation", required=True, choices=("not_required", "observed"))
+    add_ownership_common(ownership_retire, expected=True)
+
+    ownership_claim = ownership_sub.add_parser("claim", help="Claim a ready handoff as this session")
+    ownership_claim.add_argument("--task", required=True, help="Task path to bind to this session")
+    add_ownership_common(ownership_claim, expected=True)
+
+    ownership_consume = ownership_sub.add_parser("consume", help="Record target consumption")
+    add_ownership_common(ownership_consume, expected=True)
+
+    ownership_archive = ownership_sub.add_parser("archive", help="Record post-consume retention archive")
+    add_ownership_common(ownership_archive, expected=True)
+
+    ownership_status_parser = ownership_sub.add_parser("status", help="Show ownership status")
+    add_ownership_common(ownership_status_parser)
+    ownership_status_parser.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+    ownership_status_parser.set_defaults(explicit_user_request=True)
+
     # finish
     subparsers.add_parser("finish", help="Clear active task")
 
@@ -824,6 +936,7 @@ def main() -> int:
         "start": cmd_start,
         "current": cmd_current,
         "continuity": cmd_continuity,
+        "ownership": cmd_ownership,
         "finish": cmd_finish,
         "set-branch": cmd_set_branch,
         "set-base-branch": cmd_set_base_branch,
