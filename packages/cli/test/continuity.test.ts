@@ -113,6 +113,84 @@ describe("task continuity", () => {
     expect(result).toMatchObject({ status: "withheld", reason: "session_fallback_untrusted" });
   });
 
+  it("fails closed when the direct task pointer changes while acquiring a record lock", () => {
+    const root = fixture();
+    const request = path.join(root, "continuity-request.json");
+    fs.writeFileSync(request, JSON.stringify({
+      objective: "Do not cross task boundaries.", decisions: [], completed: [], open_items: [], blockers: [],
+      next_safe_action: "Wait for explicit authorization.", non_transferable_operations: [], evidence: ["evidence.md"],
+    }) + "\n");
+    const other = path.join(root, ".trellis", "tasks", "other");
+    fs.mkdirSync(other, { recursive: true });
+    fs.writeFileSync(path.join(other, "task.json"), JSON.stringify({ id: "other", title: "Other", status: "in_progress", children: [] }) + "\n");
+
+    const probe = spawnSync(python, ["-c", String.raw`
+import json
+import sys
+from contextlib import contextmanager
+from pathlib import Path
+
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / ".trellis" / "scripts"))
+from common import continuation_record as record
+
+@contextmanager
+def switch_pointer(_):
+    (root / ".trellis" / ".runtime" / "sessions" / "codex_target.json").write_text(
+        json.dumps({"current_task": ".trellis/tasks/other"}) + "\n", encoding="utf-8"
+    )
+    yield
+
+record._record_lock = switch_pointer
+try:
+    record.seal(root, root / "continuity-request.json", "absent")
+except record.ContinuationError as exc:
+    print(exc)
+    raise SystemExit(0)
+raise SystemExit("seal unexpectedly accepted a changed task")
+`, root], {
+      cwd: root, encoding: "utf8", env: { ...process.env, TRELLIS_CONTEXT_ID: "codex_target" },
+    });
+    expect(probe.status, probe.stderr).toBe(0);
+    expect(probe.stdout).toContain("current task changed while acquiring record lock");
+    expect(fs.existsSync(path.join(root, ".trellis", ".runtime", "continuation-records", "demo", "record.json"))).toBe(false);
+
+    fs.writeFileSync(path.join(root, ".trellis", ".runtime", "sessions", "codex_target.json"), JSON.stringify({ current_task: ".trellis/tasks/demo" }) + "\n");
+    const sealed = run(root, ["seal", "--request", "continuity-request.json", "--expected", "absent", "--explicit-user-request"]);
+    expect(sealed.status, sealed.stderr).toBe(0);
+    const digest = JSON.parse(sealed.stdout).record_digest as string;
+    const clearProbe = spawnSync(python, ["-c", String.raw`
+import json
+import sys
+from contextlib import contextmanager
+from pathlib import Path
+
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / ".trellis" / "scripts"))
+from common import continuation_record as record
+
+@contextmanager
+def switch_pointer(_):
+    (root / ".trellis" / ".runtime" / "sessions" / "codex_target.json").write_text(
+        json.dumps({"current_task": ".trellis/tasks/other"}) + "\n", encoding="utf-8"
+    )
+    yield
+
+record._record_lock = switch_pointer
+try:
+    record.clear(root, sys.argv[2])
+except record.ContinuationError as exc:
+    print(exc)
+    raise SystemExit(0)
+raise SystemExit("clear unexpectedly accepted a changed task")
+`, root, digest], {
+      cwd: root, encoding: "utf8", env: { ...process.env, TRELLIS_CONTEXT_ID: "codex_target" },
+    });
+    expect(clearProbe.status, clearProbe.stderr).toBe(0);
+    expect(clearProbe.stdout).toContain("current task changed while acquiring record lock");
+    expect(fs.existsSync(path.join(root, ".trellis", ".runtime", "continuation-records", "demo", "record.json"))).toBe(true);
+  });
+
   it("serializes simultaneous seals and rejects a symlinked request path", async () => {
     const root = fixture();
     const request = path.join(root, "continuity-request.json");

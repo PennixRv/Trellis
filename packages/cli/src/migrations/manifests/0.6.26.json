@@ -1,0 +1,9 @@
+{
+  "version": "0.6.26",
+  "description": "Adds a task-bound continuation record for safe cross-session handoff state.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Features:**\n- Adds a bounded Continuation Record projection bound to the direct current Trellis session and task.\n- Fails closed when task identity changes while a continuation record operation is acquiring its lock.\n\n**Internal:**\n- Keeps continuation runtime state outside version-controlled project files.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

@@ -362,10 +362,15 @@ def status(root: Path | None = None) -> dict[str, Any]:
 def seal(root: Path, request_path: Path, expected: str) -> dict[str, Any]:
     expected = _expected_digest(expected)
     request_path = _request_path(root, request_path)
-    task = _task_source(root)
-    path = _record_path(root, task["id"])
+    initial_task = _task_source(root)
+    path = _record_path(root, initial_task["id"])
     with _record_lock(path):
         task = _task_source(root)
+        if (
+            (task["id"], task["path"], task["context_key"])
+            != (initial_task["id"], initial_task["path"], initial_task["context_key"])
+        ):
+            raise ContinuationError("current task changed while acquiring record lock")
         current_digest: str | None = None
         current: dict[str, Any] | None = None
         if path.exists():
@@ -419,9 +424,15 @@ def seal(root: Path, request_path: Path, expected: str) -> dict[str, Any]:
 
 def clear(root: Path, expected: str) -> dict[str, Any]:
     expected = _expected_digest(expected)
-    task = _task_source(root)
-    path = _record_path(root, task["id"])
+    initial_task = _task_source(root)
+    path = _record_path(root, initial_task["id"])
     with _record_lock(path):
+        task = _task_source(root)
+        if (
+            (task["id"], task["path"], task["context_key"])
+            != (initial_task["id"], initial_task["path"], initial_task["context_key"])
+        ):
+            raise ContinuationError("current task changed while acquiring record lock")
         if not path.exists():
             if expected == "absent":
                 return {"status": STATUS_ABSENT}
