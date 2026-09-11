@@ -49,6 +49,21 @@ injection, so the fix is intentionally made at the shared policy boundary.
 
 The source checkout was safely fast-forwarded from detached `HEAD` to local
 `main` at the existing user-owned `890196e1` line, preserving its two commits
-and the pre-existing `marketplace` modification. The source fix must pass the
-full quality gate before the stable release script is run; generated `dist/`
+and the pre-existing `marketplace` Gitlink. The source fix passed the full
+serial quality gate before the stable release script was run; generated `dist/`
 files must come from the release build and must not be edited manually.
+
+The release script correctly rejected the first attempt before it created a
+release commit, tag, or push: npm already contains `@pennixrv/trellis@0.6.24`,
+but both its tarball and this source line lacked `0.6.24.json`. The published
+v0.6.24 task records establish that it was the non-migrating semantic
+RecoveryBrief/formal-handoff Marketplace release. This repository therefore
+backfills the matching non-migrating manifest; the continuity gate is not
+bypassed.
+
+Marketplace is a Git workflow registry, not an npm package. Its `index.json`
+`version` remains registry schema version `1`. For the coordinated v0.6.25
+release, the clean Marketplace `8ff6829` source commit is retained and receives
+an immutable `v0.6.25` compatibility tag before the parent Trellis v0.6.25
+release. The parent Gitlink already pins that exact commit, so no unrelated
+Marketplace asset change is justified.

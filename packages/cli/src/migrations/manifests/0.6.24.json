@@ -1,0 +1,9 @@
+{
+  "version": "0.6.24",
+  "description": "Publishes the bounded semantic RecoveryBrief and formal handoff workflow contract.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Enhancements:**\n- Adds the bounded semantic RecoveryBrief and formal handoff contract to the Pennix Marketplace `codex-subnode-channel` workflow.\n- Aligns the published Trellis workflow source with the Pennix Marketplace v0.6.24 release.\n\n**Internal:**\n- Restores the missing release manifest so adjacent-version `trellis update` paths remain complete.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}
