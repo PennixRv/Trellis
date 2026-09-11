@@ -67,3 +67,22 @@ release, the clean Marketplace `8ff6829` source commit is retained and receives
 an immutable `v0.6.25` compatibility tag before the parent Trellis v0.6.25
 release. The parent Gitlink already pins that exact commit, so no unrelated
 Marketplace asset change is justified.
+
+## Deployment evidence
+
+- Marketplace tag `v0.6.25` was pushed successfully and resolves to content
+  commit `8ff6829244b8b0206b15dbd63d99ed45340d980f`.
+- Trellis release commit `24ee1ee717656ced304574562d08b3ea767161c3` and tag
+  `v0.6.25` were pushed to `PennixRv/Trellis`; its `marketplace` Gitlink is the
+  same Marketplace content commit.
+- GitHub `CI` and `Publish to npm` runs for `0.6.25` completed successfully;
+  both `@pennixrv/trellis@0.6.25` and `@pennixrv/trellis-core@0.6.25` resolve
+  from the public npm registry.
+- `/usr/bin/trellis` was reinstalled from npm and reports `0.6.25`. The current
+  project was updated through `trellis update --skip-all`; one unconflicted
+  resolver template changed, while ten existing customized files were
+  preserved. The requested strict disposable-project initialization smoke test
+  was intentionally skipped after the user confirmed it was unnecessary.
+- The user-level static Trellis records in `/home/penn/.codex/pennix-docs/`
+  were updated to the aligned `0.6.25` release and committed locally as
+  `d76f58b`.
