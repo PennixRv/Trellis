@@ -1,0 +1,7 @@
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"Review implementation quality, security, compatibility, and dependency boundaries."}
+{"file":".trellis/spec/cli/backend/filesystem-safety.md","reason":"Audit CAS, atomicity, path containment, symlink, permissions, and failure safety."}
+{"file":".trellis/spec/cli/backend/workflow-state-contract.md","reason":"Verify hooks remain read-only and mandatory workflow breadcrumb text stays synchronized."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Verify regression coverage and meaningful failure-before-fix assertions."}
+{"file":".trellis/spec/cli/unit-test/integration-patterns.md","reason":"Verify fresh init/update and template/dogfood parity."}
+{"file":".trellis/tasks/09-11-continuation-record-runtime/design.md","reason":"Check implementation against the CR contract, states, CAS, and ownership boundaries."}
+{"file":".trellis/tasks/09-11-continuation-record-runtime/implement.md","reason":"Check ordered execution, validation gates, release, and rollback requirements."}

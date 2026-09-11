@@ -1,0 +1,8 @@
+{"file":".trellis/spec/cli/backend/index.md","reason":"CLI backend routing and pre-development checklist."}
+{"file":".trellis/spec/cli/backend/filesystem-safety.md","reason":"Runtime path containment, symlink, atomic write, permission, and destructive-operation safety."}
+{"file":".trellis/spec/cli/backend/script-conventions.md","reason":"Bundled script conventions and dogfood/template synchronization contract."}
+{"file":".trellis/spec/cli/backend/workflow-state-contract.md","reason":"Read-only workflow-state injection and breadcrumb invariants."}
+{"file":".trellis/spec/cli/backend/commands-update.md","reason":"Fresh init/update template propagation and conflict behavior."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Regression and non-tautological test conventions."}
+{"file":".trellis/spec/cli/unit-test/integration-patterns.md","reason":"Template distribution and project integration test patterns."}
+{"file":".trellis/tasks/09-11-continuation-record-runtime/research/2026-09-11-implementation-contract-baseline.md","reason":"Verified CR source boundaries, registration points, and unresolved gates."}

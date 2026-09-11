@@ -1,0 +1,33 @@
+{
+  "id": "continuation-record-runtime",
+  "name": "continuation-record-runtime",
+  "title": "Implement task-bound Continuation Record runtime",
+  "description": "Add a task-bound, source-digest and CAS-guarded Continuation Record with read-only context projection without taking ownership of formal handoff or OpenViking lifecycle.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-09-11",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-11-session-isolation-resolver-fix"
+  ],
+  "parent": null,
+  "relatedFiles": [
+    "prd.md",
+    "design.md",
+    "implement.md",
+    "research/2026-09-11-implementation-contract-baseline.md"
+  ],
+  "notes": "First source change is the inherited session-isolation resolver repair: a known current context key without a task pointer must not borrow a foreign sole-session pointer. Preserve only no-identity fallback. This task directly repairs the fork; no separate repair task is created.",
+  "meta": {}
+}
