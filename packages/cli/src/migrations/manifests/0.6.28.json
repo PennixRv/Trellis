@@ -1,0 +1,9 @@
+{
+  "version": "0.6.28",
+  "description": "Publishes the ownership-safe task handoff transfer runtime.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Enhancements:**\n- Publishes ownership-safe task handoff transfer state and its bundled project helpers.\n\n**Internal:**\n- No project-file migration is required for this release.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow. This manifest restores the published 0.6.28 release entry so updates do not skip a version in the manifest chain."
+}

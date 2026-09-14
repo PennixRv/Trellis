@@ -62,6 +62,7 @@ import { agentsMdContent } from "../../src/templates/markdown/index.js";
 import { computeHash, loadHashes } from "../../src/utils/template-hash.js";
 import {
   subnodeAgentTemplate,
+  subnodeEnvTemplate,
   workflowMdTemplate,
 } from "../../src/templates/trellis/index.js";
 import {
@@ -283,6 +284,29 @@ describe("update() integration", () => {
     const hashes = readHashesV2(hashFilePath());
     expect(hashes[`${PATHS.AGENTS}/subnode.md`]).toBe(
       computeHash(subnodeAgentTemplate),
+    );
+  });
+
+  it("backfills the managed subnode role environment through the normal update path", async () => {
+    await setupProject();
+    const envPath = projectFile(`${PATHS.AGENTS}/subnode.env`);
+    fs.rmSync(envPath);
+    // Model a project created before this asset existed, not a user deletion.
+    writeHashesV2(
+      hashFilePath(),
+      removeHashEntry(
+        readHashesV2(hashFilePath()),
+        `${PATHS.AGENTS}/subnode.env`,
+      ) as Record<string, string>,
+    );
+    fs.writeFileSync(versionFilePath(), "0.6.17");
+
+    await update({});
+
+    expect(fs.readFileSync(envPath, "utf-8")).toBe(subnodeEnvTemplate);
+    const hashes = readHashesV2(hashFilePath());
+    expect(hashes[`${PATHS.AGENTS}/subnode.env`]).toBe(
+      computeHash(subnodeEnvTemplate),
     );
   });
 

@@ -217,6 +217,134 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     expect(validate.stdout).toContain("pending-review");
   });
 
+  it("binds a worker handle and creates one coordinator disposition", () => {
+    const mismatch = run(
+      tmp,
+      "init",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "coordinator-decision",
+      "--subnode-id",
+      "primary",
+      "--draft",
+      writeDraft(tmp, "mismatch.json", {
+        channel_ref: {
+          name: "subnode-task-a",
+          scope: "project",
+          worker_handle: "other-worker",
+        },
+      }),
+    );
+    expect(mismatch.status).toBe(1);
+    expect(mismatch.stderr).toContain("worker_handle must match");
+
+    const init = run(
+      tmp,
+      "init",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "coordinator-decision",
+      "--subnode-id",
+      "primary",
+      "--draft",
+      writeDraft(tmp, "decision.json"),
+    );
+    expect(init.status, init.stderr).toBe(0);
+    const report = writeCompleteReport(
+      tmp,
+      "coordinator-decision",
+      "primary",
+      "source",
+      "README.md",
+    );
+
+    const missingChecks = run(
+      tmp,
+      "disposition",
+      "--report",
+      report,
+      "--outcome",
+      "accepted",
+      "--terminal-lifecycle",
+      "done",
+      "--terminal-seq",
+      "17",
+      "--terminal-at",
+      "2026-09-14T03:00:00Z",
+      "--check",
+      "report_validation",
+      "--reason",
+      "The coordinator inspected the report.",
+    );
+    expect(missingChecks.status).toBe(1);
+    expect(missingChecks.stderr).toContain("disposition.checks is missing");
+
+    const disposition = run(
+      tmp,
+      "disposition",
+      "--report",
+      report,
+      "--outcome",
+      "accepted",
+      "--terminal-lifecycle",
+      "done",
+      "--terminal-seq",
+      "17",
+      "--terminal-at",
+      "2026-09-14T03:00:00Z",
+      "--check",
+      "report_validation",
+      "--check",
+      "source_recheck",
+      "--check",
+      "protected_target_check",
+      "--reason",
+      "The coordinator independently rechecked the evidence and target state.",
+    );
+    expect(disposition.status, disposition.stderr).toBe(0);
+    const dispositionPath = path.join(
+      artifactDir(tmp, "coordinator-decision", "primary"),
+      "disposition.json",
+    );
+    expect(JSON.parse(fs.readFileSync(dispositionPath, "utf-8"))).toMatchObject({
+      outcome: "accepted",
+      report_status: "complete",
+      terminal: { lifecycle: "done", seq: 17 },
+      checks: [
+        "report_validation",
+        "source_recheck",
+        "protected_target_check",
+      ],
+    });
+
+    const duplicate = run(
+      tmp,
+      "disposition",
+      "--report",
+      report,
+      "--outcome",
+      "accepted",
+      "--terminal-lifecycle",
+      "done",
+      "--terminal-seq",
+      "17",
+      "--terminal-at",
+      "2026-09-14T03:00:00Z",
+      "--check",
+      "report_validation",
+      "--check",
+      "source_recheck",
+      "--check",
+      "protected_target_check",
+      "--reason",
+      "Repeated decision.",
+    );
+    expect(duplicate.status).toBe(1);
+    expect(duplicate.stderr).toContain("disposition already exists");
+  });
+
   it("permits bounded planning evidence before task activation", () => {
     const taskPath = path.join(tmp, ".trellis", "tasks", "task-a", "task.json");
     const task = JSON.parse(fs.readFileSync(taskPath, "utf-8"));
@@ -233,7 +361,13 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
       "--subnode-id",
       "independent-design",
       "--draft",
-      writeDraft(tmp, "planning-draft.json"),
+      writeDraft(tmp, "planning-draft.json", {
+        channel_ref: {
+          name: "subnode-task-a",
+          scope: "project",
+          worker_handle: "independent-design",
+        },
+      }),
     );
     expect(init.status, init.stderr).toBe(0);
     expect(
@@ -359,7 +493,14 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
       "--subnode-id",
       "retry-1",
       "--draft",
-      writeDraft(tmp, "missing-retry-target.json", { retry_of: "primary" }),
+      writeDraft(tmp, "missing-retry-target.json", {
+        retry_of: "primary",
+        channel_ref: {
+          name: "subnode-task-a",
+          scope: "project",
+          worker_handle: "retry-1",
+        },
+      }),
     );
     expect(missing.status).toBe(1);
     expect(missing.stderr).toContain("existing subnode brief");

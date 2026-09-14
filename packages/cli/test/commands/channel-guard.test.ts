@@ -15,6 +15,8 @@ import {
   formatBudgetOverflowError,
   isIdleCleanupEligible,
   parseWorkerGuardSection,
+  parseSubnodeDispatchSection,
+  loadSubnodeDispatchConfig,
   resolveWorkerGuardConfig,
   scanLiveWorkers,
   type LiveWorker,
@@ -222,6 +224,71 @@ describe("parseWorkerGuardSection", () => {
         ].join("\n"),
       ),
     ).toThrow(/non-negative integer/);
+  });
+});
+
+describe("subnode dispatch defaults", () => {
+  it("parses role defaults and inline comments", () => {
+    const parsed = parseSubnodeDispatchSection(
+      [
+        "channel:",
+        "  worker_guard:",
+        "    max_live_workers: 6",
+        "  subnode:",
+        "    idle_timeout: 2m # role idle cleanup",
+        "    max_live_workers: 8",
+        "    timeout: '30m'",
+        "    warn_before: 5m",
+      ].join("\n"),
+    );
+    expect(parsed).toEqual({
+      idleTimeoutMs: 2 * 60_000,
+      maxLiveWorkers: 8,
+      timeoutMs: 30 * 60_000,
+      warnBeforeMs: 5 * 60_000,
+    });
+  });
+
+  it("uses the subnode default budget without changing ordinary defaults", () => {
+    expect(loadSubnodeDispatchConfig("/nonexistent").maxLiveWorkers).toBe(8);
+    expect(
+      resolveWorkerGuardConfig({
+        cwd: "/nonexistent",
+        env: {},
+      }).maxLiveWorkers,
+    ).toBe(DEFAULT_MAX_LIVE_WORKERS);
+  });
+
+  it("lets explicit flags and guard environment override the role default", () => {
+    expect(
+      resolveWorkerGuardConfig({
+        cwd: "/nonexistent",
+        env: { [ENV_MAX_LIVE_WORKERS]: "3" },
+        roleDefaults: { maxLiveWorkers: 8 },
+      }).maxLiveWorkers,
+    ).toBe(3);
+    expect(
+      resolveWorkerGuardConfig({
+        cwd: "/nonexistent",
+        env: {},
+        flagMaxLiveWorkers: 2,
+        roleDefaults: { maxLiveWorkers: 8 },
+      }).maxLiveWorkers,
+    ).toBe(2);
+  });
+
+  it("stops parsing the role section at the next channel key", () => {
+    const parsed = parseSubnodeDispatchSection(
+      [
+        "channel:",
+        "  subnode:",
+        "    max_live_workers: 8",
+        "  trusted_context_dirs:",
+        "    - /tmp/contexts",
+      ].join("\n"),
+    );
+    expect(parsed?.maxLiveWorkers).toBe(8);
+    expect(parsed?.timeoutMs).toBeUndefined();
   });
 });
 

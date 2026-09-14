@@ -98,7 +98,8 @@ trellis channel create <name> [opts]
 
 trellis channel spawn <name> [opts]
   --scope <scope>        : project | global
-  --agent <name>         : load .trellis/agents/<name>.md (sets provider / as / system prompt)
+  --agent <name>         : load .trellis/agents/<name>.md (sets provider / as / system prompt;
+                           optional role env_file is loaded automatically)
   --provider <p>         : claude | codex (overrides agent)
   --as <worker-name>     : worker identifier (default = agent name)
   --cwd <path>           : worker cwd (default process.cwd())
@@ -109,20 +110,24 @@ trellis channel spawn <name> [opts]
                            to match the user's main-session Codex permissions; ignored
                            for other providers; invalid value throws before spawn)
   --timeout <duration>   : auto-kill after duration (e.g. "30m", "1h", "7200s")
-                           — no default; opt-in hard cutoff
+                           — `channel.subnode.timeout` when `--agent subnode`,
+                           otherwise no default; explicit flag wins
   --warn-before <duration>: emit `supervisor_warning` before timeout
-                           (default "5m"; "0ms" disables warning)
+                           (subnode role default from `channel.subnode.warn_before`;
+                           otherwise "5m"; "0ms" disables warning)
   --file <path>          : context file (repeatable, glob OK)
   --jsonl <path>         : manifest of {file, reason} entries (repeatable)
   --by <agent>           : caller identity recorded on `spawned` event
   --inbox-policy <policy>: explicitOnly | broadcastAndExplicit (default explicitOnly)
                            — durable worker inbox delivery policy recorded on `spawned`
   --idle-timeout <duration>: OOM-guard idle-cleanup TTL for this worker
-                           (default 5m from .trellis/config.yaml; "0" disables idle cleanup;
+                           (subnode role default from `channel.subnode.idle_timeout`;
+                           otherwise 5m from `.trellis/config.yaml`; "0" disables idle cleanup;
                            supervisor self-terminates with `killed{reason:"idle-timeout"}`
                            when continuously idle past the TTL — never mid-turn)
   --max-live-workers <n> : spawn-time live-worker budget for this project/scope
-                           (default 6 from .trellis/config.yaml; "0" disables the
+                           (subnode role default 8 from `channel.subnode`;
+                           otherwise 6 from `.trellis/config.yaml`; "0" disables the
                            budget check; expired idle workers are cleaned first,
                            then `spawn` rejects with an actionable error if still over)
   → stdout (one line, JSON): {"pid": number, "log": string, "worker": string}
@@ -169,6 +174,12 @@ trellis channel wait <name> [opts]
 trellis channel barrier <name> [opts]
   --scope <scope>        : project | global
   → stdout: current durable event sequence as one integer; does not append an event
+
+trellis channel workers <name> [opts]
+  --scope <scope>        : project | global
+  --include-terminal     : include terminal worker projections
+  --json                 : emit the complete durable projection as JSON
+  → stdout: worker projection table or JSON; never reads PID sidecars
 
 trellis channel messages <name> [opts]
   --scope <scope>        : project | global
@@ -233,7 +244,8 @@ trellis channel run [name] [opts]
   --message <text>       : inline prompt
   --message-file <path>  : read prompt from file
   --stdin                : read prompt from stdin
-  --timeout <duration>   : max wait for done (default 5m)
+  --timeout <duration>   : max wait for done (default 5m; `channel.subnode.timeout`
+                            when `--agent subnode` and no explicit timeout is set)
   → on success: stdout = worker's final message body, channel auto-rm'd, exit 0
   → on failure (error/killed/timeout): channel preserved, stderr "channel kept for inspection: <path>", exit 1
 
@@ -445,6 +457,11 @@ type ChannelEventKind =
   `turn_started.inputSeq`. Pid files feed `probeWorkerRuntime` /
   `reconcileWorkerLiveness` only; `reconcileWorkerLiveness` performs no durable
   writes unless `appendTerminalEvents: true`.
+- `trellis channel workers` exposes this same projection for coordinator
+  recovery and terminal confirmation. Without `--include-terminal`, terminal
+  workers are filtered out; `--json` is the machine-readable form. It never
+  reparses the event log in the CLI and never treats PID sidecars as lifecycle
+  truth.
 - Inbox policy applies to `kind:"message"` only. `explicitOnly` (default)
   consumes only messages whose `to` targets the worker; `broadcastAndExplicit`
   also consumes broadcasts. Old `spawned` events without `inboxPolicy` project
@@ -631,6 +648,13 @@ type WorkerGuardConfig = {
   idleTimeoutMs: number; // default 300_000; 0 disables idle cleanup
   maxLiveWorkers: number; // default 6; 0 disables spawn budget
 };
+
+type SubnodeDispatchConfig = {
+  idleTimeoutMs?: number;
+  maxLiveWorkers: number; // default 8; 0 disables spawn budget
+  timeoutMs: number; // default 30m
+  warnBeforeMs: number; // default 5m
+};
 ```
 
 CLI additions:
@@ -641,6 +665,15 @@ trellis channel spawn <name>
   --max-live-workers <n>     # 6 default; 0 disables live-worker budget
 ```
 
+For `--agent subnode`, the role-specific defaults are read from
+`.trellis/config.yaml#channel.subnode`. Explicit CLI flags take precedence;
+guard environment variables take precedence over the role's guard values;
+the generic `channel.worker_guard` remains the fallback. Missing subnode
+configuration uses code defaults for the role budget (`8`), timeout (`30m`),
+and warning lead (`5m`); an omitted role `idle_timeout` continues to fall
+through to `channel.worker_guard` (whose built-in default is `5m`). This does
+not change ordinary worker behavior.
+
 Config:
 
 ```yaml
@@ -648,7 +681,21 @@ channel:
   worker_guard:
     idle_timeout: 5m
     max_live_workers: 6
+  subnode:
+    idle_timeout: 5m
+    max_live_workers: 8
+    timeout: 30m
+    warn_before: 5m
 ```
+
+When `--agent subnode` is selected, `channel.subnode` supplies role defaults
+for these four values. Explicit spawn flags override them; the two existing
+guard environment variables override the role's guard values; ordinary
+workers continue to use `channel.worker_guard` and its default budget of 6.
+If an older project has no `channel.subnode` section, code defaults supply
+the role budget, timeout, and warning lead, while its existing
+`channel.worker_guard.idle_timeout` remains the idle fallback. No config
+migration is required.
 
 Env:
 
@@ -659,8 +706,9 @@ TRELLIS_CHANNEL_MAX_LIVE_WORKERS=6
 
 #### 3. Contracts
 
-- Configuration precedence is CLI flag → env → `.trellis/config.yaml` →
-  built-in default. `0` disables the corresponding guard at every layer.
+- Configuration precedence is CLI flag → env → `channel.subnode` for
+  `--agent subnode` → `channel.worker_guard` → built-in default. `0` disables
+  the corresponding guard at every layer.
 - The live-worker budget is per project bucket. `spawn` scans every channel
   in that bucket and counts non-terminal workers with live pids. It also
   counts `<worker>.reservation` sidecars as `lifecycle:"starting"` live
@@ -693,6 +741,7 @@ TRELLIS_CHANNEL_MAX_LIVE_WORKERS=6
 | `--max-live-workers <n>` is negative / non-integer                       | commander rejects with an argument error                                                   |
 | `idle_timeout: 0` or `TRELLIS_CHANNEL_WORKER_IDLE_TIMEOUT=0`             | idle cleanup disabled; workers are still counted for budget unless budget is also disabled |
 | `max_live_workers: 0` or `TRELLIS_CHANNEL_MAX_LIVE_WORKERS=0`            | budget check disabled; supervisor idle self-termination still works if TTL > 0             |
+| `--agent subnode` without `channel.subnode`                              | uses role code defaults for budget/timeout/warning and the existing worker-guard idle fallback; ordinary worker defaults remain unchanged |
 | Live count after expired-idle cleanup is `>= maxLiveWorkers`             | reject `spawn` with live worker list, `trellis channel kill` hints, and override hint      |
 | Idle worker pid is live but command line is unverified                   | count it; do not auto-signal it                                                            |
 | Worker is running a turn when idle TTL expires                           | do nothing until it returns to idle                                                        |
@@ -984,6 +1033,21 @@ only applies to per-worker supervisor cleanup.
 - `TRELLIS_CHANNEL_PROJECT` not set → derive from `process.cwd()`
 - `selectExistingChannelProject(name)` may **mutate `process.env.TRELLIS_CHANNEL_PROJECT`** when falling back to a unique cross-bucket match, so the rest of the CLI invocation lands on the same bucket
 
+### Role environment files
+
+An agent definition may declare `env_file: <name>` in frontmatter. The value
+must name a regular, relative sibling file under the agent's trusted roots.
+The channel loader parses one plain `KEY=VALUE` entry per non-empty,
+non-comment line and stores the result in the existing supervisor config. The
+supervisor merges those values into the provider child environment. There is no
+general `channel spawn --env` option: role-owned values stay attached to the
+agent card and are selected automatically by `--agent`.
+
+These files are normal `.trellis/agents/` template assets, so `trellis init`
+and `trellis update` manage them with the existing hash and conflict rules.
+They must not contain secrets. The generic channel runtime does not interpret
+shell quoting, expansion, or commands in them.
+
 ---
 
 ## 4. Validation & Error Matrix
@@ -1038,6 +1102,7 @@ only applies to per-worker supervisor cleanup.
 | `--agent <name>`                                                | `/^[A-Za-z0-9._-]+$/` regex                                                                                                                                                                                       | throw                                                                                                                                    |
 | `--agent` resolved path                                         | `realpath(path).startsWith(realpath(agentsRoot) + sep)`                                                                                                                                                           | throw                                                                                                                                    |
 | Frontmatter parse                                               | `Object.create(null)`, reject keys in `["__proto__","prototype","constructor"]`                                                                                                                                   | skip key                                                                                                                                 |
+| Agent `env_file`                                                | non-empty relative sibling path; regular file; realpath remains under the agent or trusted roots; entries are plain `KEY=VALUE`                                                                                                                                             | throw before spawn                                                                                                                        |
 | Context file per-file size                                      | `MAX_PER_FILE_BYTES = 1_000_000` (1MB)                                                                                                                                                                            | truncate + stderr warn                                                                                                                   |
 | Context total size                                              | `WARN_TOTAL_BYTES = 500_000` (500KB)                                                                                                                                                                              | stderr warn (still loads)                                                                                                                |
 
@@ -1210,6 +1275,10 @@ trellis channel send trellis-issue --scope global --as main --thread forum-mode 
 | `assertSafeName` / `channelDir` traversal guard | security         | (a) `".."`, `"."`, `"../x"`, `"../../x"`, `"a/b"`, `"a\b"` → throw `Invalid channel name`, (b) ordinary names (`"a"`, `"chat-only"`, `"a.b"`) accepted, (c) `channelDir("../../escape")` throws before resolving a path — duplicated in both `core` and `cli` copies of `paths.ts` |
 | Agent name validator                            | security         | `--agent ../../evil` → throw                                                                                                                                                                                                                                                       |
 | Frontmatter prototype pollution                 | security         | a `.trellis/agents/<name>.md` fixture with `__proto__: ...` frontmatter → key dropped, no pollution observable                                                                                                                                                                     |
+| Agent role environment file                     | unit/integration | `env_file: subnode.env` resolves beside the agent, parses plain `KEY=VALUE`, and rejects traversal or malformed entries; `trellis update` backfills the managed asset and hash                                                                                                                                                     |
+| Durable worker projection CLI                    | integration      | `channel workers` reads core `listWorkers`, hides terminal workers by default, includes them with `--include-terminal`, and emits the same projection as JSON with `--json`                                                                                                                                                      |
+| Subnode dispatch defaults                         | unit/integration | `channel.subnode` values apply only to `spawn --agent subnode`; explicit flags and guard env vars override them; missing config uses `8` while ordinary workers retain `6`                                                                                                                                                       |
+| Subnode coordinator disposition                  | integration      | valid report + terminal observation + required coordinator checks creates `disposition.json` once; a second write or missing check is rejected                                                                                                                                                                                   |
 | `safeIdentifier`                                | unit             | newline / NUL / control chars stripped from worker name in protocol prompt                                                                                                                                                                                                         |
 
 ---
@@ -1336,6 +1405,7 @@ commands/channel/
 ├── spawn.ts                  channel spawn + supervisor fork
 ├── send.ts                   channel send
 ├── wait.ts                   channel wait (+ --all)
+├── workers.ts                channel workers (durable worker projection)
 ├── messages.ts               channel messages (+ --follow)
 ├── threads.ts                channel post / forum / thread
 ├── list.ts                   channel list (+ --all-projects / --all)

@@ -93,7 +93,8 @@ default_package: cli
 # continuously idle past `idle_timeout`).
 #
 # Precedence: CLI flag > env var (TRELLIS_CHANNEL_WORKER_IDLE_TIMEOUT /
-# TRELLIS_CHANNEL_MAX_LIVE_WORKERS) > this config > built-in default.
+# TRELLIS_CHANNEL_MAX_LIVE_WORKERS) > role config (`channel.subnode` for
+# subnodes, `channel.worker_guard` otherwise) > built-in default.
 #
 # `idle_timeout: 0` disables idle cleanup (workers can sit idle forever
 # unless explicitly killed or given `--timeout`).
@@ -111,6 +112,13 @@ channel:
   worker_guard:
     idle_timeout: 5m
     max_live_workers: 6
+  # Defaults for `trellis channel spawn --agent subnode`. Explicit spawn
+  # flags still override these values; ordinary workers use worker_guard.
+  subnode:
+    idle_timeout: 5m
+    max_live_workers: 8
+    timeout: 30m
+    warn_before: 5m
   # trusted_context_dirs:
   #   - /work/user/trellis_workspace
   # auto_trust_trellis_symlinks: false

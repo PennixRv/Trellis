@@ -13,6 +13,7 @@ import { resolveTrustedRoots } from "./context-trust.js";
 import {
   enforceSpawnBudget,
   formatBudgetOverflowError,
+  loadSubnodeDispatchConfig,
   resolveWorkerGuardConfig,
 } from "./guard.js";
 import { withLock } from "./store/lock.js";
@@ -61,11 +62,51 @@ export interface SpawnOptions {
   maxLiveWorkers?: number;
 }
 
+/** Parse a role-owned KEY=VALUE file without shell expansion or interpolation. */
+export function parseAgentEnvFile(filePath: string): Record<string, string> {
+  const env: Record<string, string> = {};
+  const lines = fs.readFileSync(filePath, "utf-8").split(/\r?\n/);
+  for (const [index, rawLine] of lines.entries()) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const separator = line.indexOf("=");
+    const name = separator < 0 ? "" : line.slice(0, separator).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      throw new Error(
+        `Invalid environment entry in ${filePath}:${index + 1}; expected KEY=VALUE`,
+      );
+    }
+    const value = line.slice(separator + 1).trim();
+    if (value.includes("\0")) {
+      throw new Error(`Environment value for '${name}' contains a NUL byte`);
+    }
+    env[name] = value;
+  }
+  return env;
+}
+
+/** Apply supervisor role defaults without consuming guard env precedence. */
+export function applySubnodeSupervisorDefaults(
+  opts: SpawnOptions,
+  cwd = process.cwd(),
+): SpawnOptions {
+  if (opts.agent !== "subnode") return opts;
+  const config = loadSubnodeDispatchConfig(cwd);
+  return {
+    ...opts,
+    ...(opts.timeoutMs === undefined ? { timeoutMs: config.timeoutMs } : {}),
+    ...(opts.warnBeforeMs === undefined
+      ? { warnBeforeMs: config.warnBeforeMs }
+      : {}),
+  };
+}
+
 interface ResolvedSpawn {
   provider: Provider;
   as: string;
   systemPrompt: string;
   model?: string;
+  env?: Record<string, string>;
   contextFiles: string[];
   contextManifests: string[];
 }
@@ -77,6 +118,7 @@ function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
   let provider = opts.provider;
   let model = opts.model;
   let as = opts.as;
+  let env: Record<string, string> | undefined;
 
   if (opts.agent) {
     const agent = loadAgent(opts.agent, cwd, trustedRoots);
@@ -84,6 +126,7 @@ function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
     provider = provider ?? agent.provider;
     model = model ?? agent.model;
     as = as ?? agent.name;
+    env = agent.envFile ? parseAgentEnvFile(agent.envFile) : undefined;
   }
 
   if (!provider) {
@@ -108,6 +151,7 @@ function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
     as,
     systemPrompt,
     model,
+    ...(env ? { env } : {}),
     contextFiles: context.paths,
     contextManifests: context.manifests,
   };
@@ -171,18 +215,32 @@ export async function channelSpawn(
     );
   }
 
-  const resolved = resolveSpawn(channelName, opts);
-
+  const subnodeConfig =
+    opts.agent === "subnode"
+      ? loadSubnodeDispatchConfig(process.cwd())
+      : undefined;
+  const effectiveOpts = applySubnodeSupervisorDefaults(opts);
+  const resolved = resolveSpawn(channelName, effectiveOpts);
   // OOM guard: enforce live-worker budget for this project/scope before
   // forking a supervisor. Expired idle workers are cleaned first; if the
   // budget is still exhausted we reject rather than guess which non-
   // expired worker to kill.
   const guardPolicy = resolveWorkerGuardConfig({
-    ...(opts.idleTimeoutMs !== undefined
-      ? { flagIdleTimeoutMs: opts.idleTimeoutMs }
+    ...(effectiveOpts.idleTimeoutMs !== undefined
+      ? { flagIdleTimeoutMs: effectiveOpts.idleTimeoutMs }
       : {}),
-    ...(opts.maxLiveWorkers !== undefined
-      ? { flagMaxLiveWorkers: opts.maxLiveWorkers }
+    ...(effectiveOpts.maxLiveWorkers !== undefined
+      ? { flagMaxLiveWorkers: effectiveOpts.maxLiveWorkers }
+      : {}),
+    ...(subnodeConfig
+      ? {
+          roleDefaults: {
+            ...(subnodeConfig.idleTimeoutMs !== undefined
+              ? { idleTimeoutMs: subnodeConfig.idleTimeoutMs }
+              : {}),
+            maxLiveWorkers: subnodeConfig.maxLiveWorkers,
+          },
+        }
       : {}),
   });
   // Serialize the budget check across the whole project bucket. A per-worker
@@ -221,7 +279,7 @@ export async function channelSpawn(
           return spawnLocked(
             channelName,
             resolved,
-            opts,
+            effectiveOpts,
             ref.project,
             guardPolicy.idleTimeoutMs,
           );
@@ -271,6 +329,7 @@ async function spawnLocked(
       idleTimeoutMs,
       spawnedBy,
       ...(opts.inboxPolicy ? { inboxPolicy: opts.inboxPolicy } : {}),
+      ...(resolved.env ? { env: resolved.env } : {}),
       ...(opts.agent ? { agent: opts.agent } : {}),
       ...(resolved.contextFiles.length > 0
         ? { contextFiles: resolved.contextFiles }

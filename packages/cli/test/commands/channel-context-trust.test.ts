@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadAgent } from "../../src/commands/channel/agent-loader.js";
 import { assembleContext } from "../../src/commands/channel/context-loader.js";
 import {
+  applySubnodeSupervisorDefaults,
+  parseAgentEnvFile,
+} from "../../src/commands/channel/spawn.js";
+import {
   parseChannelTrustSection,
   resolveTrustedRoots,
 } from "../../src/commands/channel/context-trust.js";
@@ -391,5 +395,89 @@ describe("agent-loader honors trusted roots", () => {
     );
     const agent = loadAgent("architect", cwd, []);
     expect(agent.systemPrompt).toBe("Body");
+  });
+
+  it("resolves an agent role environment file beside the definition", () => {
+    const agents = path.join(cwd, ".trellis", "agents");
+    fs.mkdirSync(agents, { recursive: true });
+    fs.writeFileSync(
+      path.join(agents, "subnode.md"),
+      [
+        "---",
+        "name: subnode",
+        "provider: codex",
+        "env_file: subnode.env",
+        "---",
+        "",
+        "Body",
+      ].join("\n"),
+    );
+    const envFile = path.join(agents, "subnode.env");
+    fs.writeFileSync(envFile, "# role settings\nFOO=bar\nEMPTY=\n");
+
+    const agent = loadAgent("subnode", cwd, []);
+    expect(agent.envFile).toBe(envFile);
+    expect(parseAgentEnvFile(envFile)).toEqual({ FOO: "bar", EMPTY: "" });
+  });
+
+  it("rejects malformed role environment entries", () => {
+    const envFile = path.join(cwd, "subnode.env");
+    fs.writeFileSync(envFile, "not-an-entry\nBAD-NAME=value\n");
+    expect(() => parseAgentEnvFile(envFile)).toThrow("expected KEY=VALUE");
+  });
+
+  it("rejects an agent environment file outside the agent directory", () => {
+    const agents = path.join(cwd, ".trellis", "agents");
+    fs.mkdirSync(agents, { recursive: true });
+    fs.writeFileSync(
+      path.join(agents, "subnode.md"),
+      [
+        "---",
+        "name: subnode",
+        "env_file: ../outside.env",
+        "---",
+        "",
+        "Body",
+      ].join("\n"),
+    );
+    expect(() => loadAgent("subnode", cwd, [])).toThrow(
+      "must name a relative file beside the agent definition",
+    );
+  });
+
+  it("applies subnode supervisor defaults without changing explicit values", () => {
+    const input = {
+      agent: "subnode",
+      timeoutMs: 1_000,
+      warnBeforeMs: 500,
+    };
+    expect(applySubnodeSupervisorDefaults(input, cwd)).toEqual(input);
+    expect(
+      applySubnodeSupervisorDefaults({ agent: "subnode" }, cwd),
+    ).toMatchObject({
+      timeoutMs: 30 * 60_000,
+      warnBeforeMs: 5 * 60_000,
+    });
+    expect(applySubnodeSupervisorDefaults({ agent: "other" }, cwd)).toEqual({
+      agent: "other",
+    });
+  });
+
+  it("reads configured subnode supervisor defaults", () => {
+    fs.mkdirSync(path.join(cwd, ".trellis"), { recursive: true });
+    fs.writeFileSync(
+      path.join(cwd, ".trellis", "config.yaml"),
+      [
+        "channel:",
+        "  subnode:",
+        "    timeout: 2m",
+        "    warn_before: 5s",
+      ].join("\n"),
+    );
+
+    expect(applySubnodeSupervisorDefaults({ agent: "subnode" }, cwd)).toMatchObject({
+      timeoutMs: 2 * 60_000,
+      warnBeforeMs: 5_000,
+    });
   });
 });

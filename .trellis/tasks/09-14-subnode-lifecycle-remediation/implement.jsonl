@@ -1,0 +1,4 @@
+{"file":".trellis/spec/cli/backend/commands-channel.md","reason":"Channel agent loading, supervisor environment propagation, lifecycle, and required tests contract."}
+{"file":".trellis/spec/cli/backend/filesystem-safety.md","reason":"Agent asset path containment and managed template update safety contract."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"TypeScript and lint conventions for the CLI implementation."}
+{"file":".trellis/tasks/09-14-subnode-lifecycle-remediation/research/external-lifecycle.md","reason":"External lifecycle comparisons and the adopted minimal state/disposition contract."}

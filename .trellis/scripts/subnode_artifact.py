@@ -3,7 +3,7 @@
 
 The coordinator creates an immutable brief before dispatching a subnode. The
 subnode appends its worklog and writes its own final report. This helper never
-dispatches workers, decides acceptance, or mutates task state.
+dispatches workers, makes the acceptance judgment, or mutates task state.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -30,6 +31,13 @@ SECRET_PATTERNS = (
     re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"),
 )
+TERMINAL_LIFECYCLES = {"done", "error", "killed", "crashed"}
+DISPOSITION_OUTCOMES = {"accepted", "rejected", "deferred"}
+REQUIRED_DISPOSITION_CHECKS = {
+    "report_validation",
+    "source_recheck",
+    "protected_target_check",
+}
 
 
 class ArtifactError(Exception):
@@ -232,6 +240,8 @@ def _validate_brief_data(
     _require_text_list(brief.get("stop_conditions"), "brief.stop_conditions")
     _require_text(brief.get("deadline"), "brief.deadline", max_len=128)
     _validate_channel_ref(brief.get("channel_ref"))
+    if brief["channel_ref"]["worker_handle"] != subnode_id:
+        _fail("channel_ref.worker_handle must match brief.subnode_id")
     _validate_retry_target(
         brief.get("retry_of"),
         task_dir,
@@ -362,6 +372,41 @@ def _validate_report_file(
     return report, evidence, brief, node_dir
 
 
+def _validate_disposition_data(
+    disposition: dict[str, Any],
+    report: dict[str, Any],
+    brief: dict[str, Any],
+) -> None:
+    if disposition.get("schema_version") != SCHEMA_VERSION:
+        _fail(f"disposition.schema_version must be {SCHEMA_VERSION}")
+    for field in ("task_id", "work_id", "subnode_id", "role_id"):
+        if disposition.get(field) != brief.get(field):
+            _fail(f"disposition.{field} does not match brief.{field}")
+    if disposition.get("report_path") != brief.get("report_path"):
+        _fail("disposition.report_path does not match brief.report_path")
+    if disposition.get("report_status") != report.get("status"):
+        _fail("disposition.report_status does not match report.status")
+    if disposition.get("outcome") not in DISPOSITION_OUTCOMES:
+        _fail("disposition.outcome must be accepted, rejected, or deferred")
+    terminal = disposition.get("terminal")
+    if not isinstance(terminal, dict):
+        _fail("disposition.terminal must be an object")
+    if terminal.get("lifecycle") not in TERMINAL_LIFECYCLES:
+        _fail("disposition.terminal.lifecycle must be done, error, killed, or crashed")
+    sequence = terminal.get("seq")
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
+        _fail("disposition.terminal.seq must be a positive integer")
+    _require_text(terminal.get("observed_at"), "disposition.terminal.observed_at", max_len=128)
+    checks = _require_text_list(disposition.get("checks"), "disposition.checks")
+    if len(checks) != len(set(checks)):
+        _fail("disposition.checks must not contain duplicates")
+    missing = REQUIRED_DISPOSITION_CHECKS.difference(checks)
+    if missing:
+        _fail("disposition.checks is missing: " + ", ".join(sorted(missing)))
+    _require_text(disposition.get("reason"), "disposition.reason")
+    _require_text(disposition.get("decided_at"), "disposition.decided_at", max_len=128)
+
+
 def _init(args: argparse.Namespace) -> None:
     repo_root = get_repo_root()
     task_dir = resolve_task_dir(args.task, repo_root)
@@ -425,6 +470,42 @@ def _validate(args: argparse.Namespace) -> None:
     print(f"Validated pending-review report: {report['subnode_id']}")
 
 
+def _disposition(args: argparse.Namespace) -> None:
+    repo_root = get_repo_root()
+    report, _evidence, brief, node_dir = _validate_report_file(args.report, repo_root)
+    disposition_path = node_dir / "disposition.json"
+    if disposition_path.exists() or disposition_path.is_symlink():
+        _fail(f"disposition already exists and cannot be replaced: {disposition_path}")
+    disposition = {
+        "schema_version": SCHEMA_VERSION,
+        "task_id": brief["task_id"],
+        "work_id": brief["work_id"],
+        "subnode_id": brief["subnode_id"],
+        "role_id": brief["role_id"],
+        "report_path": brief["report_path"],
+        "report_status": report["status"],
+        "outcome": args.outcome,
+        "terminal": {
+            "lifecycle": args.terminal_lifecycle,
+            "seq": args.terminal_seq,
+            "observed_at": args.terminal_at,
+        },
+        "checks": args.check,
+        "reason": args.reason,
+        "decided_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _validate_disposition_data(disposition, report, brief)
+    try:
+        with disposition_path.open("x", encoding="utf-8") as stream:
+            json.dump(disposition, stream, indent=2, ensure_ascii=False)
+            stream.write("\n")
+    except FileExistsError:
+        _fail(f"disposition already exists and cannot be replaced: {disposition_path}")
+    except OSError as exc:
+        _fail(f"could not write disposition {disposition_path}: {exc}")
+    print(f"Recorded coordinator disposition: {brief['subnode_id']} -> {args.outcome}")
+
+
 def _validate_counter(args: argparse.Namespace) -> None:
     repo_root = get_repo_root()
     primary_dir = Path(args.primary)
@@ -473,6 +554,24 @@ def _parser() -> argparse.ArgumentParser:
     validate = subparsers.add_parser("validate", help="validate a pending-review report")
     validate.add_argument("--report", required=True)
     validate.set_defaults(handler=_validate)
+
+    disposition = subparsers.add_parser(
+        "disposition",
+        help="record one coordinator disposition for a validated report",
+    )
+    disposition.add_argument("--report", required=True)
+    disposition.add_argument("--outcome", choices=sorted(DISPOSITION_OUTCOMES), required=True)
+    disposition.add_argument("--terminal-lifecycle", choices=sorted(TERMINAL_LIFECYCLES), required=True)
+    disposition.add_argument("--terminal-seq", type=int, required=True)
+    disposition.add_argument("--terminal-at", required=True)
+    disposition.add_argument(
+        "--check",
+        action="append",
+        required=True,
+        help="independent check name (repeat; requires report_validation, source_recheck, and protected_target_check)",
+    )
+    disposition.add_argument("--reason", required=True)
+    disposition.set_defaults(handler=_disposition)
 
     counter = subparsers.add_parser(
         "validate-counter",

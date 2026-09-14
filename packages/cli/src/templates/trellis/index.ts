@@ -10,8 +10,8 @@
  *   │   ├── __init__.py
  *   │   ├── common/           # Shared utilities (Python)
  *   │   └── *.py              # Main scripts (Python)
- *   ├── agents/                # Channel runtime agent definitions
- *   │   └── *.md               # Loaded by `trellis channel spawn --agent <name>`
+ *   ├── agents/                # Channel runtime agent definitions and assets
+ *   │   └── *.md / *.env       # Loaded by the channel runtime
  *   ├── scripts-shell-archive/ # Archived shell scripts (for reference)
  *   ├── workflow.md           # Workflow guide
  *   ├── config.yaml            # Trellis configuration
@@ -94,6 +94,7 @@ export const gitattributesTemplate = readTemplate("gitattributes.txt");
 export const implementAgentTemplate = readTemplate("agents/implement.md");
 export const checkAgentTemplate = readTemplate("agents/check.md");
 export const subnodeAgentTemplate = readTemplate("agents/subnode.md");
+export const subnodeEnvTemplate = readTemplate("agents/subnode.env");
 
 /**
  * Get all script templates as a map of relative path to content
@@ -142,7 +143,7 @@ export function getAllScripts(): Map<string, string> {
 }
 
 /**
- * Get all channel runtime agent definitions as a map of relative path
+ * Get all channel runtime agent assets as a map of relative path
  * (under `.trellis/agents/`) to content.
  *
  * Consumed by `trellis init` (to dispatch on first install) and by
@@ -154,5 +155,6 @@ export function getAllAgents(): Map<string, string> {
   agents.set("implement.md", implementAgentTemplate);
   agents.set("check.md", checkAgentTemplate);
   agents.set("subnode.md", subnodeAgentTemplate);
+  agents.set("subnode.env", subnodeEnvTemplate);
   return agents;
 }

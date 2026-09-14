@@ -17,7 +17,7 @@ import type { Provider } from "./adapters/index.js";
 import { createChannel } from "./create.js";
 import { channelRm } from "./rm.js";
 import { channelSend } from "./send.js";
-import { channelSpawn } from "./spawn.js";
+import { applySubnodeSupervisorDefaults, channelSpawn } from "./spawn.js";
 import { channelDir, eventsPath } from "./store/paths.js";
 import { readLastSeq, type ChannelEvent } from "./store/events.js";
 import { watchEvents } from "./store/watch.js";
@@ -41,7 +41,19 @@ export interface RunOptions {
 
 export async function channelRun(opts: RunOptions): Promise<void> {
   const name = opts.name ?? `run-${crypto.randomBytes(4).toString("hex")}`;
-  const timeoutMs = opts.timeoutMs ?? 5 * 60 * 1000;
+  // Keep the ordinary one-shot default at five minutes while letting an
+  // explicitly selected subnode role use its project dispatch default.
+  const spawnOptions = applySubnodeSupervisorDefaults({
+    agent: opts.agent,
+    provider: opts.provider,
+    as: opts.as,
+    cwd: opts.cwd,
+    model: opts.model,
+    ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+    files: opts.files,
+    jsonls: opts.jsonls,
+  });
+  const timeoutMs = spawnOptions.timeoutMs ?? 5 * 60 * 1000;
 
   await createChannel(name, {
     by: "main",
@@ -58,14 +70,8 @@ export async function channelRun(opts: RunOptions): Promise<void> {
   let succeeded = false;
   try {
     const spawned = await channelSpawn(name, {
-      agent: opts.agent,
-      provider: opts.provider,
-      as: opts.as,
-      cwd: opts.cwd,
-      model: opts.model,
+      ...spawnOptions,
       timeoutMs,
-      files: opts.files,
-      jsonls: opts.jsonls,
     });
     workerName = spawned.worker;
 

@@ -1,0 +1,9 @@
+{
+  "version": "0.6.29",
+  "description": "Makes bounded subnode dispatch defaults configurable and records durable coordinator review state.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Enhancements:**\n- Adds a durable `trellis channel workers` projection for coordinator recovery and terminal-state inspection.\n- Adds role-specific `channel.subnode` defaults for the live-worker budget, idle cleanup, supervisor timeout, and timeout warning. The generated live-worker default is 8; ordinary workers retain 6.\n- Adds create-once coordinator dispositions for validated subnode reports.\n\n**Fixes:**\n- Applies the subnode role timeout and warning defaults consistently to `channel run --agent subnode`.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects without channel.subnode use the compatible code defaults; add the optional section from a newly initialized project when per-project subnode tuning is needed."
+}

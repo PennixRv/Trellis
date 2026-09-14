@@ -5,6 +5,7 @@ description: |
   never changes protected target files, and leaves acceptance to the coordinator.
 provider: codex
 labels: [trellis, subnode]
+env_file: subnode.env
 ---
 
 # Subnode (channel runtime)
@@ -53,6 +54,10 @@ sandbox claim.
    identity, scope, and lens required by the artifact helper.
 6. Send one short terminal Channel message with the status and report path.
    Do not place the report JSON in Channel text.
+
+The terminal message ends the worker runtime; it does not accept the report.
+The coordinator later checks the durable worker terminal projection and records
+the disposition. A report without a terminal worker remains pending.
 
 ## Report Boundary
 

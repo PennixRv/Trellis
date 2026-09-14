@@ -30,6 +30,7 @@ import {
   implementAgentTemplate,
   checkAgentTemplate,
   subnodeAgentTemplate,
+  subnodeEnvTemplate,
   configYamlTemplate,
 } from "../../src/templates/trellis/index.js";
 
@@ -57,6 +58,7 @@ describe("trellis template constants", () => {
     workspaceNoteScript,
     workflowMdTemplate,
     gitignoreTemplate,
+    subnodeEnvTemplate,
   };
 
   function inProgressBreadcrumb(): string {
@@ -434,6 +436,7 @@ describe("getAllAgents", () => {
     expect(agents.has("implement.md")).toBe(true);
     expect(agents.has("check.md")).toBe(true);
     expect(agents.has("subnode.md")).toBe(true);
+    expect(agents.has("subnode.env")).toBe(true);
   });
 
   it("values match exported constants", () => {
@@ -441,11 +444,16 @@ describe("getAllAgents", () => {
     expect(agents.get("implement.md")).toBe(implementAgentTemplate);
     expect(agents.get("check.md")).toBe(checkAgentTemplate);
     expect(agents.get("subnode.md")).toBe(subnodeAgentTemplate);
+    expect(agents.get("subnode.env")).toBe(subnodeEnvTemplate);
+    expect(subnodeEnvTemplate).toContain("OPENVIKING_AUTO_RECALL=0");
+    expect(subnodeEnvTemplate).toContain("OPENVIKING_AUTO_CAPTURE=0");
+    expect(subnodeEnvTemplate).toContain("OPENVIKING_NO_AUTO_INJECT=1");
   });
 
   it("each agent body starts with `---` frontmatter and a matching name field", () => {
     const agents = getAllAgents();
     for (const [file, content] of agents) {
+      if (!file.endsWith(".md")) continue;
       expect(content.startsWith("---\n"), `${file} must start with --- frontmatter`).toBe(true);
       // Frontmatter must close on a `---\n` line.
       const frontmatterClose = content.indexOf("\n---\n", 4);

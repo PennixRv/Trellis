@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
   channelRm: vi.fn(),
 }));
 
-vi.mock("../../src/commands/channel/spawn.js", () => ({
+vi.mock("../../src/commands/channel/spawn.js", async (importOriginal) => ({
+  ...(await importOriginal()),
   channelSpawn: mocks.channelSpawn,
 }));
 vi.mock("../../src/commands/channel/send.js", () => ({
@@ -83,5 +84,38 @@ describe("channelRun startup barrier", () => {
     ).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "done", by: "worker" }),
     ]));
+  });
+
+  it("uses the subnode role timeout for one-shot subnode dispatch", async () => {
+    fs.mkdirSync(path.join(projectDir, ".trellis"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, ".trellis", "config.yaml"),
+      [
+        "channel:",
+        "  subnode:",
+        "    timeout: 2m",
+        "    warn_before: 5s",
+      ].join("\n"),
+    );
+    mocks.channelSpawn.mockImplementation(async (channel: string) => {
+      await appendEvent(channel, { kind: "done", by: "worker" });
+      return { pid: 1234, log: "worker.log", worker: "worker" };
+    });
+
+    await channelRun({
+      name: "subnode-role-default",
+      cwd: projectDir,
+      agent: "subnode",
+      as: "worker",
+      message: "run",
+    });
+
+    expect(mocks.channelSpawn).toHaveBeenCalledWith(
+      "subnode-role-default",
+      expect.objectContaining({
+        timeoutMs: 2 * 60_000,
+        warnBeforeMs: 5_000,
+      }),
+    );
   });
 });
