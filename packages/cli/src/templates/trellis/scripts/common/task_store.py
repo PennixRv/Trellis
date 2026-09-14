@@ -1482,8 +1482,9 @@ def _auto_commit_archive(
         )
         return not source_was_tracked
 
+    commit_paths = [*paths, *([source_rel] if source_was_tracked else [])]
     rc, _, _ = run_git(
-        ["diff", "--cached", "--quiet", "--", *paths, source_rel],
+        ["diff", "--cached", "--quiet", "--", *commit_paths],
         cwd=repo_root,
     )
     if rc == 0:
@@ -1493,10 +1494,11 @@ def _auto_commit_archive(
     commit_msg = f"chore(task): archive {task_name}"
     # Commit with an explicit pathspec: a bare `git commit` would sweep any
     # unrelated entries the developer had staged before archiving into the
-    # chore commit (#579). `source_rel` is included so the source-side
-    # deletions staged above land in the same commit.
+    # chore commit (#579). Include `source_rel` only when it was tracked, so
+    # the source-side deletions land in that commit without passing an absent,
+    # never-tracked path to git.
     rc, _, err = run_git_retry_index_lock(
-        ["commit", "-m", commit_msg, "--", *paths, source_rel], cwd=repo_root
+        ["commit", "-m", commit_msg, "--", *commit_paths], cwd=repo_root
     )
     if rc == 0:
         print(f"[OK] Auto-committed: {commit_msg}", file=sys.stderr)

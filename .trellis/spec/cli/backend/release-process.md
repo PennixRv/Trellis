@@ -160,11 +160,11 @@ Any `FAIL` line means: `cd <submodule> && git checkout -B main && git push origi
 ### Contract: the pre-release sweep MUST exclude `.trellis/`
 
 The pre-release `git add` in `release.js` (the `chore: pre-release updates`
-commit) **must** exclude `.trellis/` from its pathspec, alongside `docs-site`
-and `marketplace`:
+commit) **must** recursively exclude `.trellis/**` from its pathspec, alongside
+`docs-site` and `marketplace`:
 
 ```js
-run("git add -A -- ':!docs-site' ':!marketplace' ':!.trellis'");
+run("git add -A -- . ':!docs-site' ':!marketplace' ':(exclude,glob).trellis/**'");
 ```
 
 `.trellis/tasks/` is not gitignored, so a blanket `git add -A` sweeps in any

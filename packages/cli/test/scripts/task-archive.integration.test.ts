@@ -179,6 +179,36 @@ describe.skipIf(!hasPython())(
       expect(status).toMatch(/^A\s+README\.md/m);
     });
 
+    it("auto-commits an archive for a task that was never tracked", () => {
+      makeTask(tmp, "untracked", "untracked task prd\n");
+
+      runArchive(tmp, "untracked");
+
+      const archivedFiles = git(
+        tmp,
+        "show",
+        "HEAD",
+        "--name-only",
+        "--pretty=format:",
+      )
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const archiveMonths = fs.readdirSync(
+        path.join(tmp, ".trellis", "tasks", "archive"),
+      );
+      expect(archiveMonths).toHaveLength(1);
+      const archiveRoot = `.trellis/tasks/archive/${archiveMonths[0]}/untracked`;
+
+      expect(archivedFiles).toEqual([
+        `${archiveRoot}/prd.md`,
+        `${archiveRoot}/task.json`,
+      ]);
+      expect(
+        fs.existsSync(path.join(tmp, ".trellis", "tasks", "untracked")),
+      ).toBe(false);
+    });
+
     it(
       "stages source-side deletions in the archive commit (phantom-delete fix)",
       () => {

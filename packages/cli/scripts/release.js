@@ -142,7 +142,7 @@ function main() {
   // (parallel in-progress work, runtime artifacts) must never be swept into
   // "chore: pre-release updates" (#303). Staging .trellis/ only ever goes
   // through safe_commit.py's precise allowlist, never a blanket `git add -A`.
-  run("git add -A -- ':!docs-site' ':!marketplace' ':!.trellis'");
+  run("git add -A -- . ':!docs-site' ':!marketplace' ':(exclude,glob).trellis/**'");
   if (hasGitDiff()) {
     run("git commit -m 'chore: pre-release updates'");
   }
