@@ -41,3 +41,43 @@ Completed the response-gated Codex app-server initialization handshake and recor
 ### Next Steps
 
 - Root repository must arrange CI-only publication, installation, and a fresh-host sentinel before closing Issue 155.
+
+
+## Session 2: Release configurable subnode lifecycle
+<!-- trellis-session: v=2 fp=dab14e3a63ea87a7 -->
+
+**Date**: 2026-09-14
+**Task**: Release configurable subnode lifecycle
+**Package**: cli
+**Branch**: `main`
+
+### Summary
+
+Completed, released, and archived bounded Channel subnode lifecycle remediation.
+
+### Main Changes
+
+- Added role-owned subnode OpenViking environment isolation, durable worker projection, and coordinator disposition.
+- Made the subnode worker budget configurable with generated default 8 while ordinary workers retain 6.
+- Restored published manifest continuity for 0.6.28 and released CLI/Core 0.6.29.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `93be5259` | feat(channel): harden subnode lifecycle |
+| `e9cf0758` | 0.6.29 |
+| `a73f7f94` | chore(task): archive 09-14-subnode-lifecycle-remediation |
+
+### Testing
+
+- [OK] pnpm test: core 377 passed, 1 skipped; CLI 1960 passed across 89 files.
+- [OK] pnpm lint, pnpm lint:all (0 Python errors; 68 existing warnings), pnpm typecheck, pnpm build, manifest continuity, GitNexus, and npm publication verification passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- No active implementation task remains; start the next planned workflow task from a clean main.
