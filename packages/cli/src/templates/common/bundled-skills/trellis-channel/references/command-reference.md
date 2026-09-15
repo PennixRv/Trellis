@@ -36,6 +36,7 @@ trellis channel create <name>
   [--linked-context-raw  <text>]          # [deprecated alias]
   [--cwd <path>]                          # recorded in create event
   [--by <agent>]                          # default: main
+  [--owner-session <id>]                  # opaque main Codex session owner
   [--force]                               # overwrite existing channel
   [--ephemeral]                           # hide from default list, prunable
 ```
@@ -57,6 +58,7 @@ trellis channel list
   [--project <slug>]                      # substring match on task field
   [--all]                                 # include ephemeral (suffix '*')
   [--all-projects]                        # scan every project bucket
+  [--owner-session <id>]                  # exact immutable owner match
 ```
 
 Behavior:
@@ -166,6 +168,7 @@ Behavior:
 ```bash
 trellis channel workers <name>
   [--scope project|global]
+  [--project-key <key>]                   # project bucket when names collide
   [--include-terminal]
   [--json]
 ```
@@ -173,7 +176,21 @@ trellis channel workers <name>
 Reads the durable worker projection from Trellis core. Without
 `--include-terminal`, only non-terminal workers are shown. `--json` is the
 machine-readable form for coordinator recovery and disposition checks. This
-command does not inspect PID sidecars and does not poll.
+command includes the ordered, deduplicated `sessionIds` observed for each
+worker. It does not inspect PID sidecars and does not poll.
+
+### `task progress`
+
+```bash
+trellis task progress
+  [--json]
+```
+
+Counts task records under the direct active-task directories in
+`.trellis/tasks/`; archived tasks are historical and are excluded from the
+current plan. JSON output is `{completed, planned, partial}`; malformed active
+task records remain in `planned` and set `partial: true`. With `--json`, update
+notices are written to stderr so stdout remains parseable.
 
 ---
 

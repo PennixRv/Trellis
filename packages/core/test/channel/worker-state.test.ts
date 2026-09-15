@@ -37,6 +37,7 @@ describe("reduceWorkerRegistry", () => {
     expect(w.terminal).toBe(false);
     expect(w.activity).toBe("idle");
     expect(w.provider).toBe("claude");
+    expect(w.sessionIds).toEqual([]);
     expect(w.inboxPolicy).toBe("explicitOnly");
     expect(w.startedBy).toBe("main");
   });
@@ -45,6 +46,19 @@ describe("reduceWorkerRegistry", () => {
     reset();
     const reg = reduceWorkerRegistry([ev("spawned", { as: "w1" })]);
     expect(reg.workers[0].inboxPolicy).toBe("explicitOnly");
+  });
+
+  it("replays worker session bindings in order and deduplicates repeats", () => {
+    reset();
+    const reg = reduceWorkerRegistry([
+      ev("spawned", { as: "w", provider: "codex" }),
+      ev("session_bound", { worker: "w", sessionId: "session-a" }),
+      ev("session_bound", { worker: "w", sessionId: "session-a" }),
+      ev("session_bound", { worker: "w", sessionId: "session-b" }),
+      ev("session_bound", { worker: "unknown", sessionId: "ignored" }),
+    ]);
+    expect(reg.workers).toHaveLength(1);
+    expect(reg.workers[0].sessionIds).toEqual(["session-a", "session-b"]);
   });
 
   it("honors spawned.inboxPolicy", () => {

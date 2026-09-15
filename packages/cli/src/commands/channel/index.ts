@@ -82,6 +82,10 @@ export function registerChannelCommand(program: Command): void {
     )
     .option("--cwd <path>", "working directory recorded in the create event")
     .option("--by <agent>", "agent name recorded as the creator", "main")
+    .option(
+      "--owner-session <id>",
+      "opaque main Codex session owner (defaults to host session env)",
+    )
     .option("--force", "overwrite existing channel with the same name")
     .option(
       "--ephemeral",
@@ -103,6 +107,7 @@ export function registerChannelCommand(program: Command): void {
           linkedContextRaw?: string[];
           cwd?: string;
           by?: string;
+          ownerSession?: string;
           force?: boolean;
           ephemeral?: boolean;
         },
@@ -421,6 +426,10 @@ export function registerChannelCommand(program: Command): void {
     .description("Show durable worker lifecycle projections for a channel")
     .option("--scope <scope>", "channel scope: project | global")
     .option(
+      "--project-key <key>",
+      "project bucket containing the channel (project scope only)",
+    )
+    .option(
       "--include-terminal",
       "include done, error, killed, and crashed workers",
     )
@@ -428,6 +437,7 @@ export function registerChannelCommand(program: Command): void {
     .action(async (name: string, raw: Record<string, unknown>) => {
       const opts = raw as {
         scope?: string;
+        projectKey?: string;
         includeTerminal?: boolean;
         json?: boolean;
       };
@@ -610,6 +620,10 @@ export function registerChannelCommand(program: Command): void {
       "--all-projects",
       "scan every project bucket (default: only the current cwd's project)",
     )
+    .option(
+      "--owner-session <id>",
+      "exactly match the immutable main Codex session owner",
+    )
     .action(async (raw: Record<string, unknown>) => {
       const opts = raw as {
         json?: boolean;
@@ -617,6 +631,7 @@ export function registerChannelCommand(program: Command): void {
         all?: boolean;
         allProjects?: boolean;
         scope?: string;
+        ownerSession?: string;
       };
       try {
         await channelList(opts);

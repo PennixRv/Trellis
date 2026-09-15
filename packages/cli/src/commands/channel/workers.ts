@@ -6,6 +6,7 @@ import {
 
 export interface WorkersOptions {
   scope?: string;
+  projectKey?: string;
   includeTerminal?: boolean;
   json?: boolean;
 }
@@ -18,6 +19,7 @@ export async function channelWorkers(
   const workers = await listWorkers({
     channel: channelName,
     scope: parseChannelScope(opts.scope),
+    ...(opts.projectKey ? { projectKey: opts.projectKey } : {}),
     includeTerminal: opts.includeTerminal,
   });
   if (opts.json) {

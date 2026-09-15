@@ -29,6 +29,7 @@ export type ChannelEventKind =
   | "context"
   | "channel"
   | "spawned"
+  | "session_bound"
   | "killed"
   | "respawned"
   | "progress"
@@ -52,6 +53,7 @@ export const CHANNEL_EVENT_KINDS: ReadonlySet<ChannelEventKind> = new Set([
   "context",
   "channel",
   "spawned",
+  "session_bound",
   "killed",
   "respawned",
   "progress",
@@ -141,6 +143,8 @@ export interface CreateChannelEvent extends BaseChannelEvent<"create"> {
   linkedContext?: ContextEntry[];
   labels?: string[];
   ephemeral?: boolean;
+  /** Main Codex session that created this Channel, when known. */
+  ownerSessionId?: string;
 }
 
 export interface MessageChannelEvent extends BaseChannelEvent<"message"> {
@@ -189,6 +193,12 @@ export interface SpawnedChannelEvent extends BaseChannelEvent<"spawned"> {
    * `explicitOnly`.
    */
   inboxPolicy?: InboxPolicy;
+}
+
+export interface SessionBoundChannelEvent
+  extends BaseChannelEvent<"session_bound"> {
+  worker: string;
+  sessionId: string;
 }
 
 export interface KilledChannelEvent extends BaseChannelEvent<"killed"> {
@@ -315,6 +325,7 @@ export type GenericChannelEvent = BaseChannelEvent<
     | "context"
     | "channel"
     | "spawned"
+    | "session_bound"
     | "killed"
     | "done"
     | "error"
@@ -335,6 +346,7 @@ export type ChannelEvent =
   | ContextChannelEvent
   | ChannelMetadataEvent
   | SpawnedChannelEvent
+  | SessionBoundChannelEvent
   | KilledChannelEvent
   | DoneChannelEvent
   | ErrorChannelEvent

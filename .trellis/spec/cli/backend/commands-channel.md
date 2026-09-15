@@ -90,6 +90,7 @@ trellis channel create <name> [opts]
   --context-raw <text>      : raw context text (repeatable)
   --cwd <path>           : cwd recorded in create event (default process.cwd())
   --by <agent>           : creator identity (default "main")
+  --owner-session <id>   : opaque main Codex session owner (optional; exact-match filter key)
   --force                : if channel exists, kill workers + rmrf + recreate
   --ephemeral            : mark for hide-from-list + prune --ephemeral
   → stdout: "Created channel '<name>' at <abs-path>"
@@ -177,8 +178,10 @@ trellis channel barrier <name> [opts]
 
 trellis channel workers <name> [opts]
   --scope <scope>        : project | global
+  --project-key <key>    : project bucket when same-named channels coexist (project scope only)
   --include-terminal     : include terminal worker projections
   --json                 : emit the complete durable projection as JSON
+  → JSON includes `sessionIds: string[]` in observed event order
   → stdout: worker projection table or JSON; never reads PID sidecars
 
 trellis channel messages <name> [opts]

@@ -18,6 +18,7 @@ import { PACKAGE_NAME, VERSION } from "../constants/version.js";
 import { compareVersions } from "../utils/compare-versions.js";
 import { getConfiguredPlatforms } from "../configurators/index.js";
 import { AI_TOOLS } from "../types/ai-tools.js";
+import { taskProgress } from "../commands/task-progress.js";
 
 // Re-export for backwards compatibility (consumers should prefer constants/version.js)
 export { VERSION, PACKAGE_NAME };
@@ -33,23 +34,26 @@ function checkForUpdates(cwd: string): void {
   const projectVersion = fs.readFileSync(versionFile, "utf-8").trim();
   const cliVersion = VERSION;
   const comparison = compareVersions(cliVersion, projectVersion);
+  const writeHint = (message: string): void => {
+    (process.argv.includes("--json") ? console.error : console.log)(message);
+  };
 
   if (comparison > 0) {
     // CLI is newer than project - update available
-    console.log(
+    writeHint(
       chalk.yellow(
         `\n⚠️  Trellis update available: ${projectVersion} → ${cliVersion}`,
       ),
     );
-    console.log(chalk.gray(`   Run: trellis update\n`));
+    writeHint(chalk.gray(`   Run: trellis update\n`));
   } else if (comparison < 0) {
     // CLI is older than project - CLI needs updating
-    console.log(
+    writeHint(
       chalk.yellow(
         `\n⚠️  Your CLI (${cliVersion}) is older than project (${projectVersion})`,
       ),
     );
-    console.log(chalk.gray(`   Run: trellis upgrade\n`));
+    writeHint(chalk.gray(`   Run: trellis upgrade\n`));
   }
 }
 
@@ -395,5 +399,17 @@ program
   });
 
 registerChannelCommand(program);
+
+const task = program
+  .command("task")
+  .description("Read-only project task information");
+
+task
+  .command("progress")
+  .description("Show completed and planned task counts")
+  .option("--json", "Output machine-readable JSON")
+  .action((options: Record<string, unknown>) => {
+    taskProgress({ json: options.json as boolean | undefined });
+  });
 
 program.parse();
