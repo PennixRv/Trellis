@@ -3,7 +3,7 @@
   "name": "cch-channel-observability",
   "title": "Expose Trellis owner and worker session projection for CCH",
   "description": "Persist Codex main-session ownership and worker session history in the public Trellis Channel projection and expose precise CLI filters for CCH.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "cli",
@@ -11,7 +11,7 @@
   "creator": "penn",
   "assignee": "penn",
   "createdAt": "2026-09-15",
-  "completedAt": null,
+  "completedAt": "2026-09-15",
   "branch": "task/cch-channel-observability",
   "base_branch": "main",
   "worktree_path": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Completed in Trellis v0.6.32: owner/session projection, durable session_bound events, worker CLI projection, tests, package release, and global installation passed. Live same-owner worker lifecycle remains a root integration boundary.",
   "meta": {}
 }

@@ -54,3 +54,7 @@ Remove unneeded mandatory null relation fields and permit early terminal reports
   completed successfully, with `@pennixrv/trellis` and
   `@pennixrv/trellis-core` published as `0.6.23`.
 - Marketplace `v0.6.23` is `4c3b0715da929b70752301127e0fb7c2a13b4600`.
+
+The task was released as the coordinated `v0.6.23` Marketplace/Trellis
+combination. Later Trellis releases retain these changes; this task records
+the historical release boundary and is ready for archive.

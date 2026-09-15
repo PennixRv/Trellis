@@ -23,15 +23,15 @@ Update the Pennix Marketplace workflow with bounded semantic RecoveryBrief and f
 
 ## Acceptance Criteria
 
-- [ ] The existing workflow asset states the semantic gates, exclusions,
+- [x] The existing workflow asset states the semantic gates, exclusions,
   ownership, and explicit handoff evidence boundary without duplicating a
   user-level coordinator or inventing new runtime behavior.
-- [ ] A native `trellis init` smoke test resolves the released Marketplace
+- [x] A native `trellis init` smoke test resolves the released Marketplace
   workflow and produces a usable project workflow.
-- [ ] Marketplace and parent releases are remotely resolvable as `v0.6.24`.
-- [ ] Existing project checks and release checks appropriate to the changed
+- [x] Marketplace and parent releases are remotely resolvable as `v0.6.24`.
+- [x] Existing project checks and release checks appropriate to the changed
   assets pass; only task files and intended release files are staged.
-- [ ] A fresh native init and an update of the current project both expose
+- [x] A fresh native init and an update of the current project both expose
   `trellis-research-record` under Codex's `.agents/skills/`; no custom skill
   dispatcher, Hook, or per-platform registry is added.
 
@@ -42,3 +42,15 @@ Update the Pennix Marketplace workflow with bounded semantic RecoveryBrief and f
 - The parent working tree already contains unrelated changes and is detached;
   release only through its normal documented path after confirming it supports
   the coordinated asset patch.
+
+## Verification
+
+- Marketplace commit `8ff6829` contains the semantic RecoveryBrief and formal
+  handoff guidance and is reachable from the published Marketplace tags
+  `v0.6.24` and later.
+- Trellis `v0.6.24` was published with the matching Marketplace Gitlink;
+  the release continuity repair is recorded in commit `0b55c6ab` and later
+  releases retain the asset.
+- Native initialization/update distribution and bundled
+  `trellis-research-record` discovery were covered by the release checks.
+  No custom dispatcher, Hook, or task schema was introduced.
