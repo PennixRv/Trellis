@@ -25,5 +25,13 @@
   published to both npm packages, and verified by the publish workflow after registry propagation.
 - Marketplace: tags `v0.6.33` and `v0.6.34` point at the existing `8ff6829` Marketplace content; no version field exists
   in `index.json`, so no unrelated Marketplace content was fabricated.
+- Installation and fresh-host acceptance: global `@pennixrv/trellis` and `@pennixrv/trellis-core` are both `0.6.34`,
+  the coordinating project's stamped `.trellis/.version` is `0.6.34`, and `trellis update --skip-all` completed while
+  preserving protected local assets. The current root Hook was then synchronized with the released template and is
+  byte-identical to `packages/cli/src/templates/shared-hooks/inject-subagent-context.py`.
+- Fresh temporary-project probe: a normal `file` entry and legacy `path` entry were fully projected by the installed
+  Hook and `task.py validate` returned `0`; replacing the implement entry with a 40,000-byte file produced the
+  expected truncation notice and a non-zero validator result containing `role=implement`, the source path, and the
+  limit reason. This verifies the released behavior outside the source checkout.
 - Boundary: formal Pennix handoff, OpenViking memory, and independent Pi/OMP renderers remain outside this Python
   projection task.
