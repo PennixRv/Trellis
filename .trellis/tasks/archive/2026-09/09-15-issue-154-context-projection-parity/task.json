@@ -1,0 +1,30 @@
+{
+  "id": "issue-154-context-projection-parity",
+  "name": "issue-154-context-projection-parity",
+  "title": "Issue 154：Python 子节点上下文投影一致性",
+  "description": "让 task.py validate 与共享 Python 子节点 Hook 使用同一完整投影判定，阻止会被截断、跳过或总预算降级的 implement/check 上下文通过校验；不改变 Pennix 正式 handoff 生命周期。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "shared-python-context-projection",
+  "package": "cli",
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-09-15",
+  "completedAt": "2026-09-15",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "Coordinates root task 08-23-issue-154-trellis-context-validation; formal handoff and independent Pi/OMP renderers are outside this Python projection contract.",
+  "meta": {
+    "root_coordination_task": "/home/penn/devel/codex-workflow-optimization/.trellis/tasks/08-23-issue-154-trellis-context-validation",
+    "target_paths": ".trellis/scripts/common/context_projection.py,packages/cli/src/migrations/manifests/0.6.32.json,packages/cli/src/templates/trellis/scripts/common/context_projection.py,.trellis/scripts/common/task_context.py,packages/cli/src/templates/trellis/scripts/common/task_context.py,packages/cli/src/templates/shared-hooks/inject-subagent-context.py,packages/cli/test/scripts/context-injection-limits.integration.test.ts",
+    "scope_boundary": "Current Codex shared Python Hook only; no Pennix handoff lifecycle or Pi/OMP renderer changes"
+  }
+}
