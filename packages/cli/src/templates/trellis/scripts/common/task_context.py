@@ -26,10 +26,11 @@ import json
 from pathlib import Path
 
 from .config import get_context_injection_limits
+from .context_projection import parse_context_manifest, project_agent_context
 from .git import branch_exists_locally
 from .io import read_json
 from .log import Colors, colored
-from .paths import DIR_ARCHIVE, DIR_TASKS, DIR_WORKFLOW, FILE_TASK_JSON, get_repo_root
+from .paths import FILE_TASK_JSON, get_repo_root
 from .task_utils import resolve_task_dir
 
 # Extensions that look like code rather than spec/research docs. Entries with
@@ -134,24 +135,8 @@ def curated_entry_count(jsonl_file: Path) -> int | None:
     entry is a JSON object row carrying a truthy ``file`` (or legacy ``path``)
     value: the same rows the sub-agent injection hook materializes.
     """
-    if not jsonl_file.is_file():
-        return None
-    try:
-        lines = jsonl_file.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return 0
-    count = 0
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(data, dict) and (data.get("file") or data.get("path")):
-            count += 1
-    return count
+    entries, _, manifest_exists = parse_context_manifest(jsonl_file)
+    return len(entries) if manifest_exists else None
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -214,59 +199,6 @@ def _is_exempt_from_code_file_warning(file_path: str, task_rel: str) -> bool:
     return False
 
 
-def _resolve_context_entry_path(
-    file_path: str, repo_root: Path, task_dir: Path | None
-) -> Path | None:
-    """Resolve a JSONL entry, binding archived self-references to the archive copy.
-
-    Exact historical self-references are remapped only for archived tasks.
-    ``None`` means the remapped path traversed or resolved outside that archive.
-    """
-    repo_path = repo_root / file_path
-    if task_dir is None:
-        return repo_path
-
-    try:
-        task_parts = task_dir.resolve().relative_to(repo_root.resolve()).parts
-    except ValueError:
-        return repo_path
-
-    archive_prefix = (DIR_WORKFLOW, DIR_TASKS, DIR_ARCHIVE)
-    if len(task_parts) != 5 or task_parts[:3] != archive_prefix:
-        return repo_path
-
-    year_month = task_parts[3]
-    if (
-        len(year_month) != 7
-        or year_month[4] != "-"
-        or not year_month[:4].isdigit()
-        or not year_month[5:].isdigit()
-    ):
-        return repo_path
-
-    historical_root = f"{DIR_WORKFLOW}/{DIR_TASKS}/{task_dir.name}"
-    posix_path = file_path.replace("\\", "/")
-    if posix_path == historical_root:
-        relative_parts: tuple[str, ...] = ()
-    elif posix_path.startswith(f"{historical_root}/"):
-        relative_path = posix_path[len(historical_root) + 1 :]
-        if relative_path.endswith("/"):
-            relative_path = relative_path[:-1]
-        relative_parts = tuple(relative_path.split("/")) if relative_path else ()
-        if any(part in ("", ".", "..") for part in relative_parts):
-            return None
-    else:
-        return repo_path
-
-    try:
-        archive_root = task_dir.resolve()
-        resolved_path = task_dir.joinpath(*relative_parts).resolve()
-        resolved_path.relative_to(archive_root)
-    except (OSError, RuntimeError, ValueError):
-        return None
-    return resolved_path
-
-
 def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = None) -> int:
     """Validate a single JSONL file.
 
@@ -275,11 +207,10 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
     accepting them here would pass locally and fail later. Other rows without
     a ``file`` field are skipped silently, matching what consumers do.
 
-    Beyond hard errors (missing file/dir, invalid JSON), this also prints
-    non-blocking hygiene warnings (never counted in ``errors``, never change
-    the exit code): entries that look like code files rather than
-    spec/research docs, and entries whose file size exceeds the configured
-    sub-agent context injection cap (``context_injection.max_file_bytes``).
+    The same Python projection that the shared Hook renders is evaluated for
+    each role. Hygiene warnings remain advisory; every source that would be
+    truncated, omitted, or indexed instead of appearing as complete body text
+    is a hard validation error.
     """
     file_name = jsonl_file.name
     errors = 0
@@ -295,97 +226,26 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
         except ValueError:
             task_rel = ""
 
-    max_file_bytes = get_context_injection_limits(repo_root).get("max_file_bytes", 0)
+    entries, manifest_problems, _ = parse_context_manifest(jsonl_file)
+    for problem in manifest_problems:
+        print(f"  {colored(f'{file_name}:{problem.line}: {problem.message}', Colors.RED)}")
+        errors += 1
 
-    line_num = 0
-    real_entries = 0
-    for line in jsonl_file.read_text(encoding="utf-8").splitlines():
-        line_num += 1
-        if not line.strip():
+    for entry in entries:
+        if entry.entry_type == "directory":
             continue
-
-        try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
-            print(f"  {colored(f'{file_name}:{line_num}: Invalid JSON', Colors.RED)}")
-            errors += 1
-            continue
-
-        if not isinstance(data, dict):
-            print(
-                f"  {colored(f'{file_name}:{line_num}: Expected a JSON object', Colors.RED)}"
-            )
-            errors += 1
-            continue
-
-        if "_example" in data:
-            error_message = (
-                f"{file_name}:{line_num}: Placeholder `_example` row left by an older "
-                "task.py create — delete this line, or replace it with "
-                '{"file": "<path>", "reason": "<why>"}'
-            )
-            print(f"  {colored(error_message, Colors.RED)}")
-            errors += 1
-            continue
-
-        file_path = data.get("file")
-        entry_type = data.get("type", "file")
-
-        if not file_path:
-            # Comment / unknown row without a path — skip silently
-            continue
-
-        if not isinstance(file_path, str):
-            # A truthy non-string (e.g. {"file": 1}) reached path joining and
-            # raised TypeError, so validation crashed on the row it exists to
-            # report.
-            print(
-                f"  {colored(f'{file_name}:{line_num}: `file` must be a string path', Colors.RED)}"
-            )
-            errors += 1
-            continue
-
-        real_entries += 1
-        full_path = _resolve_context_entry_path(file_path, repo_root, task_dir)
-        if entry_type == "directory":
-            if full_path is None or not full_path.is_dir():
-                print(f"  {colored(f'{file_name}:{line_num}: Directory not found: {file_path}', Colors.RED)}")
-                errors += 1
-            continue
-
-        if full_path is None or not full_path.is_file():
-            print(f"  {colored(f'{file_name}:{line_num}: File not found: {file_path}', Colors.RED)}")
-            errors += 1
-            continue
-
-        extension = Path(file_path).suffix.lower()
+        extension = Path(entry.path).suffix.lower()
         if extension in _CODE_FILE_EXTENSIONS and not _is_exempt_from_code_file_warning(
-            file_path, task_rel
+            entry.path, task_rel
         ):
             warning_message = (
-                f"{file_name}:{line_num}: Warning: {file_path} looks like a code file — "
+                f"{file_name}:{entry.line}: Warning: {entry.path} looks like a code file — "
                 "implement/check.jsonl should reference spec/research docs; "
                 "agents read code themselves"
             )
             print(f"  {colored(warning_message, Colors.YELLOW)}")
 
-        if max_file_bytes:
-            # Advisory hygiene warning, so it must never be what fails
-            # `validate`. `stat()` can still raise after the `is_file()` check
-            # above — a permission change, or the file removed in between.
-            try:
-                size: int | None = full_path.stat().st_size
-            except OSError:
-                size = None
-            if size is not None and size > max_file_bytes:
-                warning_message = (
-                    f"{file_name}:{line_num}: Warning: {file_path} is {size} bytes, "
-                    f"exceeds context_injection.max_file_bytes ({max_file_bytes}); "
-                    "injection will truncate it"
-                )
-                print(f"  {colored(warning_message, Colors.YELLOW)}")
-
-    if errors == 0 and real_entries == 0:
+    if errors == 0 and not entries:
         # Seed-only / empty manifest: sub-agents dispatched for this task
         # would run with zero spec context (#573). Silent-green here is how
         # more than half the tasks in the report ended up uncurated.
@@ -401,8 +261,22 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
         )
         return 1
 
+    if errors == 0 and task_dir is not None:
+        role = jsonl_file.stem
+        projection = project_agent_context(
+            repo_root, task_dir, role, get_context_injection_limits(repo_root)
+        )
+        for issue in projection.issues:
+            line_label = str(issue.line) if issue.line is not None else "artifact"
+            message = (
+                f"{file_name}:{line_label}: role={issue.role} source={issue.category} "
+                f"path={issue.path}: cannot be injected in full — {issue.reason}"
+            )
+            print(f"  {colored(message, Colors.RED)}")
+            errors += 1
+
     if errors == 0:
-        print(f"  {colored(f'{file_name}: ✓ ({real_entries} entries)', Colors.GREEN)}")
+        print(f"  {colored(f'{file_name}: ✓ ({len(entries)} entries)', Colors.GREEN)}")
     else:
         print(f"  {colored(f'{file_name}: ✗ ({errors} errors)', Colors.RED)}")
 
@@ -446,7 +320,7 @@ def cmd_list_context(args: argparse.Namespace) -> int:
             if not isinstance(data, dict):
                 continue
 
-            file_path = data.get("file")
+            file_path = data.get("file") or data.get("path")
             if not file_path:
                 # Placeholder / comment row — don't count as a real entry
                 continue

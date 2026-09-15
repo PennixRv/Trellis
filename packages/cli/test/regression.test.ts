@@ -1265,7 +1265,7 @@ describe("regression: JSON read/write failure reporting", () => {
     const r = runTask(["validate", name]);
     expect(r.status).not.toBe(0);
     expect(r.stderr).not.toContain("Traceback");
-    expect(r.stdout).toContain("`file` must be a string path");
+    expect(r.stdout).toContain("`file` or legacy `path` must be a string path");
   });
 
   it.skipIf(!canProvokePermissionFailure)(
@@ -6969,45 +6969,6 @@ print(json.dumps({
     expect(stderr).toContain("add-context");
   });
 
-  it("[init-context-removal] inject-subagent-context.py skips seed rows (no `file` field)", () => {
-    // Hook's read_jsonl_entries should return empty list when jsonl contains
-    // only a seed row — not crash, not treat `_example` as a path.
-    const hookContent = getSharedHookScripts().find(
-      (h) => h.name === "inject-subagent-context.py",
-    )?.content;
-    expect(hookContent).toBeDefined();
-    const hookPath = path.join(tmpDir, "hook.py");
-    fs.writeFileSync(hookPath, hookContent as string, "utf-8");
-
-    // Minimal fake jsonl with only seed
-    const jsonlDir = path.join(tmpDir, "repo");
-    fs.mkdirSync(jsonlDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(jsonlDir, "seed.jsonl"),
-      JSON.stringify({ _example: "seed row" }) + "\n",
-      "utf-8",
-    );
-
-    // Run a tiny Python snippet that imports the hook module and calls
-    // read_jsonl_entries. Capturing the stderr warning proves the code path.
-    const probeScript = `
-import sys, importlib.util
-spec = importlib.util.spec_from_file_location("h", ${JSON.stringify(hookPath)})
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-entries = mod.read_jsonl_entries(${JSON.stringify(jsonlDir)}, "seed.jsonl")
-print(len(entries))
-`;
-    const probePath = path.join(tmpDir, "probe.py");
-    fs.writeFileSync(probePath, probeScript, "utf-8");
-    const result = execSync(`${pythonCmd} ${JSON.stringify(probePath)}`, {
-      cwd: tmpDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    expect(result.trim()).toBe("0");
-  });
-
   it("[#573] task.py validate fails for a freshly created task until manifests are curated", () => {
     setupTaskRepo();
     fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
@@ -7033,6 +6994,48 @@ print(len(entries))
     expect(result.stdout).toContain("0 curated entries");
     expect(result.stdout).toContain("add-context");
     expect(result.stdout).toContain("--allow-empty-context");
+  });
+
+  it("[init-context-removal] inject-subagent-context.py skips seed rows (no `file` field)", () => {
+    const hookContent = getSharedHookScripts().find(
+      (h) => h.name === "inject-subagent-context.py",
+    )?.content;
+    expect(hookContent).toBeDefined();
+    const hookPath = path.join(tmpDir, "hook.py");
+    fs.writeFileSync(hookPath, hookContent as string, "utf-8");
+
+    const jsonlDir = path.join(tmpDir, "repo");
+    fs.mkdirSync(path.join(jsonlDir, ".trellis", "scripts"), { recursive: true });
+    fs.cpSync(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../src/templates/trellis/scripts/common",
+      ),
+      path.join(jsonlDir, ".trellis", "scripts", "common"),
+      { recursive: true },
+    );
+    fs.writeFileSync(
+      path.join(jsonlDir, "seed.jsonl"),
+      JSON.stringify({ _example: "seed row" }) + "\n",
+      "utf-8",
+    );
+
+    const probeScript = `
+import sys, importlib.util
+spec = importlib.util.spec_from_file_location("h", ${JSON.stringify(hookPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+entries = mod.read_jsonl_entries(${JSON.stringify(jsonlDir)}, "seed.jsonl")
+print(len(entries))
+`;
+    const probePath = path.join(tmpDir, "probe.py");
+    fs.writeFileSync(probePath, probeScript, "utf-8");
+    const result = execSync(`${pythonCmd} ${JSON.stringify(probePath)}`, {
+      cwd: tmpDir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    expect(result.trim()).toBe("0");
   });
 
   describe("[validation-preflight] task.py validate vs PR preflight contract", () => {
@@ -9212,9 +9215,9 @@ describe("regression: cli_adapter platform support (beta.9, beta.13, beta.16)", 
 
     // The validator is the second half of the contract: placeholder rows left
     // by older versions are a hard error, not a silently skipped comment.
-    const taskContext = getAllScripts().get("common/task_context.py");
-    expect(taskContext as string).toContain('"_example" in data');
-    expect(taskContext as string).toContain("Placeholder `_example` row");
+    const projection = getAllScripts().get("common/context_projection.py");
+    expect(projection as string).toContain('"_example" in data');
+    expect(projection as string).toContain("Placeholder `_example` row");
   });
 
   // Regression for 04-22-migrate-flow-bugs Bug C: breaking releases must
