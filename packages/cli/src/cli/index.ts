@@ -406,7 +406,7 @@ const task = program
 
 task
   .command("progress")
-  .description("Show completed and planned task counts")
+  .description("Show task lifecycle counts")
   .option("--json", "Output machine-readable JSON")
   .action((options: Record<string, unknown>) => {
     taskProgress({ json: options.json as boolean | undefined });

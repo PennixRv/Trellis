@@ -34,7 +34,7 @@ const CLI_BIN = path.resolve(
 );
 
 describe("task progress", () => {
-  it("counts only active tasks while preserving completed status", () => {
+  it("counts active tasks by lifecycle status", () => {
     const project = makeProject();
     writeTask(path.join(project, ".trellis", "tasks", "active"), "in_progress");
     writeTask(path.join(project, ".trellis", "tasks", "done"), "completed");
@@ -43,16 +43,38 @@ describe("task progress", () => {
       "completed",
     );
 
-    expect(getTaskProgress(project)).toEqual({ completed: 1, planned: 2, partial: false });
+    expect(getTaskProgress(project)).toEqual({
+      planning: 0,
+      in_progress: 1,
+      completed: 1,
+      partial: false,
+    });
   });
 
-  it("marks malformed task records partial without inventing completion", () => {
+  it("marks malformed and unknown task records partial without inventing a status", () => {
     const project = makeProject();
     const taskDirectory = path.join(project, ".trellis", "tasks", "broken");
     fs.mkdirSync(taskDirectory, { recursive: true });
     fs.writeFileSync(path.join(taskDirectory, "task.json"), "{");
 
-    expect(getTaskProgress(project)).toEqual({ completed: 0, planned: 1, partial: true });
+    expect(getTaskProgress(project)).toEqual({
+      planning: 0,
+      in_progress: 0,
+      completed: 0,
+      partial: true,
+    });
+  });
+
+  it("does not treat the legacy done status as completed", () => {
+    const project = makeProject();
+    writeTask(path.join(project, ".trellis", "tasks", "legacy"), "done");
+
+    expect(getTaskProgress(project)).toEqual({
+      planning: 0,
+      in_progress: 0,
+      completed: 0,
+      partial: true,
+    });
   });
 
   it("keeps JSON stdout parseable when the project version is behind", () => {
@@ -66,7 +88,28 @@ describe("task progress", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({ completed: 0, planned: 1, partial: false });
+    expect(JSON.parse(result.stdout)).toEqual({
+      planning: 0,
+      in_progress: 1,
+      completed: 0,
+      partial: false,
+    });
     expect(result.stderr).toContain("Trellis update available");
+  });
+
+  it("renders the compact lifecycle order and partial marker", () => {
+    const project = makeProject();
+    writeTask(path.join(project, ".trellis", "tasks", "planning"), "planning");
+    writeTask(path.join(project, ".trellis", "tasks", "working"), "in_progress");
+    writeTask(path.join(project, ".trellis", "tasks", "done"), "completed");
+    writeTask(path.join(project, ".trellis", "tasks", "unknown"), "blocked");
+
+    const result = spawnSync(process.execPath, [CLI_BIN, "task", "progress"], {
+      cwd: project,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("1:1:1?");
   });
 });

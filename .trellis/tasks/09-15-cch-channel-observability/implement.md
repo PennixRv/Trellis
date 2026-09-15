@@ -5,8 +5,10 @@
 The owner/session projection, durable `session_bound` event, worker reducer
 history, project-bucket worker selection, and read-only `task progress` command
 are implemented. `task progress` reports only direct active task records;
-archived tasks are historical and do not inflate the current plan. JSON mode
-keeps update notices on stderr so machine consumers receive parseable stdout.
+archived tasks are historical and do not inflate the current plan. Its JSON
+projection is the fixed lifecycle tuple `planning`, `in_progress`,
+`completed`, plus `partial`; JSON mode keeps update notices on stderr so
+machine consumers receive parseable stdout.
 Focused tests and the CLI regression suite pass locally; release and global
 installation are complete. CCH live-pane verification is limited to a real
 pane with no same-owner worker currently available.

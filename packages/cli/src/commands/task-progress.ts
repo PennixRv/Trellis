@@ -2,8 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 export interface TaskProgress {
+  planning: number;
+  in_progress: number;
   completed: number;
-  planned: number;
   partial: boolean;
 }
 
@@ -28,6 +29,8 @@ function taskJsonFiles(tasksRoot: string): string[] {
 export function getTaskProgress(cwd = process.cwd()): TaskProgress {
   const tasksRoot = path.join(cwd, ".trellis", "tasks");
   const files = taskJsonFiles(tasksRoot);
+  let planning = 0;
+  let in_progress = 0;
   let completed = 0;
   let partial = false;
 
@@ -36,13 +39,16 @@ export function getTaskProgress(cwd = process.cwd()): TaskProgress {
       const task = JSON.parse(fs.readFileSync(file, "utf8")) as {
         status?: unknown;
       };
-      if (task.status === "completed" || task.status === "done") completed += 1;
+      if (task.status === "planning") planning += 1;
+      else if (task.status === "in_progress") in_progress += 1;
+      else if (task.status === "completed") completed += 1;
+      else partial = true;
     } catch {
       partial = true;
     }
   }
 
-  return { completed, planned: files.length, partial };
+  return { planning, in_progress, completed, partial };
 }
 
 export function taskProgress(options: { json?: boolean } = {}): void {
@@ -51,5 +57,7 @@ export function taskProgress(options: { json?: boolean } = {}): void {
     console.log(JSON.stringify(progress));
     return;
   }
-  console.log(`${progress.completed}/${progress.planned}`);
+  console.log(
+    `${progress.planning}:${progress.in_progress}:${progress.completed}${progress.partial ? "?" : ""}`,
+  );
 }

@@ -188,9 +188,12 @@ trellis task progress
 
 Counts task records under the direct active-task directories in
 `.trellis/tasks/`; archived tasks are historical and are excluded from the
-current plan. JSON output is `{completed, planned, partial}`; malformed active
-task records remain in `planned` and set `partial: true`. With `--json`, update
-notices are written to stderr so stdout remains parseable.
+current plan. JSON output is
+`{planning, in_progress, completed, partial}` in the fixed lifecycle order.
+Malformed or unknown active task records set `partial: true` without inventing
+a lifecycle count. Human output uses `planning:in_progress:completed` and adds
+`?` when the projection is partial. With `--json`, update notices are written
+to stderr so stdout remains parseable.
 
 ---
 
