@@ -7,8 +7,9 @@ history, project-bucket worker selection, and read-only `task progress` command
 are implemented. `task progress` reports only direct active task records;
 archived tasks are historical and do not inflate the current plan. JSON mode
 keeps update notices on stderr so machine consumers receive parseable stdout.
-Focused tests and the CLI regression suite pass locally; release, installation,
-and CCH live-pane verification remain pending.
+Focused tests and the CLI regression suite pass locally; release and global
+installation are complete. CCH live-pane verification is limited to a real
+pane with no same-owner worker currently available.
 
 1. [x] Run the existing typecheck, lint, unit tests, and package checks; record the
    baseline. Run GitNexus impact analysis for `CreateChannelEvent`,
@@ -22,8 +23,10 @@ and CCH live-pane verification remain pending.
    replay tests. Run typecheck, lint, unit tests, and package checks.
 5. [x] Run GitNexus `detect-changes`, inspect the final diff, update the Channel
    reference/help documentation.
-6. [ ] Run package dry run, commit and publish the Trellis fork, reinstall it,
-   and complete CCH live-pane verification.
+6. [x] Run package dry run, commit and publish the Trellis fork, and reinstall it.
+   A real pane verified the task/session/path projections; CCH fixtures cover
+   worker states because no same-owner worker was available for a live
+   demonstration.
 
 Rollback is a normal package rollback: old consumers ignore the optional owner
 field and new event; no event history rewrite is permitted.
