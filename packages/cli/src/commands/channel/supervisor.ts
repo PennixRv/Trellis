@@ -287,6 +287,7 @@ export async function runSupervisor(
     log,
     shutdown,
     turnTracker,
+    project,
     processLines: stdoutDrain.processLines,
     signal: stdoutDrain.signal,
   });

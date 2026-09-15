@@ -40,6 +40,7 @@ interface ChannelSummary {
   ephemeral: boolean;
   type: string;
   description?: string;
+  ownerSessionId?: string;
 }
 
 export interface ListOptions {
@@ -50,6 +51,7 @@ export interface ListOptions {
   /** Scan every project bucket, not just the current cwd's. */
   allProjects?: boolean;
   scope?: string;
+  ownerSession?: string;
 }
 
 export async function channelList(opts: ListOptions = {}): Promise<void> {
@@ -93,6 +95,9 @@ export async function channelList(opts: ListOptions = {}): Promise<void> {
   let filtered = projectFilter
     ? summaries.filter((s) => s.task?.includes(projectFilter))
     : summaries;
+  if (opts.ownerSession !== undefined) {
+    filtered = filtered.filter((s) => s.ownerSessionId === opts.ownerSession);
+  }
   // Hide ephemeral channels unless --all (keeps the default `list`
   // uncluttered after lots of one-shot CR / brainstorm sessions).
   const ephemeralHidden = opts.all
@@ -191,6 +196,9 @@ function summarize(name: string, project: string): ChannelSummary | null {
     task: firstEvent?.task,
     type: metadata.type,
     description: metadata.title ?? metadata.description,
+    ...(firstEvent?.ownerSessionId
+      ? { ownerSessionId: firstEvent.ownerSessionId }
+      : {}),
     workersAlive,
     workersTotal,
     lastEventTs: lastEvent?.ts,

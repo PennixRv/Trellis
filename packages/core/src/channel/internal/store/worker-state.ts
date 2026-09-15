@@ -31,6 +31,8 @@ export interface WorkerState {
   channel?: ChannelRef;
   agent?: string;
   provider?: string;
+  /** Every worker session observed in durable event order. */
+  sessionIds: string[];
   lifecycle: WorkerLifecycle;
   terminal: boolean;
   activity: WorkerActivity;
@@ -95,6 +97,10 @@ function identifyWorker(
       const id = strField(ev, "as");
       return id ? { id, canCreate: true } : null;
     }
+    case "session_bound": {
+      const id = strField(ev, "worker");
+      return id ? { id, canCreate: false } : null;
+    }
     case "turn_started":
     case "turn_finished":
     case "interrupt_requested":
@@ -132,6 +138,7 @@ function blankWorker(id: string, ev: ChannelEvent): WorkerAcc {
     lifecycle: "running",
     terminal: false,
     activity: "idle",
+    sessionIds: [],
     pendingMessageCount: 0,
     inboxPolicy: DEFAULT_INBOX_POLICY,
     updatedAt: ev.ts,
@@ -181,6 +188,13 @@ export function reduceWorkerRegistry(
         w.inboxPolicy =
           (strField(ev, "inboxPolicy") as InboxPolicy | undefined) ??
           w.inboxPolicy;
+        break;
+      }
+      case "session_bound": {
+        const sessionId = strField(ev, "sessionId");
+        if (sessionId && !w.sessionIds.includes(sessionId)) {
+          w.sessionIds.push(sessionId);
+        }
         break;
       }
       case "turn_started": {

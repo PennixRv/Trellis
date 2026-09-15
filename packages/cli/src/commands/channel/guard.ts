@@ -534,6 +534,7 @@ function readReservationWorkers(
       lifecycle: "starting",
       terminal: false,
       activity: "idle",
+      sessionIds: [],
       pendingMessageCount: 0,
       inboxPolicy: "explicitOnly",
       updatedAt: new Date(0).toISOString(),

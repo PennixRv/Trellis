@@ -63,6 +63,9 @@ export async function createChannel(
         ? { context: opts.context }
         : {}),
       ...(opts.ephemeral ? { ephemeral: true } : {}),
+      ...(channelType !== "forum" && opts.ownerSessionId
+        ? { ownerSessionId: opts.ownerSessionId }
+        : {}),
       ...(opts.origin ? { origin: opts.origin } : {}),
       ...(opts.meta ? { meta: opts.meta } : {}),
     },

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createChannel } from "../../src/commands/channel/create.js";
 import { appendEvent } from "../../src/commands/channel/store/events.js";
 import { channelWorkers } from "../../src/commands/channel/workers.js";
+import { projectKey } from "../../src/commands/channel/store/paths.js";
 
 describe("channelWorkers", () => {
   let tmpDir: string;
@@ -84,5 +85,17 @@ describe("channelWorkers", () => {
         expect.objectContaining({ workerId: "finished", lifecycle: "killed" }),
       ]),
     );
+  });
+
+  it("passes an explicit project bucket to the core projection", async () => {
+    const otherProject = path.join(tmpDir, "other-project");
+    fs.mkdirSync(otherProject);
+    await createChannel("same-name", { by: "main" });
+    await createChannel("same-name", { by: "main", cwd: otherProject });
+    await channelWorkers("same-name", {
+      projectKey: projectKey(otherProject),
+      json: true,
+    });
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith("[]");
   });
 });
