@@ -136,6 +136,40 @@ describe("handoff ownership", () => {
     expect(["codex_target_a", "codex_target_b"]).toContain(record?.consumer_session_id);
   });
 
+  it("releases only the exact sealed handoff after its source is unavailable", () => {
+    const root = fixture();
+    expect(run(root, "codex_source", [...base("quiesce"), "--task", ".trellis/tasks/demo", "--source-session-id", "codex_source"]).status).toBe(0);
+    expect(run(root, "codex_source", base("seal", 0)).status).toBe(0);
+
+    const beforeRetire = spawnSync(
+      python,
+      [path.join(root, ".trellis", "scripts", "task.py"), "start", ".trellis/tasks/demo", "--allow-empty-context"],
+      { cwd: root, encoding: "utf8", env: { ...process.env, TRELLIS_CONTEXT_ID: "codex_other" } },
+    );
+    expect(beforeRetire.status).toBe(2);
+    expect(beforeRetire.stderr).toContain("fencing_conflict");
+
+    const retired = run(root, "", base("retire-handoff"));
+    expect(retired.status, retired.stderr + retired.stdout).toBe(0);
+    expect(JSON.parse(retired.stdout).status).toBe("ready");
+    expect(run(root, "", base("retire-handoff")).status).toBe(0);
+    expect(run(root, "", [...base("retire-handoff"), "--handoff-id", "other"]).status).toBe(2);
+
+    const sourceCurrent = spawnSync(
+      python,
+      [path.join(root, ".trellis", "scripts", "task.py"), "current", "--json"],
+      { cwd: root, encoding: "utf8", env: { ...process.env, TRELLIS_CONTEXT_ID: "codex_source" } },
+    );
+    expect(JSON.parse(sourceCurrent.stdout).current_task).toBeNull();
+    const oldStart = spawnSync(
+      python,
+      [path.join(root, ".trellis", "scripts", "task.py"), "start", ".trellis/tasks/demo", "--allow-empty-context"],
+      { cwd: root, encoding: "utf8", env: { ...process.env, TRELLIS_CONTEXT_ID: "codex_source" } },
+    );
+    expect(oldStart.status).toBe(2);
+    expect(oldStart.stderr).toContain("fencing_conflict");
+  });
+
   it("does not accept a source pointer as target identity and rejects fallback", () => {
     const root = fixture();
     expect(run(root, "codex_source", [...base("quiesce"), "--task", ".trellis/tasks/demo", "--source-session-id", "codex_source"]).status).toBe(0);

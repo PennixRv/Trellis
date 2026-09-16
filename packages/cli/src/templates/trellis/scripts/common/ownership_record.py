@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .active_task import clear_active_task, resolve_active_task, resolve_context_key, set_active_task
+from .active_task import clear_active_task, clear_active_task_for_context, resolve_active_task, resolve_context_key, set_active_task
 from .continuation_record import (
     ContinuationError,
     SAFE_ID,
@@ -290,6 +290,32 @@ def retire(root: Path, task_id: str, handoff_id: str, core_digest: str, expected
     return _public(record) | {"record_digest": digest}
 
 
+def retire_handoff(root: Path, task_id: str, handoff_id: str, core_digest: str) -> dict[str, Any]:
+    """Release one sealed handoff without requiring the departed source context."""
+    path, record = _load(root, task_id, handoff_id)
+    with _record_lock(path):
+        record = _decode(path)
+        if record["core_digest"] != core_digest:
+            raise OwnershipError("core_digest does not match")
+        if record["state"] == "ready":
+            return _public(record)
+        if record["state"] not in {"sealed", "retiring"}:
+            raise OwnershipError("ownership record is not a sealed handoff")
+        if record["state"] == "sealed":
+            record["previous_event_digest"] = record["integrity"]["record_digest"]
+            record["state"] = "retiring"
+            record["generation"] += 1
+            _write(path, record)
+        cleared = clear_active_task_for_context(record["source_context_key"], record["task"]["path"], root)
+        if cleared == "changed":
+            raise OwnershipError("source task pointer changed during handoff retirement")
+        record["previous_event_digest"] = record["integrity"]["record_digest"]
+        record["state"] = "ready"
+        record["generation"] += 1
+        digest = _write(path, record)
+    return _public(record) | {"record_digest": digest}
+
+
 def claim(root: Path, task_id: str, task_path: str, handoff_id: str, core_digest: str, expected_generation: int) -> dict[str, Any]:
     actor, active = _direct_context(root)
     path, record = _load(root, task_id, handoff_id)
@@ -410,5 +436,4 @@ def assert_task_mutation_allowed(root: Path, task_path: Path) -> None:
             raise OwnershipError("ownership record task path does not match current task")
         if record.get("consumer_session_id") == actor:
             continue
-        if record["source_session_id"] == actor or record["state"] in {"retiring", "ready", "claiming", "claimed", "consumed", "archived"}:
-            raise OwnershipError("fencing_conflict: task is owned by another handoff session")
+        raise OwnershipError("fencing_conflict: task is owned by another handoff session")

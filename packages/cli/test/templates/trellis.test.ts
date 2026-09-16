@@ -196,7 +196,7 @@ describe("trellis template constants", () => {
     expect(workflow).toContain("`report.json`");
     expect(workflow).toContain("`trellis-research-record`");
     expect(workflow).toContain("### Semantic RecoveryBrief");
-    expect(workflow).toContain("receipt validation and new-session task");
+    expect(workflow).toContain("checkpoint's exact archive/convergence");
     expect(workflow).toContain("[workflow-state:planning]");
     expect(workflow).toContain("[workflow-state:in_progress]");
     expect(workflow).toContain("rather than high-frequency polling");

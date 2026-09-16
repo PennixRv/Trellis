@@ -781,6 +781,22 @@ def clear_active_task(
     return previous
 
 
+def clear_active_task_for_context(
+    context_key: str,
+    task_path: str,
+    repo_root: Path,
+) -> str:
+    """Clear one exact session pointer, refusing an unexpected replacement."""
+    context_path = _context_path(repo_root, context_key)
+    context = _read_json(context_path)
+    if context is None or not _string_value(context.get("current_task")):
+        return "absent"
+    current = _string_value(context.get("current_task"))
+    if not _task_refs_match(current, task_path, repo_root):
+        return "changed"
+    return "cleared" if context_path.is_file() and _remove_file(context_path) else "absent"
+
+
 def clear_task_from_sessions(task_path: str, repo_root: Path) -> int:
     """Delete all session runtime files that point at a task."""
     target = _canonical_task_ref(task_path, repo_root) or normalize_task_ref(task_path)

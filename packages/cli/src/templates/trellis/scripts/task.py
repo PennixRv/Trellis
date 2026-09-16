@@ -90,6 +90,7 @@ from common.ownership_record import (
     consume as consume_ownership,
     quiesce as quiesce_ownership,
     retire as retire_ownership,
+    retire_handoff as retire_handoff_ownership,
     seal as seal_ownership,
     status as ownership_status,
 )
@@ -435,6 +436,10 @@ def cmd_ownership(args: argparse.Namespace) -> int:
             result = retire_ownership(
                 repo_root, args.task_id, args.handoff_id, args.core_digest,
                 args.expected_generation, args.archive_observation,
+            )
+        elif command == "retire-handoff":
+            result = retire_handoff_ownership(
+                repo_root, args.task_id, args.handoff_id, args.core_digest,
             )
         elif command == "claim":
             result = claim_ownership(
@@ -839,6 +844,9 @@ def main() -> int:
     ownership_retire = ownership_sub.add_parser("retire", help="Retire source and expose handoff")
     ownership_retire.add_argument("--archive-observation", required=True, choices=("not_required", "observed"))
     add_ownership_common(ownership_retire, expected=True)
+
+    ownership_retire_handoff = ownership_sub.add_parser("retire-handoff", help="Release one sealed handoff by exact id")
+    add_ownership_common(ownership_retire_handoff)
 
     ownership_claim = ownership_sub.add_parser("claim", help="Claim a ready handoff as this session")
     ownership_claim.add_argument("--task", required=True, help="Task path to bind to this session")
