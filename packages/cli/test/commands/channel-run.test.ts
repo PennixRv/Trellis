@@ -118,4 +118,30 @@ describe("channelRun startup barrier", () => {
       }),
     );
   });
+
+  it("persists an explicit owner before spawning a one-shot Codex worker", async () => {
+    mocks.channelSpawn.mockImplementation(async (channel: string) => {
+      await appendEvent(channel, { kind: "done", by: "worker" });
+      return { pid: 1234, log: "worker.log", worker: "worker" };
+    });
+
+    await channelRun({
+      name: "owned-one-shot",
+      cwd: projectDir,
+      provider: "codex",
+      as: "worker",
+      message: "run",
+      ownerSession: "main-thread",
+      timeoutMs: 100,
+    });
+
+    await expect(
+      readChannelEvents("owned-one-shot", projectKey(projectDir)),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "create",
+        ownerSessionId: "main-thread",
+      }),
+    ]));
+  });
 });

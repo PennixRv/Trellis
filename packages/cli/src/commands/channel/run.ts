@@ -37,6 +37,8 @@ export interface RunOptions {
   stdin?: boolean;
   /** Per-worker timeout (defaults to 5m if not specified). */
   timeoutMs?: number;
+  /** Opaque main Codex session owner for the ephemeral Channel. */
+  ownerSession?: string;
 }
 
 export async function channelRun(opts: RunOptions): Promise<void> {
@@ -60,6 +62,7 @@ export async function channelRun(opts: RunOptions): Promise<void> {
     cwd: opts.cwd,
     ephemeral: true,
     origin: "run",
+    ownerSession: opts.ownerSession,
   });
 
   // Capture the barrier before spawning. A provider may fail or finish while

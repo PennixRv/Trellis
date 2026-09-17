@@ -484,6 +484,10 @@ export function registerChannelCommand(program: Command): void {
     .option("--message-file <path>", "read prompt body from file")
     .option("--stdin", "read prompt body from stdin")
     .option(
+      "--owner-session <id>",
+      "opaque main Codex session owner (defaults to host session env)",
+    )
+    .option(
       "--timeout <duration>",
       "max time to wait for done (e.g. 30s, 5m, 1h; default 5m, or channel.subnode.timeout for --agent subnode)",
     )
@@ -500,6 +504,7 @@ export function registerChannelCommand(program: Command): void {
         messageFile?: string;
         stdin?: boolean;
         timeout?: string;
+        ownerSession?: string;
       };
       if (opts.provider !== undefined && !isProvider(opts.provider)) {
         console.error(
@@ -522,6 +527,7 @@ export function registerChannelCommand(program: Command): void {
           textFile: opts.messageFile,
           stdin: opts.stdin,
           timeoutMs: parseDuration(opts.timeout),
+          ownerSession: opts.ownerSession,
         });
       } catch (err) {
         console.error(

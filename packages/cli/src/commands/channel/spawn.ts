@@ -24,6 +24,7 @@ import {
   workerFile,
   workerLockPath,
 } from "./store/paths.js";
+import { isCreateEvent, readChannelEvents } from "./store/events.js";
 import { parseChannelScope } from "./store/schema.js";
 import { writeSupervisorConfig } from "./supervisor.js";
 
@@ -221,6 +222,18 @@ export async function channelSpawn(
       : undefined;
   const effectiveOpts = applySubnodeSupervisorDefaults(opts);
   const resolved = resolveSpawn(channelName, effectiveOpts);
+  if (resolved.provider === "codex") {
+    const [createEvent] = await readChannelEvents(channelName, ref.project);
+    if (
+      !createEvent ||
+      !isCreateEvent(createEvent) ||
+      !createEvent.ownerSessionId?.trim()
+    ) {
+      throw new Error(
+        `Cannot spawn Codex worker in channel '${channelName}' without a main Codex session owner. Create the channel with --owner-session <id>, or run from a Codex shell that exposes CODEX_THREAD_ID.`,
+      );
+    }
+  }
   // OOM guard: enforce live-worker budget for this project/scope before
   // forking a supervisor. Expired idle workers are cleaned first; if the
   // budget is still exhausted we reject rather than guess which non-

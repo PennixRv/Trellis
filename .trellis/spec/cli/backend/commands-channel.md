@@ -244,6 +244,7 @@ trellis channel prune [opts]
 trellis channel run [name] [opts]
   (auto-generates name "run-<8hex>" if not provided, --ephemeral implied)
   --agent / --provider / --as / --cwd / --model / --file / --jsonl  : same as spawn
+  --owner-session <id>    : opaque main Codex session owner for the ephemeral channel
   --message <text>       : inline prompt
   --message-file <path>  : read prompt from file
   --stdin                : read prompt from stdin
@@ -1036,6 +1037,82 @@ only applies to per-worker supervisor cleanup.
 - `TRELLIS_CHANNEL_PROJECT` not set → derive from `process.cwd()`
 - `selectExistingChannelProject(name)` may **mutate `process.env.TRELLIS_CHANNEL_PROJECT`** when falling back to a unique cross-bucket match, so the rest of the CLI invocation lands on the same bucket
 
+### Codex worker ownership preflight
+
+#### 1. Scope / Trigger
+
+- Trigger: a Codex worker is observable to session-scoped consumers only when
+  its Channel create event has an immutable main Codex owner.
+- Boundary: CLI resolves existing Channel metadata and validates the owner;
+  core persists the event and CCH consumes the exact owner filter.
+
+#### 2. Signatures
+
+```text
+trellis channel create <name> --owner-session <id>
+trellis channel run [name] --owner-session <id>
+```
+
+`channel spawn` has no mutable owner flag. The owner is fixed by the create
+event and must not be changed after a Channel exists.
+
+#### 3. Contracts
+
+- `createChannel` resolves the owner in this order: explicit
+  `ownerSession`, `CODEX_THREAD_ID`, then legacy `CODEX_SESSION_ID`.
+- After provider resolution, `channelSpawn` reads the first durable event.
+  For `provider: "codex"`, it requires a create event whose
+  `ownerSessionId` is non-blank.
+- The preflight runs before guard cleanup, lock acquisition, supervisor config,
+  reservation, PID write, or process fork.
+- Non-Codex providers and Channel operations that do not spawn a Codex worker
+  remain valid without an owner.
+- `TRELLIS_CONTEXT_ID` is not an owner fallback: it is a generic platform
+  context key, not CCH's exact Codex main-session key.
+
+#### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Codex spawn and create owner is non-blank | Continue through the normal spawn path. |
+| Codex spawn and owner is missing/blank | Throw before worker side effects with `--owner-session` and `CODEX_THREAD_ID` remediation. |
+| Claude spawn and owner is missing | Preserve existing spawn behavior. |
+| One-shot Codex run with `--owner-session <id>` | Persist `<id>` during internal create, then spawn normally. |
+
+#### 5. Good / Base / Bad Cases
+
+- Good: `channel create review --owner-session <main-id>` followed by a Codex
+  spawn records an exact CCH ownership key.
+- Base: a Claude-only Channel has no owner and remains valid.
+- Bad: an external shell with no Codex session environment launches an
+  ownerless Codex worker; rejecting it is required because the worker would be
+  invisible to the coordinating session.
+
+#### 6. Tests Required
+
+- Regression: ownerless direct Codex spawn rejects and creates no config, PID,
+  or reservation artifact.
+- Regression: `channel run` persists its explicit owner before delegating to
+  its spawn path.
+- Existing create owner-precedence and Channel list owner-filter tests remain
+  green.
+
+#### 7. Wrong vs Correct
+
+**Wrong** (launches a worker that its coordinator cannot observe):
+
+```ts
+await spawnLocked(channelName, resolved, opts, project, idleTimeoutMs);
+```
+
+**Correct** (validates immutable ownership before spawn side effects):
+
+```ts
+if (resolved.provider === "codex" && !createEvent.ownerSessionId?.trim()) {
+  throw new Error("Create the channel with --owner-session <id>");
+}
+```
+
 ### Role environment files
 
 An agent definition may declare `env_file: <name>` in frontmatter. The value
@@ -1064,6 +1141,7 @@ shell quoting, expansion, or commands in them.
 | `spawn` and channel not found                                                                                | throw `"Channel '<name>' not found at <dir>"`                                                                         |
 | `spawn` with no `--provider` and no `--agent` providing it                                                   | throw `"Missing --provider (and the agent definition has no \`provider:\` frontmatter)"`                              |
 | `spawn` with no `--as` and no `--agent` providing fallback name                                              | throw `"Missing --as (no agent name to fall back to)"`                                                                |
+| `spawn` resolves `provider: "codex"` but the create event has no non-blank `ownerSessionId`                 | throw before worker side effects with explicit owner/session-environment remediation                                |
 | `spawn` and worker name already has a live pid                                                               | throw `"Worker '<as>' is already running in channel '<name>' (pid <N>)"`                                              |
 | `spawn` and `--provider` not in REGISTRY                                                                     | exit 1, stderr `"--provider must be one of: claude, codex"`                                                           |
 | `send` with none of `--stdin`/`--text-file`/`[text]`                                                         | throw (missing body)                                                                                                  |

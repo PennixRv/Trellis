@@ -16,6 +16,7 @@ import { channelInterrupt } from "../../src/commands/channel/interrupt.js";
 import { channelMessages } from "../../src/commands/channel/messages.js";
 import { channelList } from "../../src/commands/channel/list.js";
 import { channelSend } from "../../src/commands/channel/send.js";
+import { channelSpawn } from "../../src/commands/channel/spawn.js";
 import { finalizeSupervisorExit } from "../../src/commands/channel/supervisor.js";
 import { runInboxWatcher } from "../../src/commands/channel/supervisor/inbox.js";
 import {
@@ -160,6 +161,50 @@ describe("channel storage and forum channels", () => {
       if (oldSession === undefined) delete process.env.CODEX_SESSION_ID;
       else process.env.CODEX_SESSION_ID = oldSession;
     }
+  });
+
+  it("rejects an ownerless Codex worker before creating worker artifacts", async () => {
+    const oldThread = process.env.CODEX_THREAD_ID;
+    const oldSession = process.env.CODEX_SESSION_ID;
+    delete process.env.CODEX_THREAD_ID;
+    delete process.env.CODEX_SESSION_ID;
+    try {
+      await createChannel("ownerless-codex", { by: "main" });
+
+      await expect(
+        channelSpawn("ownerless-codex", {
+          provider: "codex",
+          as: "worker",
+          cwd: projectDir,
+        }),
+      ).rejects.toThrow(
+        "Cannot spawn Codex worker in channel 'ownerless-codex' without a main Codex session owner",
+      );
+
+      const project = projectKey(projectDir);
+      for (const suffix of ["config", "pid", "reservation"]) {
+        expect(
+          fs.existsSync(workerFile("ownerless-codex", "worker", suffix, project)),
+        ).toBe(false);
+      }
+    } finally {
+      if (oldThread === undefined) delete process.env.CODEX_THREAD_ID;
+      else process.env.CODEX_THREAD_ID = oldThread;
+      if (oldSession === undefined) delete process.env.CODEX_SESSION_ID;
+      else process.env.CODEX_SESSION_ID = oldSession;
+    }
+  });
+
+  it("does not apply the Codex owner preflight to a Claude worker", async () => {
+    await createChannel("ownerless-claude", { by: "main" });
+
+    await expect(
+      channelSpawn("ownerless-claude", {
+        provider: "claude",
+        as: "../invalid-worker",
+        cwd: projectDir,
+      }),
+    ).rejects.toThrow("Invalid worker name");
   });
 
   it("reduces structured thread events into board state", async () => {
