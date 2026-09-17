@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  getCommandTemplates,
+  getSkillTemplates,
+} from "../../src/templates/common/index.js";
+import {
   collectPlatformTemplates,
   PLATFORM_IDS,
 } from "../../src/configurators/index.js";
@@ -147,6 +151,36 @@ describe("trellis template constants", () => {
       "utf-8",
     );
     expect(marketplaceNative).toBe(workflowMdTemplate);
+  });
+
+  it("analysis-only tasks complete evidence work without entering implementation", () => {
+    const marker = '`task.json.meta.delivery_mode = "analysis_only"`';
+    const commonTemplates = new Map(
+      [...getCommandTemplates(), ...getSkillTemplates()].map((template) => [
+        template.name,
+        template.content,
+      ]),
+    );
+
+    expect(workflowMdTemplate).toContain(marker);
+    expect(workflowMdTemplate).toContain("no-change boundary");
+    expect(workflowMdTemplate).toContain("separate change-bearing task");
+    for (const status of ["planning", "planning-inline"]) {
+      const breadcrumb = workflowStateBreadcrumb(status);
+      expect(breadcrumb).toContain(marker);
+      expect(breadcrumb).toContain("Do not wait for a start review");
+      expect(breadcrumb).toContain("archive directly");
+    }
+    for (const name of ["start", "continue", "finish-work", "brainstorm"]) {
+      const content = commonTemplates.get(name) ?? "";
+      expect(content, `${name} must describe analysis-only tasks`).toContain(marker);
+      expect(content, `${name} must keep protected-target changes separate`).toContain(
+        "separate change-bearing task",
+      );
+    }
+    expect(workflowMdTemplate).toContain(
+      "change-bearing implementation waits for `task.py start`",
+    );
   });
 
   it("marketplace TDD workflow planning breadcrumbs include behavior gates", () => {
