@@ -120,3 +120,28 @@ Required immutable Codex owner metadata before Channel spawn, restored the missi
 ### Next Steps
 
 - Address FastCtx-to-Codex CODEX_THREAD_ID propagation only in a separately owned host-integration task if transparent worker creation is required.
+
+
+## Session 4: 修复子节点终态与发布可靠性
+<!-- trellis-session: v=2 fp=a44aa70b91770efd -->
+
+**Date**: 2026-09-17
+**Task**: 修复子节点终态与发布可靠性
+**Package**: cli
+**Branch**: `main`
+
+### Summary
+
+修复 Codex subnode 的终态、报告传输和发布 manifest/npm 传播校验；发布 Trellis 0.6.38 并完成全局重装。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `de8d8911` | fix(channel): complete subnodes terminally |
+| `8aba1615` | fix(release): require target manifest |
+| `f5e96784` | fix(release): allow npm propagation |
+
+### Status
+
+[OK] **Completed**
