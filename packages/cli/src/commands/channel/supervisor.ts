@@ -269,6 +269,7 @@ export async function runSupervisor(
   const idleTimerRef: {
     current?: ReturnType<typeof scheduleSupervisorIdleTimer>;
   } = {};
+  const inboxAbort = new AbortController();
   const turnTracker = new TurnTracker({
     onIdleExit: () => idleTimerRef.current?.pause(),
     onIdleEnter: () => idleTimerRef.current?.reset(),
@@ -288,6 +289,15 @@ export async function runSupervisor(
     shutdown,
     turnTracker,
     project,
+    ...(config.agent === "subnode"
+      ? {
+          onDone: () => {
+            idleTimerRef.current?.cancel();
+            inboxAbort.abort();
+            shutdown.complete();
+          },
+        }
+      : {}),
     processLines: stdoutDrain.processLines,
     signal: stdoutDrain.signal,
   });
@@ -317,7 +327,7 @@ export async function runSupervisor(
     // during pipe teardown). The startup-failed path runs an IIFE that
     // owns process.exit; subsequent fires must be no-ops or we'd queue
     // duplicate error events.
-    if (spawnFailed) return;
+    if (spawnFailed || shutdown.isShuttingDown()) return;
     log.write(`[supervisor] worker error: ${err.message}\n`);
     if (!child.pid) {
       // Pre-spawn failure (ENOENT / EACCES): emit ONE `error` event,
@@ -500,15 +510,14 @@ export async function runSupervisor(
   // Start BEFORE adapter.handshake() so messages arriving during the
   // handshake window are captured. The adapter's `isReady()` is checked
   // inside runInboxWatcher; codex blocks there until thread/start lands.
-  const abort = new AbortController();
-  process.on("exit", () => abort.abort());
+  process.on("exit", () => inboxAbort.abort());
   void runInboxWatcher({
     channelName,
     workerName,
     adapter,
     ctx: adapterCtx,
     child,
-    signal: abort.signal,
+    signal: inboxAbort.signal,
     inboxPolicy: config.inboxPolicy ?? DEFAULT_INBOX_POLICY,
     turnTracker,
   });
@@ -584,7 +593,7 @@ function readExternalShutdownReason(
   channelName: string,
   workerName: string,
   project?: string,
-): ShutdownReason {
+): Exclude<ShutdownReason, "completed"> {
   const file = workerFile(channelName, workerName, "shutdown-reason", project);
   try {
     const reason = fs.readFileSync(file, "utf-8").trim();

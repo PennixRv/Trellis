@@ -18,6 +18,7 @@ import { channelList } from "../../src/commands/channel/list.js";
 import { channelSend } from "../../src/commands/channel/send.js";
 import { channelSpawn } from "../../src/commands/channel/spawn.js";
 import { finalizeSupervisorExit } from "../../src/commands/channel/supervisor.js";
+import { createShutdown } from "../../src/commands/channel/supervisor/shutdown.js";
 import { runInboxWatcher } from "../../src/commands/channel/supervisor/inbox.js";
 import {
   applyParseResult,
@@ -481,13 +482,14 @@ describe("channel storage and forum channels", () => {
     );
   });
 
-  it("records turn_finished when a worker emits a terminal event", async () => {
+  it("records turn_finished and runs completion cleanup when a worker emits done", async () => {
     await createChannel("turns", { by: "main" });
     const tracker = new TurnTracker();
     tracker.begin(2);
     const shutdown = {
       markTerminalEmitted: vi.fn(),
     };
+    const onDone = vi.fn();
     const child = {
       stdin: { write: vi.fn() },
     };
@@ -499,6 +501,8 @@ describe("channel storage and forum channels", () => {
       child as never,
       shutdown as never,
       tracker,
+      undefined,
+      onDone,
     );
 
     const events = await readChannelEvents("turns", projectKey(projectDir));
@@ -513,6 +517,39 @@ describe("channel storage and forum channels", () => {
         outcome: "done",
       },
     ]);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("completion cleanup does not append a killed event", async () => {
+    await createChannel("completed", { by: "main" });
+    const stdinEnd = vi.fn();
+    const child = {
+      stdin: { end: stdinEnd },
+      exitCode: 0,
+      signalCode: null,
+      kill: vi.fn(),
+    };
+    const shutdown = createShutdown({
+      channelName: "completed",
+      workerName: "subnode",
+      log: { write: noop },
+      getChild: () => child as never,
+      graceMs: 1,
+    });
+    shutdown.markTerminalEmitted();
+    vi.useFakeTimers();
+    try {
+      shutdown.complete();
+      await shutdown.finalizeOnExit(0, null);
+      await vi.runAllTimersAsync();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(stdinEnd).toHaveBeenCalledTimes(1);
+    expect(
+      await readChannelEvents("completed", projectKey(projectDir)),
+    ).toHaveLength(1);
   });
 
   it("persists adapter session IDs as durable bindings", async () => {

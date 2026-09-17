@@ -31,12 +31,16 @@ export type ShutdownReason =
   | "explicit-kill"
   | "timeout"
   | "crash"
-  | "idle-timeout";
+  | "idle-timeout"
+  | "completed";
+type KillReason = Exclude<ShutdownReason, "completed">;
 
 export interface ShutdownController {
   /** Idempotent: only the first call wins. Returns the killed-append
    *  promise so callers can await ordering if they need to. */
-  request(signal: NodeJS.Signals, reason: ShutdownReason): Promise<void>;
+  request(signal: NodeJS.Signals, reason: KillReason): Promise<void>;
+  /** End a successfully completed one-shot worker without appending `killed`. */
+  complete(): void;
   /** Synchronously mark shutdown intent without starting the kill
    *  ladder or appending `killed`. Use when other code must see
    *  `isShuttingDown=true` BEFORE the caller proceeds to any await
@@ -150,8 +154,9 @@ export function createShutdown(args: CreateShutdownArgs): ShutdownController {
 
   const request = async (
     signal: NodeJS.Signals,
-    reason: ShutdownReason,
+    reason: KillReason,
   ): Promise<void> => {
+    if (shutdownReason === "completed") return;
     // The kill ladder + killed-append are one-shot; whether we got here
     // via `claim()` + `request()` (post-spawn error) or a single
     // `request()` (signal / timeout), only run them once.
@@ -167,6 +172,13 @@ export function createShutdown(args: CreateShutdownArgs): ShutdownController {
     startKillLadder(getChild());
     killedPromise = writeKilled(shutdownReason, requestSignal);
     await killedPromise;
+  };
+
+  const complete = (): void => {
+    if (shutdownReason !== null) return;
+    shutdownReason = "completed";
+    log.write("[supervisor] completed worker; cleaning up runtime\n");
+    startKillLadder(getChild());
   };
 
   const finalizeOnExit = async (
@@ -215,6 +227,7 @@ export function createShutdown(args: CreateShutdownArgs): ShutdownController {
 
   return {
     request,
+    complete,
     claim,
     isShuttingDown: () => shutdownReason !== null,
     reason: () => shutdownReason,

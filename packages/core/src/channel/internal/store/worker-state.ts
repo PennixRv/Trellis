@@ -212,7 +212,8 @@ export function reduceWorkerRegistry(
         w.activity = "idle";
         delete w.activeTurnId;
         delete w.activeTurnStartedAt;
-        w.idleSince = ev.ts;
+        if (w.terminal) delete w.idleSince;
+        else w.idleSince = ev.ts;
         break;
       }
       case "interrupted": {
@@ -230,7 +231,10 @@ export function reduceWorkerRegistry(
         w.activity = "idle";
         delete w.activeTurnId;
         delete w.activeTurnStartedAt;
-        if ((ev as { synthesized?: unknown }).synthesized === true) {
+        if (
+          (ev as { synthesized?: unknown }).synthesized === true ||
+          w.agent === "subnode"
+        ) {
           w.lifecycle = "done";
           w.terminal = true;
           w.exitCode = numField(ev, "exit_code") ?? w.exitCode;
@@ -260,6 +264,13 @@ export function reduceWorkerRegistry(
         break;
       }
       case "killed": {
+        if (w.agent === "subnode" && w.lifecycle === "done") {
+          w.activity = "idle";
+          delete w.activeTurnId;
+          delete w.activeTurnStartedAt;
+          delete w.idleSince;
+          break;
+        }
         const reason = strField(ev, "reason");
         w.lifecycle = reason === "crash" ? "crashed" : "killed";
         w.terminal = true;

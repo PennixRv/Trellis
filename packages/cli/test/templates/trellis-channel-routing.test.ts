@@ -35,7 +35,8 @@ describe("trellis-channel routing", () => {
     expect(subnode).toContain("brief.json");
     expect(subnode).toContain("worklog.md");
     expect(subnode).toContain("report.json");
-    expect(subnode).toContain("Do not use a terminal Channel message as the report transport.");
+    expect(subnode).toContain("Do not use a Channel command or message body as the report transport.");
+    expect(subnode).toContain("final assistant reply");
     expect(skill).not.toContain("codex-workflow-dispatch");
     expect(skill).not.toContain("codex-only-analysis-channel");
   });

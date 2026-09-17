@@ -44,9 +44,11 @@ $TASK/subnodes/$WORK_ID/$SUBNODE_ID/
   disposition.json # coordinator-owned, create-once result decision
 ```
 
-Do not use a terminal Channel message as the report transport. The short final
-message names the already-written `report.json` and its status; the durable
-JSON file carries the reviewable result.
+Do not use a Channel command or message body as the report transport. The
+subnode's short final assistant reply names the already-written `report.json`
+and its status; the Codex supervisor projects that reply into the durable
+Channel message and `done` events. The durable JSON file carries the
+reviewable result.
 
 The subnode copies identity, scope, and lens from `brief.json`. The minimal
 complete report is:
@@ -117,11 +119,11 @@ not as a high-frequency supervision loop.
 
 ## Coordinator Review
 
-After a terminal message, independently validate and then record a task-level
-disposition. `complete` means only that the subnode claims it completed its
-assigned work; it is not acceptance. Confirm the terminal state from the
-durable worker projection; a report without a terminal worker is still
-pending, and a terminal worker without a valid report is recovery.
+After the subnode's final reply, independently validate and then record a
+task-level disposition. `complete` means only that the subnode claims it
+completed its assigned work; it is not acceptance. Confirm the terminal state
+from the durable worker projection; a report without a terminal worker is
+still pending, and a terminal worker without a valid report is recovery.
 
 ```bash
 REPORT="$TASK/subnodes/$WORK_ID/$SUBNODE_ID/report.json"

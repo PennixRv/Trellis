@@ -52,10 +52,12 @@ sandbox claim.
 5. A complete report includes independently checkable evidence. A non-complete
    report explains completed scope and the blocker or error. Include the exact
    identity, scope, and lens required by the artifact helper.
-6. Send one short terminal Channel message with the status and report path.
-   Do not place the report JSON in Channel text.
+6. Finish with one short final assistant reply that states the status and report
+   path. Do not place the report JSON in the reply and do not run
+   `trellis channel send`: the supervisor routes this final reply into the
+   durable Channel message and `done` events.
 
-The terminal message ends the worker runtime; it does not accept the report.
+The final reply ends the worker runtime; it does not accept the report.
 The coordinator later checks the durable worker terminal projection and records
 the disposition. A report without a terminal worker remains pending.
 

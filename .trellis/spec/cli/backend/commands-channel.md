@@ -384,6 +384,7 @@ interface WorkerAdapter {
 // supervisor/shutdown.ts
 interface ShutdownController {
   request(signal: NodeJS.Signals, reason: "explicit-kill"|"timeout"|"crash"|"idle-timeout"): Promise<void>;
+  complete(): void;                                         // normal terminal cleanup; never appends `killed`
   claim(reason): boolean;                                   // sync intent latch (no ladder)
   isShuttingDown(): boolean;
   reason(): ShutdownReason | null;
@@ -461,6 +462,21 @@ type ChannelEventKind =
   `turn_started.inputSeq`. Pid files feed `probeWorkerRuntime` /
   `reconcileWorkerLiveness` only; `reconcileWorkerLiveness` performs no durable
   writes unless `appendTerminalEvents: true`.
+- An adapter `done` event remains turn-level for reusable workers. When the
+  latest `spawned` event names `agent: "subnode"`, that same ordinary `done`
+  is the durable terminal lifecycle (`done`); a later `turn_finished` or
+  legacy idle-cleanup `killed` must not reactivate or overwrite it. A subnode
+  killed before any `done` remains `killed` or `crashed` normally.
+- The Codex supervisor calls `ShutdownController.complete()` after an ordinary
+  `done` only for `agent: "subnode"`. It stops inbox/idle supervision and uses
+  the existing process-exit ladder, but appends no `killed` event. A post-spawn
+  child error is ignored once any shutdown reason has been claimed, so normal
+  cleanup cannot add a contradictory `error`.
+- A subnode's final assistant reply is the report notification. The Codex
+  adapter projects it into the durable Channel `message` and `done` events;
+  role prompts must not tell the worker to execute `trellis channel send`,
+  because the default Channel root is outside a Codex `workspace-write`
+  sandbox. The report itself remains the task-local `report.json`.
 - `trellis channel workers` exposes this same projection for coordinator
   recovery and terminal confirmation. Without `--include-terminal`, terminal
   workers are filtered out; `--json` is the machine-readable form. It never
@@ -978,6 +994,70 @@ Legacy event logs may still contain `linkedContext`; readers normalize it to
 
 **Terminal event invariant**: every spawned worker MUST eventually produce exactly one of `done` or supervisor-synthesised fallback. `ShutdownController.markTerminalEmitted()` claims the slot **synchronously before** `await appendEvent({kind: done|error})` to prevent races with `finalizeOnExit`.
 
+### Subnode normal-completion contract
+
+#### 1. Scope / Trigger
+
+`agent: "subnode"` is a bounded, one-shot evidence worker. Its ordinary
+adapter `done` event has task-terminal meaning, unlike the turn-level `done`
+of reusable workers.
+
+#### 2. Signatures
+
+```ts
+interface ShutdownController {
+  complete(): void;
+}
+
+startStdoutPump(options: { onDone?: () => void }): Promise<void>;
+```
+
+`runSupervisor` supplies `onDone` only for a subnode. The callback cancels idle
+supervision, aborts the inbox watch, then calls `complete()`.
+
+#### 3. Contracts
+
+| Input | Worker projection | Supervisor cleanup | Report notification |
+| --- | --- | --- | --- |
+| generic adapter `done` | live/reusable | stays supervised | normal adapter projection |
+| subnode adapter `done` | terminal `done` | normal exit ladder, no `killed` | final assistant reply becomes Channel message/done |
+
+#### 4. Validation & Error Matrix
+
+| Condition | Required result |
+| --- | --- |
+| subnode emits `done`, then emits `turn_finished` | remains terminal `done`; no `idleSince` |
+| historical idle cleanup appends `killed` after subnode `done` | retains terminal `done` |
+| subnode exits or is killed before `done` | existing synthesized `done`/`error` or `killed` behavior applies |
+| worker invokes `trellis channel send` from `workspace-write` | sandbox may reject the external Channel store; use final assistant reply instead |
+
+#### 5. Good / Base / Bad Cases
+
+- Good: a subnode writes `report.json`, returns a final assistant reply naming
+  it, and `channel workers --include-terminal` reports `done`.
+- Base: a reusable worker emits `done` between inbox turns and remains ready for
+  its next message.
+- Bad: treat every adapter `done` as terminal, which breaks reusable workers;
+  or append `killed` after a successful subnode `done`, which misstates the
+  result.
+
+#### 6. Tests Required
+
+- Core reducer test: subnode `done`, later `turn_finished`, then legacy
+  `killed` still projects terminal `done`; pre-done kill remains `killed`.
+- CLI test: normal completion cleanup invokes no `killed` append.
+- Template test: bundled subnode guidance prohibits Channel-command report
+  transport and requires a final assistant reply.
+
+#### 7. Wrong vs Correct
+
+**Wrong:** worker role says “send a terminal Channel message”; the command
+writes under `~/.trellis/channels` and can fail outside `workspace-write`.
+
+**Correct:** worker writes the task-local report and returns a final assistant
+reply; the supervisor persists the transport event and closes only that
+subnode's runtime.
+
 ### Storage layout contract
 
 ```
@@ -1169,6 +1249,7 @@ shell quoting, expansion, or commands in them.
 | Shutdown requested during `await spawnSettled`                 | after settle, check `shutdown.isShuttingDown()` — if true, `await shutdown.awaitFinalize()` and return (no `spawned` event written)                                                                                           |
 | `child.on("exit")` and adapter never emitted done/error        | `finalizeOnExit` synthesises `done{synthesized:true, exit_code:0}` (code=0) or `error{synthesized:true, exit_code, exit_signal}` (otherwise). `by` = worker name (NOT `supervisor:<worker>`) so `wait --from <worker>` wakes. |
 | `child.on("exit")` and shutdown was requested                  | NO synthesis (`killed` event already serves as terminal). `finalizeOnExit` only `await killedPromise` then exits.                                                                                                             |
+| Subnode adapter emits ordinary `done`                            | stop inbox/idle supervision, call `complete()`, and let the normal exit ladder run; do NOT append `killed`, and suppress later child-error handling because shutdown is already claimed                                                                                 |
 | Kill ladder liveness check                                     | `child.exitCode === null && child.signalCode === null` (NOT `child.killed` — that means "kill() called", not "process exited")                                                                                                |
 
 ### Security boundaries
@@ -1347,6 +1428,7 @@ trellis channel send trellis-issue --scope global --as main --thread forum-mode 
 | Cold-exit fallback synthesis                    | e2e              | kill worker child PID directly (bypassing supervisor); assert `finalizeOnExit` synthesises terminal event with `by=workerName`, `synthesized:true`                                                                                                                                 |
 | Kill ladder                                     | e2e              | `channel kill`, assert events.jsonl has `killed{reason:"explicit-kill", signal:"SIGTERM"}` AND supervisor process gone within 6s                                                                                                                                                   |
 | `markTerminalEmitted` race                      | concurrent       | trigger adapter `done` and `child.on("exit")` near-simultaneously; assert exactly one terminal event (no duplicate synthesised one)                                                                                                                                                |
+| Subnode normal completion                       | unit             | reducer retains terminal `done` through later `turn_finished` / legacy idle cleanup; supervisor completion cleanup appends no `killed`; role template directs report notification through final assistant reply                                                                                                                        |
 | `wait --all` satisfaction                       | integration      | spawn 2 workers, send each a prompt; `wait --all --from a,b --kind done`; assert exit 0 after both done events seen                                                                                                                                                                |
 | `wait --all` timeout                            | integration      | spawn 2 workers; kill one before it can done; `wait --all` exits 124 with `"timeout: still waiting on <killed-one>"` on stderr                                                                                                                                                     |
 | `channel run` success cleanup                   | e2e              | run happy; assert channel directory does not exist after exit                                                                                                                                                                                                                      |

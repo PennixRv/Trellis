@@ -193,7 +193,9 @@ export async function applyParseResult(
   shutdown: ShutdownController,
   turnTracker?: TurnTracker,
   project?: string,
+  onDone?: () => void,
 ): Promise<void> {
+  let doneSeen = false;
   for (const ev of result.events) {
     // Claim the terminal slot SYNCHRONOUSLY before the await so a
     // racing `child.on("exit") → finalizeOnExit` can't see
@@ -229,6 +231,7 @@ export async function applyParseResult(
         );
       }
     }
+    if (ev.kind === "done") doneSeen = true;
   }
   if (result.side) {
     const { reply, persistSessionId, persistThreadId } = result.side;
@@ -264,6 +267,7 @@ export async function applyParseResult(
       }
     }
   }
+  if (doneSeen) onDone?.();
 }
 
 /**
@@ -281,6 +285,7 @@ export function startStdoutPump(args: {
   shutdown: ShutdownController;
   turnTracker?: TurnTracker;
   project?: string;
+  onDone?: () => void;
   processLines?: Promise<boolean>;
   signal?: AbortSignal;
 }): Promise<void> {
@@ -294,6 +299,7 @@ export function startStdoutPump(args: {
     shutdown,
     turnTracker,
     project,
+    onDone,
     processLines,
     signal,
   } = args;
@@ -311,6 +317,7 @@ export function startStdoutPump(args: {
         shutdown,
         turnTracker,
         project,
+        onDone,
       );
     },
     async (err) => {

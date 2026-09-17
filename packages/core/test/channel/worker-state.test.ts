@@ -112,6 +112,36 @@ describe("reduceWorkerRegistry", () => {
     });
   });
 
+  it("projects a subnode done as terminal and preserves it through cleanup", () => {
+    reset();
+    const completed = reduceWorkerRegistry([
+      ev("spawned", { as: "subnode", agent: "subnode" }),
+      ev("done", { by: "subnode" }),
+      ev("turn_finished", { by: "subnode", worker: "subnode" }),
+      ev("killed", {
+        by: "supervisor:subnode",
+        reason: "idle-timeout",
+      }),
+    ]).workers[0];
+    expect(completed).toMatchObject({
+      lifecycle: "done",
+      terminal: true,
+      activity: "idle",
+    });
+    expect(completed.idleSince).toBeUndefined();
+
+    reset();
+    expect(
+      reduceWorkerRegistry([
+        ev("spawned", { as: "subnode", agent: "subnode" }),
+        ev("killed", {
+          by: "supervisor:subnode",
+          reason: "timeout",
+        }),
+      ]).workers[0],
+    ).toMatchObject({ lifecycle: "killed", terminal: true });
+  });
+
   it("transitions to terminal on synthesized exit events / killed", () => {
     reset();
     expect(

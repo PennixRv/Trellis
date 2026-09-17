@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/core/backend/index.md", "reason": "Core channel reducer ownership and checks."}
+{"file": ".trellis/spec/cli/backend/commands-channel.md", "reason": "Channel event, supervisor, storage, and lifecycle contract."}
