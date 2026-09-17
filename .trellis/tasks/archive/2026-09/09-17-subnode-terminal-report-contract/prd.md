@@ -26,13 +26,13 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1: reducer 测试证明 subnode 的普通 `done` 投影为 `lifecycle: "done"`、`terminal: true`，普通 worker 的等价事件仍为非终态。
-- [ ] AC2: reducer 测试证明 subnode 已 `done` 后的清理型 `killed` 不改变 `done` 结果；未完成 subnode 仍按真实 `killed` / `crashed` 投影。
-- [ ] AC3: supervisor stdout 路径在 subnode normal `done` 后调用完成清理回调，且完成清理不写 `killed` 事件。
-- [ ] AC4: 角色卡和子节点工作流程不再指示 worker 执行 `trellis channel send`，明确最终回复由 supervisor 路由为 Channel 消息。
-- [ ] AC5: `pnpm --filter @pennixrv/trellis-core test`、`pnpm --filter @pennixrv/trellis test`、`pnpm lint`、`pnpm typecheck` 通过；发布前预检与模板产物检查通过。
-- [ ] AC6: release regression 覆盖目标 manifest 门；`pnpm release` 通过连续性和目标 manifest 检查后发布 `0.6.37`。
-- [ ] AC7: 发布回读回归覆盖至少约三分钟的有界 npm 传播窗口；`0.6.38` 的 CI 发布全绿并可在公共 npm 查询到。
+- [x] AC1: reducer 测试证明 subnode 的普通 `done` 投影为 `lifecycle: "done"`、`terminal: true`，普通 worker 的等价事件仍为非终态。
+- [x] AC2: reducer 测试证明 subnode 已 `done` 后的清理型 `killed` 不改变 `done` 结果；未完成 subnode 仍按真实 `killed` / `crashed` 投影。
+- [x] AC3: supervisor stdout 路径在 subnode normal `done` 后调用完成清理回调，且完成清理不写 `killed` 事件。
+- [x] AC4: 角色卡和子节点工作流程不再指示 worker 执行 `trellis channel send`，明确最终回复由 supervisor 路由为 Channel 消息。
+- [x] AC5: `pnpm --filter @pennixrv/trellis-core test`、`pnpm --filter @pennixrv/trellis test`、`pnpm lint`、`pnpm typecheck` 通过；发布前预检与模板产物检查通过。
+- [x] AC6: release regression 覆盖目标 manifest 门；`pnpm release` 通过连续性和目标 manifest 检查后发布 `0.6.37`。
+- [x] AC7: 发布回读回归覆盖至少约三分钟的有界 npm 传播窗口；`0.6.38` 的 CI 发布全绿并可在公共 npm 查询到。
 
 ## Out Of Scope
 
