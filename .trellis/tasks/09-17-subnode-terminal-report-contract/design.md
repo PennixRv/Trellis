@@ -59,3 +59,7 @@ specialize only the `subnode` role.
   the role-specific path; the channel code-spec records the terminal and
   transport contracts. No generic-worker behavior, sandbox setting, or new
   lifecycle/event abstraction is needed.
+- **Release follow-up:** the successful `0.6.36` npm package omitted its own
+  manifest because `release.js` only checked prior published gaps. Restore the
+  no-migration entry in this release and require the computed next-version
+  manifest before any release work begins.

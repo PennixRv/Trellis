@@ -47,4 +47,14 @@ describe("release pre-commit staging", () => {
       "README.md",
     ]);
   });
+
+  it("requires a manifest for the computed target version before releasing", () => {
+    const release = fs.readFileSync(RELEASE_SCRIPT, "utf-8");
+
+    expect(release).toContain("function assertNextVersionManifest(type)");
+    expect(release).toContain("Missing target migration manifest");
+    expect(release.indexOf("assertNextVersionManifest(type);")).toBeLessThan(
+      release.indexOf("node scripts/check-manifest-continuity.js"),
+    );
+  });
 });

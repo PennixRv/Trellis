@@ -191,6 +191,11 @@ through a release-time blanket stage.
 
 Each release branch maintains its own `packages/cli/src/migrations/manifests/<version>.json`. The CLI update logic walks the manifest chain between `fromVersion` and `toVersion`, so every published version that a user can upgrade through must have a local manifest on the release branch.
 
+`release.js` calculates the target version with the same `computeNext()` logic as
+`bump-versions.js` and fails before continuity checks, tests, or staging when
+that target manifest is absent. The checklist requirement is therefore an
+enforced release precondition, not a manual reminder.
+
 When a stable patch manifest is missing from a beta branch:
 
 ```bash
@@ -217,17 +222,18 @@ pnpm release:promote
 
 `packages/cli/scripts/release.js` runs:
 
-1. `check-manifest-continuity`
-2. `check-docs-changelog --type beta|rc|promote` for prerelease/promotion tracks
-3. core tests
-4. CLI tests
-5. pre-release commit excluding `docs-site`, `marketplace`, and `.trellis`
-6. `bump-versions.js <type>` to update both package versions together
-7. `release-preflight check-versions`
-8. version commit with the version string as the commit message
-9. git tag `v<version>`
-10. push branch and tags
-11. GitHub Actions publish workflow builds, tests, packs, publishes, and verifies both packages
+1. calculate the target version and require its manifest
+2. `check-manifest-continuity`
+3. `check-docs-changelog --type beta|rc|promote` for prerelease/promotion tracks
+4. core tests
+5. CLI tests
+6. pre-release commit excluding `docs-site`, `marketplace`, and `.trellis`
+7. `bump-versions.js <type>` to update both package versions together
+8. `release-preflight check-versions`
+9. version commit with the version string as the commit message
+10. git tag `v<version>`
+11. push branch and tags
+12. GitHub Actions publish workflow builds, tests, packs, publishes, and verifies both packages
 
 The release script does not publish locally. The pushed tag is what starts official npm publication.
 

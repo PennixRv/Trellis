@@ -11,6 +11,7 @@
 - 现有 `subnode` 的普通 `done` 被投影为 `running` / `idle`，五分钟后 idle cleanup 写入 `killed`，与上述角色合同冲突。
 - Channel 存储默认位于 `~/.trellis/channels`；Codex `workspace-write` 只允许当前工作区内写入。历史节点执行 `trellis channel send` 因该工作区外锁文件返回 `EROFS`，但 supervisor 已自动将节点最终回复写为 Channel `message` / `done`。
 - 同批次中其他节点可以写入工作区内的 `worklog.md` 和 `report.json`，所以现有证据不支持把少数报告缺失归为统一的 Trellis 文件写权限故障。
+- `pnpm release` 的已发布版本连续性检查发现 `0.6.36` 缺自身 manifest；已发布 tarball 只包含 `0.6.35.json`，而 release 脚本此前没有强制即将发布版本预先具备 manifest。
 
 ## Requirements
 
@@ -19,6 +20,7 @@
 - R3: 已有历史日志中，subnode 在普通 `done` 后的清理型 `killed` 不能覆盖该已完成的语义结果。
 - R4: subnode 角色卡与 coordinator 指南必须要求以最终回复交付简短状态和报告路径；不得要求节点运行 `trellis channel send`。
 - R5: 修改必须保持 event kind、通用 worker 复用、外部 `channel send` 命令和既有 report/disposition schema 的兼容性。
+- R6: 发布脚本必须在任何测试或暂存前计算目标版本并拒绝缺失其 manifest；补偿 `0.6.36` 的无迁移 manifest，并为 `0.6.37` 提供 manifest。
 
 ## Acceptance Criteria
 
@@ -27,6 +29,7 @@
 - [ ] AC3: supervisor stdout 路径在 subnode normal `done` 后调用完成清理回调，且完成清理不写 `killed` 事件。
 - [ ] AC4: 角色卡和子节点工作流程不再指示 worker 执行 `trellis channel send`，明确最终回复由 supervisor 路由为 Channel 消息。
 - [ ] AC5: `pnpm --filter @pennixrv/trellis-core test`、`pnpm --filter @pennixrv/trellis test`、`pnpm lint`、`pnpm typecheck` 通过；发布前预检与模板产物检查通过。
+- [ ] AC6: release regression 覆盖目标 manifest 门；`pnpm release` 通过连续性和目标 manifest 检查后发布 `0.6.37`。
 
 ## Out Of Scope
 
