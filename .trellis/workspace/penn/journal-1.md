@@ -81,3 +81,42 @@ Completed, released, and archived bounded Channel subnode lifecycle remediation.
 ### Next Steps
 
 - No active implementation task remains; start the next planned workflow task from a clean main.
+
+
+## Session 3: Fail closed unowned Codex Channel workers
+<!-- trellis-session: v=2 fp=b861cd3658d272b3 -->
+
+**Date**: 2026-09-17
+**Task**: Fail closed unowned Codex Channel workers
+**Package**: cli
+**Branch**: `main`
+
+### Summary
+
+Required immutable Codex owner metadata before Channel spawn, restored the missing 0.6.35 migration manifest, and released v0.6.36.
+
+### Main Changes
+
+- Rejected ownerless Codex worker spawns before worker state is created; forwarded --owner-session through channel run.
+- Restored the 0.6.35 empty migration manifest after tarball and release-commit verification; did not bypass continuity protection.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9568ed3b` | fix(channel): require Codex worker owner |
+| `ba2c7de8` | fix(release): restore 0.6.35 manifest |
+| `eea4c67e` | 0.6.36 |
+
+### Testing
+
+- [OK] Targeted Channel and migration tests; repeated full core (378 passed, 1 skipped) and CLI (1,983 passed) suites; release CI run 35176887545 succeeded.
+- [OK] Verified both public npm packages at 0.6.36, reinstalled /usr/bin/trellis, and smoke-tested ownerless rejection plus owner-filtered discovery.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Address FastCtx-to-Codex CODEX_THREAD_ID propagation only in a separately owned host-integration task if transparent worker creation is required.
