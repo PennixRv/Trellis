@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/cli/backend/index.md", "reason": "CLI channel specification index and quality gates"}
+{"file": ".trellis/spec/cli/backend/error-handling.md", "reason": "CLI error propagation convention"}
+{"file": ".trellis/tasks/09-17-channel-owner-session-required/research/root-cause.md", "reason": "Verified incident evidence"}
