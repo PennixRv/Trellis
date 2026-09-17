@@ -12,6 +12,7 @@
 - Channel 存储默认位于 `~/.trellis/channels`；Codex `workspace-write` 只允许当前工作区内写入。历史节点执行 `trellis channel send` 因该工作区外锁文件返回 `EROFS`，但 supervisor 已自动将节点最终回复写为 Channel `message` / `done`。
 - 同批次中其他节点可以写入工作区内的 `worklog.md` 和 `report.json`，所以现有证据不支持把少数报告缺失归为统一的 Trellis 文件写权限故障。
 - `pnpm release` 的已发布版本连续性检查发现 `0.6.36` 缺自身 manifest；已发布 tarball 只包含 `0.6.35.json`，而 release 脚本此前没有强制即将发布版本预先具备 manifest。
+- `0.6.37` 两个 npm publish step 均完成，但公共 registry 在原 `6 × 10s` 回读窗口内仍返回 `E404`，本机稍后已核验两个版本可见，说明发布校验存在传播延迟假阴性。
 
 ## Requirements
 
@@ -21,6 +22,7 @@
 - R4: subnode 角色卡与 coordinator 指南必须要求以最终回复交付简短状态和报告路径；不得要求节点运行 `trellis channel send`。
 - R5: 修改必须保持 event kind、通用 worker 复用、外部 `channel send` 命令和既有 report/disposition schema 的兼容性。
 - R6: 发布脚本必须在任何测试或暂存前计算目标版本并拒绝缺失其 manifest；补偿 `0.6.36` 的无迁移 manifest，并为 `0.6.37` 提供 manifest。
+- R7: 公共 npm 可见性校验必须容忍已观测的正常传播延迟，保留有界等待且不将短暂 `E404` 误报为发布失败。
 
 ## Acceptance Criteria
 
@@ -30,6 +32,7 @@
 - [ ] AC4: 角色卡和子节点工作流程不再指示 worker 执行 `trellis channel send`，明确最终回复由 supervisor 路由为 Channel 消息。
 - [ ] AC5: `pnpm --filter @pennixrv/trellis-core test`、`pnpm --filter @pennixrv/trellis test`、`pnpm lint`、`pnpm typecheck` 通过；发布前预检与模板产物检查通过。
 - [ ] AC6: release regression 覆盖目标 manifest 门；`pnpm release` 通过连续性和目标 manifest 检查后发布 `0.6.37`。
+- [ ] AC7: 发布回读回归覆盖至少约三分钟的有界 npm 传播窗口；`0.6.38` 的 CI 发布全绿并可在公共 npm 查询到。
 
 ## Out Of Scope
 

@@ -118,7 +118,10 @@ async function sleep(ms) {
 }
 
 async function retry(label, fn) {
-  const attempts = 6;
+  // npm publication can take longer than the original 50-second window to
+  // reach the public registry. Keep the verification bound while allowing
+  // the normal propagation delay observed in CI.
+  const attempts = 18;
   let lastError;
   for (let i = 1; i <= attempts; i += 1) {
     try {

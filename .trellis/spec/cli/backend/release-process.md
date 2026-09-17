@@ -237,6 +237,11 @@ pnpm release:promote
 
 The release script does not publish locally. The pushed tag is what starts official npm publication.
 
+The publish workflow's public-registry verification retries `npm view` for
+about three minutes (18 attempts at 10-second intervals). npm can accept a
+publish before its public read path reflects the exact version; do not mark a
+release failed merely because it exceeds a short propagation window.
+
 ---
 
 ## Publish workflow sequence

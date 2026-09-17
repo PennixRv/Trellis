@@ -63,3 +63,7 @@ specialize only the `subnode` role.
   manifest because `release.js` only checked prior published gaps. Restore the
   no-migration entry in this release and require the computed next-version
   manifest before any release work begins.
+- **Registry propagation follow-up:** `0.6.37` published both packages but
+  exceeded the prior six-attempt public `npm view` window. Retain bounded
+  verification while extending it to eighteen attempts, preventing a false
+  failure without masking persistent registry errors.
