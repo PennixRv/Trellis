@@ -145,3 +145,27 @@ Required immutable Codex owner metadata before Channel spawn, restored the missi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: Complete analysis-only workflow route
+<!-- trellis-session: v=2 fp=8b39d3e734b91723 -->
+
+**Date**: 2026-09-17
+**Task**: Complete analysis-only workflow route
+**Package**: cli
+**Branch**: `task/analysis-only-completion`
+
+### Summary
+
+Added the explicit analysis_only completion route, synchronized native workflow entry templates and marketplace mirror, and verified template distribution.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6145143` | feat(workflow): complete analysis-only tasks directly |
+| `eb8fcbdf` | docs(workflow): clarify analysis-only lifecycle |
+
+### Status
+
+[OK] **Completed**

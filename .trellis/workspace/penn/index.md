@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
+- **Total Sessions**: 5
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~147 | Active |
+| `journal-1.md` | ~171 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-09-17 | Complete analysis-only workflow route | `d6145143`, `eb8fcbdf` | `task/analysis-only-completion` |
 | 4 | 2026-09-17 | 修复子节点终态与发布可靠性 | `de8d8911`, `8aba1615`, `f5e96784` | `main` |
 | 3 | 2026-09-17 | Fail closed unowned Codex Channel workers | `9568ed3b`, `ba2c7de8`, `eea4c67e` | `main` |
 | 2 | 2026-09-14 | Release configurable subnode lifecycle | `93be5259`, `e9cf0758`, `a73f7f94` | `main` |
