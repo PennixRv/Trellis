@@ -377,6 +377,8 @@ export class TrellisContext {
    *   2. If no context key is available and exactly one session runtime file
    *      exists locally, use it (`_resolveSingleSessionFallback`). Refuses to
    *      guess when 0 or ≥2 files exist so multi-window isolation holds.
+   *   3. If no session file exists, expose one resumable task assigned to the
+   *      current developer as a read-only unbound projection.
    */
   getActiveTask(platformInput = null) {
     const contextKey = this.getContextKey(platformInput)
@@ -397,6 +399,11 @@ export class TrellisContext {
     const fallback = this._resolveSingleSessionFallback()
     if (fallback) {
       return fallback
+    }
+
+    const unbound = this._resolveUnboundTask()
+    if (unbound) {
+      return unbound
     }
 
     return { taskPath: null, source: "none", stale: false }
@@ -438,6 +445,49 @@ export class TrellisContext {
       source: `session-fallback:${fallbackKey}`,
       stale: !taskDir || !existsSync(taskDir),
     }
+  }
+
+  _resolveUnboundTask() {
+    const sessionsDir = join(this.directory, ".trellis", ".runtime", "sessions")
+    if (existsSync(sessionsDir)) {
+      let sessionFiles
+      try {
+        sessionFiles = readdirSync(sessionsDir).filter(name => name.endsWith(".json"))
+      } catch {
+        return null
+      }
+      if (sessionFiles.length > 0) return null
+    }
+
+    const developer = (process.env.TRELLIS_DEVELOPER || "").trim() || (() => {
+      try {
+        const content = readFileSync(join(this.directory, ".trellis", ".developer"), "utf-8")
+        return content.split(/\r?\n/).find(line => line.startsWith("name="))?.slice(5).trim() || ""
+      } catch {
+        return ""
+      }
+    })()
+    if (!developer) return null
+
+    const tasksDir = join(this.directory, ".trellis", "tasks")
+    let taskNames
+    try {
+      taskNames = readdirSync(tasksDir).filter(name => name !== "archive")
+    } catch {
+      return null
+    }
+
+    const candidates = taskNames.flatMap(name => {
+      try {
+        const data = JSON.parse(readFileSync(join(tasksDir, name, "task.json"), "utf-8"))
+        if (data.assignee !== developer || !["planning", "in_progress", "review"].includes(data.status)) return []
+        return [`.trellis/tasks/${name}`]
+      } catch {
+        return []
+      }
+    })
+    if (candidates.length !== 1) return null
+    return { taskPath: candidates[0], source: "unbound", stale: false }
   }
 
   getCurrentTask(platformInput = null) {

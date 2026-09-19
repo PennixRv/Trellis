@@ -121,6 +121,7 @@ python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>  # detailed 
 
   TAG ↔ PHASE scoping:
     [workflow-state:no_task]      → no active task; before Phase 1
+    [workflow-state:unbound_task] → one developer-owned task exists without a session pointer
     [workflow-state:task_error]   → active task record is unreadable; repair it before continuing
     [workflow-state:planning]     → all of Phase 1 (status='planning')
     [workflow-state:planning-inline] → Codex inline variant of Phase 1
@@ -181,6 +182,12 @@ No active task. First classify the current turn and ask for task-creation consen
 Simple conversation / small task: ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session.
 Complex task: ask the user if you can create a Trellis task and enter the planning phase. If the user says no, explain, clarify scope, or suggest a smaller split.
 [/workflow-state:no_task]
+
+<!-- Per-turn breadcrumb: shown when one resumable task exists without a direct session binding. -->
+
+[workflow-state:unbound_task]
+An existing task is assigned to the current developer, but this shell has no direct Trellis session binding. Do not create a duplicate task. Continue reading and working from the existing task artifacts; before any lifecycle write or closure, run the native `task.py start <task>` command once a direct session identity is available. Never edit `.trellis/.runtime/sessions/` manually.
+[/workflow-state:unbound_task]
 
 <!-- Per-turn breadcrumb: shown when the active task record cannot be read. -->
 
@@ -671,6 +678,7 @@ All tag blocks live in the `## Phase Index` section above, immediately after eac
 | Scope | Corresponding tag |
 |---|---|
 | No active task (before Phase 1) | `[workflow-state:no_task]` (after the Phase Index ASCII art) |
+| One developer-owned task without a session binding | `[workflow-state:unbound_task]` (bind before lifecycle writes) |
 | Active task record unreadable | `[workflow-state:task_error]` (repair the existing task before continuing) |
 | All of Phase 1 (task created → ready for implementation) | `[workflow-state:planning]` (after Phase 1 summary) |
 | Codex inline Phase 1 | `[workflow-state:planning-inline]` |

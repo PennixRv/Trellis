@@ -156,6 +156,7 @@ function getActiveTask(ctx, platformInput = null) {
     const status = typeof data.status === "string" ? data.status : ""
     if (!status) return null
     const id = data.id || taskRef.split("/").pop()
+    if (active.source === "unbound") return { id, status: "unbound_task", source: active.source }
     return { id, status, source: active.source }
   } catch {
     return null

@@ -6126,6 +6126,20 @@ print(json.dumps({
     expect(output).toContain("Source: none");
   });
 
+  it("[session-unbound] one developer-owned resumable task is projected without writing a session", () => {
+    setupTaskRepo();
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify({ title: "Issue 106 task", status: "in_progress", assignee: "test-dev" }, null, 2),
+    );
+
+    const { output, status } = runTaskCurrent();
+    expect(status).toBe(0);
+    expect(output).toContain("Current task: .trellis/tasks/issue-106");
+    expect(output).toContain("Source: unbound");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
+  });
+
   it("[session-fallback] multiple session files — refuses to guess, returns none", () => {
     setupTaskRepo();
     writeSessionContext("codex_session_a", ".trellis/tasks/issue-106");

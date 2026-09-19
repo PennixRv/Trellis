@@ -308,6 +308,11 @@ def cmd_finish(args: argparse.Namespace) -> int:
         print(colored("No current task set", Colors.YELLOW))
         return 0
 
+    if active.source_type == "unbound":
+        print(colored("Task exists but no direct session is bound; run task.py start first", Colors.YELLOW))
+        print(f"Task: {current}")
+        return 0
+
     try:
         assert_task_mutation_allowed(repo_root, repo_root / current)
     except (OwnershipError, OSError) as exc:

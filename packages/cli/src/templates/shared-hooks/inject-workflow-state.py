@@ -192,6 +192,8 @@ def get_active_task(
     status = data.get("status", "")
     if not isinstance(status, str) or not status:
         return task_dir.name, "task_error", active.source
+    if active.source_type == "unbound":
+        return task_id, "unbound_task", active.source
     return task_id, status, active.source
 
 
