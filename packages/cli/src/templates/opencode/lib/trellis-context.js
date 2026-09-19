@@ -373,7 +373,8 @@ export class TrellisContext {
    *
    * Resolution order (mirrors Python `active_task.resolve_active_task`):
    *   1. Lookup the runtime file for the input-derived context key. A known
-   *      key is authoritative, so a missing or empty context returns no task.
+   *      key is authoritative when it contains a task; a missing or empty
+   *      context may use the guarded unbound-task projection.
    *   2. If no context key is available and exactly one session runtime file
    *      exists locally, use it (`_resolveSingleSessionFallback`). Refuses to
    *      guess when 0 or ≥2 files exist so multi-window isolation holds.
@@ -392,6 +393,10 @@ export class TrellisContext {
           source: `session:${contextKey}`,
           stale: !taskDir || !existsSync(taskDir),
         }
+      }
+      const unbound = this._resolveUnboundTask()
+      if (unbound) {
+        return unbound
       }
       return { taskPath: null, source: "none", stale: false }
     }
@@ -456,7 +461,14 @@ export class TrellisContext {
       } catch {
         return null
       }
-      if (sessionFiles.length > 0) return null
+      if (sessionFiles.some(file => {
+        try {
+          const context = JSON.parse(readFileSync(join(sessionsDir, file), "utf-8"))
+          return Boolean(this.normalizeTaskRef(context?.current_task || ""))
+        } catch {
+          return false
+        }
+      })) return null
     }
 
     const developer = (process.env.TRELLIS_DEVELOPER || "").trim() || (() => {

@@ -830,6 +830,20 @@ describe("opencode TrellisContext single-session fallback", () => {
     expect(active.stale).toBe(false);
   });
 
+  it("projects one developer-owned task when the known context file is missing", () => {
+    writeFileSync(join(dir, ".trellis", ".developer"), "name=test-dev\n");
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "demo-task", "task.json"),
+      JSON.stringify({ status: "in_progress", assignee: "test-dev" }),
+    );
+    const ctx = new TrellisContext(dir);
+    const active = ctx.getActiveTask({ sessionID: "missing-key" });
+
+    expect(active.taskPath).toBe(".trellis/tasks/demo-task");
+    expect(active.source).toBe("unbound");
+    expect(active.stale).toBe(false);
+  });
+
   it("prefers an exact context-key match over the fallback", () => {
     writeSessionFile(dir, "opencode_session_exact", ".trellis/tasks/demo-task");
     writeSessionFile(dir, "opencode_other", ".trellis/tasks/demo-task");

@@ -2,8 +2,8 @@
 """Session-scoped active task resolution.
 
 The user-facing concept is a single "active task". Trellis stores that pointer
-per AI session/window under `.trellis/.runtime/sessions/`; without a stable
-session key there is no active task.
+per AI session/window under `.trellis/.runtime/sessions/`; when the pointer is
+missing, a unique developer-owned resumable task may be exposed read-only.
 """
 
 from __future__ import annotations
@@ -654,9 +654,10 @@ def resolve_active_task(
     """Resolve the active task from session runtime state only.
 
     A stale session task is returned as stale. A known context identity is
-    authoritative: a missing or empty context for that identity returns no
-    task. When context identity is unavailable, single-session inference may
-    cover pull-based platform sub-agents (copilot, gemini, qoder) that don't
+    authoritative when it contains a task reference; a missing or empty
+    context may use the guarded unbound-task projection. When context identity
+    is unavailable, single-session inference may cover pull-based platform
+    sub-agents (copilot, gemini, qoder) that don't
     inherit the parent's session id. ≥2 files or 0 files yield
     ActiveTask(None) — refuses to guess across windows.
     """
@@ -671,6 +672,10 @@ def resolve_active_task(
         active = _active_from_ref(task_ref, repo_root, "session", context_key)
         if active:
             return active
+        if allow_single_session_fallback:
+            unbound = _resolve_unbound_task(repo_root)
+            if unbound is not None:
+                return unbound
         return ActiveTask(None, "none", context_key)
 
     if allow_single_session_fallback:
@@ -713,8 +718,10 @@ def _resolve_single_session_fallback(repo_root: Path) -> ActiveTask | None:
 def _resolve_unbound_task(repo_root: Path) -> ActiveTask | None:
     """Expose one developer-owned task when no session pointer exists."""
     sessions_dir = _runtime_sessions_dir(repo_root)
-    if sessions_dir.is_dir() and any(sessions_dir.glob("*.json")):
-        return None
+    if sessions_dir.is_dir():
+        session_files = sorted(sessions_dir.glob("*.json"))
+        if any(_string_value((_read_json(session) or {}).get("current_task")) for session in session_files):
+            return None
 
     from .paths import get_developer, get_tasks_dir
     from .tasks import iter_active_tasks

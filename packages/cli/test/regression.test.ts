@@ -6140,6 +6140,21 @@ print(json.dumps({
     expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
   });
 
+  it("[session-unbound] missing current context file still projects one developer-owned task", () => {
+    setupTaskRepo();
+    writeProjectFile(path.join(".trellis", ".developer"), "name=test-dev\n");
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify({ title: "Issue 106 task", status: "in_progress", assignee: "test-dev" }, null, 2),
+    );
+
+    const { output, status } = runTaskCurrent({ CODEX_THREAD_ID: "missing-current-session" });
+    expect(status).toBe(0);
+    expect(output).toContain("Current task: .trellis/tasks/issue-106");
+    expect(output).toContain("Source: unbound");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
+  });
+
   it("[session-fallback] multiple session files — refuses to guess, returns none", () => {
     setupTaskRepo();
     writeSessionContext("codex_session_a", ".trellis/tasks/issue-106");
