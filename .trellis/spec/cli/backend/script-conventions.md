@@ -550,7 +550,7 @@ for session/window scoped task state:
    detected platform; then a shell ticket for a matching AI-run `task.py`
    command.
 2. Read `.trellis/.runtime/sessions/<session-key>.json`.
-3. If no context key or no session task is present, return no active task.
+3. If no context key or no session task is present, return an unbound task only when no session JSON exists and exactly one resumable task is assigned to the current developer; otherwise return no active task.
 4. If a session task exists but the task directory is stale, return stale
    session state.
 

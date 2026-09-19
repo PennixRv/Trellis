@@ -70,7 +70,9 @@ Both regexes MUST use the `\1` backreference variant — `[workflow-state:([A-Za
    matrix below), the hook receives stdin JSON containing `cwd`.
 2. It walks up from `cwd` to find `.trellis/`. If none, exit 0.
 3. It calls `common.active_task.resolve_active_task()` to look up the
-   per-session active task. If absent → status is the pseudo `no_task`. If
+   per-session active task. If absent, it may project one unique resumable
+   task assigned to the current developer as the read-only pseudo-status
+   `unbound_task`; otherwise status is the pseudo `no_task`. If
    the pointer is stale (task dir deleted) → status is `stale_<source_type>`.
 4. Otherwise it reads `task.json.status` from the resolved task directory. If
    the task directory exists but `task.json` is missing, malformed, or has no
@@ -295,7 +297,8 @@ Which breadcrumbs actually fire in normal flow:
 
 | Status | Reachability | Notes |
 |--------|--------------|-------|
-| `no_task` | ✅ reachable | Pseudo-status; emitted when `resolve_active_task()` returns no pointer. |
+| `no_task` | ✅ reachable | Pseudo-status; emitted when no direct pointer exists and the guarded unbound projection does not apply. |
+| `unbound_task` | ✅ reachable | Read-only pseudo-status; emitted only with no session JSON and exactly one developer-owned resumable task. It never writes a pointer or permits lifecycle mutation. |
 | `task_error` | ✅ reachable | Pseudo-status; emitted when a session task pointer resolves to a directory whose `task.json` cannot be read or has no usable `status`. |
 | `planning` | ✅ reachable | After `cmd_create` (which now auto-sets the session pointer when available) and before `cmd_start`. `planning-inline` is the Codex inline-mode breadcrumb body for the same task status. |
 | `in_progress` | ✅ reachable | After `cmd_start`, until `cmd_archive`. `in_progress-inline` is the Codex inline-mode breadcrumb body for the same task status. |

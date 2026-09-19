@@ -678,6 +678,10 @@ def resolve_active_task(
         if fallback is not None:
             return fallback
 
+        unbound = _resolve_unbound_task(repo_root)
+        if unbound is not None:
+            return unbound
+
     return ActiveTask(None, "none", context_key)
 
 
@@ -704,6 +708,31 @@ def _resolve_single_session_fallback(repo_root: Path) -> ActiveTask | None:
 
     fallback_key = session_file.stem
     return _active_from_ref(task_ref, repo_root, "session-fallback", fallback_key)
+
+
+def _resolve_unbound_task(repo_root: Path) -> ActiveTask | None:
+    """Expose one developer-owned task when no session pointer exists."""
+    sessions_dir = _runtime_sessions_dir(repo_root)
+    if sessions_dir.is_dir() and any(sessions_dir.glob("*.json")):
+        return None
+
+    from .paths import get_developer, get_tasks_dir
+    from .tasks import iter_active_tasks
+
+    developer = get_developer(repo_root)
+    if not developer:
+        return None
+
+    candidates = [
+        task
+        for task in iter_active_tasks(get_tasks_dir(repo_root))
+        if task.assignee == developer and task.status in {"planning", "in_progress", "review"}
+    ]
+    if len(candidates) != 1:
+        return None
+
+    task_path = candidates[0].directory.relative_to(repo_root).as_posix()
+    return ActiveTask(task_path, "unbound", None)
 
 
 def _utc_now() -> str:
