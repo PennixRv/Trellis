@@ -6138,14 +6138,14 @@ print(json.dumps({
     return { output, status };
   }
 
-  it("[session-fallback] single session file — fallback returns its task with session-fallback source", () => {
+  it("[session-fallback] main CLI does not borrow a sole unrelated session", () => {
     setupTaskRepo();
     writeSessionContext("codex_session_parent", ".trellis/tasks/issue-106");
 
     const { output, status } = runTaskCurrent();
-    expect(status).toBe(0);
-    expect(output).toContain("Current task: .trellis/tasks/issue-106");
-    expect(output).toContain("Source: session-fallback:codex_session_parent");
+    expect(status).toBe(1);
+    expect(output).toContain("Current task: (none)");
+    expect(output).toContain("Source: none");
   });
 
   it("[session-fallback] zero session files — no fallback, returns none", () => {

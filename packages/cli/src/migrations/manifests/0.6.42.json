@@ -1,0 +1,9 @@
+{
+  "version": "0.6.42",
+  "description": "Isolates unbound task resolution from unrelated session fallback inference.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fix:**\n- Stop the default task resolver from borrowing a task from a sole unrelated session file, while preserving read-only unbound task and ambiguity projections.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal trellis update flow."
+}

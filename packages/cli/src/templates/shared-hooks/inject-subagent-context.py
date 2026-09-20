@@ -149,7 +149,7 @@ def get_current_task(
     input_data: dict,
     *,
     platform: str | None = None,
-    allow_single_session_fallback: bool = True,
+    allow_single_session_fallback: bool = False,
     allow_environment_context: bool = True,
     require_existing: bool = False,
 ) -> str | None:
@@ -740,7 +740,11 @@ def main():
         sys.exit(0)
 
     # Get current task directory (research doesn't require it)
-    task_dir = get_current_task(repo_root, input_data)
+    task_dir = get_current_task(
+        repo_root,
+        input_data,
+        allow_single_session_fallback=True,
+    )
 
     # implement/check need task directory
     if subagent_type in AGENTS_REQUIRE_TASK:
