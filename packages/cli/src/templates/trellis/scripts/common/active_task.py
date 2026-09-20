@@ -168,6 +168,7 @@ class ActiveTask:
     source_type: str
     context_key: str | None = None
     stale: bool = False
+    candidate_paths: tuple[str, ...] = ()
 
     @property
     def source(self) -> str:
@@ -735,11 +736,16 @@ def _resolve_unbound_task(repo_root: Path) -> ActiveTask | None:
         for task in iter_active_tasks(get_tasks_dir(repo_root))
         if task.assignee == developer and task.status in {"planning", "in_progress", "review"}
     ]
-    if len(candidates) != 1:
+    if len(candidates) == 0:
         return None
 
-    task_path = candidates[0].directory.relative_to(repo_root).as_posix()
-    return ActiveTask(task_path, "unbound", None)
+    task_paths = tuple(sorted(
+        task.directory.relative_to(repo_root).as_posix()
+        for task in candidates
+    ))
+    if len(task_paths) == 1:
+        return ActiveTask(task_paths[0], "unbound", None)
+    return ActiveTask(None, "unbound_ambiguous", None, candidate_paths=task_paths)
 
 
 def _utc_now() -> str:

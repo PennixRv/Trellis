@@ -312,6 +312,11 @@ def cmd_finish(args: argparse.Namespace) -> int:
         print(colored("Task exists but no direct session is bound; run task.py start first", Colors.YELLOW))
         print(f"Task: {current}")
         return 0
+    if active.source_type == "unbound_ambiguous":
+        print(colored("Multiple tasks exist but no direct session is bound; choose one before finishing", Colors.YELLOW))
+        for candidate in active.candidate_paths:
+            print(f"Candidate: {candidate}")
+        return 0
 
     try:
         assert_task_mutation_allowed(repo_root, repo_root / current)
@@ -367,6 +372,8 @@ def cmd_current(args: argparse.Namespace) -> int:
             "source": active.source,
             "stale": active.stale,
         }
+        if active.candidate_paths:
+            payload["candidates"] = list(active.candidate_paths)
         # Only present when the read failed, so the healthy shape is unchanged.
         if read_error:
             payload["error"] = read_error
@@ -374,6 +381,12 @@ def cmd_current(args: argparse.Namespace) -> int:
         return 0 if active.task_path else 1
 
     if args.source:
+        if active.source_type == "unbound_ambiguous":
+            print("Current task: (ambiguous)")
+            print("Source: unbound_ambiguous")
+            for candidate in active.candidate_paths:
+                print(f"Candidate: {candidate}")
+            return 1
         print(f"Current task: {active.task_path or '(none)'}")
         print(f"Source: {active.source}")
         if active.stale:
@@ -383,6 +396,11 @@ def cmd_current(args: argparse.Namespace) -> int:
     if active.task_path:
         print(active.task_path)
         return 0
+
+    if active.source_type == "unbound_ambiguous":
+        print("Multiple active tasks require explicit binding:")
+        for candidate in active.candidate_paths:
+            print(candidate)
 
     return 1
 

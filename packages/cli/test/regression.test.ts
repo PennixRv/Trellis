@@ -5919,6 +5919,38 @@ print(json.dumps({
     expect(ctx).not.toContain("<sub-agent-notice>");
   });
 
+  it("[issue-180] Codex SessionStart reports ambiguous unbound tasks", () => {
+    setupTaskRepo();
+    for (const [task, status] of [
+      ["issue-106", "in_progress"],
+      ["other-task", "planning"],
+    ] as const) {
+      writeProjectFile(
+        path.join(".trellis", "tasks", task, "task.json"),
+        JSON.stringify({ title: task, status, assignee: "test-dev" }, null, 2),
+      );
+    }
+    writeProjectFile(
+      path.join(".codex", "hooks", "session-start.py"),
+      expectTemplateContent(codexSessionStart, "codex session-start"),
+    );
+
+    const payload = JSON.parse(
+      runPython(
+        path.join(".codex", "hooks", "session-start.py"),
+        JSON.stringify({ cwd: tmpDir }),
+      ),
+    ) as {
+      hookSpecificOutput: { additionalContext: string };
+    };
+    const ctx = payload.hookSpecificOutput.additionalContext;
+    expect(ctx).toContain("Status: TASK BINDING AMBIGUOUS");
+    expect(ctx).toContain(".trellis/tasks/issue-106");
+    expect(ctx).toContain(".trellis/tasks/other-task");
+    expect(ctx).toContain("Current task: ambiguous; candidates=");
+    expect(ctx).not.toContain("Status: NO ACTIVE TASK");
+  });
+
   it("[#248] Copilot template does not assert Copilot ignores SessionStart hook output", () => {
     // GitHub #248: Microsoft's VS Code Agent hooks docs (preview, since VS
     // Code 1.110, Feb 2026) document SessionStart additionalContext as the
@@ -6152,6 +6184,26 @@ print(json.dumps({
     expect(status).toBe(0);
     expect(output).toContain("Current task: .trellis/tasks/issue-106");
     expect(output).toContain("Source: unbound");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
+  });
+
+  it("[session-unbound] multiple developer-owned tasks report ambiguity without binding", () => {
+    setupTaskRepo();
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify({ title: "Issue 106 task", status: "in_progress", assignee: "test-dev" }, null, 2),
+    );
+    writeProjectFile(
+      path.join(".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify({ title: "Other task", status: "planning", assignee: "test-dev" }, null, 2),
+    );
+
+    const { output, status } = runTaskCurrent();
+    expect(status).toBe(1);
+    expect(output).toContain("Current task: (ambiguous)");
+    expect(output).toContain("Source: unbound_ambiguous");
+    expect(output).toContain("Candidate: .trellis/tasks/issue-106");
+    expect(output).toContain("Candidate: .trellis/tasks/other-task");
     expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
   });
 
@@ -6588,6 +6640,36 @@ print(json.dumps({
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
       "trellis-brainstorm",
     );
+  });
+
+  it("[workflow-state] ambiguous unbound tasks are projected with candidates", () => {
+    setupTaskRepo();
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify({ title: "Issue 106 task", status: "in_progress", assignee: "test-dev" }, null, 2),
+    );
+    writeProjectFile(
+      path.join(".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify({ title: "Other task", status: "planning", assignee: "test-dev" }, null, 2),
+    );
+    writeWorkflowMd(
+      "[workflow-state:unbound_ambiguous]\n" +
+        "Choose one active task and bind it explicitly.\n" +
+        "[/workflow-state:unbound_ambiguous]\n",
+    );
+    writeWorkflowStateHook();
+
+    const output = runInjectWorkflowState();
+    const parsed = JSON.parse(output) as {
+      hookSpecificOutput: { additionalContext: string };
+    };
+    const context = parsed.hookSpecificOutput.additionalContext;
+    expect(context).toContain("Status: unbound_ambiguous");
+    expect(context).toContain(
+      "Candidates: .trellis/tasks/issue-106, .trellis/tasks/other-task",
+    );
+    expect(context).not.toContain("Status: no_task");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
   });
 
   it("reports task_error when task.json is malformed", () => {

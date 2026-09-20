@@ -498,8 +498,16 @@ export class TrellisContext {
         return []
       }
     })
-    if (candidates.length !== 1) return null
-    return { taskPath: candidates[0], source: "unbound", stale: false }
+    if (candidates.length === 0) return null
+    if (candidates.length === 1) {
+      return { taskPath: candidates[0], source: "unbound", stale: false }
+    }
+    return {
+      taskPath: null,
+      source: "unbound_ambiguous",
+      stale: false,
+      candidatePaths: candidates.sort(),
+    }
   }
 
   getCurrentTask(platformInput = null) {

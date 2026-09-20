@@ -844,6 +844,28 @@ describe("opencode TrellisContext single-session fallback", () => {
     expect(active.stale).toBe(false);
   });
 
+  it("reports multiple developer-owned tasks as an explicit ambiguity", () => {
+    writeFileSync(join(dir, ".trellis", ".developer"), "name=test-dev\n");
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "demo-task", "task.json"),
+      JSON.stringify({ status: "in_progress", assignee: "test-dev" }),
+    );
+    mkdirSync(join(dir, ".trellis", "tasks", "other-task"), { recursive: true });
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify({ status: "planning", assignee: "test-dev" }),
+    );
+    const ctx = new TrellisContext(dir);
+    const active = ctx.getActiveTask({ sessionID: "missing-key" });
+
+    expect(active.taskPath).toBeNull();
+    expect(active.source).toBe("unbound_ambiguous");
+    expect(active.candidatePaths).toEqual([
+      ".trellis/tasks/demo-task",
+      ".trellis/tasks/other-task",
+    ]);
+  });
+
   it("prefers an exact context-key match over the fallback", () => {
     writeSessionFile(dir, "opencode_session_exact", ".trellis/tasks/demo-task");
     writeSessionFile(dir, "opencode_other", ".trellis/tasks/demo-task");
@@ -1235,6 +1257,31 @@ describe("opencode messages.transform injection (issue #553)", () => {
     expect(messages[0].parts[0].text).toContain("<workflow-state>");
     expect(messages[0].parts[0].synthetic).toBe(true);
     expect(messages[0].parts[1]).toEqual(original);
+  });
+
+  it("inject-workflow-state.js shows candidates for ambiguous unbound tasks", async () => {
+    writeFileSync(join(dir, ".trellis", ".developer"), "name=test-dev\n");
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "demo-task", "task.json"),
+      JSON.stringify({ status: "in_progress", assignee: "test-dev" }),
+    );
+    mkdirSync(join(dir, ".trellis", "tasks", "other-task"), { recursive: true });
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify({ status: "planning", assignee: "test-dev" }),
+    );
+
+    const hooks = await loadWorkflowHooks();
+    const messages = [userTurn("user prompt")];
+    await hooks[MESSAGES_TRANSFORM_HOOK]({}, { messages });
+    const breadcrumb = ephemeralTexts(messages[0]).find(text =>
+      text.startsWith("<workflow-state>"),
+    );
+    expect(breadcrumb).toContain("Status: unbound_ambiguous");
+    expect(breadcrumb).toContain(
+      "Candidates: .trellis/tasks/demo-task, .trellis/tasks/other-task",
+    );
+    expect(breadcrumb).not.toContain("Status: no_task");
   });
 
   it("inject-workflow-state.js skips injection when the prompt contains the default skip keyword", async () => {
