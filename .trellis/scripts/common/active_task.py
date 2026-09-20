@@ -649,18 +649,17 @@ def resolve_active_task(
     platform_input: dict[str, Any] | None = None,
     platform: str | None = None,
     *,
-    allow_single_session_fallback: bool = True,
+    allow_single_session_fallback: bool = False,
     allow_environment_context: bool = True,
 ) -> ActiveTask:
     """Resolve the active task from session runtime state only.
 
-    A stale session task is returned as stale. A known context identity is
-    authoritative when it contains a task reference; a missing or empty
-    context may use the guarded unbound-task projection. When context identity
-    is unavailable, single-session inference may cover pull-based platform
-    sub-agents (copilot, gemini, qoder) that don't
-    inherit the parent's session id. ≥2 files or 0 files yield
-    ActiveTask(None) — refuses to guess across windows.
+    A stale session task is returned as stale. Missing or unmatched session
+    identity does not infer ownership from the number of session files.
+    A unique developer-owned task, or an explicit ambiguous projection, may
+    still be exposed without writing a binding. Only the legacy inference from
+    one unrelated session file is opt-in; pull-based child agents use that
+    compatibility opt-in when they cannot inherit a parent session identity.
     """
     context_key = resolve_context_key(
         platform_input,
@@ -673,10 +672,9 @@ def resolve_active_task(
         active = _active_from_ref(task_ref, repo_root, "session", context_key)
         if active:
             return active
-        if allow_single_session_fallback:
-            unbound = _resolve_unbound_task(repo_root)
-            if unbound is not None:
-                return unbound
+        unbound = _resolve_unbound_task(repo_root)
+        if unbound is not None:
+            return unbound
         return ActiveTask(None, "none", context_key)
 
     if allow_single_session_fallback:
@@ -684,9 +682,9 @@ def resolve_active_task(
         if fallback is not None:
             return fallback
 
-        unbound = _resolve_unbound_task(repo_root)
-        if unbound is not None:
-            return unbound
+    unbound = _resolve_unbound_task(repo_root)
+    if unbound is not None:
+        return unbound
 
     return ActiveTask(None, "none", context_key)
 

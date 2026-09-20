@@ -125,7 +125,7 @@ def _file_digest(path: Path, maximum: int = MAX_EVIDENCE_BYTES) -> tuple[str, in
 
 
 def _task_source(root: Path) -> dict[str, Any]:
-    active = resolve_active_task(root)
+    active = resolve_active_task(root, allow_single_session_fallback=True)
     if not active.task_path:
         raise NoDirectCurrentTask("no_direct_current_task")
     if active.source_type == "session-fallback":
