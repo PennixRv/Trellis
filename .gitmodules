@@ -1,6 +1,6 @@
 [submodule "docs-site"]
 	path = docs-site
-	url = https://github.com/mindfold-ai/docs.git
+	url = https://github.com/PennixRv/docs.git
 [submodule "marketplace"]
 	path = marketplace
 	url = https://github.com/PennixRv/marketplace.git
