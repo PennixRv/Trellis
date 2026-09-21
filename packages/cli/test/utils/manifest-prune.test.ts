@@ -82,6 +82,53 @@ describe("pruneOrphanManifestKeys", () => {
     expect(kept).not.toHaveProperty(".claude/sessions/user.jsonl");
   });
 
+  it("keeps the opt-in Claude statusline manifest entry while enabled", () => {
+    const hashes = {
+      ".claude/settings.json": "claude-hash",
+      ".claude/hooks/statusline.py": "statusline-hash",
+    };
+    fs.mkdirSync(path.join(tmpDir, ".claude", "hooks"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: {
+          type: "command",
+          command: "python3 .claude/hooks/statusline.py",
+        },
+      }),
+    );
+    saveHashes(tmpDir, hashes);
+
+    const { pruned, hashes: kept } = pruneOrphanManifestKeys(
+      tmpDir,
+      ["claude-code"],
+      hashes,
+    );
+
+    expect(pruned).toEqual([]);
+    expect(kept).toHaveProperty(".claude/hooks/statusline.py");
+  });
+
+  it("does not adopt a custom Claude statusLine as Trellis statusline ownership", () => {
+    const hashes = { ".claude/hooks/statusline.py": "stale-hash" };
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({
+        statusLine: { type: "command", command: "python3 .custom/status.py" },
+      }),
+    );
+    saveHashes(tmpDir, hashes);
+
+    const { pruned } = pruneOrphanManifestKeys(
+      tmpDir,
+      ["claude-code"],
+      hashes,
+    );
+
+    expect(pruned).toEqual([".claude/hooks/statusline.py"]);
+  });
+
   it("keeps root-level AGENTS.md when it has Trellis managed-block markers", () => {
     const hashes = { "AGENTS.md": "h" };
     fs.writeFileSync(

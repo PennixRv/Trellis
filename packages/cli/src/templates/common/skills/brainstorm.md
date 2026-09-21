@@ -8,6 +8,12 @@ For every non-trivial task, the user must respond at least once after the initia
 
 While any user-owned product, scope, UX, compatibility, risk, or acceptance decision remains unresolved, end the turn with exactly one highest-value question. Do not edit product code, dispatch implementation, or run `task.py start`.
 
+## Analysis-Only Exception
+
+When `task.json.meta.delivery_mode = "analysis_only"` exactly and the PRD names a bounded evidence deliverable plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems, task-creation consent authorizes that evidence work. Do not require a second planning approval or run `task.py start`: perform the declared research, audit, or design work while status remains `planning`, record the evidence, verify acceptance criteria and the boundary, commit task artifacts, and archive directly. If the evidence recommends a protected-target change, record it and create a separate change-bearing task before doing it.
+
+All other tasks follow the planning and implementation approval gates below.
+
 ## Non-Negotiable Evidence Rule
 
 If a question can be answered by exploring the codebase, explore the codebase instead.

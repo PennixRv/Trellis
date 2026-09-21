@@ -1,9 +1,9 @@
 {
   "version": "0.6.17",
-  "description": "Adds Devin CLI mem reading; lazy SQLite pages; task/session binding fixes",
+  "description": "Adds Devin CLI memory support, task/session safety fixes, and the Pennix beta package identity.",
   "breaking": false,
   "recommendMigrate": false,
-  "changelog": "**Enhancements:**\n- `trellis mem` can read Cognition Devin CLI sessions from `~/.local/share/devin/cli/sessions.db` (`--platform devin`). This is not Desktop/Cascade `trellis init --devin`. Live CREATE TABLE comments are stripped; Devin forests do not fall back to max(node_id). (#614)\n\n**Bug Fixes:**\n- SQLite mem readers load main-file pages on demand instead of the whole database. (#596)\n- Pi headless subagents forward ask-policy prompts to the parent session. (#611)\n- Active-task lookup no longer binds another session's task when the current session id is missing. (#608)\n- `task.py archive` restores child `parent` links if it stops after unlinking some children. (#613)",
+  "changelog": "**Enhancements:**\n- `trellis mem` can read Cognition Devin CLI sessions from `~/.local/share/devin/cli/sessions.db` (`--platform devin`).\n- Publishes the Trellis CLI and Core packages under the `@pennixrv` scope.\n\n**Bug fixes:**\n- SQLite mem readers load main-file pages on demand instead of the whole database.\n- Pi headless subagents forward ask-policy prompts to the parent session.\n- Active-task lookup no longer binds another session's task when the current session id is missing.\n- `task.py archive` restores child `parent` links if it stops after unlinking some children.\n- Channel startup records its event barrier before spawning the runtime and cleans up correctly on startup failures.",
   "migrations": [],
-  "notes": "`trellis mem --platform devin` reads Devin CLI sessions. No file migrations required."
+  "notes": "No file migration required. Existing projects can upgrade normally."
 }

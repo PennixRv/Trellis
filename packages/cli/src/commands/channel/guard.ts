@@ -21,7 +21,7 @@ import {
   reduceWorkerRegistry,
   type ChannelEvent,
   type WorkerState,
-} from "@mindfoldhq/trellis-core/channel";
+} from "@pennixrv/trellis-core/channel";
 
 import { DIR_NAMES } from "../../constants/paths.js";
 
@@ -40,6 +40,15 @@ export const DEFAULT_IDLE_TTL_MS = 5 * 60 * 1000;
 
 /** Built-in default live-worker budget per project/scope. */
 export const DEFAULT_MAX_LIVE_WORKERS = 6;
+
+/** Default active-assignment budget for the bounded subnode procedure. */
+export const DEFAULT_SUBNODE_MAX_LIVE_WORKERS = 8;
+
+/** Default hard lifetime for a bounded subnode worker. */
+export const DEFAULT_SUBNODE_TIMEOUT_MS = 30 * 60 * 1000;
+
+/** Default warning lead time for a bounded subnode worker timeout. */
+export const DEFAULT_SUBNODE_WARN_BEFORE_MS = 5 * 60 * 1000;
 
 /** Env var override for the idle-cleanup TTL. */
 export const ENV_IDLE_TIMEOUT = "TRELLIS_CHANNEL_WORKER_IDLE_TIMEOUT";
@@ -63,14 +72,17 @@ export interface ResolveGuardOptions {
   cwd?: string;
   /** Override env source (default `process.env`). */
   env?: NodeJS.ProcessEnv;
+  /** Role-specific config values below env and above general config. */
+  roleDefaults?: Pick<ProjectGuardConfig, "idleTimeoutMs" | "maxLiveWorkers">;
 }
 
 /**
  * Resolve the effective guard policy. Precedence:
  *   1. CLI flag (`flag*Ms` / `flagMaxLiveWorkers`)
  *   2. environment variable
- *   3. `.trellis/config.yaml` `channel.worker_guard`
- *   4. built-in default constant
+ *   3. role-specific defaults (when supplied by `--agent subnode`)
+ *   4. `.trellis/config.yaml` `channel.worker_guard`
+ *   5. built-in default constant
  */
 export function resolveWorkerGuardConfig(
   opts: ResolveGuardOptions = {},
@@ -82,12 +94,14 @@ export function resolveWorkerGuardConfig(
   const idleTimeoutMs = pickNonNegativeMs(
     opts.flagIdleTimeoutMs,
     parseEnvDuration(env[ENV_IDLE_TIMEOUT], ENV_IDLE_TIMEOUT),
+    opts.roleDefaults?.idleTimeoutMs,
     fromConfig?.idleTimeoutMs,
     DEFAULT_IDLE_TTL_MS,
   );
   const maxLiveWorkers = pickNonNegativeInt(
     opts.flagMaxLiveWorkers,
     parseEnvInt(env[ENV_MAX_LIVE_WORKERS], ENV_MAX_LIVE_WORKERS),
+    opts.roleDefaults?.maxLiveWorkers,
     fromConfig?.maxLiveWorkers,
     DEFAULT_MAX_LIVE_WORKERS,
   );
@@ -150,6 +164,13 @@ function parseEnvInt(
 interface ProjectGuardConfig {
   idleTimeoutMs?: number;
   maxLiveWorkers?: number;
+}
+
+export interface SubnodeDispatchConfig {
+  idleTimeoutMs?: number;
+  maxLiveWorkers: number;
+  timeoutMs: number;
+  warnBeforeMs: number;
 }
 
 /**
@@ -230,6 +251,99 @@ export function parseWorkerGuardSection(
   return any ? found : undefined;
 }
 
+/** Parse the role-specific `channel.subnode` dispatch defaults. */
+export function parseSubnodeDispatchSection(
+  content: string,
+): Partial<SubnodeDispatchConfig> | undefined {
+  const lines = content.split("\n");
+  let inChannel = false;
+  let inSubnode = false;
+  const found: Partial<SubnodeDispatchConfig> = {};
+  let any = false;
+
+  for (const raw of lines) {
+    const line = raw.replace(/\r$/, "");
+    const trimmed = line.trimEnd();
+    if (trimmed === "" || trimmed.trimStart().startsWith("#")) continue;
+
+    if (/^channel:\s*$/.test(trimmed)) {
+      inChannel = true;
+      inSubnode = false;
+      continue;
+    }
+    if (inChannel && /^ {2}subnode:\s*$/.test(trimmed)) {
+      inSubnode = true;
+      continue;
+    }
+    if (inSubnode) {
+      const idle = trimmed.match(/^ {4}idle_timeout:\s*(.+)$/);
+      if (idle) {
+        found.idleTimeoutMs = parseChannelDuration(
+          stripValue(idle[1]),
+          "channel.subnode.idle_timeout",
+        );
+        any = true;
+        continue;
+      }
+      const max = trimmed.match(/^ {4}max_live_workers:\s*(.+)$/);
+      if (max) {
+        found.maxLiveWorkers = parseChannelInteger(
+          stripValue(max[1]),
+          "channel.subnode.max_live_workers",
+        );
+        any = true;
+        continue;
+      }
+      const timeout = trimmed.match(/^ {4}timeout:\s*(.+)$/);
+      if (timeout) {
+        found.timeoutMs = parseChannelDuration(
+          stripValue(timeout[1]),
+          "channel.subnode.timeout",
+        );
+        any = true;
+        continue;
+      }
+      const warnBefore = trimmed.match(/^ {4}warn_before:\s*(.+)$/);
+      if (warnBefore) {
+        found.warnBeforeMs = parseChannelDuration(
+          stripValue(warnBefore[1]),
+          "channel.subnode.warn_before",
+        );
+        any = true;
+        continue;
+      }
+      if (!/^ {4}\S/.test(line)) inSubnode = false;
+    }
+    if (inChannel && !/^ {2}\S/.test(line) && /^\S/.test(line)) {
+      inChannel = false;
+      inSubnode = false;
+    }
+  }
+
+  return any ? found : undefined;
+}
+
+/** Resolve subnode defaults without changing ordinary worker defaults. */
+export function loadSubnodeDispatchConfig(cwd: string): SubnodeDispatchConfig {
+  const configPath = path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml");
+  let content = "";
+  try {
+    content = fs.readFileSync(configPath, "utf-8");
+  } catch {
+    // Existing projects without the section still get the procedure default.
+  }
+  const fromConfig = parseSubnodeDispatchSection(content);
+  return {
+    maxLiveWorkers:
+      fromConfig?.maxLiveWorkers ?? DEFAULT_SUBNODE_MAX_LIVE_WORKERS,
+    timeoutMs: fromConfig?.timeoutMs ?? DEFAULT_SUBNODE_TIMEOUT_MS,
+    warnBeforeMs: fromConfig?.warnBeforeMs ?? DEFAULT_SUBNODE_WARN_BEFORE_MS,
+    ...(fromConfig?.idleTimeoutMs !== undefined
+      ? { idleTimeoutMs: fromConfig.idleTimeoutMs }
+      : {}),
+  };
+}
+
 function stripValue(s: string): string {
   return s
     .trim()
@@ -255,6 +369,26 @@ function parseGuardDuration(raw: string, key: string): number {
   } catch (err) {
     throw new Error(
       `channel.worker_guard.${key}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+function parseChannelInteger(raw: string, key: string): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`${key} must be a non-negative integer (got '${raw}')`);
+  }
+  return n;
+}
+
+function parseChannelDuration(raw: string, key: string): number {
+  const asInt = Number(raw);
+  if (Number.isFinite(asInt) && /^\d+$/.test(raw)) return asInt;
+  try {
+    return parseDuration(raw) ?? 0;
+  } catch (err) {
+    throw new Error(
+      `${key}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }
@@ -400,6 +534,7 @@ function readReservationWorkers(
       lifecycle: "starting",
       terminal: false,
       activity: "idle",
+      sessionIds: [],
       pendingMessageCount: 0,
       inboxPolicy: "explicitOnly",
       updatedAt: new Date(0).toISOString(),

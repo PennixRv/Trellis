@@ -42,6 +42,7 @@ export type {
   ContextChannelEvent,
   ChannelMetadataEvent,
   SpawnedChannelEvent,
+  SessionBoundChannelEvent,
   KilledChannelEvent,
   DoneChannelEvent,
   ErrorChannelEvent,

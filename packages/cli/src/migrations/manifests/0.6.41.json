@@ -1,0 +1,9 @@
+{
+  "version": "0.6.41",
+  "description": "Restores active-task visibility when a host context key has no persisted session file.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fix:**\n- Projects one unique developer-owned resumable task as read-only workflow context when the host provides a context key whose session file is missing, while still refusing to guess when another session pointer exists.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal trellis update flow."
+}

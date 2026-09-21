@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cli/backend/commands-channel.md","reason":"Verify env_file CLI contract, supervisor propagation, security matrix, and integration coverage."}
+{"file":".trellis/spec/cli/backend/filesystem-safety.md","reason":"Verify role asset containment, update ownership behavior, and no destructive runtime writes."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Verify the regression tests use project conventions and fail on missing behavior."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"Verify lint, type safety, and maintainability requirements."}
+{"file":".trellis/tasks/09-14-subnode-lifecycle-remediation/research/external-lifecycle.md","reason":"Verify the implemented lifecycle remains within the researched and adopted boundary."}

@@ -14,8 +14,11 @@ import {
 } from "../../src/commands/channel/context.js";
 import { channelInterrupt } from "../../src/commands/channel/interrupt.js";
 import { channelMessages } from "../../src/commands/channel/messages.js";
+import { channelList } from "../../src/commands/channel/list.js";
 import { channelSend } from "../../src/commands/channel/send.js";
+import { channelSpawn } from "../../src/commands/channel/spawn.js";
 import { finalizeSupervisorExit } from "../../src/commands/channel/supervisor.js";
+import { createShutdown } from "../../src/commands/channel/supervisor/shutdown.js";
 import { runInboxWatcher } from "../../src/commands/channel/supervisor/inbox.js";
 import {
   applyParseResult,
@@ -83,6 +86,126 @@ describe("channel storage and forum channels", () => {
     expect(
       fs.existsSync(eventsPath("root-check", projectKey(projectDir))),
     ).toBe(true);
+  });
+
+  it("records and filters the immutable main session owner", async () => {
+    await createChannel("owned", { by: "main", ownerSession: "main-a" });
+    await createChannel("other", { by: "main", ownerSession: "main-b" });
+    await createChannel("forum", {
+      by: "main",
+      type: "forum",
+      ownerSession: "main-a",
+    });
+    const otherProject = path.join(tmpDir, "other-project");
+    fs.mkdirSync(otherProject);
+    await createChannel("owned", {
+      by: "main",
+      cwd: otherProject,
+      ownerSession: "main-a",
+    });
+
+    const ownedEvents = await readChannelEvents(
+      "owned",
+      projectKey(projectDir),
+    );
+    expect(ownedEvents[0]).toMatchObject({
+      kind: "create",
+      ownerSessionId: "main-a",
+    });
+    const forumEvents = await readChannelEvents("forum", projectKey(projectDir));
+    expect(forumEvents[0]).not.toHaveProperty("ownerSessionId");
+
+    vi.mocked(console.log).mockClear();
+    await channelList({
+      all: true,
+      allProjects: true,
+      json: true,
+      ownerSession: "main-a",
+    });
+    const listed = JSON.parse(String(vi.mocked(console.log).mock.calls[0]?.[0])) as {
+      name: string;
+      project: string;
+      ownerSessionId?: string;
+    }[];
+    expect(listed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "owned", ownerSessionId: "main-a" }),
+      ]),
+    );
+    expect(listed).toHaveLength(2);
+    expect(listed.every((entry) => entry.ownerSessionId === "main-a")).toBe(true);
+    expect(new Set(listed.map((entry) => entry.project)).size).toBe(2);
+  });
+
+  it("uses host session identity fallbacks only when explicit owner is absent", async () => {
+    const oldThread = process.env.CODEX_THREAD_ID;
+    const oldSession = process.env.CODEX_SESSION_ID;
+    process.env.CODEX_THREAD_ID = "thread-owner";
+    process.env.CODEX_SESSION_ID = "session-owner";
+    try {
+      await createChannel("thread-owned", { by: "main" });
+      delete process.env.CODEX_THREAD_ID;
+      await createChannel("session-owned", { by: "main" });
+      const threadEvents = await readChannelEvents(
+        "thread-owned",
+        projectKey(projectDir),
+      );
+      const sessionEvents = await readChannelEvents(
+        "session-owned",
+        projectKey(projectDir),
+      );
+      expect(threadEvents[0]).toMatchObject({ ownerSessionId: "thread-owner" });
+      expect(sessionEvents[0]).toMatchObject({ ownerSessionId: "session-owner" });
+    } finally {
+      if (oldThread === undefined) delete process.env.CODEX_THREAD_ID;
+      else process.env.CODEX_THREAD_ID = oldThread;
+      if (oldSession === undefined) delete process.env.CODEX_SESSION_ID;
+      else process.env.CODEX_SESSION_ID = oldSession;
+    }
+  });
+
+  it("rejects an ownerless Codex worker before creating worker artifacts", async () => {
+    const oldThread = process.env.CODEX_THREAD_ID;
+    const oldSession = process.env.CODEX_SESSION_ID;
+    delete process.env.CODEX_THREAD_ID;
+    delete process.env.CODEX_SESSION_ID;
+    try {
+      await createChannel("ownerless-codex", { by: "main" });
+
+      await expect(
+        channelSpawn("ownerless-codex", {
+          provider: "codex",
+          as: "worker",
+          cwd: projectDir,
+        }),
+      ).rejects.toThrow(
+        "Cannot spawn Codex worker in channel 'ownerless-codex' without a main Codex session owner",
+      );
+
+      const project = projectKey(projectDir);
+      for (const suffix of ["config", "pid", "reservation"]) {
+        expect(
+          fs.existsSync(workerFile("ownerless-codex", "worker", suffix, project)),
+        ).toBe(false);
+      }
+    } finally {
+      if (oldThread === undefined) delete process.env.CODEX_THREAD_ID;
+      else process.env.CODEX_THREAD_ID = oldThread;
+      if (oldSession === undefined) delete process.env.CODEX_SESSION_ID;
+      else process.env.CODEX_SESSION_ID = oldSession;
+    }
+  });
+
+  it("does not apply the Codex owner preflight to a Claude worker", async () => {
+    await createChannel("ownerless-claude", { by: "main" });
+
+    await expect(
+      channelSpawn("ownerless-claude", {
+        provider: "claude",
+        as: "../invalid-worker",
+        cwd: projectDir,
+      }),
+    ).rejects.toThrow("Invalid worker name");
   });
 
   it("reduces structured thread events into board state", async () => {
@@ -359,13 +482,14 @@ describe("channel storage and forum channels", () => {
     );
   });
 
-  it("records turn_finished when a worker emits a terminal event", async () => {
+  it("records turn_finished and runs completion cleanup when a worker emits done", async () => {
     await createChannel("turns", { by: "main" });
     const tracker = new TurnTracker();
     tracker.begin(2);
     const shutdown = {
       markTerminalEmitted: vi.fn(),
     };
+    const onDone = vi.fn();
     const child = {
       stdin: { write: vi.fn() },
     };
@@ -377,6 +501,8 @@ describe("channel storage and forum channels", () => {
       child as never,
       shutdown as never,
       tracker,
+      undefined,
+      onDone,
     );
 
     const events = await readChannelEvents("turns", projectKey(projectDir));
@@ -391,6 +517,62 @@ describe("channel storage and forum channels", () => {
         outcome: "done",
       },
     ]);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("completion cleanup does not append a killed event", async () => {
+    await createChannel("completed", { by: "main" });
+    const stdinEnd = vi.fn();
+    const child = {
+      stdin: { end: stdinEnd },
+      exitCode: 0,
+      signalCode: null,
+      kill: vi.fn(),
+    };
+    const shutdown = createShutdown({
+      channelName: "completed",
+      workerName: "subnode",
+      log: { write: noop },
+      getChild: () => child as never,
+      graceMs: 1,
+    });
+    shutdown.markTerminalEmitted();
+    vi.useFakeTimers();
+    try {
+      shutdown.complete();
+      await shutdown.finalizeOnExit(0, null);
+      await vi.runAllTimersAsync();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(stdinEnd).toHaveBeenCalledTimes(1);
+    expect(
+      await readChannelEvents("completed", projectKey(projectDir)),
+    ).toHaveLength(1);
+  });
+
+  it("persists adapter session IDs as durable bindings", async () => {
+    await createChannel("session-bindings", { by: "main" });
+    await applyParseResult(
+      "session-bindings",
+      "worker",
+      { events: [], side: { persistSessionId: "codex-session-1" } },
+      { stdin: { write: vi.fn() } } as never,
+      { markTerminalEmitted: vi.fn() } as never,
+    );
+    const events = await readChannelEvents(
+      "session-bindings",
+      projectKey(projectDir),
+    );
+    expect(events.at(-1)).toMatchObject({
+      kind: "session_bound",
+      worker: "worker",
+      sessionId: "codex-session-1",
+    });
+    expect(
+      fs.readFileSync(workerFile("session-bindings", "worker", "session-id", projectKey(projectDir)), "utf8"),
+    ).toBe("codex-session-1");
   });
 
   it("marks the active turn aborted before an interrupt turn starts", async () => {

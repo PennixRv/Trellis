@@ -244,6 +244,14 @@ function loadBreadcrumbs(workflowPath) {
  */
 function getActiveTask(ctx, platformInput = null) {
   const active = ctx.getActiveTask(platformInput)
+  if (active.source === "unbound_ambiguous") {
+    return {
+      id: null,
+      status: "unbound_ambiguous",
+      source: active.source,
+      candidates: active.candidatePaths || [],
+    }
+  }
   const taskRef = active.taskPath
   if (!taskRef) return null
   const taskDir = ctx.resolveTaskDir(taskRef)
@@ -257,6 +265,7 @@ function getActiveTask(ctx, platformInput = null) {
     const status = typeof data.status === "string" ? data.status : ""
     if (!status) return null
     const id = data.id || taskRef.split("/").pop()
+    if (active.source === "unbound") return { id, status: "unbound_task", source: active.source }
     return { id, status, source: active.source }
   } catch {
     return null
@@ -270,12 +279,17 @@ function getActiveTask(ctx, platformInput = null) {
  *   "Refer to workflow.md for current step." line
  * - no_task pseudo-status (id === null) → header omits task info
  */
-function buildBreadcrumb(id, status, templates) {
+function buildBreadcrumb(id, status, templates, candidates = []) {
   let body = templates[status]
   if (body === undefined) {
     body = "Refer to workflow.md for current step."
   }
-  let header = id === null ? `Status: ${status}` : `Task: ${id} (${status})`
+  let header
+  if (status === "unbound_ambiguous") {
+    header = `Status: ${status}\nCandidates: ${candidates.join(", ")}`
+  } else {
+    header = id === null ? `Status: ${status}` : `Task: ${id} (${status})`
+  }
   return `<workflow-state>\n${header}\n${body}\n</workflow-state>`
 }
 
@@ -318,7 +332,7 @@ export default async ({ directory }) => {
           const templates = loadBreadcrumbs(resolveWorkflowMd(ctx, directory, platformInput))
           const task = getActiveTask(ctx, platformInput)
           const breadcrumb = task
-            ? buildBreadcrumb(task.id, task.status, templates, task.source)
+            ? buildBreadcrumb(task.id, task.status, templates, task.candidates)
             : buildBreadcrumb(null, "no_task", templates)
 
           prependEphemeralText(messages, breadcrumb)

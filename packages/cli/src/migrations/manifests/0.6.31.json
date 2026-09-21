@@ -1,0 +1,9 @@
+{
+  "version": "0.6.31",
+  "description": "Exposes public channel session telemetry for read-only workflow consumers.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Enhancements:**\n- Exposes owner-matched channel and worker session telemetry through the public CLI projection.\n- Adds the read-only task progress projection used by status integrations.\n\n**Fixes:**\n- Keeps existing project configuration and workflow data compatible; no project migration is required.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

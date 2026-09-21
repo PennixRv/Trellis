@@ -18,6 +18,7 @@ import { channelPrune, channelRm } from "./rm.js";
 import { channelSend } from "./send.js";
 import { channelRun } from "./run.js";
 import { channelSpawn } from "./spawn.js";
+import { channelWorkers } from "./workers.js";
 import {
   channelThreadPost,
   channelThreadRename,
@@ -26,9 +27,9 @@ import {
 } from "./threads.js";
 import { channelTitleClear, channelTitleSet } from "./title.js";
 import { runSupervisor } from "./supervisor.js";
-import { channelWait, parseDuration } from "./wait.js";
+import { channelBarrier, channelWait, parseDuration } from "./wait.js";
 import { parseCsv } from "./store/schema.js";
-import { parseInboxPolicy } from "@mindfoldhq/trellis-core/channel";
+import { parseInboxPolicy } from "@pennixrv/trellis-core/channel";
 
 function parseNonNegativeInteger(value: string): number {
   if (!/^\d+$/.test(value)) {
@@ -81,6 +82,10 @@ export function registerChannelCommand(program: Command): void {
     )
     .option("--cwd <path>", "working directory recorded in the create event")
     .option("--by <agent>", "agent name recorded as the creator", "main")
+    .option(
+      "--owner-session <id>",
+      "opaque main Codex session owner (defaults to host session env)",
+    )
     .option("--force", "overwrite existing channel with the same name")
     .option(
       "--ephemeral",
@@ -102,6 +107,7 @@ export function registerChannelCommand(program: Command): void {
           linkedContextRaw?: string[];
           cwd?: string;
           by?: string;
+          ownerSession?: string;
           force?: boolean;
           ephemeral?: boolean;
         },
@@ -172,11 +178,35 @@ export function registerChannelCommand(program: Command): void {
     );
 
   channel
+    .command("barrier <name>")
+    .description(
+      "Print the current durable event sequence without appending an event",
+    )
+    .option("--scope <scope>", "channel scope: project | global")
+    .action(async (name: string, raw: Record<string, unknown>) => {
+      const opts = raw as { scope?: string };
+      try {
+        console.log(await channelBarrier(name, { scope: opts.scope }));
+      } catch (err) {
+        console.error(
+          chalk.red("Error:"),
+          err instanceof Error ? err.message : err,
+        );
+        process.exit(1);
+      }
+    });
+
+  channel
     .command("wait <name>")
     .description("Block until an event matching the filter arrives, or timeout")
     .requiredOption("--as <agent>", "agent name waiting")
     .option("--scope <scope>", "channel scope: project | global")
     .option("--timeout <duration>", "max wait (e.g. 30s, 2m, 1h)")
+    .option(
+      "--after-seq <sequence>",
+      "replay only events after this durable sequence barrier",
+      parseNonNegativeInteger,
+    )
     .option("--from <agents>", "only wake on events from these agents (CSV)")
     .option(
       "--kind <kind[,kind...]>",
@@ -197,6 +227,7 @@ export function registerChannelCommand(program: Command): void {
       const opts = raw as {
         as: string;
         timeout?: string;
+        afterSeq?: number;
         from?: string;
         kind?: string;
         scope?: string;
@@ -210,6 +241,7 @@ export function registerChannelCommand(program: Command): void {
         await channelWait(name, {
           as: opts.as,
           timeoutMs: parseDuration(opts.timeout),
+          afterSeq: opts.afterSeq,
           from: opts.from,
           kind: opts.kind,
           scope: opts.scope,
@@ -299,11 +331,11 @@ export function registerChannelCommand(program: Command): void {
     )
     .option(
       "--timeout <duration>",
-      "auto-kill worker after this duration (e.g. 30m, 1h, 7200s)",
+      "auto-kill worker after this duration (subnode role default comes from config)",
     )
     .option(
       "--warn-before <duration>",
-      "emit supervisor_warning before timeout (default 5m; 0ms disables)",
+      "emit supervisor_warning before timeout (subnode role default comes from config)",
     )
     .option(
       "--file <path>",
@@ -327,11 +359,11 @@ export function registerChannelCommand(program: Command): void {
     )
     .option(
       "--idle-timeout <duration>",
-      "OOM-guard idle-cleanup TTL for this worker (default 5m; 0 disables)",
+      "OOM-guard idle-cleanup TTL (subnode role default comes from config)",
     )
     .option(
       "--max-live-workers <n>",
-      "spawn-time live-worker budget for this project/scope (default 6; 0 disables)",
+      "spawn-time live-worker budget (subnode role default comes from config)",
       parseNonNegativeInteger,
     )
     .action(async (name: string, raw: Record<string, unknown>) => {
@@ -390,6 +422,37 @@ export function registerChannelCommand(program: Command): void {
     });
 
   channel
+    .command("workers <name>")
+    .description("Show durable worker lifecycle projections for a channel")
+    .option("--scope <scope>", "channel scope: project | global")
+    .option(
+      "--project-key <key>",
+      "project bucket containing the channel (project scope only)",
+    )
+    .option(
+      "--include-terminal",
+      "include done, error, killed, and crashed workers",
+    )
+    .option("--json", "print the complete worker projection as JSON")
+    .action(async (name: string, raw: Record<string, unknown>) => {
+      const opts = raw as {
+        scope?: string;
+        projectKey?: string;
+        includeTerminal?: boolean;
+        json?: boolean;
+      };
+      try {
+        await channelWorkers(name, opts);
+      } catch (err) {
+        console.error(
+          chalk.red("Error:"),
+          err instanceof Error ? err.message : err,
+        );
+        process.exit(1);
+      }
+    });
+
+  channel
     .command("run [name]")
     .description(
       "One-shot: create ephemeral channel, spawn worker, send prompt, wait done, print final answer, cleanup",
@@ -421,8 +484,12 @@ export function registerChannelCommand(program: Command): void {
     .option("--message-file <path>", "read prompt body from file")
     .option("--stdin", "read prompt body from stdin")
     .option(
+      "--owner-session <id>",
+      "opaque main Codex session owner (defaults to host session env)",
+    )
+    .option(
       "--timeout <duration>",
-      "max time to wait for done (e.g. 30s, 5m, 1h; default 5m)",
+      "max time to wait for done (e.g. 30s, 5m, 1h; default 5m, or channel.subnode.timeout for --agent subnode)",
     )
     .action(async (name: string | undefined, raw: Record<string, unknown>) => {
       const opts = raw as {
@@ -437,6 +504,7 @@ export function registerChannelCommand(program: Command): void {
         messageFile?: string;
         stdin?: boolean;
         timeout?: string;
+        ownerSession?: string;
       };
       if (opts.provider !== undefined && !isProvider(opts.provider)) {
         console.error(
@@ -459,6 +527,7 @@ export function registerChannelCommand(program: Command): void {
           textFile: opts.messageFile,
           stdin: opts.stdin,
           timeoutMs: parseDuration(opts.timeout),
+          ownerSession: opts.ownerSession,
         });
       } catch (err) {
         console.error(
@@ -557,6 +626,10 @@ export function registerChannelCommand(program: Command): void {
       "--all-projects",
       "scan every project bucket (default: only the current cwd's project)",
     )
+    .option(
+      "--owner-session <id>",
+      "exactly match the immutable main Codex session owner",
+    )
     .action(async (raw: Record<string, unknown>) => {
       const opts = raw as {
         json?: boolean;
@@ -564,6 +637,7 @@ export function registerChannelCommand(program: Command): void {
         all?: boolean;
         allProjects?: boolean;
         scope?: string;
+        ownerSession?: string;
       };
       try {
         await channelList(opts);

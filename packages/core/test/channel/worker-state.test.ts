@@ -37,6 +37,7 @@ describe("reduceWorkerRegistry", () => {
     expect(w.terminal).toBe(false);
     expect(w.activity).toBe("idle");
     expect(w.provider).toBe("claude");
+    expect(w.sessionIds).toEqual([]);
     expect(w.inboxPolicy).toBe("explicitOnly");
     expect(w.startedBy).toBe("main");
   });
@@ -45,6 +46,19 @@ describe("reduceWorkerRegistry", () => {
     reset();
     const reg = reduceWorkerRegistry([ev("spawned", { as: "w1" })]);
     expect(reg.workers[0].inboxPolicy).toBe("explicitOnly");
+  });
+
+  it("replays worker session bindings in order and deduplicates repeats", () => {
+    reset();
+    const reg = reduceWorkerRegistry([
+      ev("spawned", { as: "w", provider: "codex" }),
+      ev("session_bound", { worker: "w", sessionId: "session-a" }),
+      ev("session_bound", { worker: "w", sessionId: "session-a" }),
+      ev("session_bound", { worker: "w", sessionId: "session-b" }),
+      ev("session_bound", { worker: "unknown", sessionId: "ignored" }),
+    ]);
+    expect(reg.workers).toHaveLength(1);
+    expect(reg.workers[0].sessionIds).toEqual(["session-a", "session-b"]);
   });
 
   it("honors spawned.inboxPolicy", () => {
@@ -96,6 +110,36 @@ describe("reduceWorkerRegistry", () => {
       activity: "idle",
       error: "boom",
     });
+  });
+
+  it("projects a subnode done as terminal and preserves it through cleanup", () => {
+    reset();
+    const completed = reduceWorkerRegistry([
+      ev("spawned", { as: "subnode", agent: "subnode" }),
+      ev("done", { by: "subnode" }),
+      ev("turn_finished", { by: "subnode", worker: "subnode" }),
+      ev("killed", {
+        by: "supervisor:subnode",
+        reason: "idle-timeout",
+      }),
+    ]).workers[0];
+    expect(completed).toMatchObject({
+      lifecycle: "done",
+      terminal: true,
+      activity: "idle",
+    });
+    expect(completed.idleSince).toBeUndefined();
+
+    reset();
+    expect(
+      reduceWorkerRegistry([
+        ev("spawned", { as: "subnode", agent: "subnode" }),
+        ev("killed", {
+          by: "supervisor:subnode",
+          reason: "timeout",
+        }),
+      ]).workers[0],
+    ).toMatchObject({ lifecycle: "killed", terminal: true });
   });
 
   it("transitions to terminal on synthesized exit events / killed", () => {

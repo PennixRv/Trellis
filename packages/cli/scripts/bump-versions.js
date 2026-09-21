@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Bump @mindfoldhq/trellis and @mindfoldhq/trellis-core to the same next
+ * Bump @pennixrv/trellis and @pennixrv/trellis-core to the same next
  * version. Replaces the per-package `pnpm version --no-git-tag-version`
  * calls in the release scripts so the two packages can never drift.
  *
@@ -60,7 +60,9 @@ function bumpPrerelease(current, preid) {
   if (parsed.prerelease) {
     // Existing prerelease: if same preid, bump its counter; otherwise switch
     // track (rc.N -> beta.0 is unusual but we mirror what pnpm/npm do).
-    const m = parsed.prerelease.match(/^([A-Za-z0-9-]+)\.(\d+)$/);
+    const m = parsed.prerelease.match(
+      /^([A-Za-z0-9-]+)\.(\d+)(?:\.pennix\.\d+)?$/,
+    );
     if (m && m[1] === preid) {
       return `${parsed.major}.${parsed.minor}.${parsed.patch}-${preid}.${Number(m[2]) + 1}`;
     }
@@ -122,7 +124,7 @@ function main() {
   writeJSON(CLI_PKG, cli);
   // Human message to stderr so stdout stays a clean machine-readable value.
   process.stderr.write(
-    `${GREEN}ok${RESET} bumped @mindfoldhq/trellis and @mindfoldhq/trellis-core (${type}) -> ${next}\n`,
+    `${GREEN}ok${RESET} bumped @pennixrv/trellis and @pennixrv/trellis-core (${type}) -> ${next}\n`,
   );
   process.stdout.write(next + "\n");
 }

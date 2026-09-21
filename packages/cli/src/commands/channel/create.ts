@@ -4,7 +4,7 @@ import {
   resolveChannelRef,
   type ChannelScope,
   type ChannelType,
-} from "@mindfoldhq/trellis-core/channel";
+} from "@pennixrv/trellis-core/channel";
 
 import {
   parseChannelScope,
@@ -36,6 +36,8 @@ export interface CreateOptions {
    * exposing the mode for downstream consumers.
    */
   origin?: string;
+  /** Opaque main Codex session owner; defaults are resolved by the CLI. */
+  ownerSession?: string;
 }
 
 export async function createChannel(
@@ -51,6 +53,13 @@ export async function createChannel(
   const labels = parseCsv(opts.labels);
 
   const createMode = opts.origin;
+  const ownerSessionId = [
+    opts.ownerSession,
+    process.env.CODEX_THREAD_ID,
+    process.env.CODEX_SESSION_ID,
+  ]
+    .map((value) => value?.trim())
+    .find((value): value is string => Boolean(value));
 
   const event = await coreCreateChannel({
     channel: name,
@@ -64,6 +73,7 @@ export async function createChannel(
     ...(opts.description ? { description: opts.description } : {}),
     ...(context ? { context } : {}),
     ...(opts.ephemeral ? { ephemeral: true } : {}),
+    ...(ownerSessionId ? { ownerSessionId } : {}),
     ...(opts.force ? { force: true } : {}),
     origin: "cli",
     ...(createMode ? { meta: { trellis: { createMode } } } : {}),

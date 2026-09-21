@@ -2,8 +2,8 @@
 """Session-scoped active task resolution.
 
 The user-facing concept is a single "active task". Trellis stores that pointer
-per AI session/window under `.trellis/.runtime/sessions/`; without a stable
-session key there is no active task.
+per AI session/window under `.trellis/.runtime/sessions/`; when the pointer is
+missing, a unique developer-owned resumable task may be exposed read-only.
 """
 
 from __future__ import annotations
@@ -168,6 +168,7 @@ class ActiveTask:
     source_type: str
     context_key: str | None = None
     stale: bool = False
+    candidate_paths: tuple[str, ...] = ()
 
     @property
     def source(self) -> str:
@@ -675,10 +676,12 @@ def resolve_active_task(
 ) -> ActiveTask:
     """Resolve the active task from session runtime state only.
 
-    A stale session task is returned as stale. Missing context identity or a
-    Missing or unmatched session identity does not infer ownership from the
-    number of session files. Pull-based child-agent callers that cannot inherit
-    a parent identity must opt into the compatibility fallback explicitly.
+    A stale session task is returned as stale. Missing or unmatched session
+    identity does not infer ownership from the number of session files.
+    A unique developer-owned task, or an explicit ambiguous projection, may
+    still be exposed without writing a binding. Only the legacy inference from
+    one unrelated session file is opt-in; pull-based child agents use that
+    compatibility opt-in when they cannot inherit a parent session identity.
     """
     context_key = resolve_context_key(
         platform_input,
@@ -691,11 +694,19 @@ def resolve_active_task(
         active = _active_from_ref(task_ref, repo_root, "session", context_key)
         if active:
             return active
+        unbound = _resolve_unbound_task(repo_root)
+        if unbound is not None:
+            return unbound
+        return ActiveTask(None, "none", context_key)
 
     if allow_single_session_fallback:
         fallback = _resolve_single_session_fallback(repo_root)
         if fallback is not None:
             return fallback
+
+    unbound = _resolve_unbound_task(repo_root)
+    if unbound is not None:
+        return unbound
 
     return ActiveTask(None, "none", context_key)
 
@@ -723,6 +734,38 @@ def _resolve_single_session_fallback(repo_root: Path) -> ActiveTask | None:
 
     fallback_key = session_file.stem
     return _active_from_ref(task_ref, repo_root, "session-fallback", fallback_key)
+
+
+def _resolve_unbound_task(repo_root: Path) -> ActiveTask | None:
+    """Expose one developer-owned task when no session pointer exists."""
+    sessions_dir = _runtime_sessions_dir(repo_root)
+    if sessions_dir.is_dir():
+        session_files = sorted(sessions_dir.glob("*.json"))
+        if any(_string_value((_read_json(session) or {}).get("current_task")) for session in session_files):
+            return None
+
+    from .paths import get_developer, get_tasks_dir
+    from .tasks import iter_active_tasks
+
+    developer = get_developer(repo_root)
+    if not developer:
+        return None
+
+    candidates = [
+        task
+        for task in iter_active_tasks(get_tasks_dir(repo_root))
+        if task.assignee == developer and task.status in {"planning", "in_progress", "review"}
+    ]
+    if len(candidates) == 0:
+        return None
+
+    task_paths = tuple(sorted(
+        task.directory.relative_to(repo_root).as_posix()
+        for task in candidates
+    ))
+    if len(task_paths) == 1:
+        return ActiveTask(task_paths[0], "unbound", None)
+    return ActiveTask(None, "unbound_ambiguous", None, candidate_paths=task_paths)
 
 
 def _utc_now() -> str:
@@ -798,6 +841,22 @@ def clear_active_task(
     if context_path.is_file():
         _remove_file(context_path)
     return previous
+
+
+def clear_active_task_for_context(
+    context_key: str,
+    task_path: str,
+    repo_root: Path,
+) -> str:
+    """Clear one exact session pointer, refusing an unexpected replacement."""
+    context_path = _context_path(repo_root, context_key)
+    context = _read_json(context_path)
+    if context is None or not _string_value(context.get("current_task")):
+        return "absent"
+    current = _string_value(context.get("current_task"))
+    if not _task_refs_match(current, task_path, repo_root):
+        return "changed"
+    return "cleared" if context_path.is_file() and _remove_file(context_path) else "absent"
 
 
 def clear_task_from_sessions(task_path: str, repo_root: Path) -> int:

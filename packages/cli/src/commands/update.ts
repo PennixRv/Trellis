@@ -59,9 +59,14 @@ import {
   collectPlatformTemplates,
 } from "../configurators/index.js";
 import { replacePythonCommandLiterals } from "../configurators/shared.js";
+import {
+  CLAUDE_STATUSLINE_PATH,
+  isClaudeStatuslineManaged,
+} from "../configurators/claude.js";
 import { preserveCodexAgentModelKeys } from "../configurators/codex.js";
 import { printZcodeSetupHint } from "../configurators/zcode.js";
 import { ensureGitattributes } from "../configurators/workflow.js";
+import { getStatuslineHook } from "../templates/claude/index.js";
 import { pruneOrphanManifestKeys } from "../utils/manifest-prune.js";
 import {
   fetchRegistrySpecTemplates,
@@ -75,6 +80,8 @@ import {
 import { loadSpecRegistryConfig } from "../utils/registry-config.js";
 import {
   cleanupEmptyDirs,
+  getManagedMarkdownBlock,
+  mergeManagedMarkdownBlock,
   TRELLIS_BLOCK_END,
   TRELLIS_BLOCK_START,
 } from "../utils/managed-paths.js";
@@ -120,6 +127,105 @@ const LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES = new Set<string>([
   // false "modified by you" conflict.
   "c1f511b1cfc1902f2147da159f09cc51f380b0c9e341cdb3ac5dea5233f3e307",
 ]);
+const CODEX_WORKFLOW_STATE_HOOK_PATH = ".codex/hooks/inject-workflow-state.py";
+const LEGACY_PENNIX_CODEX_DISPATCH_SIGNATURES = [
+  "def _resolve_codex_dispatch_mode(config: dict, repo_root: Path | None = None) -> str:",
+  "from common.config import get_workflow_dispatch_mode",
+  "return get_workflow_dispatch_mode(root, config=config)",
+] as const;
+const LEGACY_PENNIX_ACTIVE_TASK_GUARD =
+  "    active = _resolve_active_task(root, input_data)\n" +
+  "    if not active.task_path:\n" +
+  "        return None";
+const PENNIX_AMBIGUITY_PROJECTION =
+  "    active = _resolve_active_task(root, input_data)\n" +
+  '    if active.source_type == "unbound_ambiguous":\n' +
+  '        candidates = ", ".join(active.candidate_paths)\n' +
+  '        return candidates, "unbound_ambiguous", active.source\n' +
+  "    if not active.task_path:\n" +
+  "        return None";
+const LEGACY_PENNIX_BREADCRUMB_HEADER =
+  '    header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"';
+const PENNIX_AMBIGUITY_BREADCRUMB_HEADER =
+  '    if status == "unbound_ambiguous":\n' +
+  '        header = f"Status: {status}\\nCandidates: {task_id}"\n' +
+  "    else:\n" +
+  '        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"';
+
+interface LegacyPennixCodexHookMigration {
+  content: string;
+  needsUpdate: boolean;
+}
+
+/**
+ * Preserve the historical Pennix Codex hook while adding the one projection
+ * it predates. This is intentionally stricter than hash tracking: the Hook
+ * carried a Pennix-specific dispatch resolver, so pristine installations were
+ * correctly classified as locally modified and never received issue #180.
+ */
+function migrateLegacyPennixCodexWorkflowHook(
+  relativePath: string,
+  existingContent: string,
+): LegacyPennixCodexHookMigration | null {
+  if (
+    relativePath !== CODEX_WORKFLOW_STATE_HOOK_PATH ||
+    !LEGACY_PENNIX_CODEX_DISPATCH_SIGNATURES.every((signature) =>
+      existingContent.includes(signature),
+    )
+  ) {
+    return null;
+  }
+
+  const hasProjection = existingContent.includes(PENNIX_AMBIGUITY_PROJECTION);
+  const hasHeader = existingContent.includes(
+    PENNIX_AMBIGUITY_BREADCRUMB_HEADER,
+  );
+  if (hasProjection && hasHeader) {
+    return { content: existingContent, needsUpdate: false };
+  }
+  if (
+    (!hasProjection &&
+      !existingContent.includes(LEGACY_PENNIX_ACTIVE_TASK_GUARD)) ||
+    (!hasHeader && !existingContent.includes(LEGACY_PENNIX_BREADCRUMB_HEADER))
+  ) {
+    return null;
+  }
+
+  return {
+    content: existingContent
+      .replace(LEGACY_PENNIX_ACTIVE_TASK_GUARD, PENNIX_AMBIGUITY_PROJECTION)
+      .replace(
+        LEGACY_PENNIX_BREADCRUMB_HEADER,
+        PENNIX_AMBIGUITY_BREADCRUMB_HEADER,
+      ),
+    needsUpdate: !hasProjection || !hasHeader,
+  };
+}
+
+/** Keep recognized Pennix Hook customizations in the desired template map. */
+function preserveLegacyPennixCodexWorkflowHook(
+  cwd: string,
+  templates: Map<string, string>,
+): void {
+  if (!templates.has(CODEX_WORKFLOW_STATE_HOOK_PATH)) {
+    return;
+  }
+  const hookPath = path.join(cwd, CODEX_WORKFLOW_STATE_HOOK_PATH);
+  if (!fs.existsSync(hookPath)) {
+    return;
+  }
+  try {
+    const migration = migrateLegacyPennixCodexWorkflowHook(
+      CODEX_WORKFLOW_STATE_HOOK_PATH,
+      fs.readFileSync(hookPath, "utf-8"),
+    );
+    if (migration) {
+      templates.set(CODEX_WORKFLOW_STATE_HOOK_PATH, migration.content);
+    }
+  } catch {
+    // The normal conflict path reports unreadable or concurrently changed files.
+  }
+}
 
 // Paths that should never be touched (true user data)
 // spec/ is user-customized content created during init; update should never modify it
@@ -131,87 +237,12 @@ const PROTECTED_PATHS = [
   `${DIR_NAMES.WORKFLOW}/.current-task`,
 ];
 
-function getManagedBlock(
-  content: string,
-  startMarker: string,
-  endMarker: string,
-): string | null {
-  const start = content.indexOf(startMarker);
-  if (start === -1) {
-    return null;
-  }
-
-  const end = content.indexOf(endMarker, start);
-  if (end === -1) {
-    return null;
-  }
-
-  return content.slice(start, end + endMarker.length);
-}
-
 function getTrellisManagedBlock(content: string): string | null {
-  return getManagedBlock(content, TRELLIS_BLOCK_START, TRELLIS_BLOCK_END);
-}
-
-function replaceManagedBlock(
-  existingContent: string,
-  templateContent: string,
-  startMarker: string,
-  endMarker: string,
-): string | null {
-  const existingStart = existingContent.indexOf(startMarker);
-  if (existingStart === -1) {
-    return null;
-  }
-
-  const existingEnd = existingContent.indexOf(endMarker, existingStart);
-  if (existingEnd === -1) {
-    return null;
-  }
-
-  const templateBlock = getManagedBlock(
-    templateContent,
-    startMarker,
-    endMarker,
+  return getManagedMarkdownBlock(
+    content,
+    TRELLIS_BLOCK_START,
+    TRELLIS_BLOCK_END,
   );
-  if (!templateBlock) {
-    return null;
-  }
-
-  return (
-    existingContent.slice(0, existingStart) +
-    templateBlock +
-    existingContent.slice(existingEnd + endMarker.length)
-  );
-}
-
-function mergeManagedBlockContent(
-  existingContent: string,
-  templateContent: string,
-  startMarker: string,
-  endMarker: string,
-): string {
-  const replaced = replaceManagedBlock(
-    existingContent,
-    templateContent,
-    startMarker,
-    endMarker,
-  );
-  if (replaced !== null) {
-    return replaced;
-  }
-
-  const templateBlock = getManagedBlock(
-    templateContent,
-    startMarker,
-    endMarker,
-  );
-  if (!templateBlock) {
-    return templateContent;
-  }
-
-  const trimmed = existingContent.replace(/\s+$/, "");
-  return `${trimmed}\n\n${templateBlock}\n`;
 }
 
 function buildManagedBlockTemplate(
@@ -227,11 +258,13 @@ function buildManagedBlockTemplate(
   }
 
   const existingContent = fs.readFileSync(fullPath, "utf-8");
-  return mergeManagedBlockContent(
-    existingContent,
-    templateContent,
-    startMarker,
-    endMarker,
+  return (
+    mergeManagedMarkdownBlock(
+      existingContent,
+      templateContent,
+      startMarker,
+      endMarker,
+    ) ?? templateContent
   );
 }
 
@@ -281,7 +314,7 @@ function isSafeUntrackedCopilotInstructionsMerge(
   }
 
   if (
-    getManagedBlock(
+    getManagedMarkdownBlock(
       existingContent,
       COPILOT_INSTRUCTIONS_BLOCK_START,
       COPILOT_INSTRUCTIONS_BLOCK_END,
@@ -290,14 +323,13 @@ function isSafeUntrackedCopilotInstructionsMerge(
     return false;
   }
 
-  return (
-    mergeManagedBlockContent(
-      existingContent,
-      getCopilotInstructions(),
-      COPILOT_INSTRUCTIONS_BLOCK_START,
-      COPILOT_INSTRUCTIONS_BLOCK_END,
-    ) === newContent
+  const merged = mergeManagedMarkdownBlock(
+    existingContent,
+    getCopilotInstructions(),
+    COPILOT_INSTRUCTIONS_BLOCK_START,
+    COPILOT_INSTRUCTIONS_BLOCK_END,
   );
+  return merged !== null && merged === newContent;
 }
 
 /**
@@ -855,6 +887,7 @@ async function collectRegistrySpecTemplates(
 
 async function collectTemplateFiles(
   cwd: string,
+  hashes: TemplateHashes,
   extraPlatforms?: Set<AITool>,
   /**
    * Bypass `update.skip` when collecting templates. Enable this for breaking
@@ -928,9 +961,13 @@ async function collectTemplateFiles(
   // as a modified-file conflict by the hash comparison below.
   if (platforms.has("codex")) {
     preserveCodexAgentModelKeys(cwd, files);
+    preserveLegacyPennixCodexWorkflowHook(cwd, files);
   }
 
   preserveExistingClaudeStatusLine(cwd, files);
+  if (platforms.has("claude-code") && isClaudeStatuslineManaged(cwd, hashes)) {
+    files.set(CLAUDE_STATUSLINE_PATH, getStatuslineHook());
+  }
 
   for (const [filePath, content] of await collectRegistrySpecTemplates(cwd)) {
     files.set(filePath, content);
@@ -1006,6 +1043,18 @@ function analyzeChanges(
       }
     } else {
       const existingContent = fs.readFileSync(fullPath, "utf-8");
+      const legacyPennixHook = migrateLegacyPennixCodexWorkflowHook(
+        relativePath,
+        existingContent,
+      );
+      if (
+        legacyPennixHook?.needsUpdate &&
+        newContent === legacyPennixHook.content
+      ) {
+        change.status = "changed";
+        result.autoUpdateFiles.push(change);
+        continue;
+      }
       if (existingContent === newContent) {
         // Content same as template - already up to date
         change.status = "unchanged";
@@ -2243,6 +2292,7 @@ export async function update(options: UpdateOptions): Promise<void> {
   // Collect templates (used for both migration classification and change analysis)
   const templates = await collectTemplateFiles(
     cwd,
+    hashes,
     codexUpgradeNeeded ? new Set<AITool>(["codex"]) : undefined,
     breakingBypass,
   );

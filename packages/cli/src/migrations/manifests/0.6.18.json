@@ -1,0 +1,9 @@
+{
+  "version": "0.6.18",
+  "description": "Hardens channel worker startup cleanup and preserves explicitly managed Claude statusline assets.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Bug fixes:**\n- Worker startup now stops the runtime if channel registration or task projection fails, preventing an orphaned worker.\n- `trellis update` preserves a Claude statusline script only when the existing Claude settings explicitly reference the managed script; `trellis uninstall` removes it consistently.\n- Bundled `trellis-meta` guidance now documents which generated Trellis assets should be tracked by Git.",
+  "migrations": [],
+  "notes": "No migration required. Existing projects can upgrade normally."
+}

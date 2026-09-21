@@ -50,6 +50,8 @@ import type { AdapterEvent, ParseResult } from "./types.js";
 export interface CodexCtx {
   /** id → label tracking outgoing requests, so adapter can recognise their responses. */
   pending: Map<number, "initialize" | "thread/start" | "turn/start" | "other">;
+  /** Promise waiters used by the handshake; normal turn requests do not wait here. */
+  responseWaiters: Map<number, CodexResponseWaiter>;
   /** Codex item id → stream metadata used to classify interleaved deltas. */
   items: Map<string, CodexItemMeta>;
   /** Whether the current turn has emitted a final user-visible answer. */
@@ -64,9 +66,16 @@ export interface CodexCtx {
   nextId: number;
 }
 
+export interface CodexResponseWaiter {
+  resolve: (result: unknown) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export function createCodexCtx(): CodexCtx {
   return {
     pending: new Map(),
+    responseWaiters: new Map(),
     items: new Map(),
     finalMessageSeen: false,
     pendingDone: false,
@@ -198,6 +207,21 @@ function handleResponse(msg: JsonRpcInbound, ctx: CodexCtx): ParseResult {
   const id = msg.id as number;
   const label = ctx.pending.get(id);
   ctx.pending.delete(id);
+
+  const waiter = ctx.responseWaiters.get(id);
+  if (waiter) {
+    ctx.responseWaiters.delete(id);
+    clearTimeout(waiter.timer);
+    if (msg.error) {
+      waiter.reject(
+        new Error(
+          `RPC error for ${label ?? "<unknown>"} (id=${id}): ${msg.error.message ?? ""}`,
+        ),
+      );
+    } else {
+      waiter.resolve(msg.result);
+    }
+  }
 
   const events: AdapterEvent[] = [];
   const side: ParseResult["side"] = {
@@ -618,6 +642,49 @@ export function encodeCodexRequest(
   ctx.pending.set(id, label);
   const line = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
   return { id, line };
+}
+
+export function encodeCodexRequestWithResponse(
+  ctx: CodexCtx,
+  method: string,
+  params: unknown,
+  label: "initialize" | "thread/start" | "turn/start" | "other" = "other",
+  timeoutMs = 30_000,
+): { id: number; line: string; response: Promise<unknown> } {
+  const request = encodeCodexRequest(ctx, method, params, label);
+  const response = waitForCodexResponse(ctx, request.id, timeoutMs);
+  return { ...request, response };
+}
+
+export function waitForCodexResponse(
+  ctx: CodexCtx,
+  id: number,
+  timeoutMs = 30_000,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const label = ctx.pending.get(id) ?? "request";
+      ctx.responseWaiters.delete(id);
+      ctx.pending.delete(id);
+      reject(
+        new Error(`Codex ${label} response timed out after ${timeoutMs}ms`),
+      );
+    }, timeoutMs);
+    ctx.responseWaiters.set(id, { resolve, reject, timer });
+  });
+}
+
+export function cancelCodexResponse(
+  ctx: CodexCtx,
+  id: number,
+  error: Error,
+): void {
+  const waiter = ctx.responseWaiters.get(id);
+  if (!waiter) return;
+  ctx.responseWaiters.delete(id);
+  ctx.pending.delete(id);
+  clearTimeout(waiter.timer);
+  waiter.reject(error);
 }
 
 export function encodeCodexUserMessage(

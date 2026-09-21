@@ -7,7 +7,7 @@ description: "Understand and customize the local Trellis architecture inside a u
 
 This skill is for local Trellis users who have already run `trellis init` in a project. After reading it, an AI should understand the Trellis architecture, operating model, and customization entry points inside that user project, then modify the generated `.trellis/` and platform directory files according to the user's request.
 
-Trellis v0.6 adds three architectural surfaces on top of the pre-v0.6 workflow / persistence / platform model. First, a multi-agent collaboration runtime: `trellis channel` coordinates multiple AI worker processes through project-scoped JSONL event logs at `~/.trellis/channels/<project>/<channel>/events.jsonl`, with worker OOM guard, forum/thread channels, durable idempotency keys, and bundled `.trellis/agents/{check,implement}.md` runtime definitions. Second, cross-session memory: `trellis mem list | search | context | extract | projects` reads raw Claude Code, Codex, and Pi Agent JSONL already on disk, slices by `--phase brainstorm|implement|all`, and never uploads anything. Third, a dual-package npm release: `@mindfoldhq/trellis` (CLI) and `@mindfoldhq/trellis-core` (SDK with `/channel`, `/task`, `/mem`, `/testing` subpaths) ship in lockstep on one version. Treat these as first-class customization surfaces alongside the per-platform integration files.
+Trellis v0.6 adds three architectural surfaces on top of the pre-v0.6 workflow / persistence / platform model. First, a multi-agent collaboration runtime: `trellis channel` coordinates multiple AI worker processes through project-scoped JSONL event logs at `~/.trellis/channels/<project>/<channel>/events.jsonl`, with worker OOM guard, forum/thread channels, durable idempotency keys, and bundled `.trellis/agents/{check,implement}.md` runtime definitions. Second, cross-session memory: `trellis mem list | search | context | extract | projects` reads raw Claude Code, Codex, and Pi Agent JSONL already on disk, slices by `--phase brainstorm|implement|all`, and never uploads anything. Third, a dual-package npm release: `@pennixrv/trellis` (CLI) and `@pennixrv/trellis-core` (SDK with `/channel`, `/task`, `/mem`, `/testing` subpaths) ship in lockstep on one version. Treat these as first-class customization surfaces alongside the per-platform integration files.
 
 The default operating scope is local files in the user project:
 
@@ -17,7 +17,7 @@ The default operating scope is local files in the user project:
 - User-owned channel store outside the project tree: `~/.trellis/channels/<project>/<channel>/events.jsonl`.
 - Raw platform conversation logs queryable via `trellis mem`: `~/.claude/projects/`, `~/.codex/sessions/`, and `~/.pi/agent/sessions/` (OpenCode adapter degraded for the v0.6 line).
 
-Do not assume the user has the Trellis source repository. Do not default to modifying the global npm install directory or `node_modules` — both `@mindfoldhq/trellis` and `@mindfoldhq/trellis-core` ship as published packages sharing one version and one git tag per release.
+Do not assume the user has the Trellis source repository. Do not default to modifying the global npm install directory or `node_modules` — both `@pennixrv/trellis` and `@pennixrv/trellis-core` ship as published packages sharing one version and one git tag per release.
 
 ## How To Use
 
@@ -36,7 +36,7 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 - `references/local-architecture/workflow.md`: Phases, routing, workflow-state blocks, and selectable workflow templates (`native`, `tdd`, `channel-driven-subagent-dispatch`, marketplace) in `.trellis/workflow.md`.
 - `references/local-architecture/task-system.md`: Task directories, active task, JSONL context, parent/child task trees, and task runtime.
 - `references/local-architecture/spec-system.md`: How `.trellis/spec/` is organized, injected, and refreshed from a `registry.spec` source.
-- `references/local-architecture/workspace-memory.md`: `.trellis/workspace/` journals plus `trellis mem` cross-session recall and the `@mindfoldhq/trellis-core/mem` SDK.
+- `references/local-architecture/workspace-memory.md`: `.trellis/workspace/` journals plus `trellis mem` cross-session recall and the `@pennixrv/trellis-core/mem` SDK.
 - `references/local-architecture/context-injection.md`: Hooks, sub-agent preludes, and channel-runtime worker inbox routing.
 - `references/local-architecture/multi-agent-channel.md`: `trellis channel` subcommands, project-scoped event store, forum/thread channels, worker OOM guard, durable idempotency, and bundled `.trellis/agents/` runtime agents.
 - `references/local-architecture/bundled-skills.md`: Auto-dispatched bundled skills (`trellis-meta`, `trellis-spec-bootstrap`, `trellis-session-insight`) and how `getBundledSkillTemplates()` ships them to every platform skill root.
@@ -45,7 +45,7 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 
 - `references/platform-files/overview.md`: How shared `.trellis/` files relate to platform directories and the four platform integration modes (hook-driven, agent prelude, main-session workflow, channel runtime).
 - `references/platform-files/platform-map.md`: Platform directories and paths for skills, agents, hooks, and extensions across all supported platforms including Reasonix and Pi's native `trellis_subagent` extension.
-- `references/platform-files/hooks-and-settings.md`: How settings/config files, hooks, plugins, and extensions connect to Trellis; covers `channel.worker_guard.*` and `codex.dispatch_mode`.
+- `references/platform-files/hooks-and-settings.md`: How settings/config files, hooks, plugins, and extensions connect to Trellis; covers `channel.worker_guard.*`, `channel.subnode.*`, and `codex.dispatch_mode`.
 - `references/platform-files/agents.md`: Per-platform `trellis-research` / `trellis-implement` / `trellis-check` sub-agent files plus bundled `.trellis/agents/{check,implement}.md` for the channel runtime.
 - `references/platform-files/skills-and-commands.md`: Differences between skills, commands, prompts, and workflows, plus how to change them.
 
@@ -64,7 +64,7 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 ## Current Rules
 
 - `.trellis/workflow.md` is the local workflow source of truth; its initial content was selected from a workflow template (built-in `native`, `tdd`, `channel-driven-subagent-dispatch`, or a marketplace template) at `trellis init` time and can be re-selected via `trellis workflow --template <id>`. Missing `.trellis/agents/<name>.md` files referenced by the active template trigger a non-blocking stderr warning pointing at `trellis update`.
-- `.trellis/config.yaml` is the project-level Trellis configuration entry point. It hosts task lifecycle hooks (`hooks.after_create` / `after_start` / `after_finish` / `after_archive`), journal shape (`session_commit_message` / `max_journal_lines` / `session_auto_commit`), channel worker guard (`channel.worker_guard.idle_timeout` / `max_live_workers`), Codex dispatch mode (`codex.dispatch_mode: inline | sub-agent`), and the spec registry block (`registry.spec.source` + `registry.spec.template`).
+- `.trellis/config.yaml` is the project-level Trellis configuration entry point. It hosts task lifecycle hooks (`hooks.after_create` / `after_start` / `after_finish` / `after_archive`), journal shape (`session_commit_message` / `max_journal_lines` / `session_auto_commit`), generic channel worker guard (`channel.worker_guard.idle_timeout` / `max_live_workers`), bounded subnode defaults (`channel.subnode.max_live_workers` / `idle_timeout` / `timeout` / `warn_before`), Codex dispatch mode (`codex.dispatch_mode: inline | sub-agent`), and the spec registry block (`registry.spec.source` + `registry.spec.template`).
 - `.trellis/spec/` stores the user's project-specific coding conventions and design constraints. When `registry.spec` is set, files are refreshed by `trellis update`; local edits surface as "modified by user" conflicts in `.trellis/.template-hashes.json`.
 - `.trellis/tasks/` stores task PRDs, design notes, implement plans, research files, and JSONL context. Tasks form parent/child trees: `task.py create --parent <slug>`, `task.py add-subtask <parent> <child>`, `task.py remove-subtask <parent> <child>`, and `task.py list-context <task>`. `task.py create` rejects a slug already present in `.trellis/tasks/archive/**`.
 - `.trellis/workspace/` stores **deliberately written** developer journals. Raw cross-session dialogue is **not** stored here — it lives on disk under `~/.claude/projects/`, `~/.codex/sessions/`, and `~/.pi/agent/sessions/` and is recovered via `trellis mem search|extract|context`. The bundled `trellis-session-insight` skill teaches when to reach for `mem`.
@@ -77,9 +77,9 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 ## Do Not
 
 - Do not treat Trellis upstream source code as the default target for local customization.
-- Do not modify the global npm install directory or `node_modules/@mindfoldhq/trellis` or `node_modules/@mindfoldhq/trellis-core` to implement project needs; both packages ship in lockstep.
+- Do not modify the global npm install directory or `node_modules/@pennixrv/trellis` or `node_modules/@pennixrv/trellis-core` to implement project needs; both packages ship in lockstep.
 - Do not overwrite user-modified local files with default templates; check `.trellis/.template-hashes.json` first and prefer `.new` sidecar files over destructive overwrites.
 - Do not put team-private project rules into any public bundled skill (`trellis-meta`, `trellis-spec-bootstrap`, `trellis-session-insight`, `trellis-channel`); put project rules in `.trellis/spec/`, a project-local skill, the current task, or the workspace journal — `trellis update` will overwrite anything inside a bundled skill directory.
-- Do not hand-edit `~/.trellis/channels/<project>/<channel>/events.jsonl`; sequence numbers are assigned under a file lock and replay-safe writes go through the `trellis channel` CLI or the `@mindfoldhq/trellis-core/channel` SDK.
+- Do not hand-edit `~/.trellis/channels/<project>/<channel>/events.jsonl`; sequence numbers are assigned under a file lock and replay-safe writes go through the `trellis channel` CLI or the `@pennixrv/trellis-core/channel` SDK.
 - Do not edit `.claude/agents/trellis-implement.md` (or any other per-platform sub-agent file) when the goal is to change channel runtime worker behavior — edit `.trellis/agents/<name>.md` instead.
 - Do not describe removed or never-shipped mechanisms as current Trellis behavior; cross-check against the local `.trellis/config.yaml` and the installed CLI's `trellis --help` before claiming a knob exists.

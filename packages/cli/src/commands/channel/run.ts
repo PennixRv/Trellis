@@ -17,9 +17,9 @@ import type { Provider } from "./adapters/index.js";
 import { createChannel } from "./create.js";
 import { channelRm } from "./rm.js";
 import { channelSend } from "./send.js";
-import { channelSpawn } from "./spawn.js";
+import { applySubnodeSupervisorDefaults, channelSpawn } from "./spawn.js";
 import { channelDir, eventsPath } from "./store/paths.js";
-import type { ChannelEvent } from "./store/events.js";
+import { readLastSeq, type ChannelEvent } from "./store/events.js";
 import { watchEvents } from "./store/watch.js";
 
 export interface RunOptions {
@@ -37,31 +37,44 @@ export interface RunOptions {
   stdin?: boolean;
   /** Per-worker timeout (defaults to 5m if not specified). */
   timeoutMs?: number;
+  /** Opaque main Codex session owner for the ephemeral Channel. */
+  ownerSession?: string;
 }
 
 export async function channelRun(opts: RunOptions): Promise<void> {
   const name = opts.name ?? `run-${crypto.randomBytes(4).toString("hex")}`;
-  const timeoutMs = opts.timeoutMs ?? 5 * 60 * 1000;
+  // Keep the ordinary one-shot default at five minutes while letting an
+  // explicitly selected subnode role use its project dispatch default.
+  const spawnOptions = applySubnodeSupervisorDefaults({
+    agent: opts.agent,
+    provider: opts.provider,
+    as: opts.as,
+    cwd: opts.cwd,
+    model: opts.model,
+    ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+    files: opts.files,
+    jsonls: opts.jsonls,
+  });
+  const timeoutMs = spawnOptions.timeoutMs ?? 5 * 60 * 1000;
 
   await createChannel(name, {
     by: "main",
     cwd: opts.cwd,
     ephemeral: true,
     origin: "run",
+    ownerSession: opts.ownerSession,
   });
+
+  // Capture the barrier before spawning. A provider may fail or finish while
+  // the supervisor is starting; taking it after spawn would hide that event.
+  const sinceSeq = await readLastSeq(name);
 
   let workerName: string | null = null;
   let succeeded = false;
   try {
     const spawned = await channelSpawn(name, {
-      agent: opts.agent,
-      provider: opts.provider,
-      as: opts.as,
-      cwd: opts.cwd,
-      model: opts.model,
+      ...spawnOptions,
       timeoutMs,
-      files: opts.files,
-      jsonls: opts.jsonls,
     });
     workerName = spawned.worker;
 
@@ -73,7 +86,7 @@ export async function channelRun(opts: RunOptions): Promise<void> {
       stdin: opts.stdin,
     });
 
-    await waitForDone(name, workerName, timeoutMs);
+    await waitForDone(name, workerName, timeoutMs, sinceSeq);
     await printFinalMessage(name, workerName);
     succeeded = true;
   } finally {
@@ -102,6 +115,7 @@ async function waitForDone(
   channelName: string,
   workerName: string,
   timeoutMs: number,
+  sinceSeq: number,
 ): Promise<void> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), timeoutMs);
@@ -112,7 +126,7 @@ async function waitForDone(
         self: "main",
         from: [workerName],
       },
-      { signal: abort.signal },
+      { signal: abort.signal, sinceSeq },
     )) {
       if (ev.kind === "done") return;
       if (ev.kind === "error") {

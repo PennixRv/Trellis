@@ -372,10 +372,11 @@ export class TrellisContext {
    * Get active task from session runtime context.
    *
    * Resolution order (mirrors Python `active_task.resolve_active_task`):
-   *   1. Lookup the runtime file for the input-derived context key.
-   *   2. If that misses and exactly one session runtime file exists locally,
-   *      use it (`_resolveSingleSessionFallback`). Refuses to guess when 0 or
-   *      ≥2 files exist so multi-window isolation holds.
+   *   1. Lookup the runtime file for the input-derived context key. A known
+   *      key is authoritative, so a missing or empty context returns no task.
+   *   2. If no context key is available and exactly one session runtime file
+   *      exists locally, use it (`_resolveSingleSessionFallback`). Refuses to
+   *      guess when 0 or ≥2 files exist so multi-window isolation holds.
    */
   getActiveTask(platformInput = null) {
     const contextKey = this.getContextKey(platformInput)
@@ -390,6 +391,7 @@ export class TrellisContext {
           stale: !taskDir || !existsSync(taskDir),
         }
       }
+      return { taskPath: null, source: "none", stale: false }
     }
 
     const fallback = this._resolveSingleSessionFallback()

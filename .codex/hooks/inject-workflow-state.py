@@ -171,6 +171,9 @@ def get_active_task(
     prompt.
     """
     active = _resolve_active_task(root, input_data)
+    if active.source_type == "unbound_ambiguous":
+        candidates = ", ".join(active.candidate_paths)
+        return candidates, "unbound_ambiguous", active.source
     if not active.task_path:
         return None
 
@@ -402,7 +405,10 @@ def build_breadcrumb(
         body = templates.get(status)
     if body is None:
         body = "Refer to workflow.md for current step."
-    header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"
+    if status == "unbound_ambiguous":
+        header = f"Status: {status}\nCandidates: {task_id}"
+    else:
+        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"
     return f"<workflow-state>\n{header}\n{body}\n</workflow-state>"
 
 

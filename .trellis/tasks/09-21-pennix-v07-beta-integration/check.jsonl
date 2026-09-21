@@ -1,0 +1,6 @@
+{"check":"pnpm test","result":"pass","evidence":"core 406 passed / 1 skipped; CLI 2155 passed / 2 skipped; 95 CLI test files"}
+{"check":"pnpm typecheck && pnpm lint","result":"pass","evidence":"both commands exited 0"}
+{"check":"release preflight","result":"pass","evidence":"lockstep 0.7.0-beta.4.pennix.1; npm tag beta; packed CLI pins exact core; continuity 178 local / 27 published"}
+{"check":"package archives","result":"pass","evidence":"core and CLI tarballs contain matching package identity, workflow template, and Pennix migration manifest"}
+{"check":"Marketplace submodule","result":"pass","evidence":"ec18dc6 pushed to PennixRv/marketplace pennix/v0.7-beta and reachable from the remote branch"}
+{"check":"GitNexus","result":"pass_with_review","evidence":"index rebuilt; detect-changes reports merge-wide critical risk due 387-file beta reconciliation; targeted impacts reviewed for truncate_utf8, project_agent_context, and bumpPrerelease"}

@@ -192,7 +192,10 @@ export async function applyParseResult(
   child: Child,
   shutdown: ShutdownController,
   turnTracker?: TurnTracker,
+  project?: string,
+  onDone?: () => void,
 ): Promise<void> {
+  let doneSeen = false;
   for (const ev of result.events) {
     // Claim the terminal slot SYNCHRONOUSLY before the await so a
     // racing `child.on("exit") → finalizeOnExit` can't see
@@ -201,37 +204,56 @@ export async function applyParseResult(
     if (ev.kind === "done" || ev.kind === "error") {
       shutdown.markTerminalEmitted();
     }
-    await appendEvent(channelName, {
-      kind: ev.kind,
-      by: workerName,
-      ...(ev.payload ?? {}),
-    });
+    await appendEvent(
+      channelName,
+      {
+        kind: ev.kind,
+        by: workerName,
+        ...(ev.payload ?? {}),
+      },
+      project,
+    );
     if (ev.kind === "done" || ev.kind === "error") {
       const turn = turnTracker?.finish();
       if (turn) {
         const outcome: TurnOutcome = ev.kind === "done" ? "done" : "error";
-        await appendEvent(channelName, {
-          kind: "turn_finished",
-          by: workerName,
-          worker: workerName,
-          inputSeq: turn.inputSeq,
-          turnId: turn.turnId,
-          outcome,
-        });
+        await appendEvent(
+          channelName,
+          {
+            kind: "turn_finished",
+            by: workerName,
+            worker: workerName,
+            inputSeq: turn.inputSeq,
+            turnId: turn.turnId,
+            outcome,
+          },
+          project,
+        );
       }
     }
+    if (ev.kind === "done") doneSeen = true;
   }
   if (result.side) {
     const { reply, persistSessionId, persistThreadId } = result.side;
     if (persistSessionId) {
+      await appendEvent(
+        channelName,
+        {
+          kind: "session_bound",
+          by: workerName,
+          worker: workerName,
+          sessionId: persistSessionId,
+        },
+        project,
+      );
       fs.writeFileSync(
-        workerFile(channelName, workerName, "session-id"),
+        workerFile(channelName, workerName, "session-id", project),
         persistSessionId,
       );
     }
     if (persistThreadId) {
       fs.writeFileSync(
-        workerFile(channelName, workerName, "thread-id"),
+        workerFile(channelName, workerName, "thread-id", project),
         persistThreadId,
       );
     }
@@ -245,6 +267,7 @@ export async function applyParseResult(
       }
     }
   }
+  if (doneSeen) onDone?.();
 }
 
 /**
@@ -261,6 +284,8 @@ export function startStdoutPump(args: {
   log: { write: (data: string) => void };
   shutdown: ShutdownController;
   turnTracker?: TurnTracker;
+  project?: string;
+  onDone?: () => void;
   processLines?: Promise<boolean>;
   signal?: AbortSignal;
 }): Promise<void> {
@@ -273,6 +298,8 @@ export function startStdoutPump(args: {
     log,
     shutdown,
     turnTracker,
+    project,
+    onDone,
     processLines,
     signal,
   } = args;
@@ -289,15 +316,21 @@ export function startStdoutPump(args: {
         child,
         shutdown,
         turnTracker,
+        project,
+        onDone,
       );
     },
     async (err) => {
       log.write(`[supervisor] stdout line handler failed: ${err.message}\n`);
-      await appendEvent(channelName, {
-        kind: "error",
-        by: `supervisor:${workerName}`,
-        message: `stdout pipeline error: ${err.message}`,
-      }).catch(() => undefined);
+      await appendEvent(
+        channelName,
+        {
+          kind: "error",
+          by: `supervisor:${workerName}`,
+          message: `stdout pipeline error: ${err.message}`,
+        },
+        project,
+      ).catch(() => undefined);
     },
     signal,
   );

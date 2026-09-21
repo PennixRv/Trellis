@@ -22,12 +22,18 @@ import { DIR_NAMES, FILE_NAMES, PATHS } from "../constants/paths.js";
 import { VERSION } from "../constants/version.js";
 import { agentsMdContent } from "../templates/markdown/index.js";
 import {
+  mergeManagedMarkdownBlock,
+  TRELLIS_BLOCK_END,
+  TRELLIS_BLOCK_START,
+} from "../utils/managed-paths.js";
+import {
   setWriteMode,
   startRecordingWrites,
   stopRecordingWrites,
   writeFile,
   type WriteMode,
 } from "../utils/file-writer.js";
+import { writeFileAtomic } from "../utils/atomic-write.js";
 import { emptyTaskJson, type TaskJson } from "../utils/task-json.js";
 import {
   detectProjectType,
@@ -1958,7 +1964,7 @@ export async function init(options: InitOptions): Promise<void> {
       logPythonAdaptationNotice(pythonCmd);
     }
 
-    // Create root files (skip if exists)
+    // Create root files
     await createRootFiles(cwd);
   } finally {
     stopRecordingWrites();
@@ -2070,10 +2076,37 @@ function askInput(prompt: string): Promise<string> {
 
 async function createRootFiles(cwd: string): Promise<void> {
   const agentsPath = path.join(cwd, FILE_NAMES.AGENTS);
+  const existed = fs.existsSync(agentsPath);
+  const mergedContent = existed
+    ? mergeManagedMarkdownBlock(
+        fs.readFileSync(agentsPath, "utf-8"),
+        agentsMdContent,
+        TRELLIS_BLOCK_START,
+        TRELLIS_BLOCK_END,
+      )
+    : agentsMdContent;
 
-  // Write AGENTS.md from template
-  const agentsWritten = await writeFile(agentsPath, agentsMdContent);
+  if (mergedContent === null) {
+    const sidecarPath = `${agentsPath}.new`;
+    if (!fs.existsSync(sidecarPath)) {
+      writeFileAtomic(sidecarPath, agentsMdContent);
+    }
+    console.warn(
+      chalk.yellow(
+        "⚠ AGENTS.md has malformed TRELLIS markers; kept it unchanged and wrote AGENTS.md.new for manual merge.",
+      ),
+    );
+    return;
+  }
+
+  // AGENTS.md is mixed ownership: force only the already-merged document so
+  // an existing user file receives the managed block without losing its text.
+  const agentsWritten = await writeFile(agentsPath, mergedContent, {
+    mode: "force",
+  });
   if (agentsWritten) {
-    console.log(chalk.blue("📄 Created AGENTS.md"));
+    console.log(
+      chalk.blue(existed ? "📄 Updated AGENTS.md" : "📄 Created AGENTS.md"),
+    );
   }
 }

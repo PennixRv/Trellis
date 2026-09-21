@@ -39,16 +39,27 @@ Key `spawn` flags:
 - `--idle-timeout <duration>` — OOM guard idle TTL (default `5m`; `0` disables).
 - `--max-live-workers <n>` — spawn-time live-worker budget (default `6`; `0` disables).
 
+An agent card may declare `env_file: <file>`; the channel runtime loads that
+relative sibling file automatically for the provider child. Use this for
+stable role settings so every spawn of that role gets the same environment.
+The file contains plain `KEY=VALUE` lines only; it is not shell code and does
+not perform expansion or interpolation. Do not put credentials in a bundled
+role file. The bundled `subnode` role uses this mechanism to disable
+OpenViking's automatic recall, capture, and fixed background injection in the
+evidence worker process.
+
 The success event `spawned` records `pid`, `provider`, `agent`, the injected
 `files`, and the resolved `manifests` so later spectators can audit context.
 
 ## Agent Cards
 
 `--agent <name>` resolves to `.trellis/agents/<name>.md`. The card name must
-match `[A-Za-z0-9._-]+`. The default Trellis install ships two cards:
+match `[A-Za-z0-9._-]+`. The default Trellis install ships three cards:
 
 - `.trellis/agents/check.md` — code-quality reviewer.
 - `.trellis/agents/implement.md` — coding worker for implementation runs.
+- `.trellis/agents/subnode.md` — bounded independent-evidence worker; its
+  `subnode.env` sibling is loaded automatically.
 
 ```yaml
 ---
@@ -205,17 +216,25 @@ Precedence (highest first):
 1. CLI flags: `--idle-timeout`, `--max-live-workers` on `spawn`.
 2. Environment variables: `TRELLIS_CHANNEL_WORKER_IDLE_TIMEOUT`,
    `TRELLIS_CHANNEL_MAX_LIVE_WORKERS`.
-3. `.trellis/config.yaml` under `channel.worker_guard`.
-4. Built-in defaults (`5m`, `6`).
+3. For `--agent subnode`, `channel.subnode` in `.trellis/config.yaml`.
+4. `.trellis/config.yaml` under `channel.worker_guard`.
+5. Built-in defaults (`5m`, `6`) for ordinary workers.
 
 Cleanup notices are written to stderr at spawn time so operators can see which
 idle workers were swept and why a new spawn was rejected. The guard does not
 touch ephemeral / `channel run` workers any differently — they are subject to
 the same idle TTL and budget.
 
-To audit current state, list workers via `channel list` (the `WORKERS`
-column) and inspect per-channel `pid` / `worker-pid` sidecar files under
-`~/.trellis/channels/<bucket>/<channel>/`.
+To audit durable state, use `trellis channel workers <name> --include-terminal
+--json`. This is the canonical worker projection. Inspect per-channel `pid` /
+`worker-pid` sidecar files under `~/.trellis/channels/<bucket>/<channel>/` only
+when diagnosing host-local process liveness; they are not lifecycle truth.
+
+For bounded evidence workers, `channel.subnode` is a separate role-default
+section. It configures `idle_timeout`, `max_live_workers` (generated default
+`8`), `timeout`, and `warn_before` only for `spawn --agent subnode`. Explicit
+spawn flags remain one-dispatch overrides; ordinary workers retain the generic
+`worker_guard` defaults.
 
 ## Worker Inbox APIs
 

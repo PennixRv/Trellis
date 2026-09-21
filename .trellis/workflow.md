@@ -73,7 +73,7 @@ python3 ./.trellis/scripts/task.py create-pr [name] [--dry-run]
 
 > Run `python3 ./.trellis/scripts/task.py --help` to see the authoritative, up-to-date list.
 
-**Current-task mechanism**: `task.py create` creates the task directory and (when session identity is available) auto-sets the per-session active-task pointer so the planning breadcrumb fires immediately. `task.py start` writes the same pointer (idempotent if already set) and flips `task.json.status` from `planning` to `in_progress`. State is stored under `.trellis/.runtime/sessions/`. If no context key is available from hook input, `TRELLIS_CONTEXT_ID`, or a platform-native session environment variable, there is no active task and `task.py start` fails with a session identity hint. `task.py finish` deletes the current session file (status unchanged). `task.py archive <task>` writes `status=completed`, moves the directory to `archive/`, and deletes any runtime session files that still point at the archived task.
+**Current-task mechanism**: `task.py create` creates the task directory and (when session identity is available) auto-sets the per-session active-task pointer so the planning breadcrumb fires immediately. `task.py start` writes the same pointer (idempotent if already set) and flips `task.json.status` from `planning` to `in_progress`. State is stored under `.trellis/.runtime/sessions/`. If no context key is available from hook input, `TRELLIS_CONTEXT_ID`, or a platform-native session environment variable, `task.py start` fails with a session identity hint because it cannot persist a session pointer; read-only context may still project one unique developer-owned resumable task. `task.py finish` deletes the current session file (status unchanged). `task.py archive <task>` writes `status=completed`, moves the directory to `archive/`, and deletes any runtime session files that still point at the archived task.
 
 ### Workspace System
 
@@ -144,14 +144,14 @@ python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>  # detailed 
 ## Phase Index
 
 ```
-Phase 1: Plan    → classify, get task-creation consent, then write planning artifacts
+Phase 1: Plan    → classify, then create planning artifacts for work that needs a task
 Phase 2: Execute → implement only after task status is in_progress
 Phase 3: Finish  → verify, update spec, commit, and wrap up
 ```
 
 ### Request Triage
 
-- Simple conversation or small task: ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session.
+- Direct small work: for a clearly bounded, single-surface operation with an immediate verification path, proceed without creating a Trellis task. Apply normal safety rules. If discovery expands the scope or reveals a design, ownership, release, or durable-record need, stop and create a task before continuing.
 - Complex task: ask whether you may create a Trellis task and enter planning. If the user says no, do not do broad inline implementation; explain, clarify scope, or suggest a smaller split.
 - User approval to create a task is not approval to start implementation. Planning still happens first.
 
@@ -174,10 +174,16 @@ Create new children with `task.py create "<title>" --slug <name> --parent <paren
 <!-- Per-turn breadcrumb: shown when there is no active task (before Phase 1) -->
 
 [workflow-state:no_task]
-No active task. First classify the current turn and ask for task-creation consent before creating any Trellis task.
-Simple conversation / small task: ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session.
+No active task. First classify the current turn. Direct small work with a clear single owner and immediate verification may proceed without a Trellis task under normal safety rules.
+If scope expands or requires design, ownership, release, credentials, or a durable record, create a Trellis task before continuing.
 Complex task: ask the user if you can create a Trellis task and enter the planning phase. If the user says no, explain, clarify scope, or suggest a smaller split.
 [/workflow-state:no_task]
+
+<!-- Per-turn breadcrumb: shown when one resumable task exists without a direct session binding. -->
+
+[workflow-state:unbound_task]
+An existing task is assigned to the current developer, but this shell has no direct Trellis session binding. Do not create a duplicate task. Continue reading and working from the existing task artifacts; before any lifecycle write or closure, run the native `task.py start <task>` command once a direct session identity is available. Never edit `.trellis/.runtime/sessions/` manually.
+[/workflow-state:unbound_task]
 
 ### Phase 1: Plan
 - 1.0 Create task `[required · once]` (only after task-creation consent)
@@ -196,8 +202,8 @@ Multi-deliverable scope: consider a parent task plus independently verifiable ch
 Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start.
 [/workflow-state:planning]
 
-<!-- Per-turn breadcrumb: shown throughout Phase 1 when codex.dispatch_mode=inline.
-     Codex-only opt-in alternate to [workflow-state:planning]. The main agent
+<!-- Per-turn breadcrumb: shown throughout Phase 1 when Codex uses its default
+     codex.dispatch_mode=inline. Codex-only alternate to [workflow-state:planning]. The main agent
      edits code directly in Phase 2, so jsonl curation is skipped —
      the inline workflow loads `trellis-before-dev` instead of injecting JSONL
      into a sub-agent. -->
@@ -226,12 +232,12 @@ Sub-agent dispatch protocol applies to all platforms and all sub-agents, includi
 Tools: `trellis-implement` / `trellis-research` name sub-agent roles dispatched through your platform's sub-agent mechanism, not skills the main session loads itself (on Claude Code: use the Task/Agent tool, never the Skill tool). `trellis-update-spec` is a skill. `trellis-check` exists as both; prefer the Agent/role form when verifying after code changes.
 On DeepSeek Harness, role instructions ship as collision-free `trellis-agent-implement` / `trellis-agent-check` / `trellis-agent-research` skills under `.dsh/skills/`. The main session must not load them itself: tell the child to load the matching role skill exactly once. If `trellis_wait` is available, use the default background mode, do independent work, then call `trellis_wait` once per dependent child id and consume each native settlement notice before entering the dependent gate. If it is unavailable, dispatch every child with `run_in_background: false` from the outset. Do not poll, sleep, or start a background child without an event-driven wait path.
 Flow: `trellis-implement` -> `trellis-check` -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
-Main-session default: dispatch implement/check sub-agents. Sub-agent self-exemption: if already running as `trellis-implement`, do NOT spawn another `trellis-implement` or `trellis-check`; if already running as `trellis-check`, do NOT spawn another `trellis-check` or `trellis-implement`. Dispatch is main session only.
+Use this block only when `codex.dispatch_mode: auto` is explicitly selected. Sub-agent self-exemption: if already running as `trellis-implement`, do NOT spawn another `trellis-implement` or `trellis-check`; if already running as `trellis-check`, do NOT spawn another `trellis-check` or `trellis-implement`. Dispatch is main session only.
 Dispatch prompt starts with `Active task: <task path from task.py current>`. Read context: jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if present`.
 [/workflow-state:in_progress]
 
-<!-- Per-turn breadcrumb: shown while status='in_progress' when
-     codex.dispatch_mode=inline. Codex-only opt-in alternate to
+<!-- Per-turn breadcrumb: shown while status='in_progress' when Codex uses its
+     default codex.dispatch_mode=inline. Codex-only alternate to
      [workflow-state:in_progress]. The main session edits code directly
      instead of dispatching sub-agents. -->
 

@@ -1,4 +1,4 @@
-import { parseChannelKinds } from "./store/events.js";
+import { parseChannelKinds, readLastSeq } from "./store/events.js";
 import { resolveExistingChannelRef } from "./store/paths.js";
 import {
   normalizeThreadKey,
@@ -11,6 +11,8 @@ import { watchEvents, type WatchFilter } from "./store/watch.js";
 export interface WaitOptions {
   as: string;
   timeoutMs?: number;
+  /** Replay only events whose durable sequence is greater than this barrier. */
+  afterSeq?: number;
   from?: string;
   kind?: string;
   to?: string;
@@ -24,6 +26,17 @@ export interface WaitOptions {
 
 const TIMEOUT_EXIT_CODE = 124;
 
+/** Read the current durable event sequence without appending an event. */
+export async function channelBarrier(
+  channelName: string,
+  opts: Pick<WaitOptions, "scope"> = {},
+): Promise<number> {
+  const ref = resolveExistingChannelRef(channelName, {
+    scope: parseChannelScope(opts.scope),
+  });
+  return readLastSeq(channelName, ref.project);
+}
+
 export async function channelWait(
   channelName: string,
   opts: WaitOptions,
@@ -31,6 +44,12 @@ export async function channelWait(
   const ref = resolveExistingChannelRef(channelName, {
     scope: parseChannelScope(opts.scope),
   });
+  // Capture a durable barrier before constructing the watcher. Events that
+  // arrive after this read are replayed by `sinceSeq`, including events
+  // written during watcher setup; this avoids the EOF race where a fast
+  // worker finishes before the async generator starts tailing.
+  const sinceSeq =
+    opts.afterSeq ?? (await readLastSeq(channelName, ref.project));
   const fromList = parseCsv(opts.from);
 
   if (opts.all && (!fromList || fromList.length === 0)) {
@@ -60,6 +79,7 @@ export async function channelWait(
     for await (const ev of watchEvents(channelName, filter, {
       signal: abort.signal,
       project: ref.project,
+      sinceSeq,
     })) {
       console.log(JSON.stringify(ev));
       if (!pending) return;

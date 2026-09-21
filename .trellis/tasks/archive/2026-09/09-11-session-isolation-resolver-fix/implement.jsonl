@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/guides/index.md", "reason": "Shared workflow and planning contracts"}
+{"file": ".trellis/spec/cli/backend/script-conventions.md", "reason": "Python/template dogfood parity"}
+{"file": ".trellis/spec/cli/backend/filesystem-safety.md", "reason": "Session pointer and file safety"}
+{"file": ".trellis/spec/cli/backend/workflow-state-contract.md", "reason": "Read-only hook contract"}
+{"file": ".trellis/spec/cli/backend/release-process.md", "reason": "Official paired release and npm publication"}
+{"file": ".trellis/spec/cli/unit-test/conventions.md", "reason": "Regression test conventions"}
+{"file": ".trellis/tasks/09-11-session-isolation-resolver-fix/design.md", "reason": "Verified resolver design and scope"}

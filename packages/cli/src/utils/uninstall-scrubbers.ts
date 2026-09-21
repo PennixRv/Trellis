@@ -12,6 +12,7 @@
  * does not matter — we just look for the manifest-relative file path.
  */
 
+import { CLAUDE_STATUSLINE_PATH } from "../configurators/claude.js";
 import { getConfigTemplate as getCodexConfigTemplate } from "../templates/codex/index.js";
 
 export interface ScrubResult {
@@ -68,20 +69,18 @@ function getEntryCommand(entry: unknown): string | null {
   return null;
 }
 
-const CLAUDE_TRELLIS_STATUSLINE = ".claude/hooks/statusline.py";
-
 function isTrellisClaudeStatusLine(
   value: unknown,
   deletedPaths: readonly string[],
 ): boolean {
-  if (!deletedPaths.includes(CLAUDE_TRELLIS_STATUSLINE)) return false;
+  if (!deletedPaths.includes(CLAUDE_STATUSLINE_PATH)) return false;
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
   const command = getEntryCommand(value);
   return (
     command !== null &&
-    commandMatchesDeletedPath(command, [CLAUDE_TRELLIS_STATUSLINE])
+    commandMatchesDeletedPath(command, [CLAUDE_STATUSLINE_PATH])
   );
 }
 

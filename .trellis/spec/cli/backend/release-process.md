@@ -10,8 +10,8 @@ Trellis publishes two npm packages from one git tag:
 
 | Package | Role | Published by |
 |---|---|---|
-| `@mindfoldhq/trellis` | User-facing CLI | GitHub Actions only |
-| `@mindfoldhq/trellis-core` | Programmatic core APIs used by the CLI and external integrations | GitHub Actions only |
+| `@pennixrv/trellis` | User-facing CLI | GitHub Actions only |
+| `@pennixrv/trellis-core` | Programmatic core APIs used by the CLI and external integrations | GitHub Actions only |
 
 The package pair is version-locked. Every published version must exist for both packages with the exact same version and npm dist-tag.
 
@@ -28,8 +28,8 @@ If a CI publish looks partial or inconsistent:
 1. Inspect the GitHub Actions publish run.
 2. Verify public npm visibility:
    ```bash
-   npm view @mindfoldhq/trellis@<version> version dist-tags --json --registry=https://registry.npmjs.org/
-   npm view @mindfoldhq/trellis-core@<version> version dist-tags --json --registry=https://registry.npmjs.org/
+   npm view @pennixrv/trellis@<version> version dist-tags --json --registry=https://registry.npmjs.org/
+   npm view @pennixrv/trellis-core@<version> version dist-tags --json --registry=https://registry.npmjs.org/
    ```
 3. Fix the workflow or release scripts.
 4. Re-run the CI path or move the tag after the fix when the same version is still the intended release artifact.
@@ -52,7 +52,7 @@ node packages/cli/scripts/release-preflight.js verify-npm --package all
 | Shared tag | Git tag `v<version>` must match both package versions. |
 | Shared npm dist-tag | `beta` for `-beta.N`, `rc` for `-rc.N`, `alpha` for `-alpha.N`, `latest` for GA. |
 | Source dependency | CLI source depends on core with `workspace:*`. |
-| Packed dependency | Published CLI package must depend on `@mindfoldhq/trellis-core` with the exact release version. |
+| Packed dependency | Published CLI package must depend on `@pennixrv/trellis-core` with the exact release version. |
 
 `packages/cli/scripts/release-preflight.js` is the source of truth for these checks.
 
@@ -160,11 +160,11 @@ Any `FAIL` line means: `cd <submodule> && git checkout -B main && git push origi
 ### Contract: the pre-release sweep MUST exclude `.trellis/`
 
 The pre-release `git add` in `release.js` (the `chore: pre-release updates`
-commit) **must** exclude `.trellis/` from its pathspec, alongside `docs-site`
-and `marketplace`:
+commit) **must** recursively exclude `.trellis/**` from its pathspec, alongside
+`docs-site` and `marketplace`:
 
 ```js
-run("git add -A -- ':!docs-site' ':!marketplace' ':!.trellis'");
+run("git add -A -- . ':!docs-site' ':!marketplace' ':(exclude,glob).trellis/**'");
 ```
 
 `.trellis/tasks/` is not gitignored, so a blanket `git add -A` sweeps in any
@@ -190,6 +190,11 @@ through a release-time blanket stage.
 ## Manifest continuity across branches
 
 Each release branch maintains its own `packages/cli/src/migrations/manifests/<version>.json`. The CLI update logic walks the manifest chain between `fromVersion` and `toVersion`, so every published version that a user can upgrade through must have a local manifest on the release branch.
+
+`release.js` calculates the target version with the same `computeNext()` logic as
+`bump-versions.js` and fails before continuity checks, tests, or staging when
+that target manifest is absent. The checklist requirement is therefore an
+enforced release precondition, not a manual reminder.
 
 When a stable patch manifest is missing from a beta branch:
 
@@ -217,19 +222,25 @@ pnpm release:promote
 
 `packages/cli/scripts/release.js` runs:
 
-1. `check-manifest-continuity`
-2. `check-docs-changelog --type beta|rc|promote` for prerelease/promotion tracks
-3. core tests
-4. CLI tests
-5. pre-release commit excluding `docs-site`, `marketplace`, and `.trellis`
-6. `bump-versions.js <type>` to update both package versions together
-7. `release-preflight check-versions`
-8. version commit with the version string as the commit message
-9. git tag `v<version>`
-10. push branch and tags
-11. GitHub Actions publish workflow builds, tests, packs, publishes, and verifies both packages
+1. calculate the target version and require its manifest
+2. `check-manifest-continuity`
+3. `check-docs-changelog --type beta|rc|promote` for prerelease/promotion tracks
+4. core tests
+5. CLI tests
+6. pre-release commit excluding `docs-site`, `marketplace`, and `.trellis`
+7. `bump-versions.js <type>` to update both package versions together
+8. `release-preflight check-versions`
+9. version commit with the version string as the commit message
+10. git tag `v<version>`
+11. push branch and tags
+12. GitHub Actions publish workflow builds, tests, packs, publishes, and verifies both packages
 
 The release script does not publish locally. The pushed tag is what starts official npm publication.
+
+The publish workflow's public-registry verification retries `npm view` for
+about three minutes (18 attempts at 10-second intervals). npm can accept a
+publish before its public read path reflects the exact version; do not mark a
+release failed merely because it exceeds a short propagation window.
 
 ---
 
@@ -246,8 +257,8 @@ Required order:
 5. `pnpm build`
 6. `release-preflight verify-packed-cli`
 7. `release-preflight publish-plan --github`
-8. publish `@mindfoldhq/trellis-core` if missing
-9. publish `@mindfoldhq/trellis` if missing
+8. publish `@pennixrv/trellis-core` if missing
+9. publish `@pennixrv/trellis` if missing
 10. `release-preflight verify-npm --package all`
 
 Core publishes first because the CLI package depends on the exact core version in the packed artifact.
@@ -282,7 +293,7 @@ the npm package contains it.
 Example for a built-in multi-file skill:
 
 ```bash
-pnpm --filter @mindfoldhq/trellis build
+pnpm --filter @pennixrv/trellis build
 
 cd packages/cli
 npm pack --dry-run --json | grep 'dist/templates/common/bundled-skills/<skill>/SKILL.md'

@@ -10,12 +10,13 @@
  *   provider: claude       # claude | codex; used as default --provider
  *   model: claude-opus-4-7 # CLI-specific model id; optional
  *   labels: [design]       # optional metadata
+ *   env_file: subnode.env  # optional role environment, relative to this file
  *   ---
  *
  *   You are a senior system architect ...
  *
  * Unknown frontmatter fields are preserved as metadata but ignored by
- * channel runtime (they may be consumed by other Trellis layers).
+ * channel runtime (except the supported `env_file` role asset field).
  */
 
 import fs from "node:fs";
@@ -27,6 +28,7 @@ export interface AgentDefinition {
   provider?: "claude" | "codex";
   model?: string;
   labels?: string[];
+  envFile?: string;
   systemPrompt: string;
   raw: Record<string, string>;
   filePath: string;
@@ -106,6 +108,9 @@ export function loadAgent(
         .map((s) => s.trim())
         .filter(Boolean)
     : undefined;
+  const envFile = fm.env_file
+    ? resolveAgentEnvFile(file, fm.env_file, cwd, trustedRoots)
+    : undefined;
 
   return {
     name: fm.name?.trim() || name,
@@ -113,10 +118,55 @@ export function loadAgent(
     provider,
     model: fm.model?.trim() || undefined,
     labels,
+    ...(envFile ? { envFile } : {}),
     systemPrompt: body,
     raw: fm,
     filePath: file,
   };
+}
+
+function resolveAgentEnvFile(
+  agentFile: string,
+  declaredPath: string,
+  cwd: string,
+  trustedRoots: string[],
+): string {
+  const value = declaredPath.trim();
+  const agentDir = path.dirname(agentFile);
+  const candidate = path.resolve(agentDir, value);
+  const relative = path.relative(agentDir, candidate);
+  if (
+    !value ||
+    path.isAbsolute(value) ||
+    value.includes("\0") ||
+    !relative ||
+    relative === ".." ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(
+      `Agent env_file '${declaredPath}' must name a relative file beside the agent definition`,
+    );
+  }
+  if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) {
+    throw new Error(
+      `Agent env_file '${declaredPath}' declared by ${agentFile} does not exist or is not a regular file`,
+    );
+  }
+
+  const agentsRoot = path.resolve(cwd, ".trellis", "agents");
+  const real = fs.realpathSync(candidate);
+  const inAgentsRoot =
+    real === agentsRoot || real.startsWith(agentsRoot + path.sep);
+  const inTrustedRoot = trustedRoots.some(
+    (root) => real === root || real.startsWith(root + path.sep),
+  );
+  if (!inAgentsRoot && !inTrustedRoot) {
+    throw new Error(
+      `Agent env_file '${declaredPath}' resolves outside the trusted agent roots`,
+    );
+  }
+  return candidate;
 }
 
 function normalizeProvider(

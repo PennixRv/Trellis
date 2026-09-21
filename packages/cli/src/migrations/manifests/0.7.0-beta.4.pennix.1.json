@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.4.pennix.1",
+  "description": "Pennix v0.7 beta reconciliation on upstream v0.7.0-beta.4.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Enhancements:**\n- Reconciled Pennix Channel, lifecycle, ownership, handoff, analysis-only, managed subnode, telemetry, memory, and release contracts with upstream v0.7 beta.\n- Permitted clearly bounded direct small work with an immediate verification path across the bundled and Marketplace workflows.\n\n**Bug Fixes:**\n- Preserved upstream active-session isolation while keeping Pennix unbound task projections read-only and non-binding.\n- Centralized context projection and fixed UTF-8 boundary truncation.",
+  "migrations": [],
+  "notes": "Run `trellis update` to install the Pennix v0.7 beta workflow assets. No `--migrate` required."
+}

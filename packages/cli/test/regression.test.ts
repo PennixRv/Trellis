@@ -1266,7 +1266,7 @@ describe("regression: JSON read/write failure reporting", () => {
     const r = runTask(["validate", name]);
     expect(r.status).not.toBe(0);
     expect(r.stderr).not.toContain("Traceback");
-    expect(r.stdout).toContain("`file` must be a string path");
+    expect(r.stdout).toContain("`file` or legacy `path` must be a string path");
   });
 
   it.skipIf(!canProvokePermissionFailure)(
@@ -6244,6 +6244,38 @@ print(json.dumps({
     expect(ctx).not.toContain("<sub-agent-notice>");
   });
 
+  it("[issue-180] Codex SessionStart reports ambiguous unbound tasks", () => {
+    setupTaskRepo();
+    for (const [task, status] of [
+      ["issue-106", "in_progress"],
+      ["other-task", "planning"],
+    ] as const) {
+      writeProjectFile(
+        path.join(".trellis", "tasks", task, "task.json"),
+        JSON.stringify({ title: task, status, assignee: "test-dev" }, null, 2),
+      );
+    }
+    writeProjectFile(
+      path.join(".codex", "hooks", "session-start.py"),
+      expectTemplateContent(codexSessionStart, "codex session-start"),
+    );
+
+    const payload = JSON.parse(
+      runPython(
+        path.join(".codex", "hooks", "session-start.py"),
+        JSON.stringify({ cwd: tmpDir }),
+      ),
+    ) as {
+      hookSpecificOutput: { additionalContext: string };
+    };
+    const ctx = payload.hookSpecificOutput.additionalContext;
+    expect(ctx).toContain("Status: TASK BINDING AMBIGUOUS");
+    expect(ctx).toContain(".trellis/tasks/issue-106");
+    expect(ctx).toContain(".trellis/tasks/other-task");
+    expect(ctx).toContain("Current task: ambiguous; candidates=");
+    expect(ctx).not.toContain("Status: NO ACTIVE TASK");
+  });
+
   it("[#248] Copilot template does not assert Copilot ignores SessionStart hook output", () => {
     // GitHub #248: Microsoft's VS Code Agent hooks docs (preview, since VS
     // Code 1.110, Feb 2026) document SessionStart additionalContext as the
@@ -6451,6 +6483,55 @@ print(json.dumps({
     expect(output).toContain("Source: none");
   });
 
+  it("[session-unbound] one developer-owned resumable task is projected without writing a session", () => {
+    setupTaskRepo();
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify({ title: "Issue 106 task", status: "in_progress", assignee: "test-dev" }, null, 2),
+    );
+
+    const { output, status } = runTaskCurrent();
+    expect(status).toBe(0);
+    expect(output).toContain("Current task: .trellis/tasks/issue-106");
+    expect(output).toContain("Source: unbound");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
+  });
+
+  it("[session-unbound] missing current context file still projects one developer-owned task", () => {
+    setupTaskRepo();
+    writeProjectFile(path.join(".trellis", ".developer"), "name=test-dev\n");
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify({ title: "Issue 106 task", status: "in_progress", assignee: "test-dev" }, null, 2),
+    );
+
+    const { output, status } = runTaskCurrent({ CODEX_THREAD_ID: "missing-current-session" });
+    expect(status).toBe(0);
+    expect(output).toContain("Current task: .trellis/tasks/issue-106");
+    expect(output).toContain("Source: unbound");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
+  });
+
+  it("[session-unbound] multiple developer-owned tasks report ambiguity without binding", () => {
+    setupTaskRepo();
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify({ title: "Issue 106 task", status: "in_progress", assignee: "test-dev" }, null, 2),
+    );
+    writeProjectFile(
+      path.join(".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify({ title: "Other task", status: "planning", assignee: "test-dev" }, null, 2),
+    );
+
+    const { output, status } = runTaskCurrent();
+    expect(status).toBe(1);
+    expect(output).toContain("Current task: (ambiguous)");
+    expect(output).toContain("Source: unbound_ambiguous");
+    expect(output).toContain("Candidate: .trellis/tasks/issue-106");
+    expect(output).toContain("Candidate: .trellis/tasks/other-task");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
+  });
+
   it("[session-fallback] multiple session files — refuses to guess, returns none", () => {
     setupTaskRepo();
     writeSessionContext("codex_session_a", ".trellis/tasks/issue-106");
@@ -6480,6 +6561,30 @@ print(json.dumps({
     expect(output).not.toContain("session-fallback");
   });
 
+  it("[session-isolation] a known session with a missing, empty, or malformed pointer never borrows a sole foreign session", () => {
+    setupTaskRepo();
+    const sessionsDir = path.join(tmpDir, ".trellis", ".runtime", "sessions");
+    for (const [sessionId, ownContent] of [
+      ["missing", null],
+      ["empty", JSON.stringify({ current_task: "" })],
+      ["malformed", "{"],
+    ] as const) {
+      fs.rmSync(sessionsDir, { recursive: true, force: true });
+      writeSessionContext("codex_source", ".trellis/tasks/issue-106");
+      if (ownContent) {
+        writeProjectFile(
+          path.join(".trellis", ".runtime", "sessions", `codex_${sessionId}.json`),
+          ownContent,
+        );
+      }
+
+      const { output, status } = runTaskCurrent({ CODEX_THREAD_ID: sessionId });
+      expect(status).toBe(1);
+      expect(output).toContain("Current task: (none)");
+      expect(output).toContain("Source: none");
+    }
+  });
+
   it("[issue #469] finish removes only the exact matched session file", () => {
     setupTaskRepo();
     writeSessionContext("codex_exact", ".trellis/tasks/issue-106");
@@ -6505,7 +6610,7 @@ print(json.dumps({
     ).toBe(true);
   });
 
-  it("[issue #469] finish preserves a sole unmatched session file", () => {
+  it("[issue #469][session-isolation] finish leaves a sole foreign session file untouched", () => {
     setupTaskRepo();
     writeSessionContext("codex_previous-thread", ".trellis/tasks/issue-106");
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
@@ -6529,6 +6634,7 @@ print(json.dumps({
 
     expect(output).toContain("No current task set");
     expect(fs.readFileSync(fallbackPath)).toEqual(previousBytes);
+    expect(fs.existsSync(fallbackPath)).toBe(true);
 
     const current = runTaskCurrent({ CODEX_THREAD_ID: "current-thread" });
     expect(current.status).toBe(1);
@@ -6661,6 +6767,28 @@ print(json.dumps({
       JSON.stringify(inputData),
     );
   }
+
+  it("[session-isolation] Codex workflow state does not inherit a foreign sole session", () => {
+    setupTaskRepo();
+    writeSessionContext("codex_source", ".trellis/tasks/issue-106");
+    const hookPath = path.join(".codex", "hooks", "inject-workflow-state.py");
+    writeProjectFile(
+      hookPath,
+      expectTemplateContent(injectWorkflowStateScript, "inject-workflow-state"),
+    );
+
+    const parsed = JSON.parse(
+      runPython(
+        hookPath,
+        JSON.stringify({ cwd: tmpDir, session_id: "target" }),
+      ),
+    ) as {
+      hookSpecificOutput: { additionalContext: string };
+    };
+
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("Status: no_task");
+    expect(parsed.hookSpecificOutput.additionalContext).not.toContain("issue-106");
+  });
 
   it("[workflow-state] missing/empty workflow.md degrades to generic line (post-R5: no fallback dict)", () => {
     setupTaskRepo();
@@ -6841,6 +6969,36 @@ print(json.dumps({
     );
   });
 
+  it("[workflow-state] ambiguous unbound tasks are projected with candidates", () => {
+    setupTaskRepo();
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify({ title: "Issue 106 task", status: "in_progress", assignee: "test-dev" }, null, 2),
+    );
+    writeProjectFile(
+      path.join(".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify({ title: "Other task", status: "planning", assignee: "test-dev" }, null, 2),
+    );
+    writeWorkflowMd(
+      "[workflow-state:unbound_ambiguous]\n" +
+        "Choose one active task and bind it explicitly.\n" +
+        "[/workflow-state:unbound_ambiguous]\n",
+    );
+    writeWorkflowStateHook();
+
+    const output = runInjectWorkflowState();
+    const parsed = JSON.parse(output) as {
+      hookSpecificOutput: { additionalContext: string };
+    };
+    const context = parsed.hookSpecificOutput.additionalContext;
+    expect(context).toContain("Status: unbound_ambiguous");
+    expect(context).toContain(
+      "Candidates: .trellis/tasks/issue-106, .trellis/tasks/other-task",
+    );
+    expect(context).not.toContain("Status: no_task");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
+  });
+
   it("reports task_error when task.json is malformed", () => {
     setupTaskRepo();
     writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
@@ -6931,7 +7089,7 @@ print(json.dumps({
     const ctx = parsed.hookSpecificOutput.additionalContext;
     expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
     expect(ctx).not.toContain("<sub-agent-notice>");
-    expect(ctx).toContain("<codex-mode>auto:");
+    expect(ctx).toContain("<codex-mode>inline:");
     expect(ctx.indexOf("</codex-mode>")).toBeLessThan(
       ctx.indexOf("<workflow-state>"),
     );
@@ -7206,13 +7364,12 @@ print(json.dumps({
     }
   });
 
-  it("[issue-373] task.py create does NOT seed jsonl for Codex inline mode", () => {
+  it("[issue-373] task.py create does NOT seed jsonl for Codex default inline mode", () => {
     setupTaskRepo();
     fs.mkdirSync(path.join(tmpDir, ".codex"), { recursive: true });
-    writeConfigYaml("codex:\n  dispatch_mode: inline\n");
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "codex inline task" --description "regression fixture" --slug codex-inline-task --assignee test-dev`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "codex default inline task" --description "regression fixture" --slug codex-default-inline-task --assignee test-dev`,
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
@@ -7222,7 +7379,7 @@ print(json.dumps({
       "tasks",
       fs
         .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
-        .find((d) => d.includes("codex-inline-task")) as string,
+        .find((d) => d.includes("codex-default-inline-task")) as string,
     );
     expect(fs.existsSync(path.join(taskDir, "implement.jsonl"))).toBe(false);
     expect(fs.existsSync(path.join(taskDir, "check.jsonl"))).toBe(false);
@@ -7278,45 +7435,6 @@ print(json.dumps({
     expect(stderr).toContain("add-context");
   });
 
-  it("[init-context-removal] inject-subagent-context.py skips seed rows (no `file` field)", () => {
-    // Hook's read_jsonl_entries should return empty list when jsonl contains
-    // only a seed row — not crash, not treat `_example` as a path.
-    const hookContent = getSharedHookScripts().find(
-      (h) => h.name === "inject-subagent-context.py",
-    )?.content;
-    expect(hookContent).toBeDefined();
-    const hookPath = path.join(tmpDir, "hook.py");
-    fs.writeFileSync(hookPath, hookContent as string, "utf-8");
-
-    // Minimal fake jsonl with only seed
-    const jsonlDir = path.join(tmpDir, "repo");
-    fs.mkdirSync(jsonlDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(jsonlDir, "seed.jsonl"),
-      JSON.stringify({ _example: "seed row" }) + "\n",
-      "utf-8",
-    );
-
-    // Run a tiny Python snippet that imports the hook module and calls
-    // read_jsonl_entries. Capturing the stderr warning proves the code path.
-    const probeScript = `
-import sys, importlib.util
-spec = importlib.util.spec_from_file_location("h", ${JSON.stringify(hookPath)})
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-entries = mod.read_jsonl_entries(${JSON.stringify(jsonlDir)}, "seed.jsonl")
-print(len(entries))
-`;
-    const probePath = path.join(tmpDir, "probe.py");
-    fs.writeFileSync(probePath, probeScript, "utf-8");
-    const result = execSync(`${pythonCmd} ${JSON.stringify(probePath)}`, {
-      cwd: tmpDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    expect(result.trim()).toBe("0");
-  });
-
   it("[#573] task.py validate fails for a freshly created task until manifests are curated", () => {
     setupTaskRepo();
     fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
@@ -7342,6 +7460,48 @@ print(len(entries))
     expect(result.stdout).toContain("0 curated entries");
     expect(result.stdout).toContain("add-context");
     expect(result.stdout).toContain("--allow-empty-context");
+  });
+
+  it("[init-context-removal] inject-subagent-context.py skips seed rows (no `file` field)", () => {
+    const hookContent = getSharedHookScripts().find(
+      (h) => h.name === "inject-subagent-context.py",
+    )?.content;
+    expect(hookContent).toBeDefined();
+    const hookPath = path.join(tmpDir, "hook.py");
+    fs.writeFileSync(hookPath, hookContent as string, "utf-8");
+
+    const jsonlDir = path.join(tmpDir, "repo");
+    fs.mkdirSync(path.join(jsonlDir, ".trellis", "scripts"), { recursive: true });
+    fs.cpSync(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../src/templates/trellis/scripts/common",
+      ),
+      path.join(jsonlDir, ".trellis", "scripts", "common"),
+      { recursive: true },
+    );
+    fs.writeFileSync(
+      path.join(jsonlDir, "seed.jsonl"),
+      JSON.stringify({ _example: "seed row" }) + "\n",
+      "utf-8",
+    );
+
+    const probeScript = `
+import sys, importlib.util
+spec = importlib.util.spec_from_file_location("h", ${JSON.stringify(hookPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+entries = mod.read_jsonl_entries(${JSON.stringify(jsonlDir)}, "seed.jsonl")
+print(len(entries))
+`;
+    const probePath = path.join(tmpDir, "probe.py");
+    fs.writeFileSync(probePath, probeScript, "utf-8");
+    const result = execSync(`${pythonCmd} ${JSON.stringify(probePath)}`, {
+      cwd: tmpDir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    expect(result.trim()).toBe("0");
   });
 
   describe("[validation-preflight] task.py validate vs PR preflight contract", () => {
@@ -7983,6 +8143,7 @@ print(len(entries))
       path.join(".trellis", "workflow.md"),
       templateWorkflowMd(),
     );
+    writeConfigYaml("codex:\n  dispatch_mode: auto\n");
     const contextScript = path.join(
       tmpDir,
       ".trellis",
@@ -8249,7 +8410,7 @@ print(len(entries))
     writeProjectFile(path.join(".trellis", "config.yaml"), content);
   }
 
-  it("[issue-codex-dispatch-mode] codex breadcrumb defaults to native auto dispatch when config absent", () => {
+  it("[issue-codex-dispatch-mode] codex breadcrumb defaults to inline dispatch when config is absent", () => {
     setupTaskRepo();
     writeSessionContext("codex_workflow-a", ".trellis/tasks/issue-106");
     const codexHookPath = writeCodexInjectHook();
@@ -8270,8 +8431,8 @@ print(len(entries))
       ),
     ) as { hookSpecificOutput: { additionalContext: string } };
     const ctx = parsed.hookSpecificOutput.additionalContext;
-    expect(ctx).toContain("DISPATCH the trellis-implement");
-    expect(ctx).not.toContain("MAIN SESSION edits code");
+    expect(ctx).toContain("MAIN SESSION edits code");
+    expect(ctx).not.toContain("DISPATCH the trellis-implement");
   });
 
   it("[issue-codex-dispatch-mode] codex breadcrumb routes to plain status when codex.dispatch_mode=sub-agent", () => {
@@ -8432,9 +8593,9 @@ print(len(entries))
     ) as Record<string, string>;
     expect(result.codex_inline).toBe("in_progress-inline");
     expect(result.codex_subagent).toBe("in_progress");
-    // Default for Codex is native auto dispatch; only explicit inline swaps
-    // to the main-session breadcrumb.
-    expect(result.codex_missing).toBe("in_progress");
+    // Default for Codex is main-session inline execution; explicit auto or
+    // the legacy sub-agent alias selects native dispatch instead.
+    expect(result.codex_missing).toBe("in_progress-inline");
     expect(result.claude_inline).toBe("in_progress");
   });
 
@@ -8521,7 +8682,7 @@ print(len(entries))
         .filter((l) => l.startsWith("{"))
         .pop() ?? "{}",
     ) as Record<string, string>;
-    expect(result.codex_default).toBe("codex-sub-agent");
+    expect(result.codex_default).toBe("codex-inline");
     expect(result.codex_explicit_auto).toBe("codex-sub-agent");
     expect(result.codex_explicit_subagent).toBe("codex-sub-agent");
     expect(result.codex_inline).toBe("codex-inline");
@@ -8570,7 +8731,7 @@ print(len(entries))
       "[workflow-state:in_progress]\nDISPATCH the trellis-implement.\n[/workflow-state:in_progress]\n[workflow-state:in_progress-inline]\nMAIN SESSION inline edit.\n[/workflow-state:in_progress-inline]\n",
     );
 
-    // Default (no config.yaml) → native auto-dispatch banner.
+    // Default (no config.yaml) → main-session inline banner.
     const defaultRun = JSON.parse(
       runPython(
         codexHookPath,
@@ -8578,7 +8739,7 @@ print(len(entries))
       ),
     ) as { hookSpecificOutput: { additionalContext: string } };
     expect(defaultRun.hookSpecificOutput.additionalContext).toContain(
-      "<codex-mode>auto: implement/check work defaults to Trellis sub-agents; native Codex context injection is preferred and child-side loading is the fallback. The main session still coordinates, clarifies, updates specs, commits, and finishes.</codex-mode>",
+      "<codex-mode>inline: the main session implements/checks directly; do not dispatch implement/check sub-agents.</codex-mode>",
     );
 
     // Legacy sub-agent alias → the auto-dispatch banner.
@@ -9537,9 +9698,9 @@ describe("regression: cli_adapter platform support (beta.9, beta.13, beta.16)", 
 
     // The validator is the second half of the contract: placeholder rows left
     // by older versions are a hard error, not a silently skipped comment.
-    const taskContext = getAllScripts().get("common/task_context.py");
-    expect(taskContext as string).toContain('"_example" in data');
-    expect(taskContext as string).toContain("Placeholder `_example` row");
+    const projection = getAllScripts().get("common/context_projection.py");
+    expect(projection as string).toContain('"_example" in data');
+    expect(projection as string).toContain("Placeholder `_example` row");
   });
 
   // Regression for 04-22-migrate-flow-bugs Bug C: breaking releases must

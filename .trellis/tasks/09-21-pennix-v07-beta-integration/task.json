@@ -1,0 +1,30 @@
+{
+  "id": "pennix-v07-beta-integration",
+  "name": "pennix-v07-beta-integration",
+  "title": "Integrate Pennix v0.7 beta workflow release",
+  "description": "Rebase Pennix Trellis behavior on upstream v0.7.0-beta.4, reconcile all supported Pennix semantics, add direct bounded-work routing, publish and reinstall the resulting beta release.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "Trellis fork and Pennix Marketplace beta companion; publish @pennixrv packages and reinstall locally",
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-09-21",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "upstream_beta": "be9e19b269c25cb2787489eb81062bf96619442c",
+    "pennix_source_main": "962d8dbdc58e3ce058139dd952756f52d7adac85",
+    "delivery_mode": "change_bearing"
+  }
+}

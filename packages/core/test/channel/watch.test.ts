@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createChannel, watchChannelEvents } from "../../src/channel/index.js";
+import {
+  appendEvent,
+  createChannel,
+  readLastSeq,
+  watchChannelEvents,
+} from "../../src/channel/index.js";
 import { eventsPath } from "../../src/channel/internal/store/paths.js";
 import { setupChannelTmp, type TmpEnv } from "./setup.js";
 
@@ -55,6 +60,33 @@ describe("watchChannelEvents", () => {
       await expect(secondEvent).resolves.toMatchObject({
         done: false,
         value: { kind: "message", text: "中" },
+      });
+    } finally {
+      abortController.abort();
+      await events.return(undefined);
+    }
+  });
+
+  it("replays events committed after a durable seq barrier", async () => {
+    const channel = "barrier-race";
+    await createChannel({ channel, by: "main" });
+    const barrier = await readLastSeq(channel);
+    await appendEvent(channel, {
+      kind: "done",
+      by: "worker",
+    });
+
+    const abortController = new AbortController();
+    const events = watchChannelEvents({
+      channel,
+      sinceSeq: barrier,
+      signal: abortController.signal,
+    });
+
+    try {
+      await expect(events.next()).resolves.toMatchObject({
+        done: false,
+        value: { kind: "done", by: "worker" },
       });
     } finally {
       abortController.abort();

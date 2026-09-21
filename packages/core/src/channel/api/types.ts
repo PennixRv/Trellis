@@ -30,6 +30,8 @@ export interface CreateChannelOptions
   description?: string;
   context?: ContextEntry[];
   ephemeral?: boolean;
+  /** Opaque main Codex session identity for read-only observability. */
+  ownerSessionId?: string;
   force?: boolean;
   /** Reserved free-form field allowing CLI to mark "run" mode etc. via meta. */
 }

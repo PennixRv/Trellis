@@ -956,14 +956,23 @@ describe("opencode TrellisContext single-session fallback", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("returns the only session file when exactly one exists", () => {
+  it("returns the only session file when no session identity is available", () => {
     writeSessionFile(dir, "opencode_sole", ".trellis/tasks/demo-task");
     const ctx = new TrellisContext(dir);
-    const active = ctx.getActiveTask({ sessionID: "missing-key" });
+    const active = ctx.getActiveTask();
 
     expect(active.taskPath).toBe(".trellis/tasks/demo-task");
     expect(active.source).toBe("session-fallback:opencode_sole");
     expect(active.stale).toBe(false);
+  });
+
+  it("does not borrow the only session file for a known missing session", () => {
+    writeSessionFile(dir, "opencode_sole", ".trellis/tasks/demo-task");
+    const ctx = new TrellisContext(dir);
+    const active = ctx.getActiveTask({ sessionID: "missing-key" });
+
+    expect(active.taskPath).toBeNull();
+    expect(active.source).toBe("none");
   });
 
   it("refuses to guess when two or more session files exist", () => {
@@ -983,6 +992,56 @@ describe("opencode TrellisContext single-session fallback", () => {
 
     expect(active.taskPath).toBeNull();
     expect(active.source).toBe("none");
+  });
+
+  it("projects one developer-owned task when no session pointer exists", () => {
+    writeFileSync(join(dir, ".trellis", ".developer"), "name=test-dev\n");
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "demo-task", "task.json"),
+      JSON.stringify({ status: "in_progress", assignee: "test-dev" }),
+    );
+    const ctx = new TrellisContext(dir);
+    const active = ctx.getActiveTask();
+
+    expect(active.taskPath).toBe(".trellis/tasks/demo-task");
+    expect(active.source).toBe("unbound");
+    expect(active.stale).toBe(false);
+  });
+
+  it("projects one developer-owned task when the known context file is missing", () => {
+    writeFileSync(join(dir, ".trellis", ".developer"), "name=test-dev\n");
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "demo-task", "task.json"),
+      JSON.stringify({ status: "in_progress", assignee: "test-dev" }),
+    );
+    const ctx = new TrellisContext(dir);
+    const active = ctx.getActiveTask({ sessionID: "missing-key" });
+
+    expect(active.taskPath).toBe(".trellis/tasks/demo-task");
+    expect(active.source).toBe("unbound");
+    expect(active.stale).toBe(false);
+  });
+
+  it("reports multiple developer-owned tasks as an explicit ambiguity", () => {
+    writeFileSync(join(dir, ".trellis", ".developer"), "name=test-dev\n");
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "demo-task", "task.json"),
+      JSON.stringify({ status: "in_progress", assignee: "test-dev" }),
+    );
+    mkdirSync(join(dir, ".trellis", "tasks", "other-task"), { recursive: true });
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify({ status: "planning", assignee: "test-dev" }),
+    );
+    const ctx = new TrellisContext(dir);
+    const active = ctx.getActiveTask({ sessionID: "missing-key" });
+
+    expect(active.taskPath).toBeNull();
+    expect(active.source).toBe("unbound_ambiguous");
+    expect(active.candidatePaths).toEqual([
+      ".trellis/tasks/demo-task",
+      ".trellis/tasks/other-task",
+    ]);
   });
 
   it("prefers an exact context-key match over the fallback", () => {
@@ -1016,7 +1075,32 @@ describe("opencode inject-subagent-context (issue #264)", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("mutates implement prompt using single-session fallback when sessionID misses", async () => {
+  it("mutates implement prompt using single-session fallback without session identity", async () => {
+    writeSessionFile(dir, "opencode_sole", ".trellis/tasks/demo-task");
+    const output: TaskToolOutput = {
+      args: {
+        subagent_type: "trellis-implement",
+        prompt: "do the implementation",
+      },
+    };
+
+    await hooks["tool.execute.before"](
+      { tool: "task" },
+      output,
+    );
+
+    expect(output.args.prompt).toContain("<!-- trellis-hook-injected -->");
+    expect(output.args.prompt).toContain("# Implement Agent Task");
+    expect(output.args.prompt).toContain("Demo PRD");
+    expect(output.args.prompt).toContain("do the implementation");
+    // Marker must be at the top so generated agent definitions can detect
+    // successful injection via a prefix check.
+    expect(output.args.prompt.startsWith("<!-- trellis-hook-injected -->")).toBe(
+      true,
+    );
+  });
+
+  it("does not mutate an implement prompt for a known session without its own pointer", async () => {
     writeSessionFile(dir, "opencode_sole", ".trellis/tasks/demo-task");
     const output: TaskToolOutput = {
       args: {
@@ -1030,15 +1114,7 @@ describe("opencode inject-subagent-context (issue #264)", () => {
       output,
     );
 
-    expect(output.args.prompt).toContain("<!-- trellis-hook-injected -->");
-    expect(output.args.prompt).toContain("# Implement Agent Task");
-    expect(output.args.prompt).toContain("Demo PRD");
-    expect(output.args.prompt).toContain("do the implementation");
-    // Marker must be at the top so generated agent definitions can detect
-    // successful injection via a prefix check.
-    expect(
-      output.args.prompt.startsWith("<!-- trellis-hook-injected -->"),
-    ).toBe(true);
+    expect(output.args.prompt).toBe("do the implementation");
   });
 
   it("inlines JSONL-referenced spec content into the implement prompt", async () => {
@@ -1061,7 +1137,7 @@ describe("opencode inject-subagent-context (issue #264)", () => {
     };
 
     await hooks["tool.execute.before"](
-      { tool: "task", sessionID: "stranger" },
+      { tool: "task" },
       output,
     );
 
@@ -1091,9 +1167,9 @@ describe("opencode inject-subagent-context (issue #264)", () => {
     expect(output.args.prompt).toContain("Demo PRD");
   });
 
-  it("Active task hint takes precedence over single-session fallback", async () => {
-    // Set up TWO matches: a session file pointing at demo-task AND a hint
-    // pointing at a different task path. Hint should win.
+  it("Active task hint resolves a known session with no runtime task", async () => {
+    // The known session must not borrow this sole foreign runtime file; the
+    // explicit dispatch hint is the only authorized task source here.
     writeSessionFile(dir, "opencode_sole", ".trellis/tasks/another-task");
     const hintTask = join(dir, ".trellis", "tasks", "hint-task");
     mkdirSync(hintTask, { recursive: true });
@@ -1361,6 +1437,31 @@ describe("opencode messages.transform injection (issue #553)", () => {
     expect(messages[0].parts[1]).toEqual(original);
   });
 
+  it("inject-workflow-state.js shows candidates for ambiguous unbound tasks", async () => {
+    writeFileSync(join(dir, ".trellis", ".developer"), "name=test-dev\n");
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "demo-task", "task.json"),
+      JSON.stringify({ status: "in_progress", assignee: "test-dev" }),
+    );
+    mkdirSync(join(dir, ".trellis", "tasks", "other-task"), { recursive: true });
+    writeFileSync(
+      join(dir, ".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify({ status: "planning", assignee: "test-dev" }),
+    );
+
+    const hooks = await loadWorkflowHooks();
+    const messages = [userTurn("user prompt")];
+    await hooks[MESSAGES_TRANSFORM_HOOK]({}, { messages });
+    const breadcrumb = ephemeralTexts(messages[0]).find(text =>
+      text.startsWith("<workflow-state>"),
+    );
+    expect(breadcrumb).toContain("Status: unbound_ambiguous");
+    expect(breadcrumb).toContain(
+      "Candidates: .trellis/tasks/demo-task, .trellis/tasks/other-task",
+    );
+    expect(breadcrumb).not.toContain("Status: no_task");
+  });
+
   it("inject-workflow-state.js skips injection when the prompt contains the default skip keyword", async () => {
     const hooks = await loadWorkflowHooks();
     const latest = userTurn("no-trellis what does this regex do");
@@ -1575,7 +1676,7 @@ describe("opencode context injection limits (issue #441)", () => {
   }
 
   async function runImplementHook(): Promise<string> {
-    writeSessionFile(dir, "opencode_sole", ".trellis/tasks/demo-task");
+    writeSessionFile(dir, "opencode_stranger", ".trellis/tasks/demo-task");
     const hooks = (await injectSubagentContextPlugin({
       directory: dir,
       platform: "linux",

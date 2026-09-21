@@ -74,6 +74,8 @@ REPO_ROOT = ${JSON.stringify(tmp)}
 spec = importlib.util.spec_from_file_location("h", ${JSON.stringify(HOOK_PATH)})
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
+sys.path.insert(0, ${JSON.stringify(path.join(tmp, ".trellis", "scripts"))})
+from common import context_projection as projection
 ${code}
 `;
   fs.writeFileSync(probePath, script, "utf-8");
@@ -274,11 +276,11 @@ print(get_context_injection_limits(Path(${JSON.stringify(tmp)}))["max_artifact_b
       });
     });
 
-    describe("inject-subagent-context.py: truncate_utf8", () => {
+    describe("context_projection.py: truncate_utf8", () => {
       it("leaves data untouched when cap is 0 (unlimited)", () => {
         const out = runHookProbe(
           tmp,
-          `print(mod.truncate_utf8(b"X" * 1000, 0) == b"X" * 1000)`,
+          `print(projection.truncate_utf8(b"X" * 1000, 0) == b"X" * 1000)`,
         );
         expect(out.trim()).toBe("True");
       });
@@ -288,8 +290,8 @@ print(get_context_injection_limits(Path(${JSON.stringify(tmp)}))["max_artifact_b
           tmp,
           `
 data = b"hello world"
-print(mod.truncate_utf8(data, len(data)) == data)
-print(mod.truncate_utf8(data, len(data) + 5) == data)
+print(projection.truncate_utf8(data, len(data)) == data)
+print(projection.truncate_utf8(data, len(data) + 5) == data)
 `,
         );
         expect(out.trim().split("\n")).toEqual(["True", "True"]);
@@ -300,7 +302,7 @@ print(mod.truncate_utf8(data, len(data) + 5) == data)
           tmp,
           `
 data = b"abcdefghij"  # 10 bytes
-print(mod.truncate_utf8(data, 9) == b"abcdefghi")
+print(projection.truncate_utf8(data, 9) == b"abcdefghi")
 `,
         );
         expect(out.trim()).toBe("True");
@@ -314,10 +316,10 @@ print(mod.truncate_utf8(data, 9) == b"abcdefghi")
           `
 data = "café".encode("utf-8")
 for cap in range(len(data) + 1):
-    out = mod.truncate_utf8(data, cap)
+    out = projection.truncate_utf8(data, cap)
     out.decode("utf-8")  # raises UnicodeDecodeError if invalid
 print("all-valid")
-print(mod.truncate_utf8(data, 4).decode("utf-8"))
+print(projection.truncate_utf8(data, 4).decode("utf-8"))
 `,
         );
         const lines = out.trim().split("\n");
@@ -331,7 +333,7 @@ print(mod.truncate_utf8(data, 4).decode("utf-8"))
           `
 data = ("x" + "\\u20ac").encode("utf-8")  # x + 3-byte euro sign
 for cap in range(len(data) + 1):
-    out = mod.truncate_utf8(data, cap)
+    out = projection.truncate_utf8(data, cap)
     out.decode("utf-8")
 print("all-valid")
 `,
@@ -346,7 +348,7 @@ print("all-valid")
           tmp,
           `
 data = "\\u4f60\\u597d\\u4e16\\u754c".encode("utf-8")  # 你好世界 — 3 bytes each
-out = mod.truncate_utf8(data, 6)
+out = projection.truncate_utf8(data, 6)
 print(out.decode("utf-8"))  # strict decode — raises on a broken byte
 `,
         );
@@ -358,7 +360,7 @@ print(out.decode("utf-8"))  # strict decode — raises on a broken byte
           tmp,
           `
 data = b"a\\xc3\\xa9b"  # "a" + 2-byte "\\u00e9" + "b"
-out = mod.truncate_utf8(data, 3)
+out = projection.truncate_utf8(data, 3)
 print(out.decode("utf-8"))  # strict decode — raises on a broken byte
 `,
         );
@@ -372,7 +374,7 @@ print(out.decode("utf-8"))  # strict decode — raises on a broken byte
 # 1 + 2 + 3 + 4 + 1 + 3 + 3 = 17 bytes of mixed-width sequences
 data = "a\\u00e9\\u20ac\\U0001f600z\\u4f60\\u597d".encode("utf-8")
 for cap in range(0, 31):
-    mod.truncate_utf8(data, cap).decode("utf-8")  # strict — raises if split
+    projection.truncate_utf8(data, cap).decode("utf-8")  # strict — raises if split
 print("all-valid")
 `,
         );
@@ -816,7 +818,7 @@ print("all-valid")
         expect(stdout).not.toContain("looks like a code file");
       });
 
-      it("warns on a jsonl entry whose file size exceeds max_file_bytes", () => {
+      it("rejects a jsonl entry whose file size exceeds max_file_bytes", () => {
         const taskDir = makeTask(tmp, "task-size-warn");
         fs.writeFileSync(
           path.join(tmp, "oversized.md"),
@@ -833,11 +835,12 @@ print("all-valid")
           ["context_injection:", "  max_file_bytes: 100"].join("\n"),
         );
         const { status, stdout } = runTaskValidate(tmp, taskDir);
-        expect(status).toBe(0);
+        expect(status).toBe(1);
         expect(stdout).toContain(
-          "implement.jsonl:1: Warning: oversized.md is 200 bytes, " +
-            "exceeds context_injection.max_file_bytes (100); " +
-            "injection will truncate it",
+          "role=implement source=file path=oversized.md: cannot be injected in full",
+        );
+        expect(stdout).toContain(
+          "exceeds context_injection.max_file_bytes (100); injection truncates it",
         );
       });
 
@@ -885,18 +888,16 @@ print("all-valid")
           encoding: "utf-8",
         });
 
-        // No traceback, and the advisory check contributed no errors.
+        // No traceback, and both the truncation and disappearance are now
+        // completeness failures rather than advisory size warnings.
         expect(r.stderr).not.toContain("Traceback");
         expect(r.status).toBe(0);
-        expect(r.stdout).toContain("ERRORS=0");
-        // The readable file is still measured and still warned about.
+        expect(r.stdout).toContain("ERRORS=2");
+        // The readable file is still measured and rejected.
         expect(r.stdout).toContain(
-          "implement.jsonl:1: Warning: present.md is 200 bytes, " +
-            "exceeds context_injection.max_file_bytes (100); " +
-            "injection will truncate it",
+          "implement.jsonl:1: role=implement source=file path=present.md: cannot be injected in full",
         );
-        // The vanished one produces no size warning at all.
-        expect(r.stdout).not.toContain("vanished.md is");
+        expect(r.stdout).toContain("path=vanished.md: cannot be injected in full");
       });
 
       it("stays warning-free for a clean, under-cap, spec-only manifest", () => {
@@ -919,6 +920,222 @@ print("all-valid")
         expect(status).toBe(0);
         expect(stdout).not.toContain("Warning:");
         expect(stdout).toContain("All validations passed");
+      });
+    });
+
+    describe("task.py validate: Python projection completeness", () => {
+      function writeImplementEntry(
+        taskDir: string,
+        entry: Record<string, unknown>,
+      ): string {
+        fs.writeFileSync(
+          path.join(taskDir, "implement.jsonl"),
+          JSON.stringify(entry) + "\n",
+          "utf-8",
+        );
+        return path.relative(tmp, taskDir).split(path.sep).join("/");
+      }
+
+      it("rejects a legacy path entry when the Hook truncates it", () => {
+        const taskDir = makeTask(tmp, "task-legacy-path-cap");
+        fs.writeFileSync(path.join(tmp, "legacy.md"), "L".repeat(200), "utf-8");
+        const relTask = writeImplementEntry(taskDir, {
+          path: "legacy.md",
+          reason: "legacy context",
+        });
+        writeConfig(tmp, "context_injection:\n  max_file_bytes: 100\n");
+
+        const hook = runHookProbe(
+          tmp,
+          `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(relTask)}))`,
+        );
+        const result = runTaskValidate(tmp, taskDir);
+
+        expect(hook).toContain("[Trellis: truncated at 100 bytes — read legacy.md");
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain(
+          "role=implement source=file path=legacy.md: cannot be injected in full",
+        );
+      });
+
+      it("rejects a binary file that the Hook represents only as a notice", () => {
+        const taskDir = makeTask(tmp, "task-binary-validation");
+        fs.writeFileSync(path.join(tmp, "asset.bin"), Buffer.from([0, 1, 2]));
+        const relTask = writeImplementEntry(taskDir, {
+          file: "asset.bin",
+          reason: "binary reference",
+        });
+
+        const hook = runHookProbe(
+          tmp,
+          `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(relTask)}))`,
+        );
+        const result = runTaskValidate(tmp, taskDir);
+
+        expect(hook).toContain("[Trellis: not inlined (binary file) — asset.bin");
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain(
+          "role=implement source=file path=asset.bin: cannot be injected in full",
+        );
+        expect(result.stdout).toContain("binary content is not inlined");
+      });
+
+      it("rejects a directory child that the Hook truncates", () => {
+        const taskDir = makeTask(tmp, "task-directory-child-cap");
+        fs.mkdirSync(path.join(tmp, "references"));
+        fs.writeFileSync(
+          path.join(tmp, "references", "large.md"),
+          "D".repeat(200),
+          "utf-8",
+        );
+        const relTask = writeImplementEntry(taskDir, {
+          file: "references/",
+          type: "directory",
+          reason: "reference directory",
+        });
+        writeConfig(tmp, "context_injection:\n  max_file_bytes: 100\n");
+
+        const hook = runHookProbe(
+          tmp,
+          `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(relTask)}))`,
+        );
+        const result = runTaskValidate(tmp, taskDir);
+
+        expect(hook).toContain(
+          "[Trellis: truncated at 100 bytes — read references/large.md",
+        );
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain(
+          "role=implement source=file path=references/large.md: cannot be injected in full",
+        );
+      });
+
+      it("rejects a directory when the Hook silently selects only its first 20 Markdown files", () => {
+        const taskDir = makeTask(tmp, "task-directory-overflow");
+        const references = path.join(tmp, "many-references");
+        fs.mkdirSync(references);
+        for (let index = 0; index < 21; index++) {
+          fs.writeFileSync(
+            path.join(references, `reference-${String(index).padStart(2, "0")}.md`),
+            `${index}\n`,
+            "utf-8",
+          );
+        }
+        const relTask = writeImplementEntry(taskDir, {
+          file: "many-references/",
+          type: "directory",
+          reason: "complete reference set",
+        });
+        writeConfig(
+          tmp,
+          [
+            "context_injection:",
+            "  max_file_bytes: 0",
+            "  max_total_bytes: 0",
+          ].join("\n"),
+        );
+
+        const hook = runHookProbe(
+          tmp,
+          `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(relTask)}))`,
+        );
+        const result = runTaskValidate(tmp, taskDir);
+
+        expect(hook).toContain("reference-19.md");
+        expect(hook).not.toContain("reference-20.md");
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain(
+          "role=implement source=directory path=many-references/",
+        );
+        expect(result.stdout).toContain("injection selects only the first 20");
+      });
+
+      it("rejects an oversized task artifact that the Hook truncates", () => {
+        const taskDir = makeTask(tmp, "task-artifact-validation");
+        fs.writeFileSync(path.join(tmp, "spec.md"), "spec\n", "utf-8");
+        const relTask = writeImplementEntry(taskDir, {
+          file: "spec.md",
+          reason: "small spec",
+        });
+        fs.writeFileSync(path.join(taskDir, "prd.md"), "P".repeat(200), "utf-8");
+        writeConfig(tmp, "context_injection:\n  max_artifact_bytes: 100\n");
+
+        const hook = runHookProbe(
+          tmp,
+          `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(relTask)}))`,
+        );
+        const result = runTaskValidate(tmp, taskDir);
+
+        expect(hook).toContain("[Trellis: truncated at 100 bytes — read");
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain("role=implement source=artifact");
+        expect(result.stdout).toContain("context_injection.max_artifact_bytes (100)");
+      });
+
+      it("rejects a role whose Hook falls back to total-budget index notices", () => {
+        const taskDir = makeTask(tmp, "task-total-budget-validation");
+        fs.writeFileSync(path.join(tmp, "first.md"), "1".repeat(50), "utf-8");
+        fs.writeFileSync(path.join(tmp, "second.md"), "2".repeat(50), "utf-8");
+        fs.writeFileSync(
+          path.join(taskDir, "implement.jsonl"),
+          [
+            JSON.stringify({ file: "first.md", reason: "first" }),
+            JSON.stringify({ file: "second.md", reason: "second" }),
+          ].join("\n") + "\n",
+          "utf-8",
+        );
+        const relTask = path.relative(tmp, taskDir).split(path.sep).join("/");
+        writeConfig(
+          tmp,
+          [
+            "context_injection:",
+            "  max_file_bytes: 0",
+            "  max_total_bytes: 120",
+          ].join("\n"),
+        );
+
+        const hook = runHookProbe(
+          tmp,
+          `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(relTask)}))`,
+        );
+        const result = runTaskValidate(tmp, taskDir);
+
+        expect(hook).toContain("[Trellis: not inlined (total context limit reached) — second.md");
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain(
+          "role=implement source=total path=second.md: cannot be injected in full",
+        );
+        expect(result.stdout).toContain("context_injection.max_total_bytes (120)");
+      });
+
+      it("accepts a complete directory and artifacts when all limits are unlimited", () => {
+        const taskDir = makeTask(tmp, "task-unlimited-complete");
+        fs.mkdirSync(path.join(tmp, "complete-references"));
+        fs.writeFileSync(
+          path.join(tmp, "complete-references", "guide.md"),
+          "G".repeat(200),
+          "utf-8",
+        );
+        writeImplementEntry(taskDir, {
+          file: "complete-references/",
+          type: "directory",
+          reason: "complete directory",
+        });
+        fs.writeFileSync(path.join(taskDir, "prd.md"), "P".repeat(200), "utf-8");
+        writeConfig(
+          tmp,
+          [
+            "context_injection:",
+            "  max_file_bytes: 0",
+            "  max_artifact_bytes: 0",
+            "  max_total_bytes: 0",
+          ].join("\n"),
+        );
+
+        const result = runTaskValidate(tmp, taskDir);
+
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain("All validations passed");
       });
     });
 
@@ -967,6 +1184,11 @@ print("all-valid")
         const taskDir = makeArchivedTask(tmp, taskName);
         fs.mkdirSync(path.join(taskDir, "research"), { recursive: true });
         fs.writeFileSync(
+          path.join(taskDir, "research", "evidence.md"),
+          "archived evidence\n",
+          "utf-8",
+        );
+        fs.writeFileSync(
           path.join(taskDir, "implement.jsonl"),
           JSON.stringify({
             file: `.trellis/tasks/${taskName}/research/`,
@@ -995,7 +1217,7 @@ print("all-valid")
         const { status, stdout } = runTaskValidate(tmp, taskDir);
 
         expect(status).toBe(1);
-        expect(stdout).toContain(`File not found: ${missingPath}`);
+        expect(stdout).toContain(`path=${missingPath}: cannot be injected in full`);
       });
 
       it("#4 does not fall back to a recreated active task when the archive copy is missing", () => {
@@ -1017,7 +1239,7 @@ print("all-valid")
         const { status, stdout } = runTaskValidate(tmp, taskDir);
 
         expect(status).toBe(1);
-        expect(stdout).toContain(`File not found: ${historicalEvidence}`);
+        expect(stdout).toContain(`path=${historicalEvidence}: cannot be injected in full`);
       });
 
       it("#5 rejects traversal in an archived self-reference without active-task fallback", () => {
@@ -1040,7 +1262,7 @@ print("all-valid")
         const { status, stdout } = runTaskValidate(tmp, taskDir);
 
         expect(status).toBe(1);
-        expect(stdout).toContain(`File not found: ${traversalPath}`);
+        expect(stdout).toContain(`path=${traversalPath}: cannot be injected in full`);
       });
 
       it.skipIf(process.platform === "win32")(
@@ -1072,7 +1294,7 @@ print("all-valid")
           const { status, stdout } = runTaskValidate(tmp, taskDir);
 
           expect(status).toBe(1);
-          expect(stdout).toContain(`File not found: ${historicalEvidence}`);
+          expect(stdout).toContain(`path=${historicalEvidence}: cannot be injected in full`);
         },
       );
 

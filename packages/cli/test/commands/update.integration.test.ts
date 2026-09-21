@@ -58,8 +58,13 @@ import {
 } from "../../src/commands/update.js";
 import { VERSION } from "../../src/constants/version.js";
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../../src/constants/paths.js";
-import { computeHash } from "../../src/utils/template-hash.js";
-import { workflowMdTemplate } from "../../src/templates/trellis/index.js";
+import { agentsMdContent } from "../../src/templates/markdown/index.js";
+import { computeHash, loadHashes } from "../../src/utils/template-hash.js";
+import {
+  subnodeAgentTemplate,
+  subnodeEnvTemplate,
+  workflowMdTemplate,
+} from "../../src/templates/trellis/index.js";
 import {
   COPILOT_INSTRUCTIONS_BLOCK_END,
   COPILOT_INSTRUCTIONS_BLOCK_START,
@@ -78,6 +83,51 @@ import { AI_TOOLS } from "../../src/types/ai-tools.js";
 
 // A managed template file that update always handles (Python script)
 const MANAGED_FILE = `${PATHS.SCRIPTS}/get_context.py`;
+const CODEX_WORKFLOW_STATE_HOOK = ".codex/hooks/inject-workflow-state.py";
+const LEGACY_PENNIX_DISPATCH_RESOLVER = `def _resolve_codex_dispatch_mode(config: dict, repo_root: Path | None = None) -> str:
+    """Resolve the Pennix-owned Codex dispatch mode."""
+    root = repo_root or Path.cwd()
+    try:
+        scripts_dir = root / ".trellis" / "scripts"
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        from common.config import get_workflow_dispatch_mode  # type: ignore[import-not-found]
+
+        return get_workflow_dispatch_mode(root, config=config)
+    except Exception:
+        return "inline"`;
+
+function makeLegacyPennixCodexHook(content: string): string {
+  const resolverStart = content.indexOf(
+    "def _resolve_codex_dispatch_mode(config: dict) -> str:",
+  );
+  const resolverEnd = content.indexOf(
+    "\n\ndef _codex_mode_banner",
+    resolverStart,
+  );
+  if (resolverStart < 0 || resolverEnd < 0) {
+    throw new Error("Current Codex hook no longer has the expected resolver");
+  }
+
+  return (
+    content.slice(0, resolverStart) +
+    LEGACY_PENNIX_DISPATCH_RESOLVER +
+    content.slice(resolverEnd)
+  )
+    .replace(
+      '    if active.source_type == "unbound_ambiguous":\n' +
+        '        candidates = ", ".join(active.candidate_paths)\n' +
+        '        return candidates, "unbound_ambiguous", active.source\n',
+      "",
+    )
+    .replace(
+      '    if status == "unbound_ambiguous":\n' +
+        '        header = f"Status: {status}\\nCandidates: {task_id}"\n' +
+        "    else:\n" +
+        '        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"',
+      '    header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"',
+    );
+}
 
 /** Remove a key from a hash object (avoids eslint no-dynamic-delete) */
 function removeHashEntry(
@@ -256,6 +306,53 @@ describe("update() integration", () => {
     // No backup directory created
     const entries = fs.readdirSync(path.join(tmpDir, DIR_NAMES.WORKFLOW));
     expect(entries.filter((e) => e.startsWith(".backup-")).length).toBe(0);
+  });
+
+  it("backfills a missing managed subnode role through the normal update path", async () => {
+    await setupProject();
+    const subnodePath = projectFile(`${PATHS.AGENTS}/subnode.md`);
+    fs.rmSync(subnodePath);
+    // Model a project created before this asset existed, not a user deletion:
+    // recorded deletions are intentionally respected by update().
+    writeHashesV2(
+      hashFilePath(),
+      removeHashEntry(
+        readHashesV2(hashFilePath()),
+        `${PATHS.AGENTS}/subnode.md`,
+      ) as Record<string, string>,
+    );
+    fs.writeFileSync(versionFilePath(), "0.6.17");
+
+    await update({});
+
+    expect(fs.readFileSync(subnodePath, "utf-8")).toBe(subnodeAgentTemplate);
+    const hashes = readHashesV2(hashFilePath());
+    expect(hashes[`${PATHS.AGENTS}/subnode.md`]).toBe(
+      computeHash(subnodeAgentTemplate),
+    );
+  });
+
+  it("backfills the managed subnode role environment through the normal update path", async () => {
+    await setupProject();
+    const envPath = projectFile(`${PATHS.AGENTS}/subnode.env`);
+    fs.rmSync(envPath);
+    // Model a project created before this asset existed, not a user deletion.
+    writeHashesV2(
+      hashFilePath(),
+      removeHashEntry(
+        readHashesV2(hashFilePath()),
+        `${PATHS.AGENTS}/subnode.env`,
+      ) as Record<string, string>,
+    );
+    fs.writeFileSync(versionFilePath(), "0.6.17");
+
+    await update({});
+
+    expect(fs.readFileSync(envPath, "utf-8")).toBe(subnodeEnvTemplate);
+    const hashes = readHashesV2(hashFilePath());
+    expect(hashes[`${PATHS.AGENTS}/subnode.env`]).toBe(
+      computeHash(subnodeEnvTemplate),
+    );
   });
 
   it("#1b current OpenCode templates are not classified as deprecated", async () => {
@@ -459,16 +556,21 @@ describe("update() integration", () => {
     expect(classified.conflict).toHaveLength(0);
     expect(classified.auto).toHaveLength(1);
 
-    await executeMigrations(classified, tmpDir, { force: true, skipAll: false }, currentTemplates);
+    await executeMigrations(
+      classified,
+      tmpDir,
+      { force: true, skipAll: false },
+      currentTemplates,
+    );
 
     // No duplicate/leftover `.pi/skills/` directory should survive.
     expect(fs.existsSync(projectFile(".pi/skills"))).toBe(false);
 
     // `.agents/skills/` must end up with the correct, current, neutral
     // content — not the stale Pi-flavored bytes from the deleted legacy dir.
-    expect(
-      readProjectFile(".agents/skills/trellis-update-spec/SKILL.md"),
-    ).toBe(neutralContent);
+    expect(readProjectFile(".agents/skills/trellis-update-spec/SKILL.md")).toBe(
+      neutralContent,
+    );
   });
 
   it("#2 dry run makes no file changes even when changes exist", async () => {
@@ -537,6 +639,58 @@ describe("update() integration", () => {
 
     // File should be auto-updated back to current template
     expect(fs.readFileSync(targetFull, "utf-8")).toBe(templateContent);
+  });
+
+  it("[issue-180] auto-updates the recognized legacy Pennix Codex hook without force", async () => {
+    await init({ yes: true, force: true, codex: true });
+
+    const currentHook = readProjectFile(CODEX_WORKFLOW_STATE_HOOK);
+    const legacyHook = makeLegacyPennixCodexHook(currentHook);
+    expect(legacyHook).toContain("get_workflow_dispatch_mode");
+    expect(legacyHook).not.toContain("unbound_ambiguous");
+    writeProjectFile(CODEX_WORKFLOW_STATE_HOOK, legacyHook);
+
+    await update({ dryRun: true });
+    expect(readProjectFile(CODEX_WORKFLOW_STATE_HOOK)).toBe(legacyHook);
+
+    await update({});
+    const upgradedHook = readProjectFile(CODEX_WORKFLOW_STATE_HOOK);
+    expect(upgradedHook).toContain("get_workflow_dispatch_mode");
+    expect(upgradedHook).toContain('if active.source_type == "unbound_ambiguous":');
+    expect(upgradedHook).toContain("Candidates: {task_id}");
+    expect(upgradedHook).toContain(
+      '    else:\n        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"',
+    );
+    expect(upgradedHook).not.toContain(
+      '    else:\n    header = f"Status: {status}"',
+    );
+    expect(readHashesV2(hashFilePath())[CODEX_WORKFLOW_STATE_HOOK]).toBe(
+      computeHash(upgradedHook),
+    );
+
+    const backupCount = fs
+      .readdirSync(projectFile(DIR_NAMES.WORKFLOW))
+      .filter((entry) => entry.startsWith(".backup-")).length;
+    await update({});
+    expect(readProjectFile(CODEX_WORKFLOW_STATE_HOOK)).toBe(upgradedHook);
+    expect(
+      fs
+        .readdirSync(projectFile(DIR_NAMES.WORKFLOW))
+        .filter((entry) => entry.startsWith(".backup-")).length,
+    ).toBe(backupCount);
+  });
+
+  it("[issue-180] leaves an unrecognized modified Codex hook on the conflict path", async () => {
+    await init({ yes: true, force: true, codex: true });
+
+    const unknownHook = makeLegacyPennixCodexHook(
+      readProjectFile(CODEX_WORKFLOW_STATE_HOOK),
+    ).replace("get_workflow_dispatch_mode", "get_local_dispatch_mode");
+    writeProjectFile(CODEX_WORKFLOW_STATE_HOOK, unknownHook);
+
+    await update({ skipAll: true });
+
+    expect(readProjectFile(CODEX_WORKFLOW_STATE_HOOK)).toBe(unknownHook);
   });
 
   it("#4b auto-updates legacy untracked AGENTS.md and preserves outside content", async () => {
@@ -742,6 +896,19 @@ describe("update() integration", () => {
     const newFile = targetFull + ".new";
     expect(fs.existsSync(newFile)).toBe(true);
     expect(fs.readFileSync(newFile, "utf-8")).toBe(templateContent);
+  });
+
+  it("preserves malformed AGENTS.md markers and offers the template as a sidecar", async () => {
+    await setupProject();
+
+    const agentsPath = projectFile(FILE_NAMES.AGENTS);
+    const malformed = "# Project Notes\n\n<!-- TRELLIS:START -->\nUnfinished\n";
+    fs.writeFileSync(agentsPath, malformed);
+
+    await update({ createNew: true });
+
+    expect(fs.readFileSync(agentsPath, "utf-8")).toBe(malformed);
+    expect(fs.readFileSync(`${agentsPath}.new`, "utf-8")).toBe(agentsMdContent);
   });
 
   it("#8 updates version file after successful update", async () => {
@@ -1297,6 +1464,12 @@ describe("update() integration", () => {
     await update({ force: true });
 
     expect(fs.existsSync(statusLinePath)).toBe(true);
+    expect(fs.readFileSync(statusLinePath, "utf-8")).toBe(
+      "# existing local statusline\n",
+    );
+    expect(loadHashes(tmpDir)).not.toHaveProperty(
+      ".claude/hooks/statusline.py",
+    );
     const updatedSettings = JSON.parse(
       fs.readFileSync(settingsPath, "utf-8"),
     ) as Record<string, unknown>;
@@ -1347,11 +1520,38 @@ describe("update() integration", () => {
 
     expect(fs.existsSync(statusLinePath)).toBe(true);
     expect(fs.readFileSync(statusLinePath, "utf-8")).toBe(hookContentBefore);
+    expect(loadHashes(tmpDir)).toHaveProperty(".claude/hooks/statusline.py");
     // Byte-identical, not just deep-equal: init's injectStatusLine must
     // produce exactly what preserveExistingClaudeStatusLine re-derives
     // (statusLine appended last). Any drift — even key order — makes update
     // flag a phantom settings.json change on every fresh opted-in project.
     expect(fs.readFileSync(settingsPath, "utf-8")).toBe(settingsBefore);
+  });
+
+  it("#22c repairs a legacy statusline hash omission without adopting custom hooks", async () => {
+    await init({ yes: true, force: true, claude: true, withStatusline: true });
+
+    const statusLinePath = path.join(
+      tmpDir,
+      ".claude",
+      "hooks",
+      "statusline.py",
+    );
+    const hashFile = hashFilePath();
+    const hashes = removeHashEntry(
+      readHashesV2(hashFile),
+      ".claude/hooks/statusline.py",
+    );
+    writeHashesV2(hashFile, hashes);
+
+    const hookContent = fs.readFileSync(statusLinePath, "utf-8");
+    await update({ force: true });
+
+    expect(fs.readFileSync(statusLinePath, "utf-8")).toBe(hookContent);
+    expect(loadHashes(tmpDir)).toHaveProperty(
+      ".claude/hooks/statusline.py",
+      computeHash(hookContent),
+    );
   });
 
   // --- Breaking-change migration gate (v0.5.0-beta.0+) ---

@@ -1,0 +1,29 @@
+{
+  "id": "analysis-only-completion",
+  "name": "analysis-only-completion",
+  "title": "分析型任务完成路径",
+  "description": "为显式 analysis_only 任务提供不进入变更型实施阶段的直接交付和归档路线。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-09-17",
+  "completedAt": "2026-09-17",
+  "branch": "task/analysis-only-completion",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "delivery_mode": "implementation",
+    "target": "workflow-template-skills"
+  }
+}

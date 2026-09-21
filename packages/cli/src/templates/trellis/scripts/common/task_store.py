@@ -266,9 +266,9 @@ def _has_subagent_platform(repo_root: Path) -> bool:
     """Return True if any sub-agent-capable platform is configured.
 
     Detected by probing well-known config directories at the repo root. Codex
-    counts by default through ``codex.dispatch_mode: auto`` (including the
-    legacy ``sub-agent`` alias); explicit inline mode loads context through
-    skills, not JSONL.
+    counts only when ``codex.dispatch_mode: auto`` is explicitly selected
+    (including the legacy ``sub-agent`` alias); the default inline mode loads
+    context through skills, not JSONL.
     """
     for config_dir in _SUBAGENT_CONFIG_DIRS:
         if (repo_root / config_dir).is_dir():
@@ -1569,8 +1569,9 @@ def _auto_commit_archive(
         )
         return not source_was_tracked
 
+    commit_paths = [*paths, *([source_rel] if source_was_tracked else [])]
     rc, _, _ = run_git(
-        ["diff", "--cached", "--quiet", "--", *paths, source_rel],
+        ["diff", "--cached", "--quiet", "--", *commit_paths],
         cwd=repo_root,
     )
     if rc == 0:
@@ -1580,10 +1581,11 @@ def _auto_commit_archive(
     commit_msg = f"chore(task): archive {task_name}"
     # Commit with an explicit pathspec: a bare `git commit` would sweep any
     # unrelated entries the developer had staged before archiving into the
-    # chore commit (#579). `source_rel` is included so the source-side
-    # deletions staged above land in the same commit.
+    # chore commit (#579). Include `source_rel` only when it was tracked, so
+    # the source-side deletions land in that commit without passing an absent,
+    # never-tracked path to git.
     rc, _, err = run_git_retry_index_lock(
-        ["commit", "-m", commit_msg, "--", *paths, source_rel], cwd=repo_root
+        ["commit", "-m", commit_msg, "--", *commit_paths], cwd=repo_root
     )
     if rc == 0:
         print(f"[OK] Auto-committed: {commit_msg}", file=sys.stderr)

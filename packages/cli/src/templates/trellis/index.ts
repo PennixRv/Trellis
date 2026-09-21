@@ -10,8 +10,8 @@
  *   │   ├── __init__.py
  *   │   ├── common/           # Shared utilities (Python)
  *   │   └── *.py              # Main scripts (Python)
- *   ├── agents/                # Channel runtime agent definitions
- *   │   └── *.md               # Loaded by `trellis channel spawn --agent <name>`
+ *   ├── agents/                # Channel runtime agent definitions and assets
+ *   │   └── *.md / *.env       # Loaded by the channel runtime
  *   ├── scripts-shell-archive/ # Archived shell scripts (for reference)
  *   ├── workflow.md           # Workflow guide
  *   ├── config.yaml            # Trellis configuration
@@ -49,9 +49,18 @@ export const commonGit = readTemplate("scripts/common/git.py");
 export const commonTypes = readTemplate("scripts/common/types.py");
 export const commonTasks = readTemplate("scripts/common/tasks.py");
 export const commonTaskContext = readTemplate("scripts/common/task_context.py");
+export const commonContextProjection = readTemplate(
+  "scripts/common/context_projection.py",
+);
 export const commonTaskStore = readTemplate("scripts/common/task_store.py");
 export const commonSessionContext = readTemplate(
   "scripts/common/session_context.py",
+);
+export const commonContinuationRecord = readTemplate(
+  "scripts/common/continuation_record.py",
+);
+export const commonOwnershipRecord = readTemplate(
+  "scripts/common/ownership_record.py",
 );
 export const commonPackagesContext = readTemplate(
   "scripts/common/packages_context.py",
@@ -75,6 +84,10 @@ export const initDeveloperScript = readTemplate("scripts/init_developer.py");
 export const taskScript = readTemplate("scripts/task.py");
 export const getContextScript = readTemplate("scripts/get_context.py");
 export const addSessionScript = readTemplate("scripts/add_session.py");
+export const subnodeArtifactScript = readTemplate(
+  "scripts/subnode_artifact.py",
+);
+export const workspaceNoteScript = readTemplate("scripts/workspace_note.py");
 
 // Configuration files
 export const workflowMdTemplate = readTemplate("workflow.md");
@@ -88,6 +101,8 @@ export const gitattributesTemplate = readTemplate("gitattributes.txt");
 // and refreshed by `trellis update`.
 export const implementAgentTemplate = readTemplate("agents/implement.md");
 export const checkAgentTemplate = readTemplate("agents/check.md");
+export const subnodeAgentTemplate = readTemplate("agents/subnode.md");
+export const subnodeEnvTemplate = readTemplate("agents/subnode.env");
 
 /**
  * Get all script templates as a map of relative path to content
@@ -114,8 +129,11 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("common/types.py", commonTypes);
   scripts.set("common/tasks.py", commonTasks);
   scripts.set("common/task_context.py", commonTaskContext);
+  scripts.set("common/context_projection.py", commonContextProjection);
   scripts.set("common/task_store.py", commonTaskStore);
   scripts.set("common/session_context.py", commonSessionContext);
+  scripts.set("common/continuation_record.py", commonContinuationRecord);
+  scripts.set("common/ownership_record.py", commonOwnershipRecord);
   scripts.set("common/packages_context.py", commonPackagesContext);
   scripts.set("common/workflow_phase.py", commonWorkflowPhase);
   scripts.set("common/workflow_selection.py", commonWorkflowSelection);
@@ -130,12 +148,14 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("task.py", taskScript);
   scripts.set("get_context.py", getContextScript);
   scripts.set("add_session.py", addSessionScript);
+  scripts.set("subnode_artifact.py", subnodeArtifactScript);
+  scripts.set("workspace_note.py", workspaceNoteScript);
 
   return scripts;
 }
 
 /**
- * Get all channel runtime agent definitions as a map of relative path
+ * Get all channel runtime agent assets as a map of relative path
  * (under `.trellis/agents/`) to content.
  *
  * Consumed by `trellis init` (to dispatch on first install) and by
@@ -146,5 +166,7 @@ export function getAllAgents(): Map<string, string> {
   const agents = new Map<string, string>();
   agents.set("implement.md", implementAgentTemplate);
   agents.set("check.md", checkAgentTemplate);
+  agents.set("subnode.md", subnodeAgentTemplate);
+  agents.set("subnode.env", subnodeEnvTemplate);
   return agents;
 }

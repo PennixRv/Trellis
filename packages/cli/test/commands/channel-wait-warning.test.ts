@@ -2,9 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createChannel } from "../../src/commands/channel/create.js";
+import { registerChannelCommand } from "../../src/commands/channel/index.js";
 import { appendEvent } from "../../src/commands/channel/store/events.js";
 import { projectKey } from "../../src/commands/channel/store/paths.js";
 import {
@@ -12,7 +14,10 @@ import {
   scheduleSupervisorTimeoutWarning,
   type SupervisorShutdownProbe,
 } from "../../src/commands/channel/supervisor/warning.js";
-import { channelWait } from "../../src/commands/channel/wait.js";
+import {
+  channelBarrier,
+  channelWait,
+} from "../../src/commands/channel/wait.js";
 import { readChannelEvents } from "../../src/commands/channel/store/events.js";
 import type { ChannelEvent } from "../../src/commands/channel/store/events.js";
 
@@ -132,6 +137,52 @@ describe("channelWait kind union (CLI)", () => {
 
     await waiter;
     expect(process.exitCode).not.toBe(124);
+  });
+
+  it("replays a terminal event committed after an explicit barrier", async () => {
+    await createChannel("wait-barrier", { by: "main" });
+    const barrier = await channelBarrier("wait-barrier");
+    await appendEvent("wait-barrier", {
+      kind: "done",
+      by: "worker",
+      duration_ms: 5,
+    });
+    vi.mocked(console.log).mockClear();
+
+    await channelWait("wait-barrier", {
+      as: "main",
+      from: "worker",
+      kind: "done",
+      afterSeq: barrier,
+      timeoutMs: 5000,
+    });
+
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse(String(vi.mocked(console.log).mock.calls[0][0])),
+    ).toMatchObject({
+      kind: "done",
+      by: "worker",
+    });
+  });
+
+  it("prints a durable sequence through the barrier command", async () => {
+    await createChannel("command-barrier", { by: "main" });
+    await appendEvent("command-barrier", {
+      kind: "progress",
+      by: "worker",
+      text: "ready",
+    });
+    vi.mocked(console.log).mockClear();
+    const program = new Command();
+    registerChannelCommand(program);
+
+    await program.parseAsync(
+      ["node", "trellis", "channel", "barrier", "command-barrier"],
+      { from: "node" },
+    );
+
+    expect(console.log).toHaveBeenCalledWith(2);
   });
 
   it("invalid CSV member surfaces the existing invalid-kind error", async () => {
