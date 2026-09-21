@@ -111,6 +111,13 @@ def _get_current_task_for_input(trellis_dir: Path, cc_data: dict) -> dict | None
         return None
 
     active = resolve_active_task(trellis_dir.parent, cc_data, platform="claude")
+    if active.source_type == "unbound_ambiguous":
+        return {
+            "title": f"Task binding ambiguous ({len(active.candidate_paths)} candidates)",
+            "status": "unbound_ambiguous",
+            "priority": "P?",
+            "source": active.source,
+        }
     if not active.task_path:
         return None
 

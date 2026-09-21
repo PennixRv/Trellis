@@ -4602,6 +4602,48 @@ print(json.dumps({
     expect(output).not.toContain("[global]");
   });
 
+  it("[session-current-task] Claude statusline shows unbound task ambiguity", () => {
+    setupTaskRepo();
+    writeProjectFile(
+      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      JSON.stringify(
+        {
+          title: "Issue 106 task",
+          status: "in_progress",
+          assignee: "test-dev",
+          package: null,
+        },
+        null,
+        2,
+      ),
+    );
+    writeProjectFile(
+      path.join(".trellis", "tasks", "other-task", "task.json"),
+      JSON.stringify(
+        { title: "Other task", status: "planning", assignee: "test-dev" },
+        null,
+        2,
+      ),
+    );
+    writeProjectFile(
+      path.join(".claude", "hooks", "statusline.py"),
+      getStatuslineHook(),
+    );
+
+    const output = runPython(
+      path.join(".claude", "hooks", "statusline.py"),
+      JSON.stringify({
+        model: { display_name: "Test" },
+        context_window: { used_percentage: 1, context_window_size: 1000 },
+        cost: { total_duration_ms: 0 },
+      }),
+    );
+
+    expect(output).toContain("Task binding ambiguous (2 candidates)");
+    expect(output).toContain("(unbound_ambiguous)");
+    expect(output).not.toContain("NO ACTIVE TASK");
+  });
+
   it("[statusline-opt-in] Claude statusline tolerates ISO-8601 resets_at and missing seven_day (no crash)", () => {
     setupTaskRepo();
     writeProjectFile(

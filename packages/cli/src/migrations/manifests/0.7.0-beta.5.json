@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.5",
+  "description": "Pennix v0.7 beta completeness audit fixes",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Bug Fixes:**\n- Claude statusline preserves the explicit `unbound_ambiguous` state instead of suppressing it as no active task.\n- Release preflight recognizes npm's exact-version JSON array response, so already-published beta releases are not planned again.",
+  "migrations": [],
+  "notes": "Run `npm install -g @pennixrv/trellis@beta` then `trellis update`. No `--migrate` required."
+}

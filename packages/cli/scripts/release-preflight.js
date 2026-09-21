@@ -75,7 +75,9 @@ function tagVersionFromEnv() {
   // GITHUB_REF for `push: tags: v*` looks like `refs/tags/v0.6.0-beta.12`.
   // GITHUB_REF_NAME on `release.published` is the tag name.
   const ref = process.env.GITHUB_REF_NAME || process.env.GITHUB_REF || "";
-  const m = ref.match(/(?:refs\/tags\/)?v(\d+\.\d+\.\d+(?:-[A-Za-z0-9.+-]+)?)$/);
+  const m = ref.match(
+    /(?:refs\/tags\/)?v(\d+\.\d+\.\d+(?:-[A-Za-z0-9.+-]+)?)$/,
+  );
   return m ? m[1] : null;
 }
 
@@ -84,6 +86,19 @@ export function computeNpmTag(version) {
   if (/-rc\./.test(version)) return "rc";
   if (/-alpha\./.test(version)) return "alpha";
   return "latest";
+}
+
+export function npmVersionMatches(raw, version) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  return (
+    parsed === version ||
+    (Array.isArray(parsed) && parsed.length === 1 && parsed[0] === version)
+  );
 }
 
 export function npmVersionExists(pkgName, version) {
@@ -95,7 +110,7 @@ export function npmVersionExists(pkgName, version) {
     if (!out) return false;
     // npm returns the literal version string for an exact-version match,
     // and an empty body for unknown versions.
-    return JSON.parse(out) === version;
+    return npmVersionMatches(out, version);
   } catch (err) {
     const stderr = err.stderr?.toString() ?? "";
     if (stderr.includes("E404") || stderr.includes("not found")) return false;
