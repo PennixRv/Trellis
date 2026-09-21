@@ -150,7 +150,7 @@ const PENNIX_AMBIGUITY_BREADCRUMB_HEADER =
   '    if status == "unbound_ambiguous":\n' +
   '        header = f"Status: {status}\\nCandidates: {task_id}"\n' +
   "    else:\n" +
-  LEGACY_PENNIX_BREADCRUMB_HEADER;
+  '        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"';
 
 interface LegacyPennixCodexHookMigration {
   content: string;

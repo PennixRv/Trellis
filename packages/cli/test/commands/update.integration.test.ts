@@ -658,6 +658,12 @@ describe("update() integration", () => {
     expect(upgradedHook).toContain("get_workflow_dispatch_mode");
     expect(upgradedHook).toContain('if active.source_type == "unbound_ambiguous":');
     expect(upgradedHook).toContain("Candidates: {task_id}");
+    expect(upgradedHook).toContain(
+      '    else:\n        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"',
+    );
+    expect(upgradedHook).not.toContain(
+      '    else:\n    header = f"Status: {status}"',
+    );
     expect(readHashesV2(hashFilePath())[CODEX_WORKFLOW_STATE_HOOK]).toBe(
       computeHash(upgradedHook),
     );
