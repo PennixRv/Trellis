@@ -1,0 +1,9 @@
+{
+  "version": "0.6.44",
+  "description": "Migrates the historical Pennix Codex workflow hook to project ambiguous unbound task state.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fix:**\n- `trellis update` now upgrades the recognized historical Pennix Codex workflow hook so multiple unbound tasks render as `unbound_ambiguous` with their candidate paths instead of `no_task`.",
+  "migrations": [],
+  "notes": "No flag is required. The compatibility update is content-precise, preserves the Pennix dispatch customization, and leaves unrecognized modified hooks on the normal conflict path."
+}

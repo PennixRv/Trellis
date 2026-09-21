@@ -83,6 +83,51 @@ import { AI_TOOLS } from "../../src/types/ai-tools.js";
 
 // A managed template file that update always handles (Python script)
 const MANAGED_FILE = `${PATHS.SCRIPTS}/get_context.py`;
+const CODEX_WORKFLOW_STATE_HOOK = ".codex/hooks/inject-workflow-state.py";
+const LEGACY_PENNIX_DISPATCH_RESOLVER = `def _resolve_codex_dispatch_mode(config: dict, repo_root: Path | None = None) -> str:
+    """Resolve the Pennix-owned Codex dispatch mode."""
+    root = repo_root or Path.cwd()
+    try:
+        scripts_dir = root / ".trellis" / "scripts"
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        from common.config import get_workflow_dispatch_mode  # type: ignore[import-not-found]
+
+        return get_workflow_dispatch_mode(root, config=config)
+    except Exception:
+        return "inline"`;
+
+function makeLegacyPennixCodexHook(content: string): string {
+  const resolverStart = content.indexOf(
+    "def _resolve_codex_dispatch_mode(config: dict) -> str:",
+  );
+  const resolverEnd = content.indexOf(
+    "\n\ndef _codex_mode_banner",
+    resolverStart,
+  );
+  if (resolverStart < 0 || resolverEnd < 0) {
+    throw new Error("Current Codex hook no longer has the expected resolver");
+  }
+
+  return (
+    content.slice(0, resolverStart) +
+    LEGACY_PENNIX_DISPATCH_RESOLVER +
+    content.slice(resolverEnd)
+  )
+    .replace(
+      '    if active.source_type == "unbound_ambiguous":\n' +
+        '        candidates = ", ".join(active.candidate_paths)\n' +
+        '        return candidates, "unbound_ambiguous", active.source\n',
+      "",
+    )
+    .replace(
+      '    if status == "unbound_ambiguous":\n' +
+        '        header = f"Status: {status}\\nCandidates: {task_id}"\n' +
+        "    else:\n" +
+        '        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"',
+      '    header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"',
+    );
+}
 
 /** Remove a key from a hash object (avoids eslint no-dynamic-delete) */
 function removeHashEntry(
@@ -594,6 +639,52 @@ describe("update() integration", () => {
 
     // File should be auto-updated back to current template
     expect(fs.readFileSync(targetFull, "utf-8")).toBe(templateContent);
+  });
+
+  it("[issue-180] auto-updates the recognized legacy Pennix Codex hook without force", async () => {
+    await init({ yes: true, force: true, codex: true });
+
+    const currentHook = readProjectFile(CODEX_WORKFLOW_STATE_HOOK);
+    const legacyHook = makeLegacyPennixCodexHook(currentHook);
+    expect(legacyHook).toContain("get_workflow_dispatch_mode");
+    expect(legacyHook).not.toContain("unbound_ambiguous");
+    writeProjectFile(CODEX_WORKFLOW_STATE_HOOK, legacyHook);
+
+    await update({ dryRun: true });
+    expect(readProjectFile(CODEX_WORKFLOW_STATE_HOOK)).toBe(legacyHook);
+
+    await update({});
+    const upgradedHook = readProjectFile(CODEX_WORKFLOW_STATE_HOOK);
+    expect(upgradedHook).toContain("get_workflow_dispatch_mode");
+    expect(upgradedHook).toContain('if active.source_type == "unbound_ambiguous":');
+    expect(upgradedHook).toContain("Candidates: {task_id}");
+    expect(readHashesV2(hashFilePath())[CODEX_WORKFLOW_STATE_HOOK]).toBe(
+      computeHash(upgradedHook),
+    );
+
+    const backupCount = fs
+      .readdirSync(projectFile(DIR_NAMES.WORKFLOW))
+      .filter((entry) => entry.startsWith(".backup-")).length;
+    await update({});
+    expect(readProjectFile(CODEX_WORKFLOW_STATE_HOOK)).toBe(upgradedHook);
+    expect(
+      fs
+        .readdirSync(projectFile(DIR_NAMES.WORKFLOW))
+        .filter((entry) => entry.startsWith(".backup-")).length,
+    ).toBe(backupCount);
+  });
+
+  it("[issue-180] leaves an unrecognized modified Codex hook on the conflict path", async () => {
+    await init({ yes: true, force: true, codex: true });
+
+    const unknownHook = makeLegacyPennixCodexHook(
+      readProjectFile(CODEX_WORKFLOW_STATE_HOOK),
+    ).replace("get_workflow_dispatch_mode", "get_local_dispatch_mode");
+    writeProjectFile(CODEX_WORKFLOW_STATE_HOOK, unknownHook);
+
+    await update({ skipAll: true });
+
+    expect(readProjectFile(CODEX_WORKFLOW_STATE_HOOK)).toBe(unknownHook);
   });
 
   it("#4b auto-updates legacy untracked AGENTS.md and preserves outside content", async () => {
