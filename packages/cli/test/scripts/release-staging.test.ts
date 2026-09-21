@@ -57,4 +57,11 @@ describe("release pre-commit staging", () => {
       release.indexOf("node scripts/check-manifest-continuity.js"),
     );
   });
+
+  it("pushes only the release tag, not every local tag", () => {
+    const release = fs.readFileSync(RELEASE_SCRIPT, "utf-8");
+
+    expect(release).toContain('"refs/tags/v${version}"');
+    expect(release).not.toContain('git push origin "HEAD:${branch}" --tags');
+  });
 });
