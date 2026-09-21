@@ -1,0 +1,30 @@
+{
+  "id": "issue180-runtime-projection-compatibility",
+  "name": "issue180-runtime-projection-compatibility",
+  "title": "Issue180 runtime projection compatibility migration",
+  "description": "修复上一轮 unbound_ambiguous 已进入模板但未进入现有 Pennix 定制项目 Hook 的升级路径；增加精确、幂等、保留定制的兼容迁移，补齐真实升级回归并发布。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P0",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-09-21",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "target": "cli",
+    "release_required": "true",
+    "regression": "issue180"
+  }
+}
