@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { npmVersionMatches } from "../../scripts/release-preflight.js";
+import {
+  npmVersionMatches,
+  npmVersionValue,
+} from "../../scripts/release-preflight.js";
 
 const PREFLIGHT_SCRIPT = path.resolve(
   __dirname,
@@ -30,5 +33,11 @@ describe("release npm visibility verification", () => {
 
     expect(source).toContain("const attempts = 18;");
     expect(source).toContain("10_000");
+  });
+
+  it("normalizes npm's single-item version arrays", () => {
+    expect(npmVersionValue(["0.7.0-beta.6"])).toBe("0.7.0-beta.6");
+    expect(npmVersionValue("0.7.0-beta.6")).toBe("0.7.0-beta.6");
+    expect(npmVersionValue([])).toEqual([]);
   });
 });

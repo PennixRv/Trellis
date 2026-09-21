@@ -101,6 +101,10 @@ export function npmVersionMatches(raw, version) {
   );
 }
 
+export function npmVersionValue(value) {
+  return Array.isArray(value) && value.length === 1 ? value[0] : value;
+}
+
 export function npmVersionExists(pkgName, version) {
   try {
     const out = execSync(
@@ -293,13 +297,17 @@ async function verifyNpm({ packageFilter }) {
 
   for (const pkg of packages) {
     await retry(`${pkg.name}@${v.cliVersion}`, () => {
-      const version = npmViewJSON(`${pkg.name}@${v.cliVersion} version`);
+      const version = npmVersionValue(
+        npmViewJSON(`${pkg.name}@${v.cliVersion} version`),
+      );
       if (version !== v.cliVersion) {
         fail(
           `${pkg.name}@${v.cliVersion} is not visible on the public npm registry.`,
         );
       }
-      const taggedVersion = npmViewJSON(`${pkg.name}@${tag} version`);
+      const taggedVersion = npmVersionValue(
+        npmViewJSON(`${pkg.name}@${tag} version`),
+      );
       if (taggedVersion !== v.cliVersion) {
         fail(
           `${pkg.name}@${tag} resolves to ${taggedVersion ?? "nothing"}, expected ${v.cliVersion}.`,
