@@ -128,7 +128,7 @@ This is per-submodule. Pushing `docs-site` but forgetting `marketplace` (or vice
 
 ```bash
 git submodule foreach 'git fetch origin -q; sha=$(git rev-parse HEAD); \
-  git merge-base --is-ancestor $sha origin/main \
+  git branch -r --contains "$sha" | grep -q "origin/" \
     && echo "ok $name" || echo "FAIL $name $sha not on remote"'
 ```
 
@@ -153,7 +153,7 @@ ignore it, which is how the v0.6.4 incident below happens a second time.
 **Instead**: fetch, then ask whether the SHA is an ancestor of the remote branch
 — that is the same question CI answers when it materialises the pointer.
 
-Any `FAIL` line means: `cd <submodule> && git checkout -B main && git push origin main` before tagging. If the tag was already pushed when you discover the miss, recover by pushing the submodule then re-running the failed CI jobs (`gh run rerun <id> --failed`) — no new tag is needed.
+The pointer may be reachable from a release branch (for example Marketplace beta assets) or from `main` (for example the shared docs site); require any advertised remote branch rather than a fixed branch name. Any `FAIL` line means: `cd <submodule> && git checkout -B <published-branch> && git push origin <published-branch>` before tagging. If the tag was already pushed when you discover the miss, recover by pushing the submodule then re-running the failed CI jobs (`gh run rerun <id> --failed`) — no new tag is needed.
 
 > **Incident note (2026-06, v0.6.4).** `marketplace/workflows/native/workflow.md` was touched as a parity mirror for a bundled template edit, committed in-submodule, and pointer-bumped in the main repo — but the submodule itself was never pushed to its `origin/main`. `pnpm release` happily tagged `v0.6.4`; CI fetched the new tag, tried to materialise the marketplace pointer `680bcbb`, and died at checkout. Fix took two commands (`git -C marketplace push origin main` + `gh run rerun --failed`) but the failure mode is invisible from main-repo `git status` (the submodule is "clean" locally), which is exactly why the verify step above is mandatory and not advisory.
 
