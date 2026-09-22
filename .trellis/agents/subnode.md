@@ -49,10 +49,17 @@ sandbox claim.
 4. Write `report.json` only when you are ready to stop. Its status is one of
    `complete`, `blocked`, `incomplete`, or `error`; it is always
    **pending coordinator review**, never accepted/rejected/deferred.
-5. A complete report includes independently checkable evidence. A non-complete
-   report explains completed scope and the blocker or error. Include the exact
-   identity, scope, and lens required by the artifact helper.
-6. Finish with one short final assistant reply that states the status and report
+5. Use report schema version 2. Include one `scope_assessment` for each brief
+   scope item, structured findings with `id`, `conclusion`, and `evidence_ids`,
+   and typed `uncertainties` or `corrections` when present. A complete report
+   includes independently checkable evidence; a non-complete report explains
+   completed scope and the blocker or error. Include the exact identity, scope,
+   and lens required by the artifact helper.
+6. Append a checkpoint marker to `worklog.md` after each material unit using
+   the exact `trellis-checkpoint` JSON fields documented by `subnode-work`.
+   Missing or incomplete checkpoint coverage becomes a coordinator review
+   concern; it does not become acceptance.
+7. Finish with one short final assistant reply that states the status and report
    path. Do not place the report JSON in the reply and do not run
    `trellis channel send`: the supervisor routes this final reply into the
    durable Channel message and `done` events.

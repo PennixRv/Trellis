@@ -50,12 +50,15 @@ and its status; the Codex supervisor projects that reply into the durable
 Channel message and `done` events. The durable JSON file carries the
 reviewable result.
 
-The subnode copies identity, scope, and lens from `brief.json`. The minimal
+The subnode copies identity, scope, and lens from `brief.json`. Schema version 2
+requires one `scope_assessment` entry for every brief scope item, structured
+findings with evidence references, and typed uncertainties or corrections when
+present. Schema version 1 is retired and the validator rejects it. The minimal
 complete report is:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "task_id": "task-id-from-brief",
   "work_id": "work-id-from-brief",
   "subnode_id": "subnode-id-from-brief",
@@ -63,6 +66,14 @@ complete report is:
   "status": "complete",
   "scope": ["exact scope copied from brief"],
   "lens": "exact lens copied from brief",
+  "scope_assessment": [
+    {
+      "scope": "exact scope item from brief",
+      "status": "covered",
+      "conclusion": "What this scope establishes.",
+      "evidence_ids": ["stable-evidence-id"]
+    }
+  ],
   "evidence": [
     {
       "id": "stable-evidence-id",
@@ -70,11 +81,29 @@ complete report is:
       "summary": "What this independently reviewable evidence establishes."
     }
   ],
-  "findings": ["Bounded conclusion."],
+  "findings": [
+    {
+      "id": "finding-id",
+      "conclusion": "Bounded conclusion.",
+      "evidence_ids": ["stable-evidence-id"]
+    }
+  ],
   "uncertainties": [],
   "corrections": []
 }
 ```
+
+Append a checkpoint marker to `worklog.md` when a material unit is complete or
+blocked. It is a bounded recovery projection, not coordinator acceptance:
+
+```text
+<!-- trellis-checkpoint: {"id":"checkpoint-1","covered_scope":["exact scope item"],"evidence_ids":["stable-evidence-id"],"conclusion_or_blocker":"Current conclusion or blocker.","unknowns":[],"safe_resume_point":"Next safe action."} -->
+```
+
+The validator returns `review_concern` for missing or incomplete checkpoint
+coverage and for inconclusive scope assessments so the coordinator can inspect
+them. Identity, schema, path, and malformed-structure failures remain hard
+errors. A concern is never automatic acceptance or rejection.
 
 For `blocked`, `incomplete`, or `error`, include the same base fields plus a
 `completed_scope` list (empty when no assigned scope started) and a non-empty

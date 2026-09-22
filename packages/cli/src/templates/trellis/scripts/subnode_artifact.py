@@ -22,10 +22,12 @@ from common.task_utils import is_within_tasks_dir, resolve_task_dir
 from common.tasks import load_task
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MAX_DRAFT_BYTES = 64 * 1024
 MAX_REPORT_BYTES = 128 * 1024
+MAX_WORKLOG_BYTES = 128 * 1024
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+CHECKPOINT_RE = re.compile(r"^<!-- trellis-checkpoint: (?P<payload>\{.*\}) -->$", re.MULTILINE)
 SECRET_PATTERNS = (
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
@@ -305,7 +307,7 @@ def _validate_brief_file(
     return brief, raw, brief_path, node_dir, task_dir
 
 
-def _validate_evidence(value: Any) -> set[tuple[str, str]]:
+def _validate_evidence(value: Any) -> set[str]:
     if not isinstance(value, list):
         _fail("report.evidence must be a list")
     identities: set[tuple[str, str]] = set()
@@ -319,13 +321,100 @@ def _validate_evidence(value: Any) -> set[tuple[str, str]]:
         if identity in identities:
             _fail("report.evidence contains a duplicate evidence identity")
         identities.add(identity)
-    return identities
+    return {evidence_id for evidence_id, _locator in identities}
+
+
+def _validate_id_list(value: Any, field: str) -> list[str]:
+    if not isinstance(value, list):
+        _fail(f"{field} must be a list")
+    result = []
+    for index, item in enumerate(value):
+        result.append(_require_text(item, f"{field}[{index}]", max_len=128))
+    if len(result) != len(set(result)):
+        _fail(f"{field} must not contain duplicates")
+    return result
+
+
+def _validate_typed_notes(value: Any, field: str) -> None:
+    if not isinstance(value, list):
+        _fail(f"report.{field} must be a list")
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            _fail(f"report.{field}[{index}] must be an object")
+        _require_id(item.get("id"), f"report.{field}[{index}].id")
+        _require_text(item.get("type"), f"report.{field}[{index}].type", max_len=64)
+        _require_text(item.get("detail"), f"report.{field}[{index}].detail")
+        _validate_id_list(item.get("evidence_ids", []), f"report.{field}[{index}].evidence_ids")
+
+
+def _validate_checkpoint(node_dir: Path, evidence_ids: set[str], scope: list[str]) -> list[str]:
+    worklog_path = node_dir / "worklog.md"
+    if worklog_path.is_symlink():
+        _fail(f"refusing symlinked worklog: {worklog_path}")
+    try:
+        raw = worklog_path.read_bytes()
+    except FileNotFoundError:
+        _fail(f"worklog does not exist: {worklog_path}")
+    except OSError as exc:
+        _fail(f"could not read worklog {worklog_path}: {exc}")
+    if len(raw) > MAX_WORKLOG_BYTES:
+        _fail(f"worklog exceeds the {MAX_WORKLOG_BYTES} byte limit: {worklog_path}")
+    _reject_obvious_secrets(raw, "worklog")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        _fail(f"worklog is not UTF-8: {worklog_path}")
+    matches = list(CHECKPOINT_RE.finditer(text))
+    if not matches:
+        return ["missing_worklog_checkpoint"]
+    concerns: list[str] = []
+    checkpoint_ids: set[str] = set()
+    for match in matches:
+        try:
+            checkpoint = json.loads(match.group("payload"))
+        except json.JSONDecodeError:
+            concerns.append("malformed_worklog_checkpoint")
+            continue
+        if not isinstance(checkpoint, dict):
+            concerns.append("malformed_worklog_checkpoint")
+            continue
+        try:
+            checkpoint_id = _require_id(checkpoint.get("id"), "worklog checkpoint.id")
+            if checkpoint_id in checkpoint_ids:
+                concerns.append("duplicate_worklog_checkpoint")
+            checkpoint_ids.add(checkpoint_id)
+            covered_scope = _require_text_list(
+                checkpoint.get("covered_scope"),
+                "worklog checkpoint.covered_scope",
+                allow_empty=True,
+            )
+            for item in covered_scope:
+                if item not in scope:
+                    concerns.append("checkpoint_scope_outside_brief")
+            checkpoint_evidence = _validate_id_list(
+                checkpoint.get("evidence_ids"), "worklog checkpoint.evidence_ids"
+            )
+            if any(item not in evidence_ids for item in checkpoint_evidence):
+                concerns.append("checkpoint_evidence_unresolved")
+            _require_text(
+                checkpoint.get("conclusion_or_blocker"),
+                "worklog checkpoint.conclusion_or_blocker",
+            )
+            _require_text_list(
+                checkpoint.get("unknowns"),
+                "worklog checkpoint.unknowns",
+                allow_empty=True,
+            )
+            _require_text(checkpoint.get("safe_resume_point"), "worklog checkpoint.safe_resume_point")
+        except ArtifactError:
+            concerns.append("malformed_worklog_checkpoint")
+    return sorted(set(concerns))
 
 
 def _validate_report_data(
     report: dict[str, Any],
     brief: dict[str, Any],
-) -> set[tuple[str, str]]:
+) -> tuple[set[str], list[str]]:
     if report.get("schema_version") != SCHEMA_VERSION:
         _fail(f"report.schema_version must be {SCHEMA_VERSION}")
     for field in ("task_id", "work_id", "subnode_id", "role_id"):
@@ -339,11 +428,52 @@ def _validate_report_data(
     if status not in {"complete", "blocked", "incomplete", "error"}:
         _fail("report.status must be complete, blocked, incomplete, or error")
     evidence = _validate_evidence(report.get("evidence"))
-    for field in ("findings", "uncertainties", "corrections"):
-        if not isinstance(report.get(field), list):
-            _fail(f"report.{field} must be a list")
+    assessment = report.get("scope_assessment")
+    if not isinstance(assessment, list) or len(assessment) != len(brief["scope"]):
+        _fail("report.scope_assessment must contain one item for every brief scope item")
+    concerns: list[str] = []
+    for index, item in enumerate(assessment):
+        if not isinstance(item, dict):
+            _fail(f"report.scope_assessment[{index}] must be an object")
+        if item.get("scope") != brief["scope"][index]:
+            _fail(f"report.scope_assessment[{index}].scope does not match brief.scope")
+        if item.get("status") not in {"covered", "inconclusive", "not-started"}:
+            _fail(f"report.scope_assessment[{index}].status is invalid")
+        _require_text(item.get("conclusion"), f"report.scope_assessment[{index}].conclusion")
+        assessment_evidence = _validate_id_list(
+            item.get("evidence_ids"), f"report.scope_assessment[{index}].evidence_ids"
+        )
+        if any(value not in evidence for value in assessment_evidence):
+            concerns.append("scope_assessment_evidence_unresolved")
+        if item["status"] != "covered":
+            concerns.append("incomplete_scope_coverage")
+        if item["status"] == "covered" and not assessment_evidence:
+            concerns.append("covered_scope_without_evidence")
+    findings = report.get("findings")
+    if not isinstance(findings, list):
+        _fail("report.findings must be a list")
+    finding_ids: set[str] = set()
+    for index, item in enumerate(findings):
+        if not isinstance(item, dict):
+            _fail(f"report.findings[{index}] must be an object")
+        finding_id = _require_id(item.get("id"), f"report.findings[{index}].id")
+        if finding_id in finding_ids:
+            _fail("report.findings contains duplicate ids")
+        finding_ids.add(finding_id)
+        _require_text(item.get("conclusion"), f"report.findings[{index}].conclusion")
+        finding_evidence = _validate_id_list(
+            item.get("evidence_ids"), f"report.findings[{index}].evidence_ids"
+        )
+        if not finding_evidence:
+            concerns.append("finding_without_evidence")
+        if any(value not in evidence for value in finding_evidence):
+            concerns.append("finding_evidence_unresolved")
+    _validate_typed_notes(report.get("uncertainties"), "uncertainties")
+    _validate_typed_notes(report.get("corrections"), "corrections")
     if status == "complete" and not evidence:
         _fail("a complete report requires at least one evidence item")
+    if status == "complete" and not findings:
+        _fail("a complete report requires at least one finding")
     if status != "complete":
         _require_text_list(
             report.get("completed_scope"),
@@ -351,13 +481,13 @@ def _validate_report_data(
             allow_empty=True,
         )
         _require_text(report.get("blocker"), "report.blocker")
-    return evidence
+    return evidence, sorted(set(concerns))
 
 
 def _validate_report_file(
     value: str,
     repo_root: Path,
-) -> tuple[dict[str, Any], set[tuple[str, str]], dict[str, Any], Path]:
+) -> tuple[dict[str, Any], set[str], dict[str, Any], Path, list[str]]:
     report_path, node_dir, _task_dir = _resolve_artifact_file(value, "report.json", repo_root)
     brief_path = node_dir / "brief.json"
     brief, _brief_raw, _brief_path, _brief_node, _brief_task = _validate_brief_file(
@@ -368,8 +498,9 @@ def _validate_report_file(
         _fail("brief.report_path does not point to the report being validated")
     report, raw = _read_json_object(report_path, MAX_REPORT_BYTES, "report")
     _reject_obvious_secrets(raw, "report")
-    evidence = _validate_report_data(report, brief)
-    return report, evidence, brief, node_dir
+    evidence, concerns = _validate_report_data(report, brief)
+    concerns.extend(_validate_checkpoint(node_dir, evidence, brief["scope"]))
+    return report, evidence, brief, node_dir, sorted(set(concerns))
 
 
 def _validate_disposition_data(
@@ -466,13 +597,20 @@ def _init(args: argparse.Namespace) -> None:
 
 def _validate(args: argparse.Namespace) -> None:
     repo_root = get_repo_root()
-    report, _evidence, _brief, _node_dir_value = _validate_report_file(args.report, repo_root)
+    report, _evidence, _brief, _node_dir_value, concerns = _validate_report_file(args.report, repo_root)
+    if concerns:
+        print(json.dumps({
+            "status": "review_concern",
+            "subnode_id": report["subnode_id"],
+            "concerns": concerns,
+        }))
+        return
     print(f"Validated pending-review report: {report['subnode_id']}")
 
 
 def _disposition(args: argparse.Namespace) -> None:
     repo_root = get_repo_root()
-    report, _evidence, brief, node_dir = _validate_report_file(args.report, repo_root)
+    report, _evidence, brief, node_dir, _concerns = _validate_report_file(args.report, repo_root)
     disposition_path = node_dir / "disposition.json"
     if disposition_path.exists() or disposition_path.is_symlink():
         _fail(f"disposition already exists and cannot be replaced: {disposition_path}")
@@ -514,10 +652,10 @@ def _validate_counter(args: argparse.Namespace) -> None:
         primary_dir = repo_root / primary_dir
     if not counter_dir.is_absolute():
         counter_dir = repo_root / counter_dir
-    primary_report, primary_evidence, primary_brief, primary_node = _validate_report_file(
+    primary_report, primary_evidence, primary_brief, primary_node, _primary_concerns = _validate_report_file(
         str(primary_dir / "report.json"), repo_root
     )
-    counter_report, counter_evidence, counter_brief, counter_node = _validate_report_file(
+    counter_report, counter_evidence, counter_brief, counter_node, _counter_concerns = _validate_report_file(
         str(counter_dir / "report.json"), repo_root
     )
     if primary_node == counter_node:

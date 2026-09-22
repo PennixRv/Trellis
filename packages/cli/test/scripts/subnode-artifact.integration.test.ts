@@ -121,7 +121,7 @@ function writeCompleteReport(
   fs.writeFileSync(
     reportPath,
     JSON.stringify({
-      schema_version: 1,
+      schema_version: 2,
       task_id: brief.task_id,
       work_id: brief.work_id,
       subnode_id: brief.subnode_id,
@@ -129,6 +129,12 @@ function writeCompleteReport(
       status: "complete",
       scope: brief.scope,
       lens: brief.lens,
+      scope_assessment: brief.scope.map((item: string) => ({
+        scope: item,
+        status: "covered",
+        conclusion: "The assigned scope was covered.",
+        evidence_ids: [evidenceId],
+      })),
       evidence: [
         {
           id: evidenceId,
@@ -137,10 +143,25 @@ function writeCompleteReport(
             "Directly observed source supporting the reported conclusion.",
         },
       ],
-      findings: ["The evidence is independently reviewable."],
+      findings: [{
+        id: `finding-${evidenceId}`,
+        conclusion: "The evidence is independently reviewable.",
+        evidence_ids: [evidenceId],
+      }],
       uncertainties: [],
       corrections: [],
     }) + "\n",
+  );
+  fs.appendFileSync(
+    path.join(dir, "worklog.md"),
+    `\n<!-- trellis-checkpoint: ${JSON.stringify({
+      id: "checkpoint-1",
+      covered_scope: brief.scope,
+      evidence_ids: [evidenceId],
+      conclusion_or_blocker: "The assigned scope is complete.",
+      unknowns: [],
+      safe_resume_point: "No further work is required for this scope.",
+    })} -->\n`,
   );
   return reportPath;
 }
@@ -178,7 +199,7 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
       fs.readFileSync(path.join(dir, "brief.json"), "utf-8"),
     );
     expect(brief).toMatchObject({
-      schema_version: 1,
+      schema_version: 2,
       task_id: "task-a",
       work_id: "dependency-audit",
       subnode_id: "primary",
@@ -215,6 +236,13 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     const validate = run(tmp, "validate", "--report", report);
     expect(validate.status, validate.stderr).toBe(0);
     expect(validate.stdout).toContain("pending-review");
+
+    const legacy = JSON.parse(fs.readFileSync(report, "utf-8"));
+    legacy.schema_version = 1;
+    fs.writeFileSync(report, JSON.stringify(legacy) + "\n");
+    const rejectedLegacy = run(tmp, "validate", "--report", report);
+    expect(rejectedLegacy.status).toBe(1);
+    expect(rejectedLegacy.stderr).toContain("schema_version must be 2");
   });
 
   it("binds a worker handle and creates one coordinator disposition", () => {
@@ -404,7 +432,7 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     fs.writeFileSync(
       reportPath,
       JSON.stringify({
-        schema_version: 1,
+        schema_version: 2,
         task_id: brief.task_id,
         work_id: brief.work_id,
         subnode_id: brief.subnode_id,
@@ -412,6 +440,12 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
         status: "error",
         scope: brief.scope,
         lens: brief.lens,
+        scope_assessment: brief.scope.map((item: string) => ({
+          scope: item,
+          status: "not-started",
+          conclusion: "The worker stopped before this scope was inspected.",
+          evidence_ids: [],
+        })),
         evidence: [],
         findings: [],
         uncertainties: [],
@@ -420,7 +454,10 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
         blocker: "The worker failed before inspecting the assigned scope.",
       }) + "\n",
     );
-    expect(run(tmp, "validate", "--report", reportPath).status).toBe(0);
+    const reviewConcern = run(tmp, "validate", "--report", reportPath);
+    expect(reviewConcern.status, reviewConcern.stderr).toBe(0);
+    expect(reviewConcern.stdout).toContain('"status": "review_concern"');
+    expect(reviewConcern.stdout).toContain("missing_worklog_checkpoint");
 
     const report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
     delete report.completed_scope;

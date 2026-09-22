@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   getCommandTemplates,
   getSkillTemplates,
+  getBundledSkillTemplates,
 } from "../../src/templates/common/index.js";
 import {
   collectPlatformTemplates,
@@ -183,6 +184,21 @@ describe("trellis template constants", () => {
     );
   });
 
+  it("routes complex analysis requests through normal planning", () => {
+    const brainstorm = getSkillTemplates().find((template) => template.name === "brainstorm")?.content ?? "";
+    for (const content of [workflowMdTemplate, brainstorm]) {
+      expect(content).toContain("material user decision");
+      expect(content).toContain("cross-owner coordination");
+      expect(content).toContain("release or credential action");
+      expect(content).toContain("normal complex planning");
+      expect(content).toContain("Planning Seal closure pass");
+    }
+    expect(brainstorm).toContain("When the host returns the current continuation's answer");
+    expect(brainstorm).not.toContain("stop the turn for native input");
+    expect(workflowMdTemplate).toContain("evidence units");
+    expect(workflowMdTemplate).toContain("static decisions and implementation paths are locked");
+  });
+
   it("keeps direct small work bounded across bundled and Marketplace workflows", () => {
     const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
       ? process.cwd()
@@ -260,6 +276,8 @@ describe("trellis template constants", () => {
     expect(workflow).toContain("`trellis-research-record`");
     expect(workflow).toContain("### Semantic RecoveryBrief");
     expect(workflow).toContain("checkpoint's exact archive/convergence");
+    expect(workflow).toContain("Evidence is unit-sized");
+    expect(workflow).toContain("Planning Seal closure pass");
     expect(workflow).toContain("[workflow-state:planning]");
     expect(workflow).toContain("[workflow-state:in_progress]");
     expect(workflow).toContain("rather than high-frequency polling");
@@ -387,6 +405,18 @@ describe("trellis template constants", () => {
     expect(block).toContain("already running as `trellis-check`");
     expect(block).toContain("do NOT spawn another `trellis-check`");
     expect(block).toContain("main session only");
+  });
+
+  it("ships the structured subnode v2 report and checkpoint contract", () => {
+    expect(subnodeAgentTemplate).toContain("report schema version 2");
+    expect(subnodeAgentTemplate).toContain("scope_assessment");
+    expect(subnodeAgentTemplate).toContain("trellis-checkpoint");
+    const channelSkill = getBundledSkillTemplates().find(
+      (template) => template.name === "trellis-channel",
+    )?.files.find((file) => file.relativePath === "references/subnode-work.md")?.content ?? "";
+    expect(channelSkill).toContain("schema_version\": 2");
+    expect(channelSkill).toContain("scope_assessment");
+    expect(channelSkill).toContain("review_concern");
   });
 
   it("[issue-237] workflow.md Phase 2 dispatch steps require prompt recursion guards", () => {

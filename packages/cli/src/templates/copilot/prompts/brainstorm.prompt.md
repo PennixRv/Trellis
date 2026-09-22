@@ -12,6 +12,10 @@ For every non-trivial task, the user must respond at least once after the initia
 
 While any user-owned product, scope, UX, compatibility, risk, or acceptance decision remains unresolved, keep the task in planning. First inventory evidence and decision dependencies. If at least two independent material decisions remain and `pennix-decision-gates` is available, delegate one bounded batch of up to three frontier questions; otherwise ask the single highest-value question. Do not edit product code, dispatch implementation, or run `task.py start` until the decision chain is sealed.
 
+## Analysis-Only Exception
+
+When `task.json.meta.delivery_mode = "analysis_only"` exactly and the PRD names a bounded evidence deliverable plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems, task-creation consent authorizes that evidence work. Keep status `planning`, record and verify the evidence, commit task artifacts, and archive directly; do not run `task.py start` or wait for a second implementation approval. This exception is eligible only when there is no material user decision, design or implementation plan, cross-owner coordination, security or deployment change, release or credential action, or protected downstream task. Otherwise use normal complex planning.
+
 ## Non-Negotiable Evidence Rule
 
 If a question can be answered by exploring the codebase, explore the codebase instead.
@@ -21,6 +25,10 @@ This is mandatory. Before asking the user a question, first check whether the an
 Do not ask the user to confirm facts that the repository can answer. Ask only for product intent, preference, scope, risk tolerance, acceptance behavior, or decisions that remain ambiguous after inspection.
 
 Repository evidence establishes current behavior and technical constraints. The user's intended behavior, feature scope boundaries, and UX preferences are never answerable by repository evidence alone, even when an existing pattern exists; existing patterns are options and recommendation evidence, not decisions.
+
+## Evidence Units For Read-Heavy Work
+
+When research, audit, review, or investigation is too large for one independently useful conclusion in the current session, split it into evidence units. Each unit has one question or scope, a minimal evidence range, a destination artifact, and a stop condition; persist facts, conclusion or blocker, unknowns, and a recovery point before starting another unit. Size each unit for one normal context window without promising an exact token or time limit.
 
 ---
 
@@ -52,10 +60,10 @@ Use a concise title from the user's request. Both the title and `--description` 
    - product intent still needed from the user
    - scope or risk decisions still needed from the user
    - likely out-of-scope items
-4. If user-owned decisions remain, calculate the independent frontier. Use `pennix-decision-gates` for a bounded batch when two or more independent material decisions are ready; otherwise ask the single highest-value question. Include recommendation and trade-off, then stop the turn for native input.
-5. After each answer batch, update `prd.md`, record the selected decisions, recheck evidence and conflicts, and repeat from step 2. Do not create a second Trellis lifecycle for the same decision chain.
+4. If user-owned decisions remain, calculate the independent frontier. Use `pennix-decision-gates` for a bounded batch when two or more independent material decisions are ready; otherwise ask the single highest-value question. Include recommendation and trade-off. Yield only while the answer is unavailable.
+5. When the host returns the current continuation's answer, persist it in `prd.md` or the decision artifact, recheck evidence and conflicts, recalculate the frontier, and continue the same planning loop. Stop only for a new unresolved frontier, a real capability or authority block, or a final sealed summary awaiting implementation approval.
 6. When no user-owned decision remains, create or update `design.md` and `implement.md` for complex tasks.
-7. Run the requirement convergence gate, then the PRD convergence pass.
+7. Run the requirement convergence gate, then the PRD convergence pass. Finish with one Planning Seal closure pass.
 8. Present the final planning summary and stop. Do not run `task.py start` or edit product code in the same turn.
 9. Only a subsequent user message that explicitly approves the latest planning summary authorizes `task.py start` and implementation. If implementation reveals a material unresolved decision, record `decision-needed`, run `task.py replan <task> "<reason>"`, and return through this planning flow; do not open a popup during implementation.
 
@@ -94,6 +102,8 @@ Before final review, verify all of the following:
 Lightweight tasks may omit `design.md` and `implement.md`; they may not skip evidence inspection, requirement convergence, final review, or fresh implementation approval.
 
 The final planning summary must show Goal, In Scope, Out of Scope, Acceptance Criteria, Key Decisions, relevant Risks or Deferred Items, and artifact status.
+
+The Planning Seal closure pass reconciles `task.json`, `prd.md`, `design.md`, `implement.md`, research, decision records, and manifests; verifies targets, branches, dependencies, release, validation, rollback, dynamic-fact dispositions, and replan triggers; and fixes every material decision to an owner and outcome. No `TBD`, `TODO`, `decision-needed`, unowned option, unspecified branch, open implementation path, validation gap, or conditional acceptance may remain. Any material discovery invalidates the seal and returns to planning.
 
 ## Artifact Rules
 
