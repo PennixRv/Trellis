@@ -205,7 +205,7 @@ export function claudeSearch(s: MemSessionInfo, kw: string): SearchHit {
 /**
  * Single-pass scan of a Claude JSONL file that produces both the cleaned
  * dialogue turns (semantically identical to {@link claudeExtractDialogue}) and
- * the list of `task.py create|start` Bash tool_use events with their
+ * the list of `task.py create|replan|start` Bash tool_use events with their
  * `turnIndex`. Compaction keeps both `turns` and `events` — the turns those
  * indices point at are still in the pool.
  */

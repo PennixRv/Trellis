@@ -45,6 +45,8 @@ max_journal_lines: 2000
 #     - "echo 'Task created'"
 #   after_start:
 #     - "echo 'Task started'"
+#   after_replan:
+#     - "echo 'Task returned to planning'"
 #   after_finish:
 #     - "echo 'Task finished'"
 #   after_archive:

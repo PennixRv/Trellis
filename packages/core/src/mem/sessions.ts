@@ -204,7 +204,7 @@ function sliceMemPhase(
     if (windows.length === 0) {
       warnings.push({
         code: "no-brainstorm-boundary",
-        message: `no task.py create/start boundary found in session — returning full dialogue.`,
+        message: `no task.py create/replan/start boundary found in session — returning full dialogue.`,
       });
       return {
         groups: [{ label: null, turns }],
@@ -224,7 +224,7 @@ function sliceMemPhase(
   if (windows.length === 0) {
     warnings.push({
       code: "no-brainstorm-boundary",
-      message: `no task.py create/start boundary found in session — implement phase is empty.`,
+      message: `no task.py create/replan/start boundary found in session — implement phase is empty.`,
     });
     return {
       groups: [{ label: null, turns: [] }],

@@ -193,7 +193,7 @@ export function grokSearch(s: MemSessionInfo, kw: string): SearchHit {
 
 /**
  * Single pass over `chat_history.jsonl`: cleaned dialogue turns plus the
- * `task.py create|start` invocations found in `run_terminal_command` tool
+ * `task.py create|replan|start` invocations found in `run_terminal_command` tool
  * calls, which is what `--phase` slicing needs.
  */
 export function collectGrokTurnsAndEvents(

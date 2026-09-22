@@ -238,7 +238,7 @@ export function collectPiTurnsAndEvents(s: MemSessionInfo): {
 - **Cleaning**: keep user text, assistant `text` blocks, `custom_message` text,
   `[branch summary]`, and `[compact summary]`. Drop thinking, tool results,
   bash output, image payloads, and tool-call arguments from dialogue.
-- **Phase signals**: collect `task.py create|start` from assistant `toolCall`
+- **Phase signals**: collect `task.py create|replan|start` from assistant `toolCall`
   blocks where `name` is `bash` or `shell` and `arguments.command` is a string,
   and from `message.role === "bashExecution"` with string `command`.
 
@@ -308,7 +308,7 @@ for (const entry of effective) addCleanTurnAndTaskEvents(entry);
   plus one structured `zcode-db-unreadable` warning; core never prints it.
 - **Cleaning/phase**: text parts become user/assistant turns; compaction starts
   the effective dialogue at the latest summary; Bash tool parts provide
-  `task.py create|start` boundaries.
+  `task.py create|replan|start` boundaries.
 
 ### Devin CLI (Cognition terminal agent)
 
@@ -658,7 +658,7 @@ extracted independently from implementation work.
 | `--phase`       | Behavior                                                                                                                                          |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `all` (default) | Pre-existing behavior — full cleaned dialogue, unchanged.                                                                                         |
-| `brainstorm`    | Returns only turns inside `[task.py create, task.py start)` windows.                                                                              |
+| `brainstorm`    | Returns only turns inside `[task.py create|replan, task.py start)` windows.                                                                              |
 | `implement`     | Returns turns OUTSIDE every brainstorm window (i.e., turns the user spent doing the actual work, plus session warm-up before the first `create`). |
 
 ### Boundary signal
@@ -667,7 +667,7 @@ A brainstorm window is bounded by `task.py` invocations recovered from
 platform-native shell-call events (which the dialogue cleaners discard):
 
 - **Window start**: a Bash-equivalent shell call whose command matches
-  `task.py create`.
+  `task.py create` or `task.py replan`.
   - Claude: assistant `tool_use` block with `name === "Bash"`,
     `input.command` is the command string.
   - Codex: top-level `function_call` event with `name` ∈ `{"exec_command",
@@ -705,6 +705,7 @@ Concretely supported invokers + path forms:
 - `py -3 .trellis/scripts/task.py create ...` (Windows launcher)
 - `python3 .trellis\\scripts\\task.py start ...` (JSONL-double-escaped backslash)
 - `python3 .trellis\scripts\task.py start ...` (single backslash)
+- `task.py replan <task-dir> "reason"` (return material ambiguity to planning)
 - `task.py start <task-dir>` (PATH + chmod +x, no invoker prefix)
 - `python3 /Users/.../task.py create ...` (absolute path)
 
@@ -729,9 +730,9 @@ Bash idioms that surface in dogfood JSONL streams.
 | `python3 .trellis/scripts/task.py start .trellis/tasks/05-08-foo`                                                | task-dir has `MM-DD-` prefix from `task.py create` | `slugFromTaskDir` strips a leading `MM-DD-` so a `create --slug foo` pairs with this `start` via slug match                                                 |
 | `--slug=foo` vs `--slug foo`                                                                                     | `=` vs space                                       | `splitShellArgs` is whitespace-only; the `=` form is captured by the equals branch in `parseTaskPyCommand`                                                  |
 
-The "two-call" case is the load-bearing one: a brainstorm window opens on the
-first `task.py create` inside the same Bash command and closes on the
-second `task.py start`, so missing the second call would silently drop the
+The transition case is the load-bearing one: a brainstorm window opens on the
+first `task.py create` or `task.py replan` inside the same Bash command and closes on the
+next `task.py start`, so missing the transition would silently drop the
 window. `parseTaskPyCommandsAll` was added in 0.6.0-beta.5 specifically to
 fix that drop after a real `--phase brainstorm` dogfood run on this repo
 returned 0 windows on a session that contained 6 tasks.
@@ -825,7 +826,7 @@ machine-readable stdout used by `--json` consumers.
 cleaned `DialogueTurn[]` (semantically identical to `codexExtractDialogue`)
 AND the list of `task.py` events with `turnIndex`, with the boundary signal
 read from `function_call` events whose `name === "exec_command"` (or `"shell"`)
-and whose argument payload contains `task.py create|start`. The dispatcher in
+and whose argument payload contains `task.py create|replan|start`. The dispatcher in
 `cmdExtract` picks the right collector by `s.platform`. Pairing
 (`buildBrainstormWindows`), labeling (`slugFromTaskDir`), and the fallback
 matrix above are shared across Claude, Codex, and Pi — only the raw-event

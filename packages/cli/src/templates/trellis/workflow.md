@@ -45,6 +45,7 @@ Every task has its own directory under `.trellis/tasks/{MM-DD-name}/` holding `t
 # Task lifecycle
 python3 ./.trellis/scripts/task.py create "<title>" [--slug <name>] [--parent <dir>]
 python3 ./.trellis/scripts/task.py start <name>          # set active task (session-scoped when available)
+python3 ./.trellis/scripts/task.py replan <name> "<reason>" # return material ambiguity to planning
 python3 ./.trellis/scripts/task.py current --source      # show active task and source
 python3 ./.trellis/scripts/task.py finish                # clear active task (triggers after_finish hooks)
 python3 ./.trellis/scripts/task.py archive <name>        # move to archive/{year-month}/
@@ -229,7 +230,7 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 [workflow-state:planning]
 Load `trellis-brainstorm`; stay in planning.
 If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete the declared evidence work now. Do not wait for a start review or run `task.py start`; when the PRD boundary and acceptance evidence pass, commit task artifacts and archive directly. A protected-target recommendation requires a separate change-bearing task.
-Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`.
+Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-gates`, batch only independent frontier questions, and stay in planning.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start.
 [/workflow-state:planning]
@@ -243,7 +244,7 @@ Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research mani
 [workflow-state:planning-inline]
 Load `trellis-brainstorm`; stay in planning.
 If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete the declared evidence work now. Do not wait for a start review or run `task.py start`; when the PRD boundary and acceptance evidence pass, commit task artifacts and archive directly. A protected-target recommendation requires a separate change-bearing task.
-Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`.
+Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-gates`, batch only independent frontier questions, and stay in planning.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-before-dev`.
 [/workflow-state:planning-inline]
@@ -262,6 +263,7 @@ Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-bef
 Sub-agent dispatch protocol applies to all platforms and all sub-agents, including native Codex `SubagentStart` context injection with child-side pull fallback, class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code/DeepSeek Harness, hook-backed ZCode/Snow, and `trellis-research`: every dispatch prompt starts with `Active task: <task path from task.py current>` before role-specific instructions. On Grok Build, use `spawn_subagent` with `subagent_type` set to the Trellis agent name (e.g. `trellis-implement`). On Kimi Code, dispatch the built-in `coder` / `explore` sub-agent with the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions. On DeepSeek Harness, tell the child to load the matching `.dsh/skills/trellis-agent-<role>/SKILL.md` exactly once, then choose the synchronization path by capability. If the optional companion plugin exposes `trellis_wait`, dispatch `subagent` in its default continuable background mode, continue independent work, and call `trellis_wait` once per dependent child id when a dependent gate is next; each call returns only after DSH has queued that child's native settlement notice. Without `trellis_wait`, dispatch each child with `run_in_background: false` from the outset so no dependent gate can overtake it. Never simulate waiting with shell sleep, polling loops, `job_output`, repeated `list_agents`, or another long-running command, and never leave a background child without an event-driven wait path.
 
 [workflow-state:in_progress]
+If implementation discovers a material unresolved decision, record `decision-needed`, run `task.py replan <task> "<reason>"`, and return to the planning frontier; do not ask a native question during implementation.
 Tools: `trellis-implement` / `trellis-research` name sub-agent roles dispatched through your platform's sub-agent mechanism, not skills the main session loads itself (on Claude Code: use the Task/Agent tool, never the Skill tool). `trellis-update-spec` is a skill. `trellis-check` exists as both; prefer the Agent/role form when verifying after code changes.
 On DeepSeek Harness, role instructions ship as collision-free `trellis-agent-implement` / `trellis-agent-check` / `trellis-agent-research` skills under `.dsh/skills/`. The main session must not load them itself: tell the child to load the matching role skill exactly once. If `trellis_wait` is available, use the default background mode, do independent work, then call `trellis_wait` once per dependent child id and consume each native settlement notice before entering the dependent gate. If it is unavailable, dispatch every child with `run_in_background: false` from the outset. Do not poll, sleep, or start a background child without an event-driven wait path.
 Flow: `trellis-implement` -> `trellis-check` -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
@@ -276,6 +278,7 @@ Dispatch prompt starts with `Active task: <task path from task.py current>`. Rea
 
 [workflow-state:in_progress-inline]
 Flow: `trellis-before-dev` -> edit -> `trellis-check` -> validation -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
+If implementation discovers a material unresolved decision, record `decision-needed`, run `task.py replan <task> "<reason>"`, and return to the planning frontier; native questions are planning-only.
 Do not dispatch implement/check sub-agents in inline mode.
 Read context: `prd.md` -> `design.md if present` -> `implement.md if present`, plus relevant spec/research loaded by skills.
 [/workflow-state:in_progress-inline]
@@ -379,7 +382,7 @@ Load the `trellis-brainstorm` skill and explore requirements interactively with 
 For an eligible analysis-only task, converge the PRD boundary, then perform the declared research, audit, or design work in this phase. It does not need a start review or `task.py start`; after acceptance evidence is recorded, continue directly to Phase 3.3.
 
 The brainstorm skill will guide you to:
-- Ask one question at a time
+- Batch up to three independent material frontier questions; ask one only when dependency ordering requires it
 - Prefer researching over asking the user
 - Prefer offering options over open-ended questions
 - Update `prd.md` immediately after each user answer

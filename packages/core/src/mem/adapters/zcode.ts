@@ -442,7 +442,7 @@ export function zcodeSearch(
 
 /**
  * Single pass over messages + parts. Emits both the cleaned dialogue turns and
- * the list of `task.py create|start` invocations found in `Bash` tool parts
+ * the list of `task.py create|replan|start` invocations found in `Bash` tool parts
  * (`{type:"tool", tool:"Bash", state:{input:{command:"..."}}}`). `turnIndex`
  * for each event is the turn count at the time the tool ran.
  *

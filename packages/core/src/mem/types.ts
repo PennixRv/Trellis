@@ -156,13 +156,13 @@ export interface MemProjectSummary {
   by_platform: Record<MemSourceKind, number>;
 }
 
-/** Parsed `task.py create|start` invocation recovered from a raw shell call. */
+/** Parsed `task.py create|start|replan` invocation recovered from a raw shell call. */
 export type ParsedTaskPyCommand =
   | { action: "create"; slug?: string; titleArg?: string }
-  | { action: "start"; taskDir?: string };
+  | { action: "start" | "replan"; taskDir?: string };
 
 export interface TaskPyEvent {
-  action: "create" | "start";
+  action: "create" | "start" | "replan";
   timestamp: string;
   /** Index into the cleaned `DialogueTurn[]` at the time the shell call ran. */
   turnIndex: number;

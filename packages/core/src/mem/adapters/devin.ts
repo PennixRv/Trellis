@@ -441,7 +441,7 @@ function buildTurn(node: SlimNode): DialogueTurn | null {
 
 /**
  * Single pass over the main chain: cleaned dialogue plus `task.py`
- * create/start events from assistant `exec` tool_calls. `turnIndex` is the
+ * create/replan/start events from assistant `exec` tool_calls. `turnIndex` is the
  * turn count *before* this node's own text is pushed (Claude/Codex
  * convention: the tool ran as part of producing the next assistant turn).
  */

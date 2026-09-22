@@ -1,7 +1,7 @@
 /**
  * Tests for brainstorm-window phase slicing.
  *
- * brainstorm window = [task.py create, task.py start)
+ * brainstorm window = [task.py create|replan, task.py start)
  *
  * Boundary signals are recovered from raw Claude JSONL `tool_use` blocks, so
  * `collectClaudeTurnsAndEvents` does its own pass producing both cleaned turns
@@ -104,6 +104,17 @@ describe("parseTaskPyCommand", () => {
     });
   });
 
+  it("matches replan and keeps the task directory", () => {
+    expect(
+      parseTaskPyCommand(
+        'python3 ./.trellis/scripts/task.py replan .trellis/tasks/05-08-foo "needs product decision"',
+      ),
+    ).toEqual({
+      action: "replan",
+      taskDir: ".trellis/tasks/05-08-foo",
+    });
+  });
+
   it("matches absolute path", () => {
     const r = parseTaskPyCommand(
       "python3 /Users/me/proj/.trellis/scripts/task.py create new-thing",
@@ -133,7 +144,7 @@ describe("parseTaskPyCommand", () => {
     expect(parseTaskPyCommand("see task.py for details")).toBeNull();
   });
 
-  it("does NOT match `task.py update` (only create/start are signals)", () => {
+  it("does NOT match `task.py update` (only create/replan/start are signals)", () => {
     expect(
       parseTaskPyCommand("python3 .trellis/scripts/task.py update foo"),
     ).toBeNull();
@@ -149,7 +160,7 @@ describe("parseTaskPyCommand", () => {
 // =============================================================================
 
 function ev(
-  action: "create" | "start",
+  action: "create" | "start" | "replan",
   turnIndex: number,
   extra: { slug?: string; taskDir?: string } = {},
 ): TaskPyEvent {
@@ -276,6 +287,19 @@ describe("buildBrainstormWindows", () => {
     const events = [ev("create", 4, { slug: "interrupted" })];
     expect(buildBrainstormWindows(events, 12)).toEqual([
       { label: "interrupted", startTurn: 4, endTurn: 12 },
+    ]);
+  });
+
+  it("opens a new brainstorm window after replan", () => {
+    const events = [
+      ev("create", 1, { slug: "foo" }),
+      ev("start", 4, { taskDir: ".trellis/tasks/foo" }),
+      ev("replan", 7, { taskDir: ".trellis/tasks/foo" }),
+      ev("start", 10, { taskDir: ".trellis/tasks/foo" }),
+    ];
+    expect(buildBrainstormWindows(events, 12)).toEqual([
+      { label: "foo", startTurn: 1, endTurn: 4 },
+      { label: "foo", startTurn: 7, endTurn: 10 },
     ]);
   });
 

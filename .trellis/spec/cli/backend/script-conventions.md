@@ -622,7 +622,7 @@ a `.current-task` fallback or a Python hook directory.
 
 ##### 1. Scope / Trigger
 
-- Trigger: any change to `task.py create/start/current/finish`, hook
+- Trigger: any change to `task.py create/replan/start/current/finish`, hook
   current-task injection, statusline current-task display, plugin active-task
   display, or platform session identity handling.
 - Reason: current-task state is a cross-platform runtime contract. A direct
@@ -633,6 +633,7 @@ a `.current-task` fallback or a Python hook directory.
 
 - `python3 .trellis/scripts/task.py create "<title>" [--slug <slug>] [--description <text>] [--no-start]`
 - `python3 .trellis/scripts/task.py start <task-dir>`
+- `python3 .trellis/scripts/task.py replan <task-dir> "<reason>"`
 - `python3 .trellis/scripts/task.py current [--source] [--json]`
 - `python3 .trellis/scripts/task.py list [--mine] [--status <status>] [--json]`
 - `python3 .trellis/scripts/task.py finish`
@@ -960,7 +961,7 @@ for.
 | `TRELLIS_HOOKS=0` or `TRELLIS_DISABLE_HOOKS=1` | Hook exits 0, writes nothing |
 | stdin is not JSON, or not an object | Treated as `{}`; no command found; no-op |
 | Payload has no recognizable command | `("", None)` → `main()` no-ops |
-| Command contains no `task.py start/current/finish` | No ticket written |
+| Command contains no `task.py start/replan/current/finish` | No ticket written |
 | `shlex.split` raises on an unbalanced quote | No subcommands → no ticket |
 | Hook payload carries no session/conversation/transcript id | No context key → no ticket |
 | Ticket older than 30 s | Rejected on read; also unlinked by the next write's sweep |
@@ -1437,7 +1438,7 @@ path = ".trellis/scripts/task.py"
 
 ### Scope / Trigger
 
-Task lifecycle events (`after_create`, `after_start`, `after_finish`, `after_archive`) execute user-defined shell commands configured in `config.yaml`.
+Task lifecycle events (`after_create`, `after_start`, `after_replan`, `after_finish`, `after_archive`) execute user-defined shell commands configured in `config.yaml`.
 
 ### Signatures
 

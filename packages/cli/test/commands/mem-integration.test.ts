@@ -586,7 +586,7 @@ describe("runMem subcommand integration", () => {
       "brainstorm",
     ]);
     const errsJoined = errs.join("\n");
-    expect(errsJoined).toMatch(/no task\.py create\/start boundary/);
+    expect(errsJoined).toMatch(/no task\.py create\/replan\/start boundary/);
     const joined = logs.join("\n");
     expect(joined).toContain("memory leak");
   });
@@ -602,7 +602,7 @@ describe("runMem subcommand integration", () => {
       "--json",
     ]);
     const errsJoined = errs.join("\n");
-    expect(errsJoined).toMatch(/no task\.py create\/start boundary/);
+    expect(errsJoined).toMatch(/no task\.py create\/replan\/start boundary/);
     const parsed = JSON.parse(logs.join("\n")) as {
       turns: unknown[];
       windows: unknown[];

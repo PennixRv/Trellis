@@ -13,7 +13,7 @@ import type {
 } from "./types.js";
 
 /**
- * Find ALL `task.py create|start` invocations in a single Bash command string.
+ * Find ALL `task.py create|start|replan` invocations in a single Bash command string.
  * A real Bash invocation can contain several (e.g.
  * `SMOKE=$(task.py create …); task.py start "$SMOKE"`). Returned in source
  * order; each entry's args are bounded to the next `task.py` invocation or
@@ -26,10 +26,10 @@ import type {
 export function parseTaskPyCommandsAll(cmd: string): ParsedTaskPyCommand[] {
   if (typeof cmd !== "string" || cmd.length === 0) return [];
   const all: ParsedTaskPyCommand[] = [];
-  const findRe = /(^|[\s/\\])task\.py\s+(create|start)(?:\s+|$)/g;
-  const matches: { action: "create" | "start"; bodyStart: number }[] = [];
+  const findRe = /(^|[\s/\\])task\.py\s+(create|start|replan)(?:\s+|$)/g;
+  const matches: { action: "create" | "start" | "replan"; bodyStart: number }[] = [];
   for (const m of cmd.matchAll(findRe)) {
-    const action = m[2] as "create" | "start";
+    const action = m[2] as "create" | "start" | "replan";
     const bodyStart = m.index + m[0].length;
     matches.push({ action, bodyStart });
   }
@@ -50,7 +50,11 @@ export function parseTaskPyCommandsAll(cmd: string): ParsedTaskPyCommand[] {
       !parsed.titleArg
     )
       continue;
-    if (cur.action === "start" && parsed.action === "start" && !parsed.taskDir)
+    if (
+      (cur.action === "start" || cur.action === "replan") &&
+      parsed.action === cur.action &&
+      !parsed.taskDir
+    )
       continue;
     all.push(parsed);
   }
@@ -64,7 +68,7 @@ export function parseTaskPyCommand(cmd: string): ParsedTaskPyCommand | null {
 }
 
 function parseRestOfTaskPyCommand(
-  action: "create" | "start",
+  action: "create" | "start" | "replan",
   restRaw: string,
 ): ParsedTaskPyCommand {
   if (action === "create") {
@@ -95,7 +99,7 @@ function parseRestOfTaskPyCommand(
     taskDir = a;
     break;
   }
-  return { action: "start", taskDir };
+  return { action, taskDir };
 }
 
 /** Best-effort shell-arg splitter: respects `"…"` / `'…'` quoting, splits on
@@ -152,13 +156,13 @@ export function slugFromTaskDir(p: string | undefined): string | undefined {
 }
 
 /**
- * Pair `create` → `start` events into brainstorm windows.
+ * Pair `create`/`replan` → `start` events into brainstorm windows.
  *
  * Pairing strategy:
  *   1. Slug match wins regardless of position.
- *   2. FIFO fallback: remaining creates pair with the next unmatched start
+ *   2. FIFO fallback: remaining planning events pair with the next unmatched start
  *      appearing after them in event order.
- *   3. Unmatched create → `[create, totalTurns)`.
+ *   3. Unmatched planning event → `[event, totalTurns)`.
  *   4. Unmatched start  → `[0, start)`.
  *
  * Windows are sorted by `startTurn` ascending for stable output ordering.
@@ -167,9 +171,9 @@ export function buildBrainstormWindows(
   events: readonly TaskPyEvent[],
   totalTurns: number,
 ): BrainstormWindow[] {
-  const creates = events
+  const planning = events
     .map((e, i) => ({ e, i }))
-    .filter(({ e }) => e.action === "create");
+    .filter(({ e }) => e.action === "create" || e.action === "replan");
   const starts = events
     .map((e, i) => ({ e, i }))
     .filter(({ e }) => e.action === "start");
@@ -180,48 +184,49 @@ export function buildBrainstormWindows(
   let windowCounter = 0;
 
   // Pass 1: pair by slug match.
-  for (const { e: createEv, i: ci } of creates) {
-    if (!createEv.slug) continue;
+  for (const { e: openEv, i: oi } of planning) {
+    const openSlug = openEv.slug ?? slugFromTaskDir(openEv.taskDir);
+    if (!openSlug) continue;
     const matchIdx = starts.findIndex(
       ({ e, i }) =>
-        !usedStartIdx.has(i) && slugFromTaskDir(e.taskDir) === createEv.slug,
+        !usedStartIdx.has(i) && slugFromTaskDir(e.taskDir) === openSlug,
     );
     if (matchIdx === -1) continue;
     const startEntry = starts[matchIdx];
     if (!startEntry) continue;
     usedStartIdx.add(startEntry.i);
-    usedCreateIdx.add(ci);
+    usedCreateIdx.add(oi);
     pushWindow(
       windows,
-      createEv.turnIndex,
+      openEv.turnIndex,
       startEntry.e.turnIndex,
-      createEv.slug,
+      openSlug,
       ++windowCounter,
     );
   }
 
-  // Pass 2: FIFO pair remaining creates with later starts.
-  for (const { e: createEv, i: ci } of creates) {
-    if (usedCreateIdx.has(ci)) continue;
-    const pairedStart = starts.find(({ i }) => !usedStartIdx.has(i) && i > ci);
+  // Pass 2: FIFO pair remaining planning events with later starts.
+  for (const { e: openEv, i: oi } of planning) {
+    if (usedCreateIdx.has(oi)) continue;
+    const pairedStart = starts.find(({ i }) => !usedStartIdx.has(i) && i > oi);
     if (pairedStart) {
       usedStartIdx.add(pairedStart.i);
-      usedCreateIdx.add(ci);
-      const slug = createEv.slug ?? slugFromTaskDir(pairedStart.e.taskDir);
+      usedCreateIdx.add(oi);
+      const slug = openEv.slug ?? slugFromTaskDir(openEv.taskDir) ?? slugFromTaskDir(pairedStart.e.taskDir);
       pushWindow(
         windows,
-        createEv.turnIndex,
+        openEv.turnIndex,
         pairedStart.e.turnIndex,
         slug,
         ++windowCounter,
       );
     } else {
-      usedCreateIdx.add(ci);
+      usedCreateIdx.add(oi);
       pushWindow(
         windows,
-        createEv.turnIndex,
+        openEv.turnIndex,
         totalTurns,
-        createEv.slug,
+        openEv.slug ?? slugFromTaskDir(openEv.taskDir),
         ++windowCounter,
       );
     }

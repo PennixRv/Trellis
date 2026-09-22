@@ -331,12 +331,13 @@ a new writer requires updating this spec.**
 | # | Writer | File:Line | Value | Trigger |
 |---|--------|-----------|-------|---------|
 | 1 | `cmd_create` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:206` | `"planning"` | `task.py create "<title>"` (also visibly auto-sets the session active-task pointer when session identity is available; `--no-start` skips pointer movement for backlog batching — see R7 in 04-30-workflow-state-commit-gap PRD) |
-| 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py:114-115, 128-129` | `"in_progress"` (gated on prior `"planning"`; both branches in `cmd_start`) | `task.py start <dir>` |
-| 3 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:337` | `"completed"` (unconditional flip + archive `mv`) | `task.py archive <dir>` |
-| 4 | `emptyTaskJson` factory | `packages/cli/src/utils/task-json.ts:54` | `"planning"` (default) | TS callers (init, update) |
-| 5 | `getBootstrapTaskJson` | `packages/cli/src/commands/init.ts:535` | `"in_progress"` (override) | `trellis init` (creator path) |
-| 6 | `getJoinerTaskJson` | `packages/cli/src/commands/init.ts:587` | `"in_progress"` (override) | `trellis init` (joiner path) |
-| 7 | migration-task via `emptyTaskJson` | `packages/cli/src/commands/update.ts:2483-2494` | `"planning"` (override on factory) | `trellis update --migrate` for breaking-change manifest |
+| 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py` | `"in_progress"` (gated on prior `"planning"`) | `task.py start <dir>` |
+| 3 | `cmd_replan` | `packages/cli/src/templates/trellis/scripts/task.py` | `"planning"` (gated on prior `"in_progress"`; appends an auditable reason) | `task.py replan <dir> "reason"` |
+| 4 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:337` | `"completed"` (unconditional flip + archive `mv`) | `task.py archive <dir>` |
+| 5 | `emptyTaskJson` factory | `packages/cli/src/utils/task-json.ts:54` | `"planning"` (default) | TS callers (init, update) |
+| 6 | `getBootstrapTaskJson` | `packages/cli/src/commands/init.ts:535` | `"in_progress"` (override) | `trellis init` (creator path) |
+| 7 | `getJoinerTaskJson` | `packages/cli/src/commands/init.ts:587` | `"in_progress"` (override) | `trellis init` (joiner path) |
+| 8 | migration-task via `emptyTaskJson` | `packages/cli/src/commands/update.ts:2483-2494` | `"planning"` (override on factory) | `trellis update --migrate` for breaking-change manifest |
 
 **No other writer exists.** No hook script writes `task.json.status` — verified
 by `grep -rn '"status"' .trellis/scripts/`. Linear-sync hook (`linear_sync.py`)

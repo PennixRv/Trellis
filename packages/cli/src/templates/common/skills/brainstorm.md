@@ -6,7 +6,7 @@ A request to build, implement, fix, refactor, or "go ahead" is not approval to l
 
 For every non-trivial task, the user must respond at least once after the initial request before implementation begins. If no clarification is needed, that response must approve the final planning summary described below.
 
-While any user-owned product, scope, UX, compatibility, risk, or acceptance decision remains unresolved, end the turn with exactly one highest-value question. Do not edit product code, dispatch implementation, or run `task.py start`.
+While any user-owned product, scope, UX, compatibility, risk, or acceptance decision remains unresolved, keep the task in planning. First inventory evidence and decision dependencies. If at least two independent material decisions remain and `pennix-decision-gates` is available, delegate one bounded batch of up to three frontier questions; otherwise ask the single highest-value question. Do not edit product code, dispatch implementation, or run `task.py start` until the decision chain is sealed.
 
 ## Analysis-Only Exception
 
@@ -54,18 +54,18 @@ Use a concise title from the user's request. Both the title and `--description` 
    - product intent still needed from the user
    - scope or risk decisions still needed from the user
    - likely out-of-scope items
-4. If a user-owned decision remains, ask the single highest-value question, include your recommendation and trade-off, then stop. Do not perform implementation work in the same turn.
-5. After each user answer, update `prd.md`, recompute the decision inventory, and repeat from step 2.
+4. If user-owned decisions remain, calculate the independent frontier. Use `pennix-decision-gates` for a bounded batch when two or more independent material decisions are ready; otherwise ask the single highest-value question. Include recommendation and trade-off, then stop the turn for native input.
+5. After each answer batch, update `prd.md`, record the selected decisions, recheck evidence and conflicts, and repeat from step 2. Do not create a second Trellis lifecycle for the same decision chain.
 6. When no user-owned decision remains, create or update `design.md` and `implement.md` for complex tasks.
 7. Run the requirement convergence gate, then the PRD convergence pass.
 8. Present the final planning summary and stop. Do not run `task.py start` or edit product code in the same turn.
-9. Only a subsequent user message that explicitly approves the latest planning summary authorizes `task.py start` and implementation. If the artifacts change materially after approval, repeat the final review.
+9. Only a subsequent user message that explicitly approves the latest planning summary authorizes `task.py start` and implementation. If implementation reveals a material unresolved decision, record `decision-needed`, run `task.py replan <task> "<reason>"`, and return through this planning flow; do not open a popup during implementation.
 
 Do not invent a project-specific product/spec hierarchy. If the repository already has product, domain, or spec docs, use them. If it does not, proceed with the evidence that exists.
 
 ## Question Rules
 
-Ask only one question per message.
+Ask one bounded batch per message: include up to three independent material frontier questions. Ask exactly one question only when it is the sole remaining material decision or later decisions depend on its answer.
 
 Each question must include:
 

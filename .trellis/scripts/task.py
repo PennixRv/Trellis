@@ -9,6 +9,7 @@ Usage:
     python3 task.py validate <dir>              # Validate jsonl files
     python3 task.py list-context <dir>          # List jsonl entries
     python3 task.py start <dir>                 # Set active task, record current branch
+    python3 task.py replan <dir> "<reason>"     # Return an in-progress task to planning
     python3 task.py current [--source] [--json] # Show active task
     python3 task.py ownership <operation> ...   # Manage formal handoff task ownership
     python3 task.py finish                      # Clear active task
@@ -29,7 +30,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from common.log import Colors, colored
@@ -299,6 +302,74 @@ def cmd_start(args: argparse.Namespace) -> int:
     else:
         print(colored("Error: Failed to set current task", Colors.RED))
         return 1
+
+
+def cmd_replan(args: argparse.Namespace) -> int:
+    """Return an in-progress task to planning without losing its binding."""
+    repo_root = get_repo_root()
+    full_path = resolve_task_dir(args.dir, repo_root)
+    if full_path is None or not full_path.is_dir():
+        print(colored(f"Error: Task not found: {args.dir}", Colors.RED), file=sys.stderr)
+        return 1
+
+    try:
+        assert_task_mutation_allowed(repo_root, full_path)
+    except (OwnershipError, OSError) as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 2
+
+    reason = " ".join(args.reason).strip()
+    if not reason:
+        print(colored("Error: replan reason must not be empty", Colors.RED), file=sys.stderr)
+        return 1
+
+    task_json_path = full_path / FILE_TASK_JSON
+    data, read_reason = read_json_checked(task_json_path)
+    if data is None:
+        problem, hint = describe_json_read_failure(task_json_path, read_reason)
+        print(colored(f"Error: {problem}", Colors.RED), file=sys.stderr)
+        print(hint, file=sys.stderr)
+        return 1
+    if data.get("status") != "in_progress":
+        print(
+            colored(
+                f"Error: replan requires status=in_progress (found {data.get('status')!r})",
+                Colors.RED,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    event = {
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "task": full_path.relative_to(repo_root).as_posix(),
+        "from_status": "in_progress",
+        "reason": reason,
+        "branch": data.get("branch"),
+    }
+    context_key = resolve_context_key()
+    if context_key:
+        event["session"] = context_key
+
+    replans_path = full_path / "replans.jsonl"
+    try:
+        with replans_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError as exc:
+        print(colored(f"Error: could not record replan: {exc}", Colors.RED), file=sys.stderr)
+        return 1
+
+    data["status"] = "planning"
+    if not write_json(task_json_path, data):
+        print(colored("Error: replan event recorded but task status was not changed", Colors.RED), file=sys.stderr)
+        return 1
+
+    print(colored(f"✓ Task returned to planning: {full_path.relative_to(repo_root)}", Colors.GREEN))
+    print("Reason:", reason)
+    run_task_hooks("after_replan", task_json_path, repo_root)
+    return 0
 
 
 def cmd_finish(args: argparse.Namespace) -> int:
@@ -900,6 +971,11 @@ def main() -> int:
         help="Start even when implement.jsonl / check.jsonl have no curated entries",
     )
 
+    # replan
+    p_replan = subparsers.add_parser("replan", help="Return an in-progress task to planning")
+    p_replan.add_argument("dir", help="Task directory")
+    p_replan.add_argument("reason", nargs="+", help="Material reason for returning to planning")
+
     # current
     p_current = subparsers.add_parser("current", help="Show active task")
     p_current.add_argument("--source", action="store_true",
@@ -1047,6 +1123,7 @@ def main() -> int:
         "validate": cmd_validate,
         "list-context": cmd_list_context,
         "start": cmd_start,
+        "replan": cmd_replan,
         "current": cmd_current,
         "continuity": cmd_continuity,
         "ownership": cmd_ownership,

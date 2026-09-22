@@ -1,0 +1,28 @@
+{
+  "id": "codex-decision-chain-replan",
+  "name": "codex-decision-chain-replan",
+  "title": "Codex decision-chain replan bridge",
+  "description": "Implement the approved Pennix decision-gates bridge, controlled same-task replan lifecycle, and Core planning-slice support directly on pennix/v0.7-beta.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-09-22",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "root_task": "09-22-trellis-codex-decision-chain-governance"
+  }
+}

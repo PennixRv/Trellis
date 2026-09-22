@@ -26,6 +26,8 @@ Shows the Phase Index (Plan / Execute / Finish) with routing + skill mapping.
 
 - `status=planning` + `task.json.meta.delivery_mode = "analysis_only"` → complete the PRD's bounded evidence work, verify its acceptance criteria and no-change boundary, then commit task artifacts and archive directly. Do not run `task.py start`; a protected-target change requires a separate change-bearing task.
 - `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
+- `status=planning` + a recorded `decision-needed` or unsealed decision chain → return to the planning frontier and load `pennix-decision-gates` when independent material questions can be batched.
+- `status=in_progress` + a material unresolved decision → record the reason and run `task.py replan <task> "<reason>"`; do not ask a native question during implementation.
 - `status=planning` + `prd.md` only → decide whether the task is lightweight or complex. Lightweight can move to **1.4** review; complex returns to **1.1** to add `design.md` + `implement.md`.
 - `status=planning` + complex artifacts complete + sub-agent jsonl not curated (empty, or only a legacy `_example` placeholder row) → **1.3**
 - `status=planning` + required artifacts complete + required jsonl curated or inline mode → **1.4** (ask for start review; only run `task.py start` after user confirms)

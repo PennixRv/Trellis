@@ -2211,7 +2211,7 @@ describe.skipIf(!ZCODE_PY)("zcodeListSessions / zcodeExtractDialogue", () => {
     expect(turns[0]?.text).toBe("real question trailing");
   });
 
-  it("detects task.py create/start commands in Bash tool parts", () => {
+  it("detects task.py create/replan/start commands in Bash tool parts", () => {
     buildZcodeDb({
       sessions: [
         { id: "s1", directory: "/p", time_created: 1, time_updated: 2 },
