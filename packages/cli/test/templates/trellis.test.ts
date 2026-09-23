@@ -228,6 +228,43 @@ describe("trellis template constants", () => {
     }
   });
 
+  it("keeps the Codex Subnode Channel planning and delivery contract", () => {
+    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
+      ? process.cwd()
+      : path.resolve(process.cwd(), "../..");
+    const workflow = fs.readFileSync(
+      path.join(
+        repoRoot,
+        "marketplace/workflows/codex-subnode-channel/workflow.md",
+      ),
+      "utf-8",
+    );
+
+    expect(workflow).toContain(
+      '`task.json.meta.delivery_mode = "analysis_only"` exactly',
+    );
+    expect(workflow).toContain(
+      "Complex research, cross-owner coordination, design, release, credential, or material-decision work is not eligible",
+    );
+    expect(workflow).toContain(
+      "After each answer, persist the decision,",
+    );
+    expect(workflow).toContain("run `python3 ./.trellis/scripts/task.py replan");
+    for (const state of [
+      "unbound_task",
+      "unbound_ambiguous",
+      "unbound_ambiguous-inline",
+    ]) {
+      expect(workflow).toContain(`[workflow-state:${state}]`);
+    }
+    expect(workflow).toContain("Evidence is unit-sized");
+    expect(workflow).toContain("Reports use schema version 2");
+    expect(workflow).toContain("Planning Seal closure pass");
+    expect(workflow).toContain(
+      "this workflow does not insert a second `Proposed commits`/`ok`",
+    );
+  });
+
   it("marketplace TDD workflow planning breadcrumbs include behavior gates", () => {
     const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
       ? process.cwd()
