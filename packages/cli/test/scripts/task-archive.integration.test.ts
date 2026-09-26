@@ -209,6 +209,44 @@ describe.skipIf(!hasPython())(
       ).toBe(false);
     });
 
+    it("does not sweep unrelated files beside the archived task", () => {
+      makeTask(tmp, "scoped", "scoped task prd\n");
+      git(tmp, "add", "-A");
+      git(tmp, "commit", "-q", "-m", "initial");
+
+      const month = new Date().toISOString().slice(0, 7);
+      const unrelated = path.join(
+        tmp,
+        ".trellis",
+        "tasks",
+        "archive",
+        month,
+        "unrelated-runtime.json",
+      );
+      fs.mkdirSync(path.dirname(unrelated), { recursive: true });
+      fs.writeFileSync(unrelated, '{"runtime":true}\n');
+
+      runArchive(tmp, "scoped");
+
+      const committed = git(
+        tmp,
+        "show",
+        "HEAD",
+        "--format=",
+        "--name-only",
+      )
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      expect(committed).toContain(
+        `.trellis/tasks/archive/${month}/scoped/task.json`,
+      );
+      expect(committed).not.toContain(
+        `.trellis/tasks/archive/${month}/unrelated-runtime.json`,
+      );
+      expect(fs.existsSync(unrelated)).toBe(true);
+    });
+
     it(
       "stages source-side deletions in the archive commit (phantom-delete fix)",
       () => {

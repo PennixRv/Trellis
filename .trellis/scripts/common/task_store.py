@@ -1469,7 +1469,9 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
         # Auto-commit unless --no-commit
         if not getattr(args, "no_commit", False):
-            if not _auto_commit_archive(dir_name, repo_root, modified_children):
+            if not _auto_commit_archive(
+                dir_name, repo_root, modified_children, archive_dest
+            ):
                 print(
                     colored(
                         "Archive moved on disk, but git auto-commit did not complete. "
@@ -1495,6 +1497,7 @@ def _auto_commit_archive(
     task_name: str,
     repo_root: Path,
     modified_children: list[str] | None = None,
+    archive_dest: Path | None = None,
 ) -> bool:
     """Stage Trellis-owned task paths and commit after archive.
 
@@ -1527,7 +1530,10 @@ def _auto_commit_archive(
     source_was_tracked = rc == 0 and bool(tracked_out.strip())
 
     paths = safe_archive_paths_to_add(
-        repo_root, task_name=task_name, modified_children=modified_children
+        repo_root,
+        task_name=task_name,
+        modified_children=modified_children,
+        archive_dest=archive_dest,
     )
     if not paths:
         print("[OK] No task changes to commit.", file=sys.stderr)
