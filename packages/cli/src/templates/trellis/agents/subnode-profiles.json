@@ -1,0 +1,14 @@
+{
+  "default_model": "gpt-6-sol",
+  "profiles": {
+    "code_path": { "reasoning_effort": "medium" },
+    "docs_source": { "reasoning_effort": "medium" },
+    "fault_diagnosis": { "reasoning_effort": "high" },
+    "correctness_test": { "reasoning_effort": "high" },
+    "security_permission": { "reasoning_effort": "high" },
+    "architecture_compat": { "reasoning_effort": "high" },
+    "requirements_assumption": { "reasoning_effort": "high" },
+    "ux_accessibility": { "reasoning_effort": "high" },
+    "evidence_synthesis": { "reasoning_effort": "medium" }
+  }
+}

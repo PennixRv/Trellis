@@ -36,6 +36,7 @@ import {
   checkAgentTemplate,
   subnodeAgentTemplate,
   subnodeEnvTemplate,
+  subnodeProfilesTemplate,
   configYamlTemplate,
 } from "../../src/templates/trellis/index.js";
 
@@ -67,9 +68,10 @@ describe("trellis template constants", () => {
   };
 
   function inProgressBreadcrumb(): string {
-    const inProgressMatch = /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/.exec(
-      workflowMdTemplate,
-    );
+    const inProgressMatch =
+      /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/.exec(
+        workflowMdTemplate,
+      );
     if (!inProgressMatch) {
       throw new Error("in_progress breadcrumb block must exist in workflow.md");
     }
@@ -128,9 +130,9 @@ describe("trellis template constants", () => {
     for (const script of pyScripts) {
       expect(
         script.includes("import") ||
-        script.includes("def ") ||
-        script.includes("class ") ||
-        script.includes("#"),
+          script.includes("def ") ||
+          script.includes("class ") ||
+          script.includes("#"),
       ).toBe(true);
     }
   });
@@ -174,10 +176,13 @@ describe("trellis template constants", () => {
     }
     for (const name of ["start", "continue", "finish-work", "brainstorm"]) {
       const content = commonTemplates.get(name) ?? "";
-      expect(content, `${name} must describe analysis-only tasks`).toContain(marker);
-      expect(content, `${name} must keep protected-target changes separate`).toContain(
-        "separate change-bearing task",
+      expect(content, `${name} must describe analysis-only tasks`).toContain(
+        marker,
       );
+      expect(
+        content,
+        `${name} must keep protected-target changes separate`,
+      ).toContain("separate change-bearing task");
     }
     expect(workflowMdTemplate).toContain(
       "change-bearing implementation waits for `task.py start`",
@@ -185,7 +190,9 @@ describe("trellis template constants", () => {
   });
 
   it("routes complex analysis requests through normal planning", () => {
-    const brainstorm = getSkillTemplates().find((template) => template.name === "brainstorm")?.content ?? "";
+    const brainstorm =
+      getSkillTemplates().find((template) => template.name === "brainstorm")
+        ?.content ?? "";
     for (const content of [workflowMdTemplate, brainstorm]) {
       expect(content).toContain("material user decision");
       expect(content).toContain("cross-owner coordination");
@@ -193,10 +200,14 @@ describe("trellis template constants", () => {
       expect(content).toContain("normal complex planning");
       expect(content).toContain("Planning Seal closure pass");
     }
-    expect(brainstorm).toContain("When the host returns the current continuation's answer");
+    expect(brainstorm).toContain(
+      "When the host returns the current continuation's answer",
+    );
     expect(brainstorm).not.toContain("stop the turn for native input");
     expect(workflowMdTemplate).toContain("evidence units");
-    expect(workflowMdTemplate).toContain("static decisions and implementation paths are locked");
+    expect(workflowMdTemplate).toContain(
+      "static decisions and implementation paths are locked",
+    );
   });
 
   it("keeps direct small work bounded across bundled and Marketplace workflows", () => {
@@ -246,10 +257,10 @@ describe("trellis template constants", () => {
     expect(workflow).toContain(
       "Complex research, cross-owner coordination, design, release, credential, or material-decision work is not eligible",
     );
+    expect(workflow).toContain("After each answer, persist the decision,");
     expect(workflow).toContain(
-      "After each answer, persist the decision,",
+      "run `python3 ./.trellis/scripts/task.py replan",
     );
-    expect(workflow).toContain("run `python3 ./.trellis/scripts/task.py replan");
     for (const state of [
       "unbound_task",
       "unbound_ambiguous",
@@ -273,12 +284,14 @@ describe("trellis template constants", () => {
       path.join(repoRoot, "marketplace/workflows/tdd/workflow.md"),
       "utf-8",
     );
-    const planning = /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/.exec(
-      tddWorkflow,
-    )?.[1];
-    const planningInline = /\[workflow-state:planning-inline\]([\s\S]*?)\[\/workflow-state:planning-inline\]/.exec(
-      tddWorkflow,
-    )?.[1];
+    const planning =
+      /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/.exec(
+        tddWorkflow,
+      )?.[1];
+    const planningInline =
+      /\[workflow-state:planning-inline\]([\s\S]*?)\[\/workflow-state:planning-inline\]/.exec(
+        tddWorkflow,
+      )?.[1];
 
     for (const block of [planning, planningInline]) {
       expect(block).toContain("observable behavior slices");
@@ -303,7 +316,10 @@ describe("trellis template constants", () => {
     );
 
     const workflow = fs.readFileSync(
-      path.join(repoRoot, "marketplace/workflows/codex-subnode-channel/workflow.md"),
+      path.join(
+        repoRoot,
+        "marketplace/workflows/codex-subnode-channel/workflow.md",
+      ),
       "utf-8",
     );
     expect(workflow).toContain("The main session delivers by default");
@@ -319,7 +335,9 @@ describe("trellis template constants", () => {
     expect(workflow).toContain("[workflow-state:in_progress]");
     expect(workflow).toContain("rather than high-frequency polling");
     expect(workflow).not.toContain("Do not poll");
-    expect(workflow).not.toContain("Channel-driven sub-agent dispatch is default");
+    expect(workflow).not.toContain(
+      "Channel-driven sub-agent dispatch is default",
+    );
   });
 
   it("[codex-native-subagents] workflow.md preserves the dispatch prompt for Codex native fallback", () => {
@@ -386,9 +404,10 @@ describe("trellis template constants", () => {
 
     const pullBasedLabels = [...generatedPullBasedLabels, "Reasonix"];
     for (const label of pullBasedLabels) {
-      expect(pullBasedBlock, `${label} must use pull-based 2.1 guidance`).toContain(
-        label,
-      );
+      expect(
+        pullBasedBlock,
+        `${label} must use pull-based 2.1 guidance`,
+      ).toContain(label);
       expect(
         hookAutoBlock,
         `${label} must not use hook/plugin auto-handles 2.1 guidance`,
@@ -426,7 +445,9 @@ describe("trellis template constants", () => {
     expect(config).toContain('return "auto"');
     expect(config).toContain("using inline");
     expect(workflowPhase).toContain('mode = "inline"');
-    expect(workflowPhase).toContain('return "codex-sub-agent" if mode == "auto" else "codex-inline"');
+    expect(workflowPhase).toContain(
+      'return "codex-sub-agent" if mode == "auto" else "codex-inline"',
+    );
     expect(taskStore).toContain('get_codex_dispatch_mode(repo_root) == "auto"');
   });
 
@@ -435,7 +456,9 @@ describe("trellis template constants", () => {
     // hosts, so its main-session dispatch guidance must not recursively apply
     // to a sub-agent that is already doing the requested work.
     const block = inProgressBreadcrumb();
-    expect(block).toContain("only when `codex.dispatch_mode: auto` is explicitly selected");
+    expect(block).toContain(
+      "only when `codex.dispatch_mode: auto` is explicitly selected",
+    );
     expect(block).toContain("Sub-agent self-exemption");
     expect(block).toContain("already running as `trellis-implement`");
     expect(block).toContain("do NOT spawn another `trellis-implement`");
@@ -448,10 +471,13 @@ describe("trellis template constants", () => {
     expect(subnodeAgentTemplate).toContain("report schema version 2");
     expect(subnodeAgentTemplate).toContain("scope_assessment");
     expect(subnodeAgentTemplate).toContain("trellis-checkpoint");
-    const channelSkill = getBundledSkillTemplates().find(
-      (template) => template.name === "trellis-channel",
-    )?.files.find((file) => file.relativePath === "references/subnode-work.md")?.content ?? "";
-    expect(channelSkill).toContain("schema_version\": 2");
+    const channelSkill =
+      getBundledSkillTemplates()
+        .find((template) => template.name === "trellis-channel")
+        ?.files.find(
+          (file) => file.relativePath === "references/subnode-work.md",
+        )?.content ?? "";
+    expect(channelSkill).toContain('schema_version": 2');
     expect(channelSkill).toContain("scope_assessment");
     expect(channelSkill).toContain("review_concern");
   });
@@ -481,7 +507,9 @@ describe("trellis template constants", () => {
       "Parent/child structure is not a dependency system",
     );
     expect(workflowMdTemplate).toContain("--parent <parent-dir>");
-    expect(workflowMdTemplate).toContain("task.py add-subtask <parent> <child>");
+    expect(workflowMdTemplate).toContain(
+      "task.py add-subtask <parent> <child>",
+    );
     expect(workflowMdTemplate).toContain(
       "start the child that owns the next independently verifiable deliverable",
     );
@@ -492,9 +520,7 @@ describe("trellis template constants", () => {
     expect(step).toContain("When considering a parent/child split");
     expect(step).toContain("Parent tasks own source requirements");
     expect(step).toContain("Child tasks own actual deliverables");
-    expect(step).toContain(
-      "Parent/child structure is not a dependency system",
-    );
+    expect(step).toContain("Parent/child structure is not a dependency system");
     expect(step).toContain("Do not start the parent unless");
   });
 
@@ -503,7 +529,9 @@ describe("trellis template constants", () => {
     const planningInline = workflowStateBreadcrumb("planning-inline");
     for (const block of [planning, planningInline]) {
       expect(block).toContain("Multi-deliverable scope");
-      expect(block).toContain("parent task plus independently verifiable child tasks");
+      expect(block).toContain(
+        "parent task plus independently verifiable child tasks",
+      );
       expect(block).toContain("not implied by tree position");
     }
   });
@@ -564,7 +592,9 @@ describe("getAllScripts", () => {
   it("does not contain multi_agent entries", () => {
     const scripts = getAllScripts();
     for (const [key] of scripts) {
-      expect(key, `${key} should not be a multi_agent script`).not.toContain("multi_agent");
+      expect(key, `${key} should not be a multi_agent script`).not.toContain(
+        "multi_agent",
+      );
     }
   });
 });
@@ -583,6 +613,7 @@ describe("getAllAgents", () => {
     expect(agents.has("check.md")).toBe(true);
     expect(agents.has("subnode.md")).toBe(true);
     expect(agents.has("subnode.env")).toBe(true);
+    expect(agents.has("subnode-profiles.json")).toBe(true);
   });
 
   it("values match exported constants", () => {
@@ -591,6 +622,14 @@ describe("getAllAgents", () => {
     expect(agents.get("check.md")).toBe(checkAgentTemplate);
     expect(agents.get("subnode.md")).toBe(subnodeAgentTemplate);
     expect(agents.get("subnode.env")).toBe(subnodeEnvTemplate);
+    expect(agents.get("subnode-profiles.json")).toBe(subnodeProfilesTemplate);
+    expect(JSON.parse(subnodeProfilesTemplate)).toMatchObject({
+      default_model: "gpt-6-sol",
+      profiles: expect.objectContaining({
+        code_path: { reasoning_effort: "medium" },
+        correctness_test: { reasoning_effort: "high" },
+      }),
+    });
     expect(subnodeEnvTemplate).toContain("OPENVIKING_AUTO_RECALL=0");
     expect(subnodeEnvTemplate).toContain("OPENVIKING_AUTO_CAPTURE=0");
     expect(subnodeEnvTemplate).toContain("OPENVIKING_NO_AUTO_INJECT=1");
@@ -600,10 +639,16 @@ describe("getAllAgents", () => {
     const agents = getAllAgents();
     for (const [file, content] of agents) {
       if (!file.endsWith(".md")) continue;
-      expect(content.startsWith("---\n"), `${file} must start with --- frontmatter`).toBe(true);
+      expect(
+        content.startsWith("---\n"),
+        `${file} must start with --- frontmatter`,
+      ).toBe(true);
       // Frontmatter must close on a `---\n` line.
       const frontmatterClose = content.indexOf("\n---\n", 4);
-      expect(frontmatterClose, `${file} must have a closing --- frontmatter line`).toBeGreaterThan(0);
+      expect(
+        frontmatterClose,
+        `${file} must have a closing --- frontmatter line`,
+      ).toBeGreaterThan(0);
       const frontmatter = content.slice(4, frontmatterClose);
       // The agent's `name:` field must match the file basename so
       // `trellis channel spawn --agent <name>` resolves correctly.

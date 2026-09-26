@@ -143,11 +143,13 @@ function writeCompleteReport(
             "Directly observed source supporting the reported conclusion.",
         },
       ],
-      findings: [{
-        id: `finding-${evidenceId}`,
-        conclusion: "The evidence is independently reviewable.",
-        evidence_ids: [evidenceId],
-      }],
+      findings: [
+        {
+          id: `finding-${evidenceId}`,
+          conclusion: "The evidence is independently reviewable.",
+          evidence_ids: [evidenceId],
+        },
+      ],
       uncertainties: [],
       corrections: [],
     }) + "\n",
@@ -336,16 +338,18 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
       artifactDir(tmp, "coordinator-decision", "primary"),
       "disposition.json",
     );
-    expect(JSON.parse(fs.readFileSync(dispositionPath, "utf-8"))).toMatchObject({
-      outcome: "accepted",
-      report_status: "complete",
-      terminal: { lifecycle: "done", seq: 17 },
-      checks: [
-        "report_validation",
-        "source_recheck",
-        "protected_target_check",
-      ],
-    });
+    expect(JSON.parse(fs.readFileSync(dispositionPath, "utf-8"))).toMatchObject(
+      {
+        outcome: "accepted",
+        report_status: "complete",
+        terminal: { lifecycle: "done", seq: 17 },
+        checks: [
+          "report_validation",
+          "source_recheck",
+          "protected_target_check",
+        ],
+      },
+    );
 
     const duplicate = run(
       tmp,
@@ -424,7 +428,9 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     expect(init.status, init.stderr).toBe(0);
 
     const dir = artifactDir(tmp, "early-error", "primary");
-    const brief = JSON.parse(fs.readFileSync(path.join(dir, "brief.json"), "utf-8"));
+    const brief = JSON.parse(
+      fs.readFileSync(path.join(dir, "brief.json"), "utf-8"),
+    );
     expect(brief).not.toHaveProperty("retry_of");
     expect(brief).not.toHaveProperty("counter_of");
 
@@ -541,6 +547,188 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     );
     expect(missing.status).toBe(1);
     expect(missing.stderr).toContain("existing subnode brief");
+  });
+
+  it("writes and validates a FIFO queue, one claim per item, and one abandonment", () => {
+    for (const [subnodeId, draftName] of [
+      ["primary", "queue-primary.json"],
+      ["secondary", "queue-secondary.json"],
+    ] as const) {
+      const init = run(
+        tmp,
+        "init",
+        "--task",
+        ".trellis/tasks/task-a",
+        "--work-id",
+        "queue-audit",
+        "--subnode-id",
+        subnodeId,
+        "--draft",
+        writeDraft(tmp, draftName, {
+          channel_ref: {
+            name: "subnode-task-a",
+            scope: "project",
+            worker_handle: subnodeId,
+          },
+        }),
+      );
+      expect(init.status, init.stderr).toBe(0);
+    }
+
+    const briefPaths = ["primary", "secondary"].map((subnodeId) =>
+      path.join(artifactDir(tmp, "queue-audit", subnodeId), "brief.json"),
+    );
+    const queue = run(
+      tmp,
+      "queue",
+      "init",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+      "--channel-name",
+      "subnode-task-a",
+      "--channel-scope",
+      "project",
+      "--brief",
+      briefPaths[0],
+      "--brief",
+      briefPaths[1],
+    );
+    expect(queue.status, queue.stderr).toBe(0);
+
+    const valid = run(
+      tmp,
+      "queue",
+      "validate",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+    );
+    expect(valid.status, valid.stderr).toBe(0);
+    expect(JSON.parse(valid.stdout)).toMatchObject({
+      status: "valid",
+      item_count: 2,
+    });
+
+    const primaryBrief = briefPaths[0];
+    const originalPrimary = fs.readFileSync(primaryBrief, "utf-8");
+    fs.writeFileSync(primaryBrief, `${originalPrimary}\n`);
+    const tampered = run(
+      tmp,
+      "queue",
+      "validate",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+    );
+    expect(tampered.status).toBe(1);
+    expect(tampered.stderr).toContain("brief digest does not match");
+    fs.writeFileSync(primaryBrief, originalPrimary);
+
+    const claim = run(
+      tmp,
+      "queue",
+      "claim",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+      "--subnode-id",
+      "primary",
+    );
+    expect(claim.status, claim.stderr).toBe(0);
+    const duplicateClaim = run(
+      tmp,
+      "queue",
+      "claim",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+      "--subnode-id",
+      "primary",
+    );
+    expect(duplicateClaim.status).toBe(1);
+    expect(duplicateClaim.stderr).toContain("already exists");
+
+    const incompleteAbandon = run(
+      tmp,
+      "queue",
+      "abandon",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+      "--reason",
+      "Incomplete accounting should be rejected.",
+      "--dispatched",
+      "primary",
+    );
+    expect(incompleteAbandon.status).toBe(1);
+    expect(incompleteAbandon.stderr).toContain("exactly match");
+
+    const abandon = run(
+      tmp,
+      "queue",
+      "abandon",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+      "--reason",
+      "The coordinator stopped after the first dispatch attempt.",
+      "--dispatched",
+      "primary",
+      "--pending",
+      "secondary",
+    );
+    expect(abandon.status, abandon.stderr).toBe(0);
+
+    const mismatchedAbandon = run(
+      tmp,
+      "queue",
+      "abandon",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+      "--reason",
+      "Claim state must determine the recorded ranges.",
+      "--dispatched",
+      "secondary",
+      "--pending",
+      "primary",
+    );
+    expect(mismatchedAbandon.status).toBe(1);
+    expect(mismatchedAbandon.stderr).toContain("exactly match");
+
+    const blockedClaim = run(
+      tmp,
+      "queue",
+      "claim",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+      "--subnode-id",
+      "secondary",
+    );
+    expect(blockedClaim.status).toBe(1);
+    expect(blockedClaim.stderr).toContain("abandoned");
+
+    const abandoned = run(
+      tmp,
+      "queue",
+      "validate",
+      "--task",
+      ".trellis/tasks/task-a",
+      "--work-id",
+      "queue-audit",
+    );
+    expect(JSON.parse(abandoned.stdout)).toMatchObject({ status: "abandoned" });
   });
 
   it("rejects traversal and a report that pretends to be an accepted disposition", () => {

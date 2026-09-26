@@ -37,6 +37,7 @@ import {
   type CodexCtx,
   type CodexSandboxMode,
 } from "./codex.js";
+import type { ReasoningEffort } from "../profiles.js";
 import type { ParseResult } from "./types.js";
 
 // `Provider` is derived from REGISTRY at the bottom of this file, so
@@ -52,6 +53,7 @@ export interface SupervisorView {
   /** Args passed to `buildArgs`. Adapters read what they need (model, resume, systemPrompt). */
   resume?: string;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   systemPrompt: string;
   /**
    * Path to a file containing the system prompt (written by the supervisor).
@@ -175,7 +177,12 @@ const codexAdapter: WorkerAdapter<CodexCtx> = {
     const ts = encodeCodexRequestWithResponse(
       ctx,
       "thread/start",
-      buildCodexThreadStartParams(view.cwd, view.systemPrompt, view.sandbox),
+      buildCodexThreadStartParams(
+        view.cwd,
+        view.systemPrompt,
+        view.sandbox,
+        view.reasoningEffort,
+      ),
       "thread/start",
     );
     child.stdin.write(ts.line);

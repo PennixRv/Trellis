@@ -99,6 +99,14 @@ describe("init() integration", () => {
     expect(fs.existsSync(path.join(tmpDir, PATHS.AGENTS, "subnode.md"))).toBe(
       true,
     );
+    expect(
+      JSON.parse(
+        fs.readFileSync(
+          path.join(tmpDir, PATHS.AGENTS, "subnode-profiles.json"),
+          "utf-8",
+        ),
+      ).default_model,
+    ).toBe("gpt-6-sol");
 
     // Default platforms: cursor + claude
     expect(fs.existsSync(path.join(tmpDir, ".cursor"))).toBe(true);

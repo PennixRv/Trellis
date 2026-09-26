@@ -63,6 +63,7 @@ import { computeHash, loadHashes } from "../../src/utils/template-hash.js";
 import {
   subnodeAgentTemplate,
   subnodeEnvTemplate,
+  subnodeProfilesTemplate,
   workflowMdTemplate,
 } from "../../src/templates/trellis/index.js";
 import {
@@ -353,6 +354,52 @@ describe("update() integration", () => {
     expect(hashes[`${PATHS.AGENTS}/subnode.env`]).toBe(
       computeHash(subnodeEnvTemplate),
     );
+  });
+
+  it("backfills the managed subnode profiles through the normal update path", async () => {
+    await setupProject();
+    const relativePath = `${PATHS.AGENTS}/subnode-profiles.json`;
+    const profilesPath = projectFile(relativePath);
+    fs.rmSync(profilesPath);
+    writeHashesV2(
+      hashFilePath(),
+      removeHashEntry(readHashesV2(hashFilePath()), relativePath) as Record<
+        string,
+        string
+      >,
+    );
+    fs.writeFileSync(versionFilePath(), "0.6.17");
+
+    await update({});
+
+    expect(fs.readFileSync(profilesPath, "utf-8")).toBe(
+      subnodeProfilesTemplate,
+    );
+    expect(readHashesV2(hashFilePath())[relativePath]).toBe(
+      computeHash(subnodeProfilesTemplate),
+    );
+  });
+
+  it("preserves locally customized subnode profiles during update", async () => {
+    await setupProject();
+    const profilesPath = projectFile(`${PATHS.AGENTS}/subnode-profiles.json`);
+    const customized =
+      JSON.stringify(
+        {
+          ...JSON.parse(subnodeProfilesTemplate),
+          profiles: {
+            ...JSON.parse(subnodeProfilesTemplate).profiles,
+            local_review: { reasoning_effort: "high" },
+          },
+        },
+        null,
+        2,
+      ) + "\n";
+    fs.writeFileSync(profilesPath, customized);
+
+    await update({ skipAll: true });
+
+    expect(fs.readFileSync(profilesPath, "utf-8")).toBe(customized);
   });
 
   it("#1b current OpenCode templates are not classified as deprecated", async () => {
@@ -656,7 +703,9 @@ describe("update() integration", () => {
     await update({});
     const upgradedHook = readProjectFile(CODEX_WORKFLOW_STATE_HOOK);
     expect(upgradedHook).toContain("get_workflow_dispatch_mode");
-    expect(upgradedHook).toContain('if active.source_type == "unbound_ambiguous":');
+    expect(upgradedHook).toContain(
+      'if active.source_type == "unbound_ambiguous":',
+    );
     expect(upgradedHook).toContain("Candidates: {task_id}");
     expect(upgradedHook).toContain(
       '    else:\n        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"',

@@ -184,6 +184,15 @@ export interface SpawnedChannelEvent extends BaseChannelEvent<"spawned"> {
   as?: string;
   provider?: string;
   pid?: number;
+  /** Resolved CLI profile metadata; optional for backward-compatible events. */
+  resolvedModel?: string;
+  resolvedReasoningEffort?: "medium" | "high" | "xhigh";
+  profile?: string;
+  profileConfigPath?: string;
+  profileConfigDigest?: string;
+  modelSource?: "explicit" | "profile" | "default" | "agent" | "none";
+  reasoningEffortSource?: "explicit" | "profile" | "none";
+  reasoningEffortReason?: string;
   agent?: string;
   files?: string[];
   manifests?: string[];

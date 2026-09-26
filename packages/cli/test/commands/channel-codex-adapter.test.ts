@@ -96,6 +96,22 @@ describe("Codex channel adapter", () => {
     expect(ctx.responseWaiters.size).toBe(0);
   });
 
+  it("passes a selected reasoning effort to thread/start without changing defaults", () => {
+    const selected = buildCodexThreadStartParams(
+      "/tmp/project",
+      "system",
+      undefined,
+      "high",
+    );
+    expect(selected.config).toMatchObject({
+      model_reasoning_effort: "high",
+      features: { multi_agent: false },
+    });
+    expect(
+      buildCodexThreadStartParams("/tmp/project").config,
+    ).not.toHaveProperty("model_reasoning_effort");
+  });
+
   it("does not start a thread when initialize fails", async () => {
     const adapter = getAdapter("codex");
     const child = new FakeCodexChild();
@@ -279,8 +295,7 @@ describe("Codex channel adapter", () => {
     });
     await flushMicrotasks();
     child.stdout.write(
-      JSON.stringify({ jsonrpc: "2.0", id: writes[0]?.id, result: {} }) +
-        "\n",
+      JSON.stringify({ jsonrpc: "2.0", id: writes[0]?.id, result: {} }) + "\n",
     );
     await flushMicrotasks();
     child.emit("error", new Error("thread transport failed"));

@@ -11,6 +11,10 @@ import type { Provider } from "./adapters/index.js";
 import { assembleContext } from "./context-loader.js";
 import { resolveTrustedRoots } from "./context-trust.js";
 import {
+  resolveSubnodeProfile,
+  type ResolvedSubnodeProfile,
+} from "./profiles.js";
+import {
   enforceSpawnBudget,
   formatBudgetOverflowError,
   loadSubnodeDispatchConfig,
@@ -34,6 +38,9 @@ export interface SpawnOptions {
   agent?: string;
   cwd?: string;
   model?: string;
+  profile?: string;
+  reasoningEffort?: string;
+  reasoningEffortReason?: string;
   resume?: string;
   /** Codex-only: overrides the `thread/start` sandbox mode (default `workspace-write`). */
   sandbox?: CodexSandboxMode;
@@ -110,6 +117,7 @@ interface ResolvedSpawn {
   env?: Record<string, string>;
   contextFiles: string[];
   contextManifests: string[];
+  profile: ResolvedSubnodeProfile;
 }
 
 function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
@@ -117,7 +125,7 @@ function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
   const trustedRoots = resolveTrustedRoots(cwd);
   let agentBody: string | undefined;
   let provider = opts.provider;
-  let model = opts.model;
+  let agentModel: string | undefined;
   let as = opts.as;
   let env: Record<string, string> | undefined;
 
@@ -125,7 +133,7 @@ function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
     const agent = loadAgent(opts.agent, cwd, trustedRoots);
     agentBody = agent.systemPrompt || undefined;
     provider = provider ?? agent.provider;
-    model = model ?? agent.model;
+    agentModel = agent.model;
     as = as ?? agent.name;
     env = agent.envFile ? parseAgentEnvFile(agent.envFile) : undefined;
   }
@@ -139,6 +147,17 @@ function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
     throw new Error("Missing --as (no agent name to fall back to)");
   }
 
+  const profile = resolveSubnodeProfile({
+    cwd,
+    agent: opts.agent,
+    provider,
+    agentModel,
+    model: opts.model,
+    profile: opts.profile,
+    reasoningEffort: opts.reasoningEffort,
+    reasoningEffortReason: opts.reasoningEffortReason,
+  });
+
   const context = assembleContext(cwd, opts.files, opts.jsonls, trustedRoots);
   const systemPrompt = buildSystemPrompt(
     channelName,
@@ -151,7 +170,8 @@ function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
     provider,
     as,
     systemPrompt,
-    model,
+    model: profile.model,
+    profile,
     ...(env ? { env } : {}),
     contextFiles: context.paths,
     contextManifests: context.manifests,
@@ -335,6 +355,13 @@ async function spawnLocked(
       cwd: opts.cwd ?? process.cwd(),
       systemPrompt: resolved.systemPrompt,
       model: resolved.model,
+      profile: resolved.profile.profile,
+      reasoningEffort: resolved.profile.reasoningEffort,
+      reasoningEffortReason: resolved.profile.reasoningEffortReason,
+      profileConfigPath: resolved.profile.profileConfigPath,
+      profileConfigDigest: resolved.profile.profileConfigDigest,
+      modelSource: resolved.profile.modelSource,
+      reasoningEffortSource: resolved.profile.reasoningEffortSource,
       resume: opts.resume,
       sandbox: opts.sandbox,
       timeoutMs: opts.timeoutMs,

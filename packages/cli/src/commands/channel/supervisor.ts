@@ -24,6 +24,11 @@ import {
 
 import { shouldUseSystemPromptFile } from "./adapters/claude.js";
 import type { CodexSandboxMode } from "./adapters/codex.js";
+import type {
+  ModelSource,
+  ReasoningEffort,
+  ReasoningEffortSource,
+} from "./profiles.js";
 import { getAdapter, type Provider } from "./adapters/index.js";
 import { appendEvent } from "./store/events.js";
 import { workerFile } from "./store/paths.js";
@@ -52,6 +57,13 @@ export interface SupervisorConfig {
   env?: Record<string, string>;
   /** Optional model override. */
   model?: string;
+  reasoningEffort?: ReasoningEffort;
+  profile?: string;
+  profileConfigPath?: string;
+  profileConfigDigest?: string;
+  modelSource?: ModelSource;
+  reasoningEffortSource?: ReasoningEffortSource;
+  reasoningEffortReason?: string;
   /** Resume an existing session/thread if id is provided. */
   resume?: string;
   /** Codex-only: overrides the `thread/start` sandbox mode (default `workspace-write`). */
@@ -213,6 +225,7 @@ export async function runSupervisor(
   const view = {
     resume: config.resume,
     model: config.model,
+    reasoningEffort: config.reasoningEffort,
     systemPrompt: config.systemPrompt,
     ...(systemPromptFile ? { systemPromptFile } : {}),
     cwd: config.cwd,
@@ -451,6 +464,24 @@ export async function runSupervisor(
         as: workerName,
         provider: config.provider,
         pid: child.pid,
+        ...(config.model ? { resolvedModel: config.model } : {}),
+        ...(config.reasoningEffort
+          ? { resolvedReasoningEffort: config.reasoningEffort }
+          : {}),
+        ...(config.profile ? { profile: config.profile } : {}),
+        ...(config.profileConfigPath
+          ? { profileConfigPath: config.profileConfigPath }
+          : {}),
+        ...(config.profileConfigDigest
+          ? { profileConfigDigest: config.profileConfigDigest }
+          : {}),
+        ...(config.modelSource ? { modelSource: config.modelSource } : {}),
+        ...(config.reasoningEffortSource
+          ? { reasoningEffortSource: config.reasoningEffortSource }
+          : {}),
+        ...(config.reasoningEffortReason
+          ? { reasoningEffortReason: config.reasoningEffortReason }
+          : {}),
         inboxPolicy: config.inboxPolicy ?? DEFAULT_INBOX_POLICY,
         ...(config.agent ? { agent: config.agent } : {}),
         ...(config.contextFiles && config.contextFiles.length > 0

@@ -324,6 +324,18 @@ export function registerChannelCommand(program: Command): void {
     )
     .option("--cwd <path>", "worker working directory (default: process cwd)")
     .option("--model <id>", "model override")
+    .option(
+      "--profile <id>",
+      "subnode Codex profile from .trellis/agents/subnode-profiles.json",
+    )
+    .option(
+      "--reasoning-effort <effort>",
+      "Codex reasoning effort: medium | high | xhigh",
+    )
+    .option(
+      "--reasoning-effort-reason <text>",
+      "reason required when the effective reasoning effort is xhigh",
+    )
     .option("--resume <id>", "resume an existing session/thread id")
     .option(
       "--sandbox <mode>",
@@ -373,6 +385,9 @@ export function registerChannelCommand(program: Command): void {
         as?: string;
         cwd?: string;
         model?: string;
+        profile?: string;
+        reasoningEffort?: string;
+        reasoningEffortReason?: string;
         resume?: string;
         sandbox?: string;
         timeout?: string;
@@ -400,6 +415,9 @@ export function registerChannelCommand(program: Command): void {
           as: opts.as,
           cwd: opts.cwd,
           model: opts.model,
+          profile: opts.profile,
+          reasoningEffort: opts.reasoningEffort,
+          reasoningEffortReason: opts.reasoningEffortReason,
           resume: opts.resume,
           sandbox,
           timeoutMs: parseDuration(opts.timeout),

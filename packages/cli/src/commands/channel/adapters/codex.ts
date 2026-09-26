@@ -1,4 +1,5 @@
 import type { AdapterEvent, ParseResult } from "./types.js";
+import type { ReasoningEffort } from "../profiles.js";
 
 /**
  * Codex `app-server` adapter (JSON-RPC 2.0 over stdio).
@@ -757,7 +758,15 @@ export function buildCodexThreadStartParams(
   cwd: string,
   systemPrompt?: string,
   sandbox?: CodexSandboxMode,
+  reasoningEffort?: ReasoningEffort,
 ): Record<string, unknown> {
+  const config: Record<string, unknown> = {
+    features: {
+      multi_agent: false,
+      multi_agent_v2: { enabled: false },
+    },
+  };
+  if (reasoningEffort) config.model_reasoning_effort = reasoningEffort;
   const params: Record<string, unknown> = {
     cwd,
     // MVP: aggressive permissive defaults to avoid getting stuck mid-turn.
@@ -768,12 +777,7 @@ export function buildCodexThreadStartParams(
     // Disable codex native multi-agent so spawned worker can't recurse into
     // its own sub-agents (would conflict with channel's collaboration layer
     // and reproduce issue #234/#237 recursion).
-    config: {
-      features: {
-        multi_agent: false,
-        multi_agent_v2: { enabled: false },
-      },
-    },
+    config,
   };
   if (systemPrompt?.trim()) {
     params.developerInstructions = systemPrompt;

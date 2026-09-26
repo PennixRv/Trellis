@@ -9,6 +9,7 @@ dispatches workers, makes the acceptance judgment, or mutates task state.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -26,6 +27,7 @@ SCHEMA_VERSION = 2
 MAX_DRAFT_BYTES = 64 * 1024
 MAX_REPORT_BYTES = 128 * 1024
 MAX_WORKLOG_BYTES = 128 * 1024
+MAX_QUEUE_BYTES = 128 * 1024
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 CHECKPOINT_RE = re.compile(r"^<!-- trellis-checkpoint: (?P<payload>\{.*\}) -->$", re.MULTILINE)
 SECRET_PATTERNS = (
@@ -152,6 +154,98 @@ def _relative_to_repo(path: Path, repo_root: Path) -> str:
         return path.relative_to(repo_root).as_posix()
     except ValueError:
         _fail(f"path is outside repository: {path}")
+
+
+def _queue_paths(task_dir: Path, work_id: str) -> tuple[Path, Path]:
+    work_dir = task_dir / "subnodes" / work_id
+    _assert_no_subpath_symlinks(task_dir, work_dir)
+    if not work_dir.exists() or not work_dir.is_dir():
+        _fail(f"queue work directory does not exist: {work_dir}")
+    return work_dir / "queue.json", work_dir / "queue-abandoned.json"
+
+
+def _queue_context(args: argparse.Namespace) -> tuple[Path, str, Path, Path, Path]:
+    repo_root = get_repo_root()
+    task_dir = resolve_task_dir(args.task, repo_root)
+    if task_dir is None or not is_within_tasks_dir(task_dir, repo_root):
+        _fail("--task must identify a direct active task directory")
+    if task_dir.is_symlink():
+        _fail(f"refusing symlinked task directory: {task_dir}")
+    work_id = _require_id(args.work_id, "--work-id")
+    task_id = _task_id(task_dir)
+    queue_path, abandoned_path = _queue_paths(task_dir, work_id)
+    for path in (queue_path, abandoned_path):
+        if path.is_symlink():
+            _fail(f"refusing symlinked queue artifact: {path}")
+    return repo_root, task_id, task_dir, queue_path, abandoned_path
+
+
+def _write_json_exclusive(path: Path, value: dict[str, Any], label: str) -> None:
+    if path.is_symlink():
+        _fail(f"refusing symlinked {label}: {path}")
+    try:
+        with path.open("x", encoding="utf-8") as stream:
+            json.dump(value, stream, indent=2, ensure_ascii=False)
+            stream.write("\n")
+    except FileExistsError:
+        _fail(f"{label} already exists and cannot be replaced: {path}")
+    except OSError as exc:
+        _fail(f"could not write {label} {path}: {exc}")
+
+
+def _validate_queue_file(
+    queue_path: Path,
+    task_dir: Path,
+    task_id: str,
+    work_id: str,
+    repo_root: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    queue, _raw = _read_json_object(queue_path, MAX_QUEUE_BYTES, "queue")
+    if queue.get("schema_version") != 1:
+        _fail("queue.schema_version must be 1")
+    if queue.get("task_id") != task_id:
+        _fail("queue.task_id does not match the task")
+    if queue.get("work_id") != work_id:
+        _fail("queue.work_id does not match the requested work")
+    channel = queue.get("channel_ref")
+    if not isinstance(channel, dict):
+        _fail("queue.channel_ref must be an object")
+    channel_name = _require_text(channel.get("name"), "queue.channel_ref.name", max_len=128)
+    channel_scope = _require_text(channel.get("scope"), "queue.channel_ref.scope", max_len=32)
+    if channel_scope not in {"project", "global"}:
+        _fail("queue.channel_ref.scope must be project or global")
+    items = queue.get("items")
+    if not isinstance(items, list) or not items:
+        _fail("queue.items must be a non-empty list")
+    seen: set[str] = set()
+    validated: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            _fail(f"queue.items[{index}] must be an object")
+        subnode_id = _require_id(item.get("subnode_id"), f"queue.items[{index}].subnode_id")
+        if subnode_id in seen:
+            _fail("queue.items contains duplicate subnode_id values")
+        seen.add(subnode_id)
+        brief_path = _require_text(item.get("brief_path"), f"queue.items[{index}].brief_path")
+        brief, raw, brief_file, node_dir, brief_task_dir = _validate_brief_file(
+            brief_path, repo_root
+        )
+        if brief_task_dir != task_dir:
+            _fail(f"queue item {subnode_id} brief belongs to another task")
+        if brief.get("work_id") != work_id or brief.get("subnode_id") != subnode_id:
+            _fail(f"queue item {subnode_id} brief identity does not match")
+        expected_brief_path = _relative_to_repo(node_dir / "brief.json", repo_root)
+        if _relative_to_repo(brief_file, repo_root) != expected_brief_path:
+            _fail(f"queue item {subnode_id} brief_path is not canonical")
+        if brief.get("channel_ref", {}).get("name") != channel_name:
+            _fail(f"queue item {subnode_id} channel name does not match the queue")
+        if brief.get("channel_ref", {}).get("scope") != channel_scope:
+            _fail(f"queue item {subnode_id} channel scope does not match the queue")
+        digest = hashlib.sha256(raw).hexdigest()
+        if item.get("brief_digest") != digest:
+            _fail(f"queue item {subnode_id} brief digest does not match")
+        validated.append({"subnode_id": subnode_id, "brief_path": brief_path, "brief_digest": digest})
+    return queue, validated
 
 
 def _validate_snapshot(value: Any) -> None:
@@ -595,6 +689,145 @@ def _init(args: argparse.Namespace) -> None:
     }))
 
 
+def _queue_init(args: argparse.Namespace) -> None:
+    repo_root, task_id, task_dir, queue_path, abandoned_path = _queue_context(args)
+    if queue_path.exists() or abandoned_path.exists():
+        _fail("queue already exists or has been abandoned")
+    if not args.brief:
+        _fail("queue init requires at least one --brief")
+    work_id = _require_id(args.work_id, "--work-id")
+    channel_name = _require_text(args.channel_name, "--channel-name", max_len=128)
+    channel_scope = _require_text(args.channel_scope, "--channel-scope", max_len=32)
+    if channel_scope not in {"project", "global"}:
+        _fail("--channel-scope must be project or global")
+    items: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for brief_arg in args.brief:
+        brief, raw, brief_path, node_dir, brief_task_dir = _validate_brief_file(
+            brief_arg, repo_root
+        )
+        subnode_id = _require_id(brief.get("subnode_id"), "brief.subnode_id")
+        if brief_task_dir != task_dir:
+            _fail(f"queue item {subnode_id} brief belongs to another task")
+        if brief.get("work_id") != work_id:
+            _fail(f"queue item {subnode_id} brief belongs to another work")
+        if subnode_id in seen:
+            _fail("queue init contains duplicate subnode_id values")
+        if brief.get("channel_ref", {}).get("name") != channel_name:
+            _fail(f"queue item {subnode_id} channel name does not match")
+        if brief.get("channel_ref", {}).get("scope") != channel_scope:
+            _fail(f"queue item {subnode_id} channel scope does not match")
+        expected_path = _relative_to_repo(node_dir / "brief.json", repo_root)
+        if _relative_to_repo(brief_path, repo_root) != expected_path:
+            _fail(f"queue item {subnode_id} brief path is not canonical")
+        seen.add(subnode_id)
+        items.append({
+            "subnode_id": subnode_id,
+            "brief_path": expected_path,
+            "brief_digest": hashlib.sha256(raw).hexdigest(),
+        })
+    queue = {
+        "schema_version": 1,
+        "task_id": task_id,
+        "work_id": work_id,
+        "channel_ref": {"name": channel_name, "scope": channel_scope},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "items": items,
+    }
+    _write_json_exclusive(queue_path, queue, "queue")
+    print(json.dumps({"queue": _relative_to_repo(queue_path, repo_root), "items": items}))
+
+
+def _queue_validate(args: argparse.Namespace) -> None:
+    repo_root, task_id, task_dir, queue_path, abandoned_path = _queue_context(args)
+    _queue, items = _validate_queue_file(
+        queue_path, task_dir, task_id, args.work_id, repo_root
+    )
+    print(json.dumps({
+        "status": "abandoned" if abandoned_path.exists() else "valid",
+        "queue": _relative_to_repo(queue_path, repo_root),
+        "task_id": task_id,
+        "work_id": args.work_id,
+        "items": items,
+        "item_count": len(items),
+    }))
+
+
+def _queue_claim(args: argparse.Namespace) -> None:
+    repo_root, task_id, task_dir, queue_path, abandoned_path = _queue_context(args)
+    if abandoned_path.exists():
+        _fail("queue has been abandoned; no further dispatch claim is allowed")
+    _queue, items = _validate_queue_file(
+        queue_path, task_dir, task_id, args.work_id, repo_root
+    )
+    subnode_id = _require_id(args.subnode_id, "--subnode-id")
+    item = next((candidate for candidate in items if candidate["subnode_id"] == subnode_id), None)
+    if item is None:
+        _fail(f"subnode is not listed in the queue: {subnode_id}")
+    claim_path = task_dir / "subnodes" / args.work_id / subnode_id / "dispatch-claim.json"
+    _assert_no_subpath_symlinks(task_dir, claim_path)
+    claim = {
+        "schema_version": 1,
+        "task_id": task_id,
+        "work_id": args.work_id,
+        "subnode_id": subnode_id,
+        "brief_digest": item["brief_digest"],
+        "claimed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _write_json_exclusive(claim_path, claim, "dispatch claim")
+    print(json.dumps({
+        "claim": _relative_to_repo(claim_path, repo_root),
+        "subnode_id": subnode_id,
+        "brief_digest": item["brief_digest"],
+    }))
+
+
+def _queue_abandon(args: argparse.Namespace) -> None:
+    repo_root, task_id, task_dir, queue_path, abandoned_path = _queue_context(args)
+    _queue, items = _validate_queue_file(
+        queue_path, task_dir, task_id, args.work_id, repo_root
+    )
+    item_ids = {item["subnode_id"] for item in items}
+    claimed_ids: set[str] = set()
+    for item in items:
+        subnode_id = item["subnode_id"]
+        claim_path = task_dir / "subnodes" / args.work_id / subnode_id / "dispatch-claim.json"
+        _assert_no_subpath_symlinks(task_dir, claim_path)
+        if not claim_path.exists():
+            continue
+        claim, _raw = _read_json_object(claim_path, MAX_DRAFT_BYTES, "dispatch claim")
+        if (
+            claim.get("schema_version") != 1
+            or claim.get("task_id") != task_id
+            or claim.get("work_id") != args.work_id
+            or claim.get("subnode_id") != subnode_id
+            or claim.get("brief_digest") != item["brief_digest"]
+        ):
+            _fail(f"dispatch claim does not match queue item {subnode_id}")
+        claimed_ids.add(subnode_id)
+    dispatched = [_require_id(value, "--dispatched") for value in (args.dispatched or [])]
+    pending = [_require_id(value, "--pending") for value in (args.pending or [])]
+    if len(set(dispatched)) != len(dispatched) or len(set(pending)) != len(pending):
+        _fail("queue abandonment lists must not contain duplicates")
+    if not set(dispatched).issubset(item_ids) or not set(pending).issubset(item_ids):
+        _fail("queue abandonment lists must contain only queued subnode IDs")
+    if set(dispatched) & set(pending):
+        _fail("a subnode cannot be both dispatched and pending")
+    if set(dispatched) != claimed_ids or set(pending) != item_ids - claimed_ids:
+        _fail("queue abandonment lists must exactly match dispatch claims and remaining queued items")
+    abandoned = {
+        "schema_version": 1,
+        "task_id": task_id,
+        "work_id": args.work_id,
+        "reason": _require_text(args.reason, "--reason"),
+        "dispatched": dispatched,
+        "pending": pending,
+        "abandoned_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _write_json_exclusive(abandoned_path, abandoned, "queue abandonment")
+    print(json.dumps({"status": "abandoned", "queue": _relative_to_repo(abandoned_path, repo_root)}))
+
+
 def _validate(args: argparse.Namespace) -> None:
     repo_root = get_repo_root()
     report, _evidence, _brief, _node_dir_value, concerns = _validate_report_file(args.report, repo_root)
@@ -718,6 +951,36 @@ def _parser() -> argparse.ArgumentParser:
     counter.add_argument("--primary", required=True, help="primary subnode artifact directory")
     counter.add_argument("--counter", required=True, help="counter subnode artifact directory")
     counter.set_defaults(handler=_validate_counter)
+
+    queue = subparsers.add_parser("queue", help="manage one write-once subnode queue")
+    queue_parsers = queue.add_subparsers(dest="queue_command", required=True)
+
+    queue_init = queue_parsers.add_parser("init", help="write one FIFO queue manifest")
+    queue_init.add_argument("--task", required=True)
+    queue_init.add_argument("--work-id", required=True)
+    queue_init.add_argument("--channel-name", required=True)
+    queue_init.add_argument("--channel-scope", required=True)
+    queue_init.add_argument("--brief", action="append", required=True)
+    queue_init.set_defaults(handler=_queue_init)
+
+    queue_validate = queue_parsers.add_parser("validate", help="validate a queue manifest")
+    queue_validate.add_argument("--task", required=True)
+    queue_validate.add_argument("--work-id", required=True)
+    queue_validate.set_defaults(handler=_queue_validate)
+
+    queue_claim = queue_parsers.add_parser("claim", help="write one dispatch intent")
+    queue_claim.add_argument("--task", required=True)
+    queue_claim.add_argument("--work-id", required=True)
+    queue_claim.add_argument("--subnode-id", required=True)
+    queue_claim.set_defaults(handler=_queue_claim)
+
+    queue_abandon = queue_parsers.add_parser("abandon", help="stop a queue permanently")
+    queue_abandon.add_argument("--task", required=True)
+    queue_abandon.add_argument("--work-id", required=True)
+    queue_abandon.add_argument("--reason", required=True)
+    queue_abandon.add_argument("--dispatched", action="append")
+    queue_abandon.add_argument("--pending", action="append")
+    queue_abandon.set_defaults(handler=_queue_abandon)
     return parser
 
 
