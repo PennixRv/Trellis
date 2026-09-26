@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.12",
+  "description": "Pinned workflow provenance and guarded workflow refresh",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Improvements:**\n- Persist the selected workflow identity, immutable source ref, and content hash in `.trellis/workflow-provenance.json`.\n- Require immutable Marketplace refs and verify workflow content against the Marketplace index hash before installation.\n- Add `trellis workflow --verify` and scope archive auto-commit to the exact archive destination.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. Existing projects without workflow provenance must explicitly select their workflow again before provenance verification is available. No --migrate required."
+}
