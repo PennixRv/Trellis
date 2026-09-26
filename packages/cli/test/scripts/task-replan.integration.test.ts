@@ -63,6 +63,14 @@ describe.skipIf(!hasPython())("task.py replan lifecycle", () => {
     expect(JSON.parse(fs.readFileSync(path.join(taskPath, "task.json"), "utf-8")).status).toBe("in_progress");
   });
 
+  it("lists replan in the task help output", () => {
+    const help = run([]);
+    expect(help.status).toBe(1);
+    expect(help.stdout).toContain(
+      'python3 task.py replan <dir> "<reason>"            Return an in-progress task to planning',
+    );
+  });
+
   it("rejects invalid preconditions without changing task state", () => {
     const taskPath = path.join(repo, ".trellis", "tasks", task);
     for (const args of [

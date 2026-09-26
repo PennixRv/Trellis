@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.13",
+  "description": "Document the replan command in task help",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fixes:**\n- Include the existing `task.py replan` command in the user-facing task help output.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}
