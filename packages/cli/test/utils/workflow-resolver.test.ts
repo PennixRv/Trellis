@@ -6,6 +6,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 
 import {
   NATIVE_WORKFLOW_ID,
@@ -14,6 +15,9 @@ import {
   resolveWorkflowTemplate,
 } from "../../src/utils/workflow-resolver.js";
 import { workflowMdTemplate } from "../../src/templates/trellis/index.js";
+
+const MARKETPLACE_SOURCE =
+  "gh:example/workflows#0123456789012345678901234567890123456789";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -31,6 +35,8 @@ describe("resolveWorkflowTemplate(native)", () => {
 
 describe("resolveWorkflowTemplate(marketplace)", () => {
   it("fetches index.json, finds the workflow entry, and downloads its content", async () => {
+    const fakeContent = "# TDD\n\nPhase 2.1 red → green → refactor.\n";
+    const contentSha256 = createHash("sha256").update(fakeContent).digest("hex");
     const index = {
       version: 1,
       templates: [
@@ -40,6 +46,7 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
           name: "TDD Workflow",
           description: "red/green/refactor",
           path: "workflows/tdd/workflow.md",
+          sha256: contentSha256,
         },
         {
           id: "electron-fullstack",
@@ -49,8 +56,6 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
         },
       ],
     };
-    const fakeContent = "# TDD\n\nPhase 2.1 red → green → refactor.\n";
-
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL) => {
@@ -65,7 +70,9 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       }),
     );
 
-    const resolved = await resolveWorkflowTemplate("tdd");
+    const resolved = await resolveWorkflowTemplate("tdd", {
+      source: MARKETPLACE_SOURCE,
+    });
     expect(resolved.id).toBe("tdd");
     expect(resolved.source).toBe("marketplace");
     expect(resolved.content).toBe(fakeContent);
@@ -90,10 +97,18 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       ),
     );
 
-    await expect(resolveWorkflowTemplate("does-not-exist")).rejects.toThrow(
+    await expect(
+      resolveWorkflowTemplate("does-not-exist", {
+        source: MARKETPLACE_SOURCE,
+      }),
+    ).rejects.toThrow(
       WorkflowResolveError,
     );
-    await expect(resolveWorkflowTemplate("does-not-exist")).rejects.toThrow(
+    await expect(
+      resolveWorkflowTemplate("does-not-exist", {
+        source: MARKETPLACE_SOURCE,
+      }),
+    ).rejects.toThrow(
       /workflow template/i,
     );
   });
@@ -104,7 +119,9 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       vi.fn(async () => new Response("", { status: 500 })),
     );
 
-    await expect(resolveWorkflowTemplate("tdd")).rejects.toThrow(
+    await expect(
+      resolveWorkflowTemplate("tdd", { source: MARKETPLACE_SOURCE }),
+    ).rejects.toThrow(
       /workflow template index/i,
     );
   });
@@ -128,7 +145,9 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       ),
     );
 
-    await expect(resolveWorkflowTemplate("broken")).rejects.toThrow(
+    await expect(
+      resolveWorkflowTemplate("broken", { source: MARKETPLACE_SOURCE }),
+    ).rejects.toThrow(
       /workflow\.md/,
     );
   });
@@ -152,9 +171,20 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       ),
     );
 
-    await expect(resolveWorkflowTemplate("escape")).rejects.toThrow(
+    await expect(
+      resolveWorkflowTemplate("escape", { source: MARKETPLACE_SOURCE }),
+    ).rejects.toThrow(
       /marketplace root/,
     );
+  });
+
+  it("requires an explicit immutable marketplace ref", async () => {
+    await expect(resolveWorkflowTemplate("tdd")).rejects.toThrow(
+      /immutable commit ref/i,
+    );
+    await expect(
+      resolveWorkflowTemplate("tdd", { source: "gh:example/workflows" }),
+    ).rejects.toThrow(/immutable.*commit ref/i);
   });
 });
 

@@ -131,7 +131,7 @@ program
   )
   .option(
     "--workflow-source <source>",
-    "Custom marketplace source for the --workflow lookup (e.g., gh:myorg/myrepo/marketplace)",
+    "Immutable marketplace source for the --workflow lookup (e.g., gh:myorg/myrepo/marketplace#<40-hex-commit>)",
   )
   .action(async (options: Record<string, unknown>) => {
     try {
@@ -317,7 +317,7 @@ program
 const workflowCommand = program
   .command("workflow")
   .description(
-    "List or switch the project's .trellis/workflow.md template (native, tdd, channel-driven-subagent-dispatch, or marketplace)",
+    "List or switch the project's .trellis/workflow.md template (native or a marketplace workflow pinned to an immutable commit)",
   )
   .option(
     "-t, --template <id>",
@@ -325,7 +325,7 @@ const workflowCommand = program
   )
   .option(
     "-m, --marketplace <source>",
-    "Custom marketplace source (e.g., gh:myorg/myrepo/marketplace)",
+    "Immutable marketplace source (e.g., gh:myorg/myrepo/marketplace#<40-hex-commit>)",
   )
   .option("--list", "List available workflow templates and exit")
   .option("-f, --force", "Overwrite a modified workflow.md without asking")
@@ -337,6 +337,10 @@ const workflowCommand = program
     "-s, --save <id>",
     "Save a template to the per-task library (.trellis/workflows/<id>.md) without touching workflow.md",
   )
+  .option(
+    "--verify",
+    "Verify the recorded workflow source/ref and active bytes",
+  )
   .action(async (options: Record<string, unknown>) => {
     try {
       await runWorkflowCommand({
@@ -346,6 +350,7 @@ const workflowCommand = program
         force: options.force as boolean | undefined,
         createNew: options.createNew as boolean | undefined,
         save: options.save as string | undefined,
+        verify: options.verify as boolean | undefined,
       });
     } catch (error) {
       if (error instanceof WorkflowCommandError) {

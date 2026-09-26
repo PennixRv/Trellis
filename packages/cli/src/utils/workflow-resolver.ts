@@ -13,9 +13,11 @@
  */
 
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
+import { VERSION } from "../constants/version.js";
 import { workflowMdTemplate } from "../templates/trellis/index.js";
 import {
   TIMEOUTS,
@@ -55,6 +57,12 @@ export interface ResolvedWorkflowTemplate {
   content: string;
   /** Where the content came from (for error messages). */
   source: "bundled" | "marketplace";
+  /** Canonical registry identity used for durable project provenance. */
+  registry: string;
+  /** Immutable registry ref, or the bundled CLI version for native. */
+  ref: string;
+  /** SHA-256 of the resolved workflow bytes before Python command substitution. */
+  contentSha256: string;
 }
 
 /**
@@ -71,10 +79,33 @@ export interface WorkflowTemplateListing {
 
 export interface WorkflowResolveOptions {
   /**
-   * Optional marketplace source (giget-style or HTTPS URL).
-   * Omitted = use the default marketplace via TEMPLATE_INDEX_URL.
+   * Marketplace source (giget-style or HTTPS URL). Required for resolving
+   * non-native workflows and must include an immutable commit ref.
    */
   source?: string;
+}
+
+const IMMUTABLE_REF_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
+
+export function isImmutableWorkflowRef(ref: string): boolean {
+  return IMMUTABLE_REF_RE.test(ref);
+}
+
+function requireImmutableMarketplaceSource(
+  source: string | undefined,
+): RegistrySource {
+  if (!source) {
+    throw new WorkflowResolveError(
+      "Marketplace workflow resolution requires --marketplace with an immutable commit ref (for example, gh:OWNER/REPO/path#<40-hex-sha>).",
+    );
+  }
+  const registry = parseSourceOrThrow(source);
+  if (!isImmutableWorkflowRef(registry.ref)) {
+    throw new WorkflowResolveError(
+      `Marketplace workflow source must use an immutable 40/64-hex commit ref; received "${registry.ref}".`,
+    );
+  }
+  return registry;
 }
 
 export class WorkflowResolveError extends Error {
@@ -100,9 +131,13 @@ function nativeListingEntry(): WorkflowTemplateListing {
 }
 
 function nativeResolvedEntry(): ResolvedWorkflowTemplate {
+  const content = workflowMdTemplate;
   return {
     ...nativeListingEntry(),
-    content: workflowMdTemplate,
+    content,
+    registry: "bundled:trellis",
+    ref: VERSION,
+    contentSha256: createHash("sha256").update(content).digest("hex"),
   };
 }
 
@@ -208,12 +243,8 @@ export async function resolveWorkflowTemplate(
     return nativeResolvedEntry();
   }
 
-  let registry: RegistrySource | undefined;
-  let indexUrl = TEMPLATE_INDEX_URL;
-  if (options.source) {
-    registry = parseSourceOrThrow(options.source);
-    indexUrl = `${registry.rawBaseUrl}/index.json`;
-  }
+  const registry = requireImmutableMarketplaceSource(options.source);
+  const indexUrl = `${registry.rawBaseUrl}/index.json`;
 
   const fetched = await fetchWorkflowEntries(registry, indexUrl);
   if (fetched.errorMessage) {
@@ -246,6 +277,19 @@ export async function resolveWorkflowTemplate(
   const backend = fetched.backend;
   const content = await fetchWorkflowFile(entry.path, registry, backend);
 
+  if (!entry.sha256 || !/^[0-9a-f]{64}$/i.test(entry.sha256)) {
+    throw new WorkflowResolveError(
+      `Workflow template "${id}" is missing a valid sha256 integrity value in the marketplace index.`,
+    );
+  }
+
+  const contentSha256 = createHash("sha256").update(content).digest("hex");
+  if (contentSha256 !== entry.sha256.toLowerCase()) {
+    throw new WorkflowResolveError(
+      `Workflow template "${id}" failed marketplace integrity verification.`,
+    );
+  }
+
   return {
     id: entry.id,
     type: "workflow",
@@ -254,6 +298,9 @@ export async function resolveWorkflowTemplate(
     path: entry.path,
     content,
     source: "marketplace",
+    registry: registry.gigetSource,
+    ref: registry.ref,
+    contentSha256,
   };
 }
 

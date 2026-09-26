@@ -48,6 +48,7 @@ export interface SpecTemplate {
   description?: string;
   path: string;
   tags?: string[];
+  sha256?: string;
 }
 
 interface TemplateIndex {
@@ -464,7 +465,15 @@ function parseTemplateIndex(raw: string, sourceLabel: string): TemplateIndex {
         `${sourceLabel} contains an invalid template entry.`,
       );
     }
-    const { id, type, name, description, path: templatePath, tags } = item;
+    const {
+      id,
+      type,
+      name,
+      description,
+      path: templatePath,
+      tags,
+      sha256,
+    } = item;
     if (
       typeof id !== "string" ||
       typeof type !== "string" ||
@@ -485,6 +494,7 @@ function parseTemplateIndex(raw: string, sourceLabel: string): TemplateIndex {
       ...(Array.isArray(tags) && tags.every((tag) => typeof tag === "string")
         ? { tags }
         : {}),
+      ...(typeof sha256 === "string" ? { sha256 } : {}),
     });
   }
 

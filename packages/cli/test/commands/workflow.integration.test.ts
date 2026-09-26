@@ -16,6 +16,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -45,6 +46,7 @@ import {
 } from "../../src/commands/workflow.js";
 import { PATHS } from "../../src/constants/paths.js";
 import { loadHashes } from "../../src/utils/template-hash.js";
+import { loadWorkflowProvenance } from "../../src/utils/workflow-provenance.js";
 import { workflowMdTemplate } from "../../src/templates/trellis/index.js";
 import { replacePythonCommandLiterals } from "../../src/configurators/shared.js";
 
@@ -76,6 +78,14 @@ const CODEX_SUBNODE_CONTENT = [
   "",
 ].join("\n");
 
+const MARKETPLACE_SOURCE =
+  "gh:example/workflows#0123456789012345678901234567890123456789";
+const MARKETPLACE_OPTIONS = { marketplace: MARKETPLACE_SOURCE };
+const TDD_SHA256 = createHash("sha256").update(TDD_CONTENT).digest("hex");
+const CODEX_SUBNODE_SHA256 = createHash("sha256")
+  .update(CODEX_SUBNODE_CONTENT)
+  .digest("hex");
+
 function stubMarketplaceFetch(): void {
   const index = {
     version: 1,
@@ -86,6 +96,7 @@ function stubMarketplaceFetch(): void {
         name: "TDD Workflow",
         description: "red/green/refactor",
         path: "workflows/tdd/workflow.md",
+        sha256: TDD_SHA256,
       },
       {
         id: "codex-subnode-channel",
@@ -93,6 +104,7 @@ function stubMarketplaceFetch(): void {
         name: "Codex Subnode Channel",
         description: "main-session delivery with explicit independent evidence",
         path: "workflows/codex-subnode-channel/workflow.md",
+        sha256: CODEX_SUBNODE_SHA256,
       },
     ],
   };
@@ -143,9 +155,33 @@ describe("trellis workflow integration", () => {
     expect(hashes[PATHS.WORKFLOW_GUIDE_FILE]).toBeTruthy();
   });
 
+  it("records and verifies native workflow provenance, then detects active edits", async () => {
+    await init({ yes: true });
+
+    expect(loadWorkflowProvenance(tmpDir)).toMatchObject({
+      workflow_id: "native",
+      source_kind: "bundled",
+      registry: "bundled:trellis",
+    });
+    await runWorkflowCommand({ verify: true });
+
+    fs.appendFileSync(
+      path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE),
+      "\n# local edit\n",
+      "utf-8",
+    );
+    await expect(runWorkflowCommand({ verify: true })).rejects.toThrow(
+      /provenance verification failed/i,
+    );
+  });
+
   it("init --workflow tdd writes marketplace content and removes the hash entry", async () => {
     stubMarketplaceFetch();
-    await init({ yes: true, workflow: "tdd" } as Record<string, unknown>);
+    await init({
+      yes: true,
+      workflow: "tdd",
+      workflowSource: MARKETPLACE_SOURCE,
+    } as Record<string, unknown>);
 
     const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
     const written = fs.readFileSync(wfPath, "utf-8");
@@ -153,6 +189,11 @@ describe("trellis workflow integration", () => {
 
     const hashes = loadHashes(tmpDir);
     expect(hashes[PATHS.WORKFLOW_GUIDE_FILE]).toBeUndefined();
+    expect(loadWorkflowProvenance(tmpDir)).toMatchObject({
+      workflow_id: "tdd",
+      source_kind: "marketplace",
+      registry: MARKETPLACE_SOURCE,
+    });
   });
 
   it("init --workflow codex-subnode-channel resolves a marketplace workflow", async () => {
@@ -160,6 +201,7 @@ describe("trellis workflow integration", () => {
     await init({
       yes: true,
       workflow: "codex-subnode-channel",
+      workflowSource: MARKETPLACE_SOURCE,
     } as Record<string, unknown>);
 
     const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
@@ -178,11 +220,15 @@ describe("trellis workflow integration", () => {
           type: "workflow",
           name: "Custom Workflow",
           path: "workflows/custom/workflow.md",
+          sha256: "",
         },
       ],
     };
     const customContent =
       "# Custom Workflow\n\n## Phase Index\nCustom phase.\n";
+    index.templates[0].sha256 = createHash("sha256")
+      .update(customContent)
+      .digest("hex");
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL) => {
@@ -200,7 +246,7 @@ describe("trellis workflow integration", () => {
     await init({
       yes: true,
       workflow: "custom",
-      workflowSource: "gh:example/workflows",
+      workflowSource: MARKETPLACE_SOURCE,
     } as Record<string, unknown>);
 
     const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
@@ -214,13 +260,21 @@ describe("trellis workflow integration", () => {
     stubMarketplaceFetch();
 
     await expect(
-      init({ yes: true, workflow: "missing-id" } as Record<string, unknown>),
+      init({
+        yes: true,
+        workflow: "missing-id",
+        workflowSource: MARKETPLACE_SOURCE,
+      } as Record<string, unknown>),
     ).rejects.toThrow(/workflow template/i);
   });
 
   it("trellis workflow --template native refreshes hash after switching from tdd", async () => {
     stubMarketplaceFetch();
-    await init({ yes: true, workflow: "tdd" } as Record<string, unknown>);
+    await init({
+      yes: true,
+      workflow: "tdd",
+      workflowSource: MARKETPLACE_SOURCE,
+    } as Record<string, unknown>);
     expect(loadHashes(tmpDir)[PATHS.WORKFLOW_GUIDE_FILE]).toBeUndefined();
 
     // Switching FROM a non-native workflow requires --force because the file
@@ -241,7 +295,7 @@ describe("trellis workflow integration", () => {
     await init({ yes: true });
     expect(loadHashes(tmpDir)[PATHS.WORKFLOW_GUIDE_FILE]).toBeTruthy();
 
-    await runWorkflowCommand({ template: "tdd" });
+    await runWorkflowCommand({ template: "tdd", ...MARKETPLACE_OPTIONS });
 
     const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
     expect(fs.readFileSync(wfPath, "utf-8")).toBe(
@@ -383,7 +437,9 @@ describe("trellis workflow integration", () => {
     });
 
     try {
-      await expect(runWorkflowCommand({ template: "tdd" })).rejects.toThrow(
+      await expect(
+        runWorkflowCommand({ template: "tdd", ...MARKETPLACE_OPTIONS }),
+      ).rejects.toThrow(
         WorkflowCommandError,
       );
 
@@ -411,7 +467,9 @@ describe("trellis workflow integration", () => {
     });
 
     try {
-      await expect(runWorkflowCommand({ template: "tdd" })).rejects.toThrow(
+      await expect(
+        runWorkflowCommand({ template: "tdd", ...MARKETPLACE_OPTIONS }),
+      ).rejects.toThrow(
         WorkflowCommandError,
       );
       expect(fs.readFileSync(wfPath, "utf-8")).toBe("# My custom edits");
@@ -431,7 +489,11 @@ describe("trellis workflow integration", () => {
     const originalContent = fs.readFileSync(wfPath, "utf-8");
     const originalHash = loadHashes(tmpDir)[PATHS.WORKFLOW_GUIDE_FILE];
 
-    await runWorkflowCommand({ template: "tdd", createNew: true });
+    await runWorkflowCommand({
+      template: "tdd",
+      createNew: true,
+      ...MARKETPLACE_OPTIONS,
+    });
 
     const newPath = `${wfPath}.new`;
     expect(fs.existsSync(newPath)).toBe(true);
@@ -468,7 +530,7 @@ describe("trellis workflow integration", () => {
     const hashesBefore = fs.readFileSync(hashesPath, "utf-8");
 
     captureStderr();
-    await runWorkflowCommand({ save: "tdd" });
+    await runWorkflowCommand({ save: "tdd", ...MARKETPLACE_OPTIONS });
 
     const libPath = path.join(tmpDir, ".trellis", "workflows", "tdd.md");
     expect(fs.readFileSync(libPath, "utf-8")).toBe(
@@ -487,14 +549,20 @@ describe("trellis workflow integration", () => {
     fs.writeFileSync(libPath, "# my locally-tuned tdd variant", "utf-8");
 
     captureStderr();
-    await expect(runWorkflowCommand({ save: "tdd" })).rejects.toThrow(
+    await expect(
+      runWorkflowCommand({ save: "tdd", ...MARKETPLACE_OPTIONS }),
+    ).rejects.toThrow(
       /already exists.*--force/,
     );
     expect(fs.readFileSync(libPath, "utf-8")).toBe(
       "# my locally-tuned tdd variant",
     );
 
-    await runWorkflowCommand({ save: "tdd", force: true });
+    await runWorkflowCommand({
+      save: "tdd",
+      force: true,
+      ...MARKETPLACE_OPTIONS,
+    });
     expect(fs.readFileSync(libPath, "utf-8")).toBe(
       replacePythonCommandLiterals(TDD_CONTENT),
     );
@@ -507,7 +575,7 @@ describe("trellis workflow integration", () => {
     // TDD_CONTENT carries only [workflow-state:in_progress] and no #### X.Y
     // heading — the other five statuses must be reported as missing.
     const stderr = captureStderr();
-    await runWorkflowCommand({ save: "tdd" });
+    await runWorkflowCommand({ save: "tdd", ...MARKETPLACE_OPTIONS });
 
     const text = stderr.text();
     expect(text).toContain("missing runtime parser markers");
@@ -542,10 +610,18 @@ describe("trellis workflow integration", () => {
     await init({ yes: true });
 
     await expect(
-      runWorkflowCommand({ save: "tdd", template: "tdd" }),
+      runWorkflowCommand({
+        save: "tdd",
+        template: "tdd",
+        ...MARKETPLACE_OPTIONS,
+      }),
     ).rejects.toThrow(/--save cannot be combined/);
     await expect(
-      runWorkflowCommand({ save: "tdd", createNew: true }),
+      runWorkflowCommand({
+        save: "tdd",
+        createNew: true,
+        ...MARKETPLACE_OPTIONS,
+      }),
     ).rejects.toThrow(/--save cannot be combined/);
     expect(
       fs.existsSync(path.join(tmpDir, ".trellis", "workflows", "tdd.md")),
@@ -570,7 +646,7 @@ describe("trellis workflow integration", () => {
     stubMarketplaceFetch();
     await init({ yes: true });
     captureStderr();
-    await runWorkflowCommand({ save: "tdd" });
+    await runWorkflowCommand({ save: "tdd", ...MARKETPLACE_OPTIONS });
 
     vi.mocked(console.log).mockClear();
     await runWorkflowCommand({ list: true });
@@ -592,7 +668,7 @@ describe("trellis workflow integration", () => {
     stubMarketplaceFetch();
     await init({ yes: true });
     captureStderr();
-    await runWorkflowCommand({ save: "tdd" });
+    await runWorkflowCommand({ save: "tdd", ...MARKETPLACE_OPTIONS });
 
     const libPath = path.join(tmpDir, ".trellis", "workflows", "tdd.md");
     const before = fs.readFileSync(libPath, "utf-8");
@@ -606,7 +682,7 @@ describe("trellis workflow integration", () => {
   it("trellis update after switching to tdd does not silently restore native workflow", async () => {
     stubMarketplaceFetch();
     await init({ yes: true });
-    await runWorkflowCommand({ template: "tdd" });
+    await runWorkflowCommand({ template: "tdd", ...MARKETPLACE_OPTIONS });
 
     const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
     const beforeUpdate = fs.readFileSync(wfPath, "utf-8");

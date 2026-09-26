@@ -15,6 +15,7 @@ import {
 } from "../configurators/index.js";
 import {
   getPythonCommandForPlatform,
+  replacePythonCommandLiterals,
   setResolvedPythonCommand,
 } from "../configurators/shared.js";
 import { AI_TOOLS, type CliFlag } from "../types/ai-tools.js";
@@ -46,7 +47,12 @@ import { initializeHashes, removeHash } from "../utils/template-hash.js";
 import {
   NATIVE_WORKFLOW_ID,
   resolveWorkflowTemplate,
+  type ResolvedWorkflowTemplate,
 } from "../utils/workflow-resolver.js";
+import {
+  buildWorkflowProvenanceRecord,
+  writeWorkflowProvenance,
+} from "../utils/workflow-provenance.js";
 import {
   isCwdHomedir,
   homedirGuardMessage,
@@ -1894,17 +1900,18 @@ export async function init(options: InitOptions): Promise<void> {
     workflowIdInput && workflowIdInput.length > 0
       ? workflowIdInput
       : NATIVE_WORKFLOW_ID;
-  let workflowMdOverride: string | undefined;
-  if (workflowId !== NATIVE_WORKFLOW_ID || options.workflowSource) {
-    const resolved = await resolveWorkflowTemplate(workflowId, {
+  const resolvedWorkflow: ResolvedWorkflowTemplate =
+    await resolveWorkflowTemplate(workflowId, {
       source: options.workflowSource,
     });
-    if (resolved.id !== NATIVE_WORKFLOW_ID) {
-      workflowMdOverride = resolved.content;
-      console.log(
-        chalk.blue(`🧭 Using workflow template: ${chalk.cyan(resolved.id)}`),
-      );
-    }
+  let workflowMdOverride: string | undefined;
+  if (resolvedWorkflow.id !== NATIVE_WORKFLOW_ID) {
+    workflowMdOverride = resolvedWorkflow.content;
+    console.log(
+      chalk.blue(
+        `🧭 Using workflow template: ${chalk.cyan(resolvedWorkflow.id)}`,
+      ),
+    );
   }
 
   // ==========================================================================
@@ -1998,6 +2005,27 @@ export async function init(options: InitOptions): Promise<void> {
   // "Durable-state contract".
   if (workflowMdOverride !== undefined && workflowId !== NATIVE_WORKFLOW_ID) {
     removeHash(cwd, PATHS.WORKFLOW_GUIDE_FILE);
+  }
+
+  const workflowPath = path.join(cwd, PATHS.WORKFLOW_GUIDE_FILE);
+  const expectedWorkflow = replacePythonCommandLiterals(
+    resolvedWorkflow.content,
+  );
+  if (
+    fs.existsSync(workflowPath) &&
+    fs.readFileSync(workflowPath, "utf-8") === expectedWorkflow
+  ) {
+    writeWorkflowProvenance(
+      cwd,
+      buildWorkflowProvenanceRecord({
+        workflowId: resolvedWorkflow.id,
+        sourceKind: resolvedWorkflow.source,
+        registry: resolvedWorkflow.registry,
+        ref: resolvedWorkflow.ref,
+        templatePath: resolvedWorkflow.path,
+        contentSha256: resolvedWorkflow.contentSha256,
+      }),
+    );
   }
 
   // Initialize developer identity (silent - no output)

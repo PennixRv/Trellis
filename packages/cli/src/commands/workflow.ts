@@ -45,6 +45,12 @@ import {
   type ResolvedWorkflowTemplate,
   type WorkflowTemplateListing,
 } from "../utils/workflow-resolver.js";
+import {
+  buildWorkflowProvenanceRecord,
+  loadWorkflowProvenance,
+  writeWorkflowProvenance,
+  type WorkflowProvenanceRecord,
+} from "../utils/workflow-provenance.js";
 import { writeFileAtomic } from "../utils/atomic-write.js";
 
 export interface WorkflowCommandOptions {
@@ -54,6 +60,7 @@ export interface WorkflowCommandOptions {
   force?: boolean;
   createNew?: boolean;
   save?: string;
+  verify?: boolean;
 }
 
 export interface CreateWorkflowOptions {
@@ -210,6 +217,30 @@ function applyHashContract(cwd: string, templateId: string): void {
   }
 }
 
+function provenanceRecord(
+  template: ResolvedWorkflowTemplate,
+): WorkflowProvenanceRecord {
+  return buildWorkflowProvenanceRecord({
+    workflowId: template.id,
+    sourceKind: template.source,
+    registry: template.registry,
+    ref: template.ref,
+    templatePath: template.path,
+    contentSha256: template.contentSha256,
+  });
+}
+
+function persistWorkflowProvenance(
+  cwd: string,
+  template: ResolvedWorkflowTemplate,
+  materializedContent: string,
+): void {
+  const activePath = workflowFilePath(cwd);
+  if (!fs.existsSync(activePath)) return;
+  if (fs.readFileSync(activePath, "utf-8") !== materializedContent) return;
+  writeWorkflowProvenance(cwd, provenanceRecord(template));
+}
+
 async function writeWorkflow(
   cwd: string,
   template: ResolvedWorkflowTemplate,
@@ -243,6 +274,7 @@ async function writeWorkflow(
       ),
     );
     applyHashContract(cwd, template.id);
+    persistWorkflowProvenance(cwd, template, finalContent);
     return;
   }
 
@@ -278,6 +310,48 @@ async function writeWorkflow(
     ),
   );
   applyHashContract(cwd, template.id);
+  persistWorkflowProvenance(cwd, template, finalContent);
+}
+
+async function verifyWorkflow(cwd: string): Promise<void> {
+  const record = loadWorkflowProvenance(cwd);
+  if (!record) {
+    throw new WorkflowCommandError(
+      `Missing ${PATHS.WORKFLOW_PROVENANCE_FILE}; select the workflow again with an explicit immutable Marketplace source/ref.`,
+    );
+  }
+
+  const template = await resolveWorkflowTemplate(record.workflow_id, {
+    source: record.source_kind === "marketplace" ? record.registry : undefined,
+  });
+  const activePath = workflowFilePath(cwd);
+  if (!fs.existsSync(activePath)) {
+    throw new WorkflowCommandError(
+      `Missing ${PATHS.WORKFLOW_GUIDE_FILE}; cannot verify workflow provenance.`,
+    );
+  }
+  const active = fs.readFileSync(activePath, "utf-8");
+  const expected = replacePythonCommandLiterals(template.content);
+  const mismatches: string[] = [];
+  if (template.id !== record.workflow_id) mismatches.push("workflow id");
+  if (template.source !== record.source_kind) mismatches.push("source kind");
+  if (template.registry !== record.registry) mismatches.push("registry");
+  if (template.ref !== record.ref) mismatches.push("ref");
+  if (template.path !== record.path) mismatches.push("template path");
+  if (template.contentSha256 !== record.content_sha256) {
+    mismatches.push("template integrity");
+  }
+  if (active !== expected) mismatches.push("active workflow bytes");
+  if (mismatches.length > 0) {
+    throw new WorkflowCommandError(
+      `Workflow provenance verification failed: ${mismatches.join(", ")}.`,
+    );
+  }
+  console.log(
+    chalk.green(
+      `✓ Workflow provenance verified: ${template.id} @ ${template.ref}`,
+    ),
+  );
 }
 
 /**
@@ -524,6 +598,23 @@ export async function runWorkflowCommand(
     throw new WorkflowCommandError(
       "No .trellis/ directory found. Run `trellis init` first.",
     );
+  }
+
+  if (options.verify) {
+    if (
+      options.list ||
+      options.template ||
+      options.marketplace ||
+      options.force ||
+      options.createNew ||
+      options.save
+    ) {
+      throw new WorkflowCommandError(
+        "--verify cannot be combined with workflow selection or write options.",
+      );
+    }
+    await verifyWorkflow(cwd);
+    return;
   }
 
   // List mode — print and exit.
