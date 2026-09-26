@@ -810,6 +810,7 @@ Usage:
   python3 task.py validate <dir>                     Validate jsonl files
   python3 task.py list-context <dir>                 List jsonl entries
   python3 task.py start <dir>                        Set active task; records the checked-out branch when unset
+  python3 task.py replan <dir> "<reason>"            Return an in-progress task to planning
   python3 task.py current [--source]                 Show active task
   python3 task.py finish                             Clear active task
   python3 task.py workflow <id>                      Select workflow variant for active task
