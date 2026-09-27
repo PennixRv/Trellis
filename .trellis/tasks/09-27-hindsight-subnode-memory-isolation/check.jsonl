@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cli/backend/migrations.md", "reason": "Review generated asset ownership and migration/update semantics."}
+{"file": ".trellis/spec/cli/unit-test/conventions.md", "reason": "Review test coverage and conventions for the changed runtime contract."}

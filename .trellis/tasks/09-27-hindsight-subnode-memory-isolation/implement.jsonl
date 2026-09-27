@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cli/backend/migrations.md", "reason": "Keep generated subnode.env updates compatible with Trellis asset ownership and update behavior."}
+{"file": ".trellis/spec/cli/unit-test/conventions.md", "reason": "Match the repository's Vitest testing conventions."}
