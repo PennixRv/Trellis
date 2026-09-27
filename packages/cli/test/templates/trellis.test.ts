@@ -328,7 +328,7 @@ describe("trellis template constants", () => {
     expect(workflow).toContain("`report.json`");
     expect(workflow).toContain("`trellis-research-record`");
     expect(workflow).toContain("### Semantic RecoveryBrief");
-    expect(workflow).toContain("checkpoint's exact archive/convergence");
+    expect(workflow).toContain("`hindsight_required` path's");
     expect(workflow).toContain("Evidence is unit-sized");
     expect(workflow).toContain("Planning Seal closure pass");
     expect(workflow).toContain("[workflow-state:planning]");
@@ -630,9 +630,8 @@ describe("getAllAgents", () => {
         correctness_test: { reasoning_effort: "high" },
       }),
     });
-    expect(subnodeEnvTemplate).toContain("OPENVIKING_AUTO_RECALL=0");
-    expect(subnodeEnvTemplate).toContain("OPENVIKING_AUTO_CAPTURE=0");
-    expect(subnodeEnvTemplate).toContain("OPENVIKING_NO_AUTO_INJECT=1");
+    expect(subnodeEnvTemplate).toContain("HINDSIGHT_DISABLED=1");
+    expect(subnodeEnvTemplate).not.toMatch(/OPENVIKING_|HINDSIGHT_API_TOKEN/);
   });
 
   it("each agent body starts with `---` frontmatter and a matching name field", () => {
