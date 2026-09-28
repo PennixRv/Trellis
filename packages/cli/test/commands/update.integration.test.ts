@@ -845,6 +845,7 @@ describe("update() integration", () => {
     writeProjectFile(
       trellisConfigPath,
       `${readProjectFile(trellisConfigPath).trimEnd()}\n` +
+        "# Project Hindsight mapping\n" +
         "pennix:\n" +
         "  memory:\n" +
         "    bank_id: pennix-project-test\n",
@@ -867,6 +868,12 @@ describe("update() integration", () => {
     );
     expect(readProjectFile(FILE_NAMES.AGENTS)).toContain(
       "When a live Trellis Channel wait returns a host continuation",
+    );
+    expect(readProjectFile(trellisConfigPath)).toContain(
+      "# Project Hindsight mapping\n" +
+        "pennix:\n" +
+        "  memory:\n" +
+        "    bank_id: pennix-project-test",
     );
     expect(readProjectFile(trellisConfigPath)).toContain(
       "bank_id: pennix-project-test",

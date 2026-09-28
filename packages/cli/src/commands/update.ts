@@ -854,7 +854,9 @@ function preserveExistingConfigExtensions(
 
   const existing = fs.readFileSync(configPath, "utf-8");
   const sectionPattern = /^([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)/;
-  const sections = (content: string): Map<string, string> => {
+  const sections = (
+    content: string,
+  ): Map<string, { content: string; index: number }> => {
     const lines = content.split(/\r?\n/);
     const starts: { key: string; index: number }[] = [];
     for (let index = 0; index < lines.length; index += 1) {
@@ -864,23 +866,43 @@ function preserveExistingConfigExtensions(
     return new Map(
       starts.map(({ key, index }, position) => [
         key,
-        lines
-          .slice(index, starts[position + 1]?.index ?? lines.length)
-          .join("\n"),
+        {
+          content: lines
+            .slice(index, starts[position + 1]?.index ?? lines.length)
+            .join("\n"),
+          index,
+        },
       ]),
     );
   };
 
-  const templateKeys = new Set(sections(template).keys());
-  const extensions = [...sections(existing)].filter(
+  const templateSections = sections(template);
+  const templateKeys = new Set(templateSections.keys());
+  const existingSections = sections(existing);
+  const templateLines = new Set(template.split(/\r?\n/));
+  const extensions = [...existingSections].filter(
     ([key]) => key !== "registry" && !templateKeys.has(key),
   );
   const withRegistry = preserveExistingRegistryConfig(cwd, template);
   if (extensions.length === 0) return withRegistry;
 
-  return `${withRegistry.trimEnd()}\n\n${extensions
-    .map(([, content]) => content.trimEnd())
-    .join("\n\n")}\n`;
+  // Keep project comments that introduce an extension, but do not duplicate
+  // the template's trailing documentation when the extension was appended
+  // directly after a generated section. The line-based parser intentionally
+  // stays limited to the generated top-level YAML shape.
+  const extensionContent = extensions.map(([, section]) => {
+    const preceding = existing
+      .split(/\r?\n/)
+      .slice(Math.max(0, section.index - 32), section.index);
+    const projectComments = preceding.filter(
+      (line) => line.trimStart().startsWith("#") && !templateLines.has(line),
+    );
+    const leading =
+      projectComments.length > 0 ? `${projectComments.join("\n")}\n` : "";
+    return `${leading}${section.content.trimEnd()}`;
+  });
+
+  return `${withRegistry.trimEnd()}\n${extensionContent.join("\n\n")}\n`;
 }
 
 async function collectRegistrySpecTemplates(

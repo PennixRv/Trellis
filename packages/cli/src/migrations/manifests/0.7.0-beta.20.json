@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.20",
+  "description": "Preserve project extension comments during ownership-aware updates",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Ownership-aware update fix:**\n- YAML project extensions retain their adjacent comments and formatting boundaries, avoiding false .new candidates.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}
