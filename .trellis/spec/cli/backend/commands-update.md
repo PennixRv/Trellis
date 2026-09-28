@@ -83,12 +83,27 @@ After collection, `collectTemplateFiles` runs two final passes:
 1. `update.skip` filtering via `commands/update.ts:loadUpdateSkipPaths` — drops paths matching the `update.skip` list in `.trellis/config.yaml`. **Bypassed** when the update is a breaking release with `recommendMigrate` (`breakingBypass`); see "Migration Trigger Semantics".
 2. `configurators/shared.ts:replacePythonCommandLiterals` is applied to every value so init-time and update-time bytes are byte-identical on the same OS. This is the load-bearing step that keeps idempotency working — see Common Pitfalls.
 
+Generated configuration files are composed by ownership, not compared as
+undifferentiated blobs:
+
+- `.trellis/config.yaml` preserves top-level sections absent from the current
+  Trellis template. The built-in `registry` section continues through its
+  normalized registry path. A project extension is not a reason to create a
+  `.new` sidecar.
+- `.codex/config.toml` preserves keys and tables absent from the Trellis
+  template. Keys already declared by the template remain Trellis-owned and a
+  user edit to one still follows the normal conflict path.
+- `AGENTS.md` preserves prose outside the unique
+  `<!-- TRELLIS:START -->`…`<!-- TRELLIS:END -->` block. When only that block
+  changes, it is an automatic Trellis update; malformed or duplicate markers
+  remain conflicts and are never guessed through.
+
 ### 2. Whole-file workflow.md update and AGENTS.md managed-block merge
 
 These two runtime-facing files have different update contracts:
 
 - **`.trellis/workflow.md`** stays on the normal whole-file template path. `collectTemplateFiles` resolves the selected workflow from `.trellis/workflow-provenance.json` and verifies its id, source, ref, path, and content hash before inserting it. Native workflows and legacy hash-tracked projects use the bundled `workflowMdTemplate`. Legacy untracked custom workflows without provenance are omitted from the desired-file map, so update cannot replace them with native bytes. `analyzeChanges` then decides whether to auto-update, prompt, skip, or create `.new`; do not partially merge only `[workflow-state:*]` blocks.
-- **`AGENTS.md`** (`commands/update.ts:buildAgentsMdTemplate`) merges only the `<!-- TRELLIS:START -->`…`<!-- TRELLIS:END -->` region via `commands/update.ts:replaceTrellisManagedBlock`; if no markers exist, the template managed block is appended. The legacy untracked-hash whitelist `LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES` lets a pristine pre-tracking AGENTS.md auto-update without a "modified by you" false positive (see `commands/update.ts:isKnownUntrackedTemplate`).
+- **`AGENTS.md`** (`commands/update.ts:buildAgentsMdTemplate`) merges only the `<!-- TRELLIS:START -->`…`<!-- TRELLIS:END -->` region via `commands/update.ts:replaceTrellisManagedBlock`; if no markers exist, the template managed block is appended. The legacy untracked-hash whitelist `LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES` lets a pristine pre-tracking AGENTS.md auto-update without a "modified by you" false positive (see `commands/update.ts:isKnownUntrackedTemplate`). A valid file whose outside prose is unchanged is also auto-updated when only the managed block differs; malformed or duplicate markers stay on the conflict path.
 
 Why workflow is whole-file: `.trellis/workflow.md` is parsed by `get_context.py`,
 `workflow_phase.py`, SessionStart strippers, and per-turn workflow-state hooks.
@@ -114,7 +129,7 @@ closed instead of guessing a different workflow.
 | `newFiles` | template has it; disk doesn't; no stored hash |
 | `userDeletedFiles` | template has it; disk doesn't; **stored hash exists** → respect deletion, do not re-add |
 | `unchangedFiles` | disk content === template content |
-| `autoUpdateFiles` | disk differs from template; stored hash matches current content (or known-untracked AGENTS.md) → user did not edit; safe to write |
+| `autoUpdateFiles` | disk differs from template; stored hash matches current content, the path is a known-untracked AGENTS.md, or only the valid AGENTS.md managed block differs → safe to write |
 | `changedFiles` | disk differs from template; stored hash absent or stale → user edited; needs decision |
 
 This bucketing is the basis for both the printed plan and the write phase.
