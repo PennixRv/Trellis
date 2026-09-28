@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { PATHS } from "../constants/paths.js";
 import { writeFileAtomic } from "./atomic-write.js";
+import type { ResolvedWorkflowTemplate } from "./workflow-resolver.js";
 
 export const WORKFLOW_PROVENANCE_SCHEMA_VERSION = 1;
 
@@ -87,4 +88,20 @@ export function loadWorkflowProvenance(
   }
 
   return parsed as unknown as WorkflowProvenanceRecord;
+}
+
+export function workflowProvenanceMismatches(
+  record: WorkflowProvenanceRecord,
+  template: ResolvedWorkflowTemplate,
+): string[] {
+  const mismatches: string[] = [];
+  if (template.id !== record.workflow_id) mismatches.push("workflow id");
+  if (template.source !== record.source_kind) mismatches.push("source kind");
+  if (template.registry !== record.registry) mismatches.push("registry");
+  if (template.ref !== record.ref) mismatches.push("ref");
+  if (template.path !== record.path) mismatches.push("template path");
+  if (template.contentSha256 !== record.content_sha256) {
+    mismatches.push("template integrity");
+  }
+  return mismatches;
 }

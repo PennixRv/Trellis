@@ -48,6 +48,7 @@ import {
 import {
   buildWorkflowProvenanceRecord,
   loadWorkflowProvenance,
+  workflowProvenanceMismatches,
   writeWorkflowProvenance,
   type WorkflowProvenanceRecord,
 } from "../utils/workflow-provenance.js";
@@ -332,15 +333,7 @@ async function verifyWorkflow(cwd: string): Promise<void> {
   }
   const active = fs.readFileSync(activePath, "utf-8");
   const expected = replacePythonCommandLiterals(template.content);
-  const mismatches: string[] = [];
-  if (template.id !== record.workflow_id) mismatches.push("workflow id");
-  if (template.source !== record.source_kind) mismatches.push("source kind");
-  if (template.registry !== record.registry) mismatches.push("registry");
-  if (template.ref !== record.ref) mismatches.push("ref");
-  if (template.path !== record.path) mismatches.push("template path");
-  if (template.contentSha256 !== record.content_sha256) {
-    mismatches.push("template integrity");
-  }
+  const mismatches = workflowProvenanceMismatches(record, template);
   if (active !== expected) mismatches.push("active workflow bytes");
   if (mismatches.length > 0) {
     throw new WorkflowCommandError(

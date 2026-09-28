@@ -687,14 +687,16 @@ describe("trellis workflow integration", () => {
     const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
     const beforeUpdate = fs.readFileSync(wfPath, "utf-8");
 
-    // Non-interactive skip on conflicts — update should treat the user's
-    // workflow as "modified" (no hash) and skip writing native bytes over it.
-    await update({ skipAll: true });
+    // Generic update must resolve the selected workflow from provenance. The
+    // old implementation compared against the bundled native workflow and
+    // incorrectly produced workflow.md.new.
+    await update({ createNew: true });
 
     const afterUpdate = fs.readFileSync(wfPath, "utf-8");
     expect(afterUpdate).toBe(beforeUpdate);
     expect(afterUpdate).not.toBe(
       replacePythonCommandLiterals(workflowMdTemplate),
     );
+    expect(fs.existsSync(`${wfPath}.new`)).toBe(false);
   });
 });

@@ -85,6 +85,14 @@ import {
   TRELLIS_BLOCK_END,
   TRELLIS_BLOCK_START,
 } from "../utils/managed-paths.js";
+import {
+  loadWorkflowProvenance,
+  workflowProvenanceMismatches,
+} from "../utils/workflow-provenance.js";
+import {
+  NATIVE_WORKFLOW_ID,
+  resolveWorkflowTemplate,
+} from "../utils/workflow-resolver.js";
 
 export {
   cleanupEmptyDirs,
@@ -926,14 +934,13 @@ async function collectTemplateFiles(
     preserveExistingRegistryConfig(cwd, configYamlTemplate),
   );
   files.set(`${DIR_NAMES.WORKFLOW}/.gitignore`, gitignoreTemplate);
-  // workflow.md is included here because it is runtime-parsed by
-  // get_context.py and shared hooks. Keep it on the normal template update
-  // path: if the installed file still matches the tracked hash, update the
-  // whole file. If the user edited it, the standard modified-file prompt /
-  // --force behavior applies. Partial tag-block merging is unsafe because
-  // platform routing markers outside [workflow-state:*] blocks are also
-  // script-consumed.
-  files.set(`${DIR_NAMES.WORKFLOW}/workflow.md`, workflowMdTemplate);
+  // workflow.md is runtime-parsed by get_context.py and shared hooks. Keep it
+  // on the normal whole-file update path, but resolve the project's selected
+  // workflow instead of silently substituting the bundled native workflow.
+  const selectedWorkflow = await resolveWorkflowUpdateTemplate(cwd, hashes);
+  if (selectedWorkflow !== null) {
+    files.set(`${DIR_NAMES.WORKFLOW}/workflow.md`, selectedWorkflow);
+  }
   // workspace/index.md stays excluded — it's runtime-appended by add_session.py
   // (journal index) and has no script-parsed structure.
   files.set(FILE_NAMES.AGENTS, buildAgentsMdTemplate(cwd));
@@ -997,6 +1004,41 @@ async function collectTemplateFiles(
   }
 
   return files;
+}
+
+/**
+ * Resolve the workflow selected by this project for generic updates.
+ *
+ * Provenance is the durable source of truth for marketplace workflows. Older
+ * projects without provenance retain their historical behavior: hash-tracked
+ * workflow.md uses the bundled template, while an untracked custom workflow
+ * remains outside the generic update set.
+ */
+async function resolveWorkflowUpdateTemplate(
+  cwd: string,
+  hashes: TemplateHashes,
+): Promise<string | null> {
+  const provenance = loadWorkflowProvenance(cwd);
+  if (!provenance) {
+    return hashes[PATHS.WORKFLOW_GUIDE_FILE] ? workflowMdTemplate : null;
+  }
+
+  const template = await resolveWorkflowTemplate(provenance.workflow_id, {
+    source:
+      provenance.source_kind === "marketplace"
+        ? provenance.registry
+        : undefined,
+  });
+  const mismatches = workflowProvenanceMismatches(provenance, template);
+  if (mismatches.length > 0) {
+    throw new Error(
+      `Workflow provenance verification failed: ${mismatches.join(", ")}.`,
+    );
+  }
+
+  return template.id === NATIVE_WORKFLOW_ID
+    ? workflowMdTemplate
+    : template.content;
 }
 
 /**

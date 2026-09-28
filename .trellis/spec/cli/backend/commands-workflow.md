@@ -124,13 +124,15 @@ Ownership contract:
 
 - `native` is Trellis-managed. After writing it, refresh the
   `.trellis/workflow.md` hash with `updateHashes`.
-- Every non-native workflow is user-managed local content. After writing it,
+- Every non-native workflow remains protected local content. After writing it,
   remove `.trellis/workflow.md` from `.trellis/.template-hashes.json` with
-  `removeHash`.
-- Do not add `workflow.variant` or any other long-lived config field to make
-  `trellis update` chase a selected variant. Switching is an explicit project
-  action. (Per-task selection via `task.json.workflow` is task-scoped state,
-  not config — it does not violate this rule.)
+  `removeHash`, and persist the immutable source in
+  `.trellis/workflow-provenance.json`.
+- Switching is still an explicit project action; generic `trellis update` does
+  not switch workflows. When provenance exists, it resolves and verifies the
+  same selected source for whole-file comparison, so it cannot fall back to the
+  bundled native workflow. Per-task selection via `task.json.workflow` is
+  task-scoped state and does not change the global workflow provenance.
 - `--save <id>` writes only `.trellis/workflows/<id>.md`. It never touches
   `.trellis/workflow.md` or `.trellis/.template-hashes.json` — no
   `updateHashes`, no `removeHash`, whether the resolved template is native or
@@ -209,7 +211,7 @@ Native source-of-truth contract:
 | Workflow entry path is missing, not `.md`, absolute, or contains `..` | Fail with workflow-specific error |
 | `init --workflow missing-id` | Reject; do not print and return success |
 | `init --workflow tdd` | Write marketplace content and remove `.trellis/workflow.md` hash |
-| `trellis update` after switching to non-native | Treat workflow as modified/user-managed; never silently restore native |
+| `trellis update` after switching to non-native | Resolve and verify the recorded workflow provenance; never silently restore native |
 | `--save <id>` where id fails `[A-Za-z0-9_-]+` | Exit 1 with invalid-id error before any resolve/fetch |
 | `--save <id>` combined with `--template` or `--create-new` | Exit 1; the library write never composes with active-workflow modes |
 | `--save <id>` and `.trellis/workflows/<id>.md` exists | Exit 1 with guidance to re-run with `--force`; `--force` overwrites the library file only |
@@ -225,16 +227,17 @@ Native source-of-truth contract:
 ### 5. Good/Base/Bad Cases
 
 - Good: `trellis workflow --template tdd` replaces a pristine native workflow,
-  removes the workflow hash, and later `trellis update` leaves TDD content in
-  place.
+  removes the workflow hash, records provenance, and later `trellis update`
+  compares against TDD content without producing a native `workflow.md.new`.
 - Good: `trellis workflow --save tdd` writes `.trellis/workflows/tdd.md` while
   `.trellis/workflow.md` and `.template-hashes.json` stay byte-unchanged, and
   a later `trellis update` leaves the library file alone.
 - Base: `trellis init --workflow native` writes bundled native workflow and
   keeps `.trellis/workflow.md` hash-tracked.
-- Bad: `trellis workflow --template tdd` writes TDD content and records the TDD
-  hash. The next `trellis update` sees a pristine file and overwrites it with
-  native workflow.
+- Bad: `trellis update` ignores a valid non-native provenance record and
+  compares the active file with bundled native workflow. The next update
+  produces a misleading native `workflow.md.new` or overwrites the selected
+  workflow.
 - Bad: `--save` removes the `.trellis/workflow.md` hash (or records one for the
   library file). The command mutated the hash contract of a file it never
   wrote, or turned user-managed library content into a Trellis-owned template.
@@ -261,6 +264,8 @@ Integration tests:
 - `--create-new` writes a generated `workflow.md.new` file beside `.trellis/workflow.md` and does not touch the active
   workflow or hash.
 - `trellis update` after switching to non-native does not restore native.
+- `trellis update` with a valid non-native provenance record does not produce a
+  native `workflow.md.new`.
 - Marketplace native mirror matches bundled native workflow when the mirror file
   exists.
 - Real `marketplace/workflows/tdd/workflow.md` planning breadcrumbs include the
@@ -309,8 +314,9 @@ fs.writeFileSync(".trellis/workflow.md", tddContent);
 removeHash(cwd, PATHS.WORKFLOW_GUIDE_FILE);
 ```
 
-Missing hash means update conservatively treats the workflow as user-managed and
-routes it through the normal modified-file decision path.
+The missing hash protects the active file. The provenance record tells update
+which selected source to compare against; it is never permission to switch back
+to native.
 
 #### Wrong
 

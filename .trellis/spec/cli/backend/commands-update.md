@@ -6,7 +6,7 @@ paths:
 ---
 # `trellis update` Command
 
-How `trellis update` upgrades a user project's bundled Trellis assets (Python scripts, workflow.md, AGENTS.md, platform configs) from the version recorded in `.trellis/.version` to the version of the installed CLI.
+How `trellis update` upgrades a user project's Trellis assets (Python scripts, the selected workflow.md, AGENTS.md, platform configs) from the version recorded in `.trellis/.version` to the version of the installed CLI.
 
 This spec covers the command pipeline, flags, interactive surface, and the subsystems update orchestrates. Manifest mechanics — schema fields, migration types, hash gating semantics — live in `migrations.md`. This document references that one rather than restating it.
 
@@ -62,7 +62,7 @@ Note that `force` / `skipAll` / `createNew` are mutually exclusive in spirit but
 
 ## Update Plan Composition
 
-### 1. Collect bundled templates
+### 1. Collect Trellis templates
 
 `commands/update.ts:collectTemplateFiles` is the single place that produces the "what should be on disk" snapshot. Sources, in order:
 
@@ -71,7 +71,7 @@ Note that `force` / `skipAll` / `createNew` are mutually exclusive in spirit but
 | Python scripts under `.trellis/scripts/` | `templates/trellis/index.ts:getAllScripts` |
 | `.trellis/config.yaml` | `templates/trellis/index.ts:configYamlTemplate` |
 | `.trellis/.gitignore` | `templates/trellis/index.ts:gitignoreTemplate` |
-| `.trellis/workflow.md` | `templates/trellis/index.ts:workflowMdTemplate` (whole-file hash-gated, see below) |
+| `.trellis/workflow.md` | `commands/update.ts:resolveWorkflowUpdateTemplate` — the selected provenance source, or the bundled native template for legacy/native projects (whole-file, see below) |
 | Root `AGENTS.md` | `commands/update.ts:buildAgentsMdTemplate` (managed-block merge) |
 | Per-platform files | `configurators/index.ts:collectPlatformTemplates` for each detected platform via `configurators/index.ts:getConfiguredPlatforms` |
 | `.claude/settings.json` `statusLine` | preserved through `commands/update.ts:preserveExistingClaudeStatusLine` |
@@ -87,7 +87,7 @@ After collection, `collectTemplateFiles` runs two final passes:
 
 These two runtime-facing files have different update contracts:
 
-- **`.trellis/workflow.md`** stays on the normal whole-file template path. `collectTemplateFiles` inserts the bundled `workflowMdTemplate`; `analyzeChanges` decides whether to auto-update, prompt, skip, or create `.new` by comparing the current file hash with `.trellis/.template-hashes.json`. Do not partially merge only `[workflow-state:*]` blocks.
+- **`.trellis/workflow.md`** stays on the normal whole-file template path. `collectTemplateFiles` resolves the selected workflow from `.trellis/workflow-provenance.json` and verifies its id, source, ref, path, and content hash before inserting it. Native workflows and legacy hash-tracked projects use the bundled `workflowMdTemplate`. Legacy untracked custom workflows without provenance are omitted from the desired-file map, so update cannot replace them with native bytes. `analyzeChanges` then decides whether to auto-update, prompt, skip, or create `.new`; do not partially merge only `[workflow-state:*]` blocks.
 - **`AGENTS.md`** (`commands/update.ts:buildAgentsMdTemplate`) merges only the `<!-- TRELLIS:START -->`…`<!-- TRELLIS:END -->` region via `commands/update.ts:replaceTrellisManagedBlock`; if no markers exist, the template managed block is appended. The legacy untracked-hash whitelist `LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES` lets a pristine pre-tracking AGENTS.md auto-update without a "modified by you" false positive (see `commands/update.ts:isKnownUntrackedTemplate`).
 
 Why workflow is whole-file: `.trellis/workflow.md` is parsed by `get_context.py`,
@@ -97,9 +97,13 @@ Runtime-significant headings and platform markers live outside
 current while leaving stale phase or platform routing sections behind.
 
 Non-native workflow variants selected through `trellis workflow --template` or
-`trellis init --workflow` are deliberately removed from
-`.trellis/.template-hashes.json`. That makes `trellis update` classify the file
-as user-managed instead of auto-updating it back to bundled native workflow.
+`trellis init --workflow` are still deliberately removed from
+`.trellis/.template-hashes.json`: the active file remains protected from silent
+replacement. The accompanying provenance record is the durable identity of the
+selected source, however, so a generic update resolves that same source and
+never substitutes the bundled native workflow. If the provenance file is
+invalid or its immutable source no longer passes integrity checks, update fails
+closed instead of guessing a different workflow.
 
 ### 3. Analyze on-disk state
 
@@ -277,7 +281,7 @@ Update and init share the same template producers:
 
 What's unique to update:
 
-- Whole-file hash-gated update for bundled native `workflow.md`; non-native workflows are user-managed by removing the workflow hash entry.
+- Whole-file update for the selected `workflow.md`; native/legacy hash-tracked projects use the bundled native template, while provenance-backed non-native projects use their recorded immutable source and legacy untracked custom workflows are left outside the desired-file map.
 - Managed-block merge for `AGENTS.md` (init writes the bundled template directly).
 - Snapshot backup at `.trellis/.backup-<timestamp>/`.
 - Migration plan + execution.
