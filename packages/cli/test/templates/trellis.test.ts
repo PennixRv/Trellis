@@ -329,6 +329,9 @@ describe("trellis template constants", () => {
     expect(workflow).toContain("`trellis-research-record`");
     expect(workflow).toContain("### Semantic RecoveryBrief");
     expect(workflow).toContain("`hindsight_required` path's");
+    expect(workflow).toContain("`retrieval_verified`");
+    expect(workflow).toContain("`canonical_persisted`");
+    expect(workflow).toContain("does not prove");
     expect(workflow).toContain("Evidence is unit-sized");
     expect(workflow).toContain("Planning Seal closure pass");
     expect(workflow).toContain("[workflow-state:planning]");
