@@ -829,6 +829,56 @@ describe("update() integration", () => {
     expect(result.endsWith(templateContent.trimEnd() + "\n")).toBe(true);
   });
 
+  it("#4f updates managed content while preserving project-owned config extensions", async () => {
+    await init({ yes: true, force: true, codex: true });
+
+    const agentsPath = projectFile(FILE_NAMES.AGENTS);
+    const currentAgents = readProjectFile(FILE_NAMES.AGENTS);
+    const staleManagedAgents = removeSubagentsSection(currentAgents);
+    const projectAgents = `${staleManagedAgents}\n\n## Project Notes\nKeep this.\n`;
+    writeProjectFile(FILE_NAMES.AGENTS, projectAgents);
+    const hashes = readHashesV2(hashFilePath());
+    hashes[FILE_NAMES.AGENTS] = computeHash(projectAgents);
+    writeHashesV2(hashFilePath(), hashes);
+
+    const trellisConfigPath = `${DIR_NAMES.WORKFLOW}/config.yaml`;
+    writeProjectFile(
+      trellisConfigPath,
+      `${readProjectFile(trellisConfigPath).trimEnd()}\n` +
+        "pennix:\n" +
+        "  memory:\n" +
+        "    bank_id: pennix-project-test\n",
+    );
+
+    const codexConfigPath = ".codex/config.toml";
+    writeProjectFile(
+      codexConfigPath,
+      readProjectFile(codexConfigPath).replace(
+        "[agents]\n",
+        "[agents]\nenabled = false\n",
+      ),
+    );
+    fs.writeFileSync(versionFilePath(), "0.7.0-beta.17");
+
+    await update({});
+
+    expect(readProjectFile(FILE_NAMES.AGENTS)).toContain(
+      "## Project Notes\nKeep this.",
+    );
+    expect(readProjectFile(FILE_NAMES.AGENTS)).toContain(
+      "When a live Trellis Channel wait returns a host continuation",
+    );
+    expect(readProjectFile(trellisConfigPath)).toContain(
+      "bank_id: pennix-project-test",
+    );
+    expect(readProjectFile(codexConfigPath)).toContain(
+      "[agents]\nenabled = false\nmax_depth = 1",
+    );
+    expect(fs.existsSync(`${agentsPath}.new`)).toBe(false);
+    expect(fs.existsSync(`${projectFile(trellisConfigPath)}.new`)).toBe(false);
+    expect(fs.existsSync(`${projectFile(codexConfigPath)}.new`)).toBe(false);
+  });
+
   it("#4e appends Trellis Copilot guidance to existing repo instructions", async () => {
     await init({ yes: true, force: true, copilot: true });
 

@@ -142,6 +142,110 @@ export function preserveCodexAgentModelKeys(
   }
 }
 
+interface TomlEntries {
+  section: string;
+  key: string;
+  line: string;
+}
+
+function collectTomlEntries(content: string): TomlEntries[] {
+  const entries: TomlEntries[] = [];
+  let section = "";
+  let inMultilineString = false;
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (inMultilineString) {
+      if ((trimmed.match(/"""/g) ?? []).length % 2 === 1) {
+        inMultilineString = false;
+      }
+      continue;
+    }
+    const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch?.[1]) {
+      section = sectionMatch[1];
+      continue;
+    }
+    const assignment = trimmed.match(/^([A-Za-z0-9_.-]+)\s*=/);
+    if (!assignment?.[1] || trimmed.startsWith("#")) continue;
+    entries.push({ section, key: assignment[1], line: rawLine });
+    if (
+      trimmed.includes('"""') &&
+      (trimmed.match(/"""/g) ?? []).length % 2 === 1
+    ) {
+      inMultilineString = true;
+    }
+  }
+  return entries;
+}
+
+/**
+ * Preserve project-owned Codex settings absent from Trellis's template.
+ * Known template keys remain Trellis-owned and therefore still use the normal
+ * modified-file conflict path; unknown keys/tables are carried forward.
+ */
+export function preserveCodexProjectConfig(
+  cwd: string,
+  files: Map<string, string>,
+): void {
+  const relativePath = ".codex/config.toml";
+  const freshContent = files.get(relativePath);
+  if (freshContent === undefined) return;
+
+  let existingContent: string;
+  try {
+    existingContent = fs.readFileSync(path.join(cwd, relativePath), "utf-8");
+  } catch {
+    return;
+  }
+
+  const freshEntries = collectTomlEntries(freshContent);
+  const known = new Map<string, Set<string>>();
+  for (const entry of freshEntries) {
+    const keys = known.get(entry.section) ?? new Set<string>();
+    keys.add(entry.key);
+    known.set(entry.section, keys);
+  }
+
+  const unknownBySection = new Map<string, string[]>();
+  for (const entry of collectTomlEntries(existingContent)) {
+    if (known.get(entry.section)?.has(entry.key)) continue;
+    const lines = unknownBySection.get(entry.section) ?? [];
+    lines.push(entry.line);
+    unknownBySection.set(entry.section, lines);
+  }
+  if (unknownBySection.size === 0) return;
+
+  const output: string[] = [];
+  let section = "";
+  const topLevel = unknownBySection.get("") ?? [];
+  let insertedTopLevel = false;
+  for (const line of freshContent.split(/\r?\n/)) {
+    const sectionMatch = line.trim().match(/^\[([^\]]+)\]$/);
+    if (sectionMatch?.[1]) {
+      if (!insertedTopLevel && topLevel.length > 0) {
+        output.push(...topLevel, "");
+        insertedTopLevel = true;
+      }
+      section = sectionMatch[1];
+      output.push(line);
+      const entries = unknownBySection.get(section);
+      if (entries) output.push(...entries);
+      continue;
+    }
+    output.push(line);
+  }
+  if (!insertedTopLevel && topLevel.length > 0) {
+    output.unshift(...topLevel, "");
+  }
+
+  for (const [unknownSection, entries] of unknownBySection) {
+    if (unknownSection === "" || known.has(unknownSection)) continue;
+    output.push("", `[${unknownSection}]`, ...entries);
+  }
+  files.set(relativePath, output.join("\n"));
+}
+
 /**
  * The Codex file set — written at init and diffed by `trellis update`.
  * - .agents/skills/ — shared skills from common source, rendered with the
@@ -196,6 +300,7 @@ export async function configureCodex(cwd: string): Promise<void> {
   // which is a no-op (replacePythonCommandLiterals is idempotent).
   const files = renderTemplateMap(collectCodexTemplates());
   preserveCodexAgentModelKeys(cwd, files);
+  preserveCodexProjectConfig(cwd, files);
   await writeTemplateMap(cwd, files);
 
   // RESIDUAL — not expressible as a path→content pair: a directory with no

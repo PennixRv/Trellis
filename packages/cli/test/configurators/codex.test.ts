@@ -6,8 +6,12 @@ import {
   extractCodexAgentModelKeys,
   applyCodexAgentModelKeys,
   preserveCodexAgentModelKeys,
+  preserveCodexProjectConfig,
 } from "../../src/configurators/codex.js";
-import { getAllAgents } from "../../src/templates/codex/index.js";
+import {
+  getAllAgents,
+  getConfigTemplate,
+} from "../../src/templates/codex/index.js";
 
 // ---------------------------------------------------------------------------
 // extractCodexAgentModelKeys
@@ -232,6 +236,46 @@ describe("preserveCodexAgentModelKeys", () => {
     const before = new Map(files);
     preserveCodexAgentModelKeys(tmpDir, files);
     expect(files).toEqual(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// preserveCodexProjectConfig (filesystem integration)
+// ---------------------------------------------------------------------------
+
+describe("preserveCodexProjectConfig", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-codex-config-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("preserves unknown project settings while leaving template keys owned by Trellis", () => {
+    const configPath = path.join(tmpDir, ".codex", "config.toml");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      getConfigTemplate().content.replace(
+        "[agents]\n",
+        "[agents]\nenabled = false\n",
+      ) +
+        "\n[projects.\"/work/example\"]\n" +
+        'trust_level = "trusted"\n',
+    );
+
+    const files = new Map([[".codex/config.toml", getConfigTemplate().content]]);
+    preserveCodexProjectConfig(tmpDir, files);
+
+    const result = files.get(".codex/config.toml") ?? "";
+    expect(result).toContain("[agents]\nenabled = false");
+    expect(result).toContain(
+      '[projects."/work/example"]\ntrust_level = "trusted"',
+    );
+    expect(result).toContain("max_depth = 1");
   });
 });
 

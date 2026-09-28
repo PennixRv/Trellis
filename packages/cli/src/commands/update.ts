@@ -63,7 +63,10 @@ import {
   CLAUDE_STATUSLINE_PATH,
   isClaudeStatuslineManaged,
 } from "../configurators/claude.js";
-import { preserveCodexAgentModelKeys } from "../configurators/codex.js";
+import {
+  preserveCodexAgentModelKeys,
+  preserveCodexProjectConfig,
+} from "../configurators/codex.js";
 import { printZcodeSetupHint } from "../configurators/zcode.js";
 import { ensureGitattributes } from "../configurators/workflow.js";
 import { getStatuslineHook } from "../templates/claude/index.js";
@@ -283,6 +286,41 @@ function buildAgentsMdTemplate(cwd: string): string {
     agentsMdContent,
     TRELLIS_BLOCK_START,
     TRELLIS_BLOCK_END,
+  );
+}
+
+function countOccurrences(content: string, needle: string): number {
+  return content.split(needle).length - 1;
+}
+
+/**
+ * A generated Markdown file can contain a user-owned document around one
+ * Trellis-managed block. If only that block changed, the whole file is still
+ * an update owned by Trellis and must not enter the user-conflict path.
+ */
+function isManagedMarkdownBlockOnlyChange(
+  relativePath: string,
+  existingContent: string,
+  newContent: string,
+): boolean {
+  if (relativePath !== FILE_NAMES.AGENTS) return false;
+  if (
+    countOccurrences(existingContent, TRELLIS_BLOCK_START) !== 1 ||
+    countOccurrences(existingContent, TRELLIS_BLOCK_END) !== 1 ||
+    countOccurrences(newContent, TRELLIS_BLOCK_START) !== 1 ||
+    countOccurrences(newContent, TRELLIS_BLOCK_END) !== 1
+  ) {
+    return false;
+  }
+
+  const existingBlock = getTrellisManagedBlock(existingContent);
+  const newBlock = getTrellisManagedBlock(newContent);
+  return (
+    existingBlock !== null &&
+    newBlock !== null &&
+    existingBlock !== newBlock &&
+    existingContent.replace(existingBlock, "") ===
+      newContent.replace(newBlock, "")
   );
 }
 
@@ -800,6 +838,51 @@ function preserveExistingRegistryConfig(cwd: string, template: string): string {
   );
 }
 
+/**
+ * Preserve top-level YAML sections not declared by the Trellis template.
+ * Project extensions are identified by structure, not by Pennix-specific key
+ * names; `registry` remains handled by its existing normalized path.
+ */
+function preserveExistingConfigExtensions(
+  cwd: string,
+  template: string,
+): string {
+  const configPath = path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml");
+  if (!fs.existsSync(configPath)) {
+    return template;
+  }
+
+  const existing = fs.readFileSync(configPath, "utf-8");
+  const sectionPattern = /^([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)/;
+  const sections = (content: string): Map<string, string> => {
+    const lines = content.split(/\r?\n/);
+    const starts: { key: string; index: number }[] = [];
+    for (let index = 0; index < lines.length; index += 1) {
+      const match = lines[index]?.match(sectionPattern);
+      if (match?.[1]) starts.push({ key: match[1], index });
+    }
+    return new Map(
+      starts.map(({ key, index }, position) => [
+        key,
+        lines
+          .slice(index, starts[position + 1]?.index ?? lines.length)
+          .join("\n"),
+      ]),
+    );
+  };
+
+  const templateKeys = new Set(sections(template).keys());
+  const extensions = [...sections(existing)].filter(
+    ([key]) => key !== "registry" && !templateKeys.has(key),
+  );
+  const withRegistry = preserveExistingRegistryConfig(cwd, template);
+  if (extensions.length === 0) return withRegistry;
+
+  return `${withRegistry.trimEnd()}\n\n${extensions
+    .map(([, content]) => content.trimEnd())
+    .join("\n\n")}\n`;
+}
+
 async function collectRegistrySpecTemplates(
   cwd: string,
 ): Promise<Map<string, string>> {
@@ -931,7 +1014,7 @@ async function collectTemplateFiles(
   // Configuration
   files.set(
     `${DIR_NAMES.WORKFLOW}/config.yaml`,
-    preserveExistingRegistryConfig(cwd, configYamlTemplate),
+    preserveExistingConfigExtensions(cwd, configYamlTemplate),
   );
   files.set(`${DIR_NAMES.WORKFLOW}/.gitignore`, gitignoreTemplate);
   // workflow.md is runtime-parsed by get_context.py and shared hooks. Keep it
@@ -968,6 +1051,7 @@ async function collectTemplateFiles(
   // as a modified-file conflict by the hash comparison below.
   if (platforms.has("codex")) {
     preserveCodexAgentModelKeys(cwd, files);
+    preserveCodexProjectConfig(cwd, files);
     preserveLegacyPennixCodexWorkflowHook(cwd, files);
   }
 
@@ -1119,6 +1203,17 @@ function analyzeChanges(
         ) {
           // Either the tracked hash matches, or this is a known pristine template
           // from before the path was hash-tracked. Safe to auto-update.
+          change.status = "changed";
+          result.autoUpdateFiles.push(change);
+        } else if (
+          isManagedMarkdownBlockOnlyChange(
+            relativePath,
+            existingContent,
+            newContent,
+          )
+        ) {
+          // The project-owned prose around AGENTS.md is unchanged; only the
+          // explicitly managed Trellis block moved to a new template version.
           change.status = "changed";
           result.autoUpdateFiles.push(change);
         } else {

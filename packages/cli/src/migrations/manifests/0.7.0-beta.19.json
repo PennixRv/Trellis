@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.19",
+  "description": "Make Trellis project updates ownership-aware for mixed generated assets",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Ownership-aware update fixes:**\n- Trellis updates preserve project-owned top-level YAML sections and Codex TOML keys/tables that are not declared by the current template.\n- AGENTS.md updates replace only the valid TRELLIS managed block when surrounding project prose is unchanged.\n- No project migration is required.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}
