@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.18",
+  "description": "Clarify Hindsight retrieval proof in the Codex subnode workflow",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Handoff contract clarification:**\n- The Codex subnode workflow distinguishes same-document retrieval verification from canonical content persistence.\n- Marketplace workflow content hashes remain synchronized with the published workflow.\n- No project migration is required.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}
