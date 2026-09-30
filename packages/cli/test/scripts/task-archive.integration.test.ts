@@ -214,7 +214,8 @@ describe.skipIf(!hasPython())(
       git(tmp, "add", "-A");
       git(tmp, "commit", "-q", "-m", "initial");
 
-      const month = new Date().toISOString().slice(0, 7);
+      const now = new Date();
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const unrelated = path.join(
         tmp,
         ".trellis",

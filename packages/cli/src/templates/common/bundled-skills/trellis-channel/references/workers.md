@@ -59,8 +59,7 @@ match `[A-Za-z0-9._-]+`. The default Trellis install ships three cards:
 
 - `.trellis/agents/check.md` — code-quality reviewer.
 - `.trellis/agents/implement.md` — coding worker for implementation runs.
-- `.trellis/agents/subnode.md` — bounded independent-evidence worker; its
-  `subnode.env` sibling is loaded automatically.
+- `.trellis/agents/subnode.md` — bounded independent-evidence worker.
 
 ```yaml
 ---

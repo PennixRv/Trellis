@@ -102,7 +102,6 @@ export const gitattributesTemplate = readTemplate("gitattributes.txt");
 export const implementAgentTemplate = readTemplate("agents/implement.md");
 export const checkAgentTemplate = readTemplate("agents/check.md");
 export const subnodeAgentTemplate = readTemplate("agents/subnode.md");
-export const subnodeEnvTemplate = readTemplate("agents/subnode.env");
 export const subnodeProfilesTemplate = readTemplate(
   "agents/subnode-profiles.json",
 );
@@ -170,7 +169,6 @@ export function getAllAgents(): Map<string, string> {
   agents.set("implement.md", implementAgentTemplate);
   agents.set("check.md", checkAgentTemplate);
   agents.set("subnode.md", subnodeAgentTemplate);
-  agents.set("subnode.env", subnodeEnvTemplate);
   agents.set("subnode-profiles.json", subnodeProfilesTemplate);
   return agents;
 }

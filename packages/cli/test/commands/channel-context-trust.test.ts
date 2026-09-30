@@ -420,19 +420,19 @@ describe("agent-loader honors trusted roots", () => {
     expect(parseAgentEnvFile(envFile)).toEqual({ FOO: "bar", EMPTY: "" });
   });
 
-  it("keeps the coordinator Hindsight environment separate from the subnode hard-off", () => {
+  it("keeps role environment values separate from the coordinator", () => {
     const agents = path.join(cwd, ".trellis", "agents");
     fs.mkdirSync(agents, { recursive: true });
     const envFile = path.join(agents, "subnode.env");
-    fs.writeFileSync(envFile, "HINDSIGHT_DISABLED=1\n");
-    const previous = process.env.HINDSIGHT_DISABLED;
-    process.env.HINDSIGHT_DISABLED = "0";
+    fs.writeFileSync(envFile, "ROLE_SETTING=1\n");
+    const previous = process.env.ROLE_SETTING;
+    process.env.ROLE_SETTING = "0";
     try {
-      expect(parseAgentEnvFile(envFile)).toEqual({ HINDSIGHT_DISABLED: "1" });
-      expect(process.env.HINDSIGHT_DISABLED).toBe("0");
+      expect(parseAgentEnvFile(envFile)).toEqual({ ROLE_SETTING: "1" });
+      expect(process.env.ROLE_SETTING).toBe("0");
     } finally {
-      if (previous === undefined) delete process.env.HINDSIGHT_DISABLED;
-      else process.env.HINDSIGHT_DISABLED = previous;
+      if (previous === undefined) delete process.env.ROLE_SETTING;
+      else process.env.ROLE_SETTING = previous;
     }
   });
 

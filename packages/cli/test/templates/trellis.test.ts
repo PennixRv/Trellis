@@ -35,7 +35,6 @@ import {
   implementAgentTemplate,
   checkAgentTemplate,
   subnodeAgentTemplate,
-  subnodeEnvTemplate,
   subnodeProfilesTemplate,
   configYamlTemplate,
 } from "../../src/templates/trellis/index.js";
@@ -64,7 +63,6 @@ describe("trellis template constants", () => {
     workspaceNoteScript,
     workflowMdTemplate,
     gitignoreTemplate,
-    subnodeEnvTemplate,
   };
 
   function inProgressBreadcrumb(): string {
@@ -615,7 +613,7 @@ describe("getAllAgents", () => {
     expect(agents.has("implement.md")).toBe(true);
     expect(agents.has("check.md")).toBe(true);
     expect(agents.has("subnode.md")).toBe(true);
-    expect(agents.has("subnode.env")).toBe(true);
+    expect(agents.has("subnode.env")).toBe(false);
     expect(agents.has("subnode-profiles.json")).toBe(true);
   });
 
@@ -624,7 +622,6 @@ describe("getAllAgents", () => {
     expect(agents.get("implement.md")).toBe(implementAgentTemplate);
     expect(agents.get("check.md")).toBe(checkAgentTemplate);
     expect(agents.get("subnode.md")).toBe(subnodeAgentTemplate);
-    expect(agents.get("subnode.env")).toBe(subnodeEnvTemplate);
     expect(agents.get("subnode-profiles.json")).toBe(subnodeProfilesTemplate);
     expect(JSON.parse(subnodeProfilesTemplate)).toMatchObject({
       default_model: "gpt-6-sol",
@@ -633,8 +630,6 @@ describe("getAllAgents", () => {
         correctness_test: { reasoning_effort: "high" },
       }),
     });
-    expect(subnodeEnvTemplate).toContain("HINDSIGHT_DISABLED=1");
-    expect(subnodeEnvTemplate).not.toMatch(/OPENVIKING_|HINDSIGHT_API_TOKEN/);
   });
 
   it("each agent body starts with `---` frontmatter and a matching name field", () => {

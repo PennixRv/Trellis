@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/cli/backend/index.md", "reason": "Codex channel supervisor, adapter and migration implementation contract."}
+{"file": ".trellis/spec/cli/unit-test/index.md", "reason": "Unit/integration test conventions for CLI and migration behavior."}
+{"file": ".trellis/spec/guides/index.md", "reason": "Shared Trellis implementation and safety guidance."}
+{"file": "AGENTS.md", "reason": "Owner instructions and modification boundary"}
+{"file": ".trellis/tasks/09-30-agentmemory-trellis-cutover/prd.md", "reason": "Locked requirements and acceptance"}
+{"file": ".trellis/tasks/09-30-agentmemory-trellis-cutover/design.md", "reason": "Final native AgentMemory configuration and protocol"}
+{"file": ".trellis/tasks/09-30-agentmemory-trellis-cutover/implement.md", "reason": "Execution release reinstall and retirement order"}

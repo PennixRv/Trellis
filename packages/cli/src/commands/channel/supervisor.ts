@@ -95,6 +95,24 @@ export interface SupervisorConfig {
 
 type Child = ChildProcessByStdio<Writable, Readable, Readable>;
 
+/** Apply memory isolation after every role/parent environment merge. */
+export function buildWorkerEnv(
+  config: Pick<SupervisorConfig, "provider" | "agent" | "env">,
+  parent: NodeJS.ProcessEnv,
+  runtime: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const env = { ...parent, ...config.env, ...runtime };
+  if (config.provider === "codex" && config.agent === "subnode") {
+    return {
+      ...Object.fromEntries(
+        Object.entries(env).filter(([key]) => !key.startsWith("AGENTMEMORY_")),
+      ),
+      AGENTMEMORY_SDK_CHILD: "1",
+    };
+  }
+  return env;
+}
+
 const SHUTDOWN_GRACE_MS = 3000;
 
 interface ResolvedProviderPath {
@@ -223,6 +241,7 @@ export async function runSupervisor(
     fs.writeFileSync(systemPromptFile, config.systemPrompt);
   }
   const view = {
+    agent: config.agent,
     resume: config.resume,
     model: config.model,
     reasoningEffort: config.reasoningEffort,
@@ -233,13 +252,11 @@ export async function runSupervisor(
   };
   const args = adapter.buildArgs(view);
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    ...config.env,
+  const env = buildWorkerEnv(config, process.env, {
     TRELLIS_HOOKS: "0",
     TRELLIS_CHANNEL: channelName,
     TRELLIS_CHANNEL_AS: workerName,
-  };
+  });
 
   const logPath = workerFile(channelName, workerName, "log", project);
   const log = fs.createWriteStream(logPath);

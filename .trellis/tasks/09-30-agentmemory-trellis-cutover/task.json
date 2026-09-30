@@ -1,0 +1,33 @@
+{
+  "id": "agentmemory-trellis-cutover",
+  "name": "agentmemory-trellis-cutover",
+  "title": "Trellis AgentMemory subnode hard-off 与消费者迁移",
+  "description": "Trellis pennix/v0.7-beta承载Codex subnode合并后AgentMemory env剥离/SDK child marker、whole-plugin及native MCP双入口关闭，Hindsight模板精确native migration与workflow权威合同；统一验收后原生beta发布和消费者更新。当前planning到开工边界，不改源码发包。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-09-30",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "root_coordinator_task": "09-30-agentmemory-hard-cutover",
+    "delivery_mode": "change_bearing",
+    "execution_class": "complex",
+    "approval_mode": "awaiting_implementation_start",
+    "planning_seal": "closed",
+    "planning_contract": "2026-10-01-agentmemory-native-plugin-mcp"
+  }
+}

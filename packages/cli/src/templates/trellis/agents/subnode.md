@@ -5,7 +5,6 @@ description: |
   never changes protected target files, and leaves acceptance to the coordinator.
 provider: codex
 labels: [trellis, subnode]
-env_file: subnode.env
 ---
 
 # Subnode (channel runtime)

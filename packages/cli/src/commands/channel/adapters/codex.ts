@@ -722,9 +722,20 @@ export function encodeCodexInterruptMessage(
   );
 }
 
-export function buildCodexArgs(opts: { model?: string }): string[] {
+export function buildCodexArgs(opts: {
+  model?: string;
+  agent?: string;
+}): string[] {
   const args = ["app-server"];
   if (opts.model) args.push("-c", `model="${opts.model}"`);
+  if (opts.agent === "subnode") {
+    args.push(
+      "-c",
+      'plugins."agentmemory@agentmemory".enabled=false',
+      "-c",
+      "mcp_servers.agentmemory.enabled=false",
+    );
+  }
   return args;
 }
 

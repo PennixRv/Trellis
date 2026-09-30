@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/cli/backend/index.md", "reason": "Review supervisor, adapter, template and native update compliance."}
+{"file": ".trellis/spec/cli/unit-test/index.md", "reason": "Review test coverage and verification conventions."}
+{"file": ".trellis/spec/guides/index.md", "reason": "Review shared safety and migration requirements."}
+{"file": ".trellis/tasks/09-30-agentmemory-trellis-cutover/prd.md", "reason": "Acceptance criteria"}
+{"file": ".trellis/tasks/09-30-agentmemory-trellis-cutover/design.md", "reason": "Protocol and ownership compliance"}
+{"file": ".trellis/tasks/09-30-agentmemory-trellis-cutover/implement.md", "reason": "Unified verification and release gates"}
