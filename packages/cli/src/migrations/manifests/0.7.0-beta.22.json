@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.22",
+  "description": "Preserve native session identity when no task is active",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "task current --json now exposes session_source independently of the task-pointer source. Taskless formal handoffs can keep their native session identity without creating a task. The Pennix Marketplace workflow uses AgentMemory exact retrieval proof instead of the retired Hindsight contract.",
+  "migrations": [],
+  "notes": "Run trellis update to refresh task.py. Existing source semantics and exit codes are unchanged. Explicitly refresh the selected Marketplace workflow to its approved commit."
+}

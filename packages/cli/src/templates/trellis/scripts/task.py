@@ -444,6 +444,7 @@ def cmd_current(args: argparse.Namespace) -> int:
         payload = {
             "current_task": task_obj,
             "source": active.source,
+            "session_source": f"session:{active.context_key}" if active.context_key else None,
             "stale": active.stale,
         }
         if active.candidate_paths:

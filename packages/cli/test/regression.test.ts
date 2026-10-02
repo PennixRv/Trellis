@@ -1628,6 +1628,7 @@ describe("regression: JSON read/write failure reporting", () => {
     >;
     expect(Object.keys(healthyPayload).sort()).toEqual([
       "current_task",
+      "session_source",
       "source",
       "stale",
     ]);
@@ -3755,6 +3756,18 @@ describe("regression: current-task path normalization", () => {
       current_task: string;
     };
     expect(context.current_task).toBe(".trellis/tasks/issue-106");
+  });
+
+  it("[taskless-session] current keeps identity independently of a task pointer", () => {
+    setupTaskRepo();
+    for (const [env, source] of [
+      [sessionEnv({ CODEX_THREAD_ID: "taskless-handoff" }), "session:codex_taskless-handoff"],
+      [sessionEnv(), null],
+    ] as const) {
+      const result = spawnSync(pythonCmd, [".trellis/scripts/task.py", "current", "--json"], { cwd: tmpDir, encoding: "utf-8", env });
+      expect(result.status, result.stderr).toBe(1);
+      expect(JSON.parse(result.stdout)).toMatchObject({ current_task: null, source: "none", session_source: source, stale: false });
+    }
   });
 
   it("[zcode-session-key] hook input and shell env resolve the same runtime key", () => {

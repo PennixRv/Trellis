@@ -1,0 +1,29 @@
+{
+  "id": "taskless-handoff-session-identity",
+  "name": "taskless-handoff-session-identity",
+  "title": "输出独立会话身份并对齐交接合同",
+  "description": "task current JSON 增加与任务指针独立的原生 session_source；同步 Marketplace 交接文档，回归验证、beta 发布与消费者升级。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-02",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "complexity": "complex",
+    "delivery_mode": "implementation"
+  }
+}
