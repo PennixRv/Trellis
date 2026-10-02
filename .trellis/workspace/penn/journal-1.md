@@ -169,3 +169,28 @@ Added the explicit analysis_only completion route, synchronized native workflow 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: 独立会话身份与 AgentMemory 合同发布
+<!-- trellis-session: v=2 fp=7ae9cf7f4e3290fa -->
+
+**Date**: 2026-10-02
+**Task**: 独立会话身份与 AgentMemory 合同发布
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+task current 独立 session_source、Marketplace 交接合同和 worker 参考完成；beta.23/core 同版 npm 可用，CI 成功，根消费者和生命周期验收通过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a72c7d5` | fix(handoff): expose native identity for taskless sessions |
+| `5126222` | 0.7.0-beta.22 |
+| `a39818b` | 0.7.0-beta.23 |
+
+### Status
+
+[OK] **Completed**
