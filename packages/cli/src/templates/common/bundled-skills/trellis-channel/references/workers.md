@@ -44,8 +44,9 @@ relative sibling file automatically for the provider child. Use this for
 stable role settings so every spawn of that role gets the same environment.
 The file contains plain `KEY=VALUE` lines only; it is not shell code and does
 not perform expansion or interpolation. Do not put credentials in a bundled
-role file. The bundled `subnode` role uses this mechanism to disable Hindsight
-hooks and Hindsight MCP tools in the evidence worker process. The coordinator
+role file. The bundled `subnode` role instead uses the native Codex adapter and
+worker environment boundary to disable the AgentMemory plugin and standalone
+AgentMemory MCP. No memory-specific env_file is generated. The coordinator
 retains its own memory capability and may pass explicitly reviewed, task-minimal
 context to the child.
 
