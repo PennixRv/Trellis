@@ -17,6 +17,7 @@ Task lifecycle includes creation, start, context configuration, finish, archive,
 | --- | --- |
 | Automatically sync an external system after task creation | `hooks.after_create` in `.trellis/config.yaml`. |
 | Automatically update status after task start | `hooks.after_start` in `.trellis/config.yaml`. |
+| Return an in-progress task to planning | `hooks.after_replan` in `.trellis/config.yaml`. |
 | Run a script after task finish | `hooks.after_finish` in `.trellis/config.yaml`. |
 | Clean external resources after archive | `hooks.after_archive` in `.trellis/config.yaml`. |
 | Change default task fields | `.trellis/scripts/common/task_store.py`. |

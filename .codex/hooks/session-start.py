@@ -229,6 +229,14 @@ def _resolve_task_dir(trellis_dir: Path, task_ref: str) -> Path:
 
 def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
     active = _resolve_active_task(trellis_dir, hook_input)
+    if active.source_type == "unbound_ambiguous":
+        candidates = "\n".join(f"- {candidate}" for candidate in active.candidate_paths)
+        return (
+            "Status: TASK BINDING AMBIGUOUS\n"
+            f"Candidates:\n{candidates}\n"
+            "Next: Review the candidates and run `python3 ./.trellis/scripts/task.py start <task>` "
+            "with the intended task once a direct session identity is available."
+        )
     if not active.task_path:
         return (
             "Status: NO ACTIVE TASK\n"
@@ -383,7 +391,10 @@ def _build_compact_current_state(
     lines.append(_format_git_state(repo_root))
 
     active = _resolve_active_task(trellis_dir, hook_input)
-    if active.task_path:
+    if active.source_type == "unbound_ambiguous":
+        candidates = ", ".join(active.candidate_paths)
+        lines.append(f"Current task: ambiguous; candidates={candidates}; bind explicitly.")
+    elif active.task_path:
         task_dir = _resolve_task_dir(trellis_dir, active.task_path)
         status = "unknown"
         task_json = task_dir / "task.json"

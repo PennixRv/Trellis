@@ -1,20 +1,9 @@
 <!-- TRELLIS:START -->
-# Trellis Instructions
+# Trellis
 
-These instructions are for AI assistants working in this project.
+Follow `.trellis/workflow.md`; read the applicable `.trellis/spec/` guidance before editing code, and keep task facts in `.trellis/tasks/`. Project-scoped helpers live in `.agents/skills/`.
 
-This project is managed by Trellis. The working knowledge you need lives under `.trellis/`:
-
-- `.trellis/workflow.md` — development phases, when to create tasks, skill routing
-- `.trellis/spec/` — package- and layer-scoped coding guidelines (read before writing code in a given layer)
-- `.trellis/workspace/` — per-developer journals and session traces
-- `.trellis/tasks/` — active and archived tasks (PRDs, research, jsonl context)
-
-If a Trellis command is available on your platform (e.g. `/trellis:finish-work`, `/trellis:continue`), prefer it over manual steps. Not every platform exposes every command.
-
-If you're using Codex or another agent-capable tool, additional project-scoped helpers may live in:
-- `.agents/skills/` — reusable Trellis skills
-- `.codex/agents/` — optional custom subagents
+When a live Trellis Channel wait returns a host continuation, resume only that continuation until it resolves, times out, or errors. Do not run another host action meanwhile, including another wait, shell command, or status/message query; use diagnostics only on demand after it returns.
 
 Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
 

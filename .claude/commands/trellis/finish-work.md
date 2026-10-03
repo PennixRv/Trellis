@@ -2,6 +2,8 @@
 
 Wrap up the current session: archive the active task (and any other completed-but-unarchived tasks the user wants to clean up) and record the session journal. Code commits are NOT done here — those happen in workflow Phase 3.4 before you invoke this command.
 
+For an eligible `task.json.meta.delivery_mode = "analysis_only"` task, reach this command directly from planning only after its PRD-defined evidence, acceptance criteria, and no-change boundary have been verified and its task artifacts have been committed. Do not run `task.py start`; a protected-target change needs a separate change-bearing task.
+
 ## Step 1: Survey current state
 
 ```bash

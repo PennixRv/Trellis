@@ -48,3 +48,89 @@ No HTTP/provider failure was observed. These checks prove current request routin
 Local source/artifact readiness is verified, including the full test suites run by the required commit hook. The next release manifest, bilingual changelogs, full release preflight, remote submodule push, release tag/CI publication, installed CLI upgrade and root native asset/workflow adoption are not completed. Root still consumes the previously published defaults and immutable Marketplace revision. No unpublished SHA has been presented as published provenance.
 
 The remaining owner sequence is Marketplace push first, the existing CI-only Trellis beta release protocol, native Trellis lifecycle upgrade, then root native update/workflow selection with a published immutable ref and integration acceptance. The three AgentMemory/terminal-wait followup tasks remain unstarted. Do not treat route success as removing their prerequisite.
+
+## Native beta.24 candidate dispositions (2026-10-03)
+
+Native create-new completed; candidates were compared with existing bytes. Preserve inline execution and project-specific roles. No hashes/provenance are hand-edited.
+
+- `.agents/skills/trellis-brainstorm/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-channel/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-channel/references/command-reference.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-channel/references/progress-debugging.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-channel/references/workers.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-continue/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-meta/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-meta/references/local-architecture/bundled-skills.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-meta/references/local-architecture/generated-files.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-meta/references/platform-files/agents.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-meta/references/platform-files/hooks-and-settings.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-meta/references/platform-files/platform-map.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-meta/references/platform-files/skills-and-commands.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-session-insight/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.agents/skills/trellis-session-insight/references/cli-quick-reference.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/commands/trellis/continue.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/commands/trellis/finish-work.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/hooks/inject-subagent-context.py.new`: accept native candidate; preserve existing file mode.
+- `.claude/hooks/inject-workflow-state.py.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-brainstorm/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-channel/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-channel/references/progress-debugging.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-meta/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-meta/references/local-architecture/bundled-skills.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-meta/references/local-architecture/generated-files.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-meta/references/platform-files/agents.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-meta/references/platform-files/hooks-and-settings.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-meta/references/platform-files/platform-map.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-meta/references/platform-files/skills-and-commands.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-session-insight/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.claude/skills/trellis-session-insight/references/cli-quick-reference.md.new`: accept native candidate; preserve existing file mode.
+- `.codex/hooks/inject-subagent-context.py.new`: accept native candidate; preserve existing file mode.
+- `.codex/hooks/inject-workflow-state.py.new`: accept native candidate; preserve existing file mode.
+- `.codex/hooks/session-start.py.new`: accept native candidate; preserve existing file mode.
+- `.cursor/commands/trellis-continue.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/commands/trellis-finish-work.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/hooks/inject-shell-session-context.py.new`: accept native candidate; preserve existing file mode.
+- `.cursor/hooks/inject-subagent-context.py.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-brainstorm/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-channel/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-channel/references/progress-debugging.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-meta/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-meta/references/local-architecture/bundled-skills.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-meta/references/local-architecture/generated-files.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-meta/references/platform-files/agents.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-meta/references/platform-files/hooks-and-settings.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-meta/references/platform-files/platform-map.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-meta/references/platform-files/skills-and-commands.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-session-insight/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.cursor/skills/trellis-session-insight/references/cli-quick-reference.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/commands/trellis/continue.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/commands/trellis/finish-work.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/lib/trellis-context.js.new`: accept native candidate; preserve existing file mode.
+- `.opencode/plugins/inject-workflow-state.js.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-brainstorm/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-channel/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-channel/references/progress-debugging.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-meta/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-meta/references/local-architecture/bundled-skills.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-meta/references/local-architecture/generated-files.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-meta/references/platform-files/agents.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-meta/references/platform-files/hooks-and-settings.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-meta/references/platform-files/platform-map.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-session-insight/SKILL.md.new`: accept native candidate; preserve existing file mode.
+- `.opencode/skills/trellis-session-insight/references/cli-quick-reference.md.new`: accept native candidate; preserve existing file mode.
+- `.pi/extensions/trellis/index.ts.new`: accept native candidate; preserve existing file mode.
+- `.pi/prompts/trellis-continue.md.new`: accept native candidate; preserve existing file mode.
+- `.pi/prompts/trellis-finish-work.md.new`: accept native candidate; preserve existing file mode.
+- `.trellis/agents/subnode.md.new`: accept native candidate; preserve existing file mode.
+- `.trellis/config.yaml.new`: accept native candidate; preserve existing file mode.
+- `.trellis/workflow.md.new`: accept through explicit native workflow selection; remove preview after verification.
+
+Marketplace commit bad3f2d failed native installation because index.json retained the old content hash. Published source correction 8f7a3741a107288ffe30a6c6ccc413f68d470c97 synchronizes the index and adds actual-byte integrity coverage (4 tests passed). CLI/core beta.24 publish CI 37092676847 succeeded; both packages publicly visible.
+
+## Published adoption checkpoint
+
+- Project version is 0.7.0-beta.24; all eight profile bytes and the native receipt equal published source SHA256 b862bd997cb8874ae0e167ca47abcd315840e6a6102373c3e516e969f14ee8a2. Python scripts and present Codex hooks parse successfully.
+- Native post-update dry-run has no remaining new/auto-update files. CCH/Windsurf retain exactly the five declared custom files and previously deleted native agent assets; other updated projects are already up to date. No directory-wide force, migration, private configuration, or hand-edited metadata was used.
+- Root and FastCtx provenance verify codex-subnode-channel @ 8f7a3741a107288ffe30a6c6ccc413f68d470c97; Trellis and Skills explicitly verify native @ beta.24.
+- Scope is released defaults and consumer adoption. Prior two read-only/no-tools route smokes establish Sol/high and Luna/xhigh reachability only; role quality, full Channel/report reliability and the three downstream tasks remain outside this acceptance.
+- CI https://github.com/PennixRv/Trellis/actions/runs/37092676847 completed successfully for release commit 427a52cae99749544306c848b9cefa2eb7bff3fc/tag v0.7.0-beta.24. Native verify-npm --package all confirms both beta tags publicly visible. Docs e9c7737d and Marketplace corrected commit 8f7a3741 are pushed. Dogfood native workflow and all 70 other reviewed candidates accepted; missing OpenCode package and retired local env preserved.

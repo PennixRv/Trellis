@@ -171,6 +171,9 @@ def get_active_task(
     prompt.
     """
     active = _resolve_active_task(root, input_data)
+    if active.source_type == "unbound_ambiguous":
+        candidates = ", ".join(active.candidate_paths)
+        return candidates, "unbound_ambiguous", active.source
     if not active.task_path:
         return None
 
@@ -194,6 +197,8 @@ def get_active_task(
     status = data.get("status", "")
     if not isinstance(status, str) or not status:
         return task_dir.name, "task_error", active.source
+    if active.source_type == "unbound":
+        return task_id, "unbound_task", active.source
     return task_id, status, active.source
 
 
@@ -312,13 +317,14 @@ def prompt_has_skip_keyword(prompt: str, keyword: str) -> bool:
 def _resolve_codex_dispatch_mode(config: dict) -> str:
     """Normalize `codex.dispatch_mode` from .trellis/config.yaml to "auto" or "inline".
 
-    Defaults to `auto`. The legacy `sub-agent` value is an alias for `auto`.
-    Any other explicit value (including invalid ones) falls back to `inline`
+    Defaults to `inline`. `auto` explicitly enables native dispatch; the
+    legacy `sub-agent` value is an alias for `auto`. Any other explicit value
+    (including invalid ones) falls back to `inline`
     without per-turn warnings. Shared by `_codex_mode_banner` (the per-turn
     banner) and `resolve_breadcrumb_key` (the breadcrumb tag key) so the two
     stay in lockstep.
     """
-    mode = "auto"
+    mode = "inline"
     if isinstance(config, dict):
         codex_cfg = config.get("codex")
         if isinstance(codex_cfg, dict):
@@ -336,16 +342,16 @@ def _codex_mode_banner(config: dict) -> str:
     """Emit a `<codex-mode>` banner for the additionalContext payload.
 
     Reads `codex.dispatch_mode` from .trellis/config.yaml; defaults to
-    `auto`, which dispatches Trellis sub-agents using native Codex context
+    `inline`, so the main session implements and checks directly. `auto`
+    explicitly dispatches Trellis sub-agents using native Codex context
     injection with a child-side fallback. This does not rely on inherited
     parent transcripts: `fork_turns` remains caller-controlled, and
     fresh-history sub-agents still receive their explicit delegated task and
-    inherited session configuration. `inline` is an explicit opt-out; the
-    legacy `sub-agent` value is an alias for `auto`. Invalid explicit values
-    fall back to `inline` without per-turn warnings. The banner makes the
-    active mode explicit to Codex AI per turn, complementing the workflow-state
-    body which is per-status. Mode tells AI which dispatch protocol to follow;
-    workflow-state tells AI what step it's at.
+    inherited session configuration. The legacy `sub-agent` value is an alias
+    for `auto`. Invalid explicit values fall back to `inline` without per-turn
+    warnings. The banner makes the active mode explicit to Codex AI per turn,
+    complementing the workflow-state body which is per-status. Mode tells AI
+    which dispatch protocol to follow; workflow-state tells AI what step it's at.
     """
     mode = _resolve_codex_dispatch_mode(config)
     if mode == "auto":
@@ -367,12 +373,12 @@ def resolve_breadcrumb_key(
 ) -> str:
     """Pick the breadcrumb tag key based on Codex dispatch_mode.
 
-    Codex defaults to ``auto`` and therefore uses the ordinary ``<status>``
-    breadcrumb for native SubagentStart dispatch with child-side fallback;
-    it does not depend on an inherited parent transcript. ``inline`` selects
-    the parallel ``<status>-inline`` tag; ``sub-agent`` remains an alias for
-    ``auto``. Invalid explicit values fall back to inline without per-turn
-    warnings.
+    Codex defaults to ``inline`` and therefore uses the parallel
+    ``<status>-inline`` breadcrumb for main-session execution. Explicit
+    ``auto`` uses the ordinary ``<status>`` breadcrumb for native
+    SubagentStart dispatch with child-side fallback; ``sub-agent`` remains an
+    alias for ``auto``. Invalid explicit values fall back to inline without
+    per-turn warnings.
 
     Non-codex platforms return the plain status unchanged.
     """
@@ -402,7 +408,10 @@ def build_breadcrumb(
         body = templates.get(status)
     if body is None:
         body = "Refer to workflow.md for current step."
-    header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"
+    if status == "unbound_ambiguous":
+        header = f"Status: {status}\nCandidates: {task_id}"
+    else:
+        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"
     return f"<workflow-state>\n{header}\n{body}\n</workflow-state>"
 
 

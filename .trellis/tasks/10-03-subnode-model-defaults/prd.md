@@ -21,7 +21,7 @@ Update the authoritative Trellis profile template and Marketplace workflow contr
 - [x] AC4 / R4: Relevant tests, lint, typecheck, build, artifact inclusion, native smoke and graph checks have recorded outcomes.
 - [x] AC5 / R5: Consumer-only edits are retracted; sources/commits are independently reviewable, without source or runtime mirrors in root.
 - [x] AC6 / R6: Local readiness is distinguished from publication, installed upgrade and root adoption; remaining native owner actions are concrete.
-- [ ] AC7 / R6: Native beta.24 CI publishes and verifies both packages; the Marketplace/docs commits are reachable remotely, and this owner repository adopts the published generated assets with recorded candidate dispositions.
+- [x] AC7 / R6: Native beta.24 CI publishes and verifies both packages; the Marketplace/docs commits are reachable remotely, and this owner repository adopts the published generated assets with recorded candidate dispositions.
 
 ## Notes
 

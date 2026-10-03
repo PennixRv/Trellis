@@ -45,6 +45,8 @@ max_journal_lines: 2000
 #     - "echo 'Task created'"
 #   after_start:
 #     - "echo 'Task started'"
+#   after_replan:
+#     - "echo 'Task returned to planning'"
 #   after_finish:
 #     - "echo 'Task finished'"
 #   after_archive:
@@ -72,17 +74,9 @@ max_journal_lines: 2000
 #   webapp:
 #     path: ./webapp
 #     git: true
-packages:
-  cli:
-    path: packages/cli
-  core:
-    path: packages/core
-  docs-site:
-    path: docs-site
-    type: submodule
 
 # Default package used when --package is not specified.
-default_package: cli
+# default_package: frontend
 
 #-------------------------------------------------------------------------------
 # Default workflow
@@ -219,3 +213,55 @@ channel:
 #
 # prompt_injection:
 #   skip_keyword: "no-trellis"   # "" disables the escape hatch entirely
+packages:
+  cli:
+    path: packages/cli
+  core:
+    path: packages/core
+  docs-site:
+    path: docs-site
+    type: submodule
+
+# Default package used when --package is not specified.
+
+default_package: cli
+
+#-------------------------------------------------------------------------------
+# Default workflow
+#-------------------------------------------------------------------------------
+# Team-shared default workflow for tasks that do not pin one. The id names a
+# variant file in `.trellis/workflows/<id>.md` (populate it with
+# `trellis workflow --save <id>`). This value is committed, so the whole team
+# shares the same default. A per-developer override lives in the gitignored
+# `.developer` file as a `workflow=<id>` line and takes precedence over this.
+#
+# Resolution precedence: per-task (task.json `workflow`) > personal
+# (`.developer` `workflow=`) > this `default_workflow` > global
+# `.trellis/workflow.md`.
+#
+# default_workflow: native
+
+#-------------------------------------------------------------------------------
+# Channel worker OOM guard
+#-------------------------------------------------------------------------------
+# Default safeguards for `trellis channel spawn` workers. The guard runs
+# at spawn time (cleans expired idle workers, then enforces the live-worker
+# budget) and inside each supervisor (self-terminates a worker that stays
+# continuously idle past `idle_timeout`).
+#
+# Precedence: CLI flag > env var (TRELLIS_CHANNEL_WORKER_IDLE_TIMEOUT /
+# TRELLIS_CHANNEL_MAX_LIVE_WORKERS) > role config (`channel.subnode` for
+# subnodes, `channel.worker_guard` otherwise) > built-in default.
+#
+# `idle_timeout: 0` disables idle cleanup (workers can sit idle forever
+# unless explicitly killed or given `--timeout`).
+# `max_live_workers: 0` disables the spawn-time budget check.
+#
+# `trusted_context_dirs` extends the `--file`/`--jsonl`/`--agent` containment
+# check beyond the worker cwd — useful when `.trellis/tasks` or
+# `.trellis/workspace` is a symlink to an external directory. Realpaths under
+# any listed dir are accepted in addition to cwd.
+# `auto_trust_trellis_symlinks: false` disables the narrow auto-trust of
+# `.trellis/tasks` / `.trellis/workspace` when either is itself a top-level
+# symlink (auto-trust is on by default).
+#

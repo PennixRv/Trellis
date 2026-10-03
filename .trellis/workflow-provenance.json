@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "workflow_id": "native",
+  "source_kind": "bundled",
+  "registry": "bundled:trellis",
+  "ref": "0.7.0-beta.24",
+  "path": "bundled:trellis/workflow.md",
+  "content_sha256": "44b7bf0c9b14c7ff0f28dd3bd3ed03f9dce7b3bbdc395a2e4f40d97d2e7be350"
+}

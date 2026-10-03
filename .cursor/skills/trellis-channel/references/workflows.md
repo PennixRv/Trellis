@@ -11,6 +11,7 @@ Use when the user says "和 codex/claude 讨论一下", "brainstorm", or "拉一
 ```bash
 trellis channel create brainstorm-storage-layer --by main \
   --task .trellis/tasks/05-XX-storage-adapter
+BARRIER="$(trellis channel barrier brainstorm-storage-layer)"
 
 trellis channel spawn brainstorm-storage-layer \
   --agent architect --provider codex \
@@ -22,7 +23,7 @@ trellis channel send brainstorm-storage-layer \
   --as main --to cx-arch --text-file /tmp/brainstorm-r1.md
 
 trellis channel wait brainstorm-storage-layer \
-  --as main --kind done --from cx-arch --timeout 10m
+  --as main --kind done --from cx-arch --after-seq "$BARRIER" --timeout 10m
 ```
 
 Do not stop after one answer. Read the answer, identify vague areas, send a
@@ -53,6 +54,7 @@ Use when the user asks to dispatch implementation or review work.
 ```bash
 TASK=.trellis/tasks/05-12-foo
 trellis channel create cr-foo --task "$TASK" --by main
+BARRIER="$(trellis channel barrier cr-foo)"
 
 trellis channel spawn cr-foo \
   --agent check \
@@ -63,7 +65,7 @@ trellis channel spawn cr-foo \
   --cwd "$PWD" --timeout 15m
 
 trellis channel send cr-foo --as main --to check --text-file /tmp/cr-brief.md
-trellis channel wait cr-foo --as main --kind done --from check --timeout 15m
+trellis channel wait cr-foo --as main --kind done --from check --after-seq "$BARRIER" --timeout 15m
 trellis channel messages cr-foo --kind message --from check --tag final_answer
 ```
 
@@ -77,6 +79,7 @@ Use one channel and distinct worker names.
 
 ```bash
 trellis channel create cr-feature --by main --ephemeral
+BARRIER="$(trellis channel barrier cr-feature)"
 
 trellis channel spawn cr-feature --agent check \
   --jsonl "$TASK/check.jsonl" --file "$TASK/prd.md" --file "$TASK/design.md" \
@@ -88,7 +91,7 @@ trellis channel spawn cr-feature --agent check --provider codex --as check-cx \
 
 trellis channel send cr-feature --as main --to check --text-file /tmp/cr-brief.md
 trellis channel send cr-feature --as main --to check-cx --text-file /tmp/cr-brief.md
-trellis channel wait cr-feature --as main --kind done --from check,check-cx --all --timeout 15m
+trellis channel wait cr-feature --as main --kind done --from check,check-cx --all --after-seq "$BARRIER" --timeout 15m
 ```
 
 `--all` means every listed worker must emit a matching event.

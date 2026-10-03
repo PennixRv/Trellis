@@ -44,9 +44,11 @@ relative sibling file automatically for the provider child. Use this for
 stable role settings so every spawn of that role gets the same environment.
 The file contains plain `KEY=VALUE` lines only; it is not shell code and does
 not perform expansion or interpolation. Do not put credentials in a bundled
-role file. The bundled `subnode` role uses this mechanism to disable
-OpenViking's automatic recall, capture, and fixed background injection in the
-evidence worker process.
+role file. The bundled `subnode` role instead uses the native Codex adapter and
+worker environment boundary to disable the AgentMemory plugin and standalone
+AgentMemory MCP. No memory-specific env_file is generated. The coordinator
+retains its own memory capability and may pass explicitly reviewed, task-minimal
+context to the child.
 
 The success event `spawned` records `pid`, `provider`, `agent`, the injected
 `files`, and the resolved `manifests` so later spectators can audit context.
@@ -58,8 +60,7 @@ match `[A-Za-z0-9._-]+`. The default Trellis install ships three cards:
 
 - `.trellis/agents/check.md` — code-quality reviewer.
 - `.trellis/agents/implement.md` — coding worker for implementation runs.
-- `.trellis/agents/subnode.md` — bounded independent-evidence worker; its
-  `subnode.env` sibling is loaded automatically.
+- `.trellis/agents/subnode.md` — bounded independent-evidence worker.
 
 ```yaml
 ---

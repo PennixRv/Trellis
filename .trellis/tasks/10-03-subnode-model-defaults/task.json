@@ -25,7 +25,11 @@
   "meta": {
     "delivery_mode": "planned_change",
     "coordination_task": "subnode-provider-config-diagnosis",
-    "source_readiness": "verified_local",
-    "release_version": "0.7.0-beta.24"
+    "source_readiness": "published_verified",
+    "release_version": "0.7.0-beta.24",
+    "consumer_adoption": "verified_beta24",
+    "publication_mode": "authorized_direct_push_no_pr",
+    "marketplace_source_commit": "8f7a3741a107288ffe30a6c6ccc413f68d470c97",
+    "release_commit": "427a52cae99749544306c848b9cefa2eb7bff3fc"
   }
 }
