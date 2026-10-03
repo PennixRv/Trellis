@@ -45,8 +45,8 @@ stable role settings so every spawn of that role gets the same environment.
 The file contains plain `KEY=VALUE` lines only; it is not shell code and does
 not perform expansion or interpolation. Do not put credentials in a bundled
 role file. The bundled `subnode` role instead uses the native Codex adapter and
-worker environment boundary to disable the Cognee plugin. The official
-Cognee integration has no standalone MCP server. No memory-specific env_file is generated. The coordinator
+worker environment boundary to disable the Cognee plugin. No memory-specific
+env_file is generated. The coordinator
 retains its own memory capability and may pass explicitly reviewed, task-minimal
 context to the child.
 
