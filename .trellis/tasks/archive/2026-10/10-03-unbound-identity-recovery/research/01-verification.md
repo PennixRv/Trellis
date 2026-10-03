@@ -40,5 +40,6 @@ archive safeguards remain in place.
   visible and owner `verify-npm --package all` passed, including beta tags.
 - Global lifecycle installed beta.25. Scoped verification for trellis-cli,
   pennix-skills, codex-config and codex-agents is match, without failures.
-- Six consumer roots have been updated and checked; the second Trellis
-  checkout will fast-forward the pushed dogfood adoption commit before closure.
+- All seven consumer roots have been updated and checked. The second Trellis
+  checkout fast-forwarded origin/pennix/v0.7-beta at adoption commit 25489876;
+  its native update dry-run and native workflow provenance verification passed.
