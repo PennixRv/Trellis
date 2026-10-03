@@ -106,7 +106,7 @@ describe("init() integration", () => {
           "utf-8",
         ),
       ).default_model,
-    ).toBe("gpt-6-sol");
+    ).toBe("gpt-6.1-sol");
 
     // Default platforms: cursor + claude
     expect(fs.existsSync(path.join(tmpDir, ".cursor"))).toBe(true);

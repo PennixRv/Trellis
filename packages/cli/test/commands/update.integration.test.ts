@@ -356,6 +356,39 @@ describe("update() integration", () => {
     );
   });
 
+  it("updates pristine legacy subnode model defaults", async () => {
+    await setupProject();
+    const relativePath = `${PATHS.AGENTS}/subnode-profiles.json`;
+    const profilesPath = projectFile(relativePath);
+    const legacy =
+      JSON.stringify(
+        {
+          default_model: "gpt-6-sol",
+          profiles: {
+            ...JSON.parse(subnodeProfilesTemplate).profiles,
+            code_path: { reasoning_effort: "medium" },
+            docs_source: { reasoning_effort: "medium" },
+          },
+        },
+        null,
+        2,
+      ) + "\n";
+    fs.writeFileSync(profilesPath, legacy);
+    writeHashesV2(hashFilePath(), {
+      ...readHashesV2(hashFilePath()),
+      [relativePath]: computeHash(legacy),
+    });
+
+    await update({ skipAll: true });
+
+    expect(fs.readFileSync(profilesPath, "utf-8")).toBe(
+      subnodeProfilesTemplate,
+    );
+    expect(readHashesV2(hashFilePath())[relativePath]).toBe(
+      computeHash(subnodeProfilesTemplate),
+    );
+  });
+
   it("preserves locally customized subnode profiles during update", async () => {
     await setupProject();
     const profilesPath = projectFile(`${PATHS.AGENTS}/subnode-profiles.json`);

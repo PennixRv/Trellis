@@ -622,13 +622,16 @@ describe("getAllAgents", () => {
     expect(agents.get("check.md")).toBe(checkAgentTemplate);
     expect(agents.get("subnode.md")).toBe(subnodeAgentTemplate);
     expect(agents.get("subnode-profiles.json")).toBe(subnodeProfilesTemplate);
-    expect(JSON.parse(subnodeProfilesTemplate)).toMatchObject({
-      default_model: "gpt-6-sol",
+    const profiles = JSON.parse(subnodeProfilesTemplate);
+    expect(profiles).toMatchObject({
+      default_model: "gpt-6.1-sol",
       profiles: expect.objectContaining({
-        code_path: { reasoning_effort: "medium" },
+        docs_source: { model: "gpt-5.6-luna", reasoning_effort: "xhigh" },
         correctness_test: { reasoning_effort: "high" },
       }),
     });
+    expect(Object.keys(profiles.profiles)).toHaveLength(8);
+    expect(profiles.profiles).not.toHaveProperty("code_path");
   });
 
   it("each agent body starts with `---` frontmatter and a matching name field", () => {
