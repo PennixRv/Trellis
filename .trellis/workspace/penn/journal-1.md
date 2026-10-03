@@ -194,3 +194,29 @@ task current 独立 session_source、Marketplace 交接合同和 worker 参考�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: Publish Sol Luna defaults and complete all consumer adoption
+<!-- trellis-session: v=2 fp=0da4eeb40a0f2a89 -->
+
+**Date**: 2026-10-03
+**Task**: Publish Sol Luna defaults and complete all consumer adoption
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+Published beta.24 CLI/core via green CI, corrected Marketplace index integrity at its source, and aligned seven consumers plus installed Skills/global CLI. Native receipts refreshed; full required tests pass. Preserve project customizations and defer all three downstream tasks.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2aa009ec55907a4f193f82c343fd0300e37278cc` | fix(cli): refresh shipped subnode model defaults |
+| `427a52cae99749544306c848b9cefa2eb7bff3fc` | 0.7.0-beta.24 |
+| `35f7e6c1606e156da960c77ad172a8bf053bcb3e` | chore(workflow): adopt published subnode defaults in dogfood assets |
+| `6af92b4a` | chore(workflow): seal refreshed receipts and seven-consumer acceptance |
+
+### Status
+
+[OK] **Completed**
