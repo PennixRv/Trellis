@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cli/backend/index.md", "reason": "Backend checklist and channel package ownership for the supervisor change."}
+{"file": ".trellis/spec/cli/unit-test/index.md", "reason": "Required Vitest and integration validation for the regression."}

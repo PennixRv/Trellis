@@ -1,0 +1,32 @@
+{
+  "id": "cognee-subnode-isolation",
+  "name": "cognee-subnode-isolation",
+  "title": "Cognee subnode memory isolation",
+  "description": "Replace legacy memory isolation with Cognee at the real supervisor and Codex adapter boundaries, preserve main capture, prove env/config overrides and publish the paired beta release. Authorized root contract: ../.trellis/tasks/10-03-cognee-memory-base-replacement.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-03",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "delivery_mode": "change_bearing",
+    "execution_class": "complex",
+    "work_domain": "workflow_governance",
+    "decision_frontier": "multiple",
+    "approval_mode": "implementation_authorized"
+  }
+}

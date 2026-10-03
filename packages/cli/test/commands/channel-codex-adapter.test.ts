@@ -59,7 +59,7 @@ describe("Codex channel adapter", () => {
       "-c",
       'model="gpt-6-sol"',
       "-c",
-      'plugins."cognee@cognee".enabled=false',
+      "plugins.cognee@cognee.enabled=false",
     ]);
     expect(buildCodexArgs({ model: "gpt-6-sol" })).toEqual([
       "app-server",

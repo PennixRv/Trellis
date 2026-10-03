@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.28",
+  "description": "Apply the native Codex Cognee plugin override correctly",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Codex subnodes now pass the unquoted dotted plugin key that the native -c parser recognizes, so the official Cognee plugin is actually disabled for the child process.",
+  "migrations": [],
+  "notes": "Upgrade the CLI to receive the adapter fix. No task or ownership migration is required."
+}
