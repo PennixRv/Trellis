@@ -63,13 +63,17 @@ export interface WatchWorkersInput extends ListWorkersInput {
 /**
  * Watch the durable worker registry. Yields a fresh registry snapshot
  * whenever a worker-relevant event lands. The first yield is the current
- * snapshot.
+ * snapshot, or the snapshot at `sinceSeq` when replaying from a barrier.
  */
 export async function* watchWorkers(
   input: WatchWorkersInput,
 ): AsyncGenerator<WorkerState[], void, unknown> {
   const ref = resolve(input);
-  const events = await readChannelEvents(input.channel, ref.project);
+  const history = await readChannelEvents(input.channel, ref.project);
+  const sinceSeq = input.sinceSeq;
+  const events = sinceSeq === undefined
+    ? history
+    : history.filter((ev) => ev.seq <= sinceSeq);
 
   const snapshot = (): WorkerState[] => {
     const registry = reduceWorkerRegistry(events, ref);

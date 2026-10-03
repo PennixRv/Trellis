@@ -198,7 +198,9 @@ export function registerChannelCommand(program: Command): void {
 
   channel
     .command("wait <name>")
-    .description("Block until an event matching the filter arrives, or timeout")
+    .description(
+      "Block until a matching event or worker terminal transition, or timeout",
+    )
     .requiredOption("--as <agent>", "agent name waiting")
     .option("--scope <scope>", "channel scope: project | global")
     .option("--timeout <duration>", "max wait (e.g. 30s, 2m, 1h)")
@@ -208,6 +210,10 @@ export function registerChannelCommand(program: Command): void {
       parseNonNegativeInteger,
     )
     .option("--from <agents>", "only wake on events from these agents (CSV)")
+    .option(
+      "--workers <workers>",
+      "wait for named workers to become terminal (CSV)",
+    )
     .option(
       "--kind <kind[,kind...]>",
       "only wake on these event kinds (CSV, OR semantics)",
@@ -221,7 +227,7 @@ export function registerChannelCommand(program: Command): void {
     .option("--include-progress", "also wake on progress events")
     .option(
       "--all",
-      "wait until each agent in --from has produced a matching event (default: first match wins)",
+      "wait for every named --from author or --workers worker (default: first match wins)",
     )
     .action(async (name: string, raw: Record<string, unknown>) => {
       const opts = raw as {
@@ -229,6 +235,7 @@ export function registerChannelCommand(program: Command): void {
         timeout?: string;
         afterSeq?: number;
         from?: string;
+        workers?: string;
         kind?: string;
         scope?: string;
         thread?: string;
@@ -243,6 +250,7 @@ export function registerChannelCommand(program: Command): void {
           timeoutMs: parseDuration(opts.timeout),
           afterSeq: opts.afterSeq,
           from: opts.from,
+          workers: opts.workers,
           kind: opts.kind,
           scope: opts.scope,
           thread: opts.thread,

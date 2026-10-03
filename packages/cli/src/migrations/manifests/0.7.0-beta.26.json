@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.26",
+  "description": "Wait for worker terminal lifecycles independently of event authors",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "channel wait --workers selects durable worker lifecycle transitions, including supervisor terminal events, with optional --all. Ordinary adapter errors and peer turn completion do not satisfy worker waits. Explicit watchWorkers sinceSeq replay starts at the barrier snapshot and applies later events once in durable order. Bundled subnode guidance uses the worker selector.",
+  "migrations": [],
+  "notes": "Run trellis update after upgrading to refresh bundled channel guidance. Existing event --from filters keep exact-author semantics. Worker mode rejects event filters. Terminal receipt is not report or disposition acceptance. watchWorkers without sinceSeq still starts with the current snapshot."
+}

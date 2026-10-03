@@ -166,6 +166,229 @@ describe("channelWait kind union (CLI)", () => {
     });
   });
 
+  it.each([
+    {
+      kind: "killed",
+      by: "supervisor:worker",
+      reason: "idle-timeout",
+      lifecycle: "killed",
+    },
+    {
+      kind: "killed",
+      by: "supervisor:worker",
+      reason: "crash",
+      lifecycle: "crashed",
+    },
+    { kind: "error", by: "supervisor:worker", lifecycle: "error" },
+    { kind: "error", by: "worker", synthesized: true, lifecycle: "error" },
+    { kind: "done", by: "worker", lifecycle: "done" },
+  ] as const)(
+    "worker wait accepts $lifecycle independent of terminal author",
+    async ({ lifecycle, ...terminal }) => {
+      await createChannel("worker-terminal", { by: "main" });
+      await appendEvent("worker-terminal", {
+        kind: "spawned",
+        by: "main",
+        as: "worker",
+        agent: "subnode",
+      });
+      const barrier = await channelBarrier("worker-terminal");
+      await appendEvent("worker-terminal", { ...terminal, worker: "worker" });
+      vi.mocked(console.log).mockClear();
+      await channelWait("worker-terminal", {
+        as: "main",
+        workers: "worker",
+        afterSeq: barrier,
+        timeoutMs: 1000,
+      });
+      expect(console.log).toHaveBeenCalledTimes(1);
+      expect(
+        JSON.parse(String(vi.mocked(console.log).mock.calls[0][0])),
+      ).toMatchObject({
+        workerId: "worker",
+        terminal: true,
+        lifecycle,
+        lastSeq: barrier + 1,
+      });
+    },
+  );
+
+  it("worker --all ignores ordinary errors and peer turn done and accepts each lifecycle once", async () => {
+    await createChannel("workers-all", { by: "main" });
+    await appendEvent("workers-all", {
+      kind: "spawned",
+      by: "main",
+      as: "sub",
+      agent: "subnode",
+    });
+    await appendEvent("workers-all", {
+      kind: "spawned",
+      by: "main",
+      as: "peer",
+      agent: "check",
+    });
+    const barrier = await channelBarrier("workers-all");
+    await appendEvent("workers-all", {
+      kind: "error",
+      by: "sub",
+      message: "503",
+    });
+    await appendEvent("workers-all", { kind: "done", by: "peer" });
+    await appendEvent("workers-all", { kind: "done", by: "sub" });
+    await appendEvent("workers-all", {
+      kind: "turn_finished",
+      by: "sub",
+      worker: "sub",
+    });
+    await appendEvent("workers-all", {
+      kind: "killed",
+      by: "supervisor:peer",
+      worker: "peer",
+      reason: "crash",
+    });
+    vi.mocked(console.log).mockClear();
+    await channelWait("workers-all", {
+      as: "main",
+      workers: "sub,peer",
+      all: true,
+      afterSeq: barrier,
+      timeoutMs: 1000,
+    });
+    const emitted = vi
+      .mocked(console.log)
+      .mock.calls.map(([line]) => JSON.parse(String(line)));
+    expect(
+      emitted.map((worker) => [
+        worker.workerId,
+        worker.lifecycle,
+        worker.lastSeq,
+      ]),
+    ).toEqual([
+      ["sub", "done", barrier + 3],
+      ["peer", "crashed", barrier + 5],
+    ]);
+  });
+
+  it("ignores old terminals even when later ordinary errors update their lastSeq", async () => {
+    await createChannel("worker-old", { by: "main" });
+    await appendEvent("worker-old", {
+      kind: "spawned",
+      by: "main",
+      as: "old",
+      agent: "subnode",
+    });
+    await appendEvent("worker-old", { kind: "done", by: "old" });
+    const barrier = await channelBarrier("worker-old");
+    await appendEvent("worker-old", {
+      kind: "error",
+      by: "old",
+      message: "late adapter error",
+    });
+    vi.mocked(console.log).mockClear();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const previous = process.exitCode;
+    try {
+      await channelWait("worker-old", {
+        as: "main",
+        workers: "old",
+        afterSeq: barrier,
+        timeoutMs: 80,
+      });
+      expect(process.exitCode).toBe(124);
+      expect(console.log).not.toHaveBeenCalled();
+      expect(stderr).toHaveBeenCalledWith("timeout: still waiting on old\n");
+    } finally {
+      process.exitCode = previous;
+    }
+  });
+
+  it("captures a default barrier and waits past adapter error until a supervisor kill", async () => {
+    await createChannel("worker-live", { by: "main" });
+    await appendEvent("worker-live", {
+      kind: "spawned",
+      by: "main",
+      as: "worker",
+      agent: "subnode",
+    });
+    vi.mocked(console.log).mockClear();
+    const waiter = channelWait("worker-live", {
+      as: "main",
+      workers: "worker",
+      timeoutMs: 1000,
+    });
+    appendSoon("worker-live", { kind: "error", by: "worker", message: "503" });
+    appendSoon(
+      "worker-live",
+      { kind: "killed", by: "supervisor:worker", worker: "worker" },
+      40,
+    );
+    await waiter;
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse(String(vi.mocked(console.log).mock.calls[0][0])),
+    ).toMatchObject({ lifecycle: "killed", lastSeq: 4 });
+  });
+
+  it.each([
+    { from: "worker" },
+    { kind: "done" },
+    { to: "main" },
+    { thread: "t" },
+    { action: "status" },
+    { includeProgress: true },
+  ])("rejects event filters in worker mode: %j", async (filter) => {
+    await createChannel("worker-filter", { by: "main" });
+    await expect(
+      channelWait("worker-filter", {
+        as: "main",
+        workers: "worker",
+        ...filter,
+      }),
+    ).rejects.toThrow(/cannot be combined with event filters/);
+  });
+
+  it("rejects empty workers and wires worker CSV/all/barrier through Commander", async () => {
+    await createChannel("worker-argv", { by: "main" });
+    await expect(
+      channelWait("worker-argv", { as: "main", workers: ", " }),
+    ).rejects.toThrow(/non-empty worker CSV/);
+    const barrier = await channelBarrier("worker-argv");
+    await appendEvent("worker-argv", {
+      kind: "killed",
+      by: "supervisor:a",
+      worker: "a",
+    });
+    await appendEvent("worker-argv", {
+      kind: "error",
+      by: "supervisor:b",
+      worker: "b",
+    });
+    vi.mocked(console.log).mockClear();
+    const program = new Command();
+    registerChannelCommand(program);
+    await program.parseAsync([
+      "node",
+      "trellis",
+      "channel",
+      "wait",
+      "worker-argv",
+      "--as",
+      "main",
+      "--workers",
+      "a,b",
+      "--all",
+      "--after-seq",
+      String(barrier),
+      "--timeout",
+      "1s",
+    ]);
+    expect(
+      vi
+        .mocked(console.log)
+        .mock.calls.map(([line]) => JSON.parse(String(line)).workerId),
+    ).toEqual(["a", "b"]);
+  });
+
   it("prints a durable sequence through the barrier command", async () => {
     await createChannel("command-barrier", { by: "main" });
     await appendEvent("command-barrier", {

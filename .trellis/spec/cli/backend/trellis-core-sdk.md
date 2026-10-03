@@ -136,6 +136,11 @@ Core owns:
 - `reduceWorkerRegistry` — the SOT worker-state projection (pure; durable
   events only, never pid files or inbox cursors)
 - `listWorkers` / `watchWorkers` — worker read/watch APIs
+  `watchWorkers` without `sinceSeq` yields the current snapshot first. With an
+  explicit `sinceSeq`, its first snapshot contains only events through that
+  barrier; later durable events are applied once, in order. Never seed a replay
+  with the full current history and then append the same events again: a same-id
+  respawn can otherwise temporarily regress to an old terminal lifecycle.
 - `probeWorkerRuntime` / `reconcileWorkerLiveness` — host-local pid-file
   observation, kept separate from the durable projection;
   `reconcileWorkerLiveness` defaults to no durable writes

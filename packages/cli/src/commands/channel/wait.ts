@@ -1,3 +1,4 @@
+import { watchWorkers } from "@pennixrv/trellis-core/channel";
 import { parseChannelKinds, readLastSeq } from "./store/events.js";
 import { resolveExistingChannelRef } from "./store/paths.js";
 import {
@@ -14,13 +15,15 @@ export interface WaitOptions {
   /** Replay only events whose durable sequence is greater than this barrier. */
   afterSeq?: number;
   from?: string;
+  /** Wait for named worker lifecycle transitions, independent of authors. */
+  workers?: string;
   kind?: string;
   to?: string;
   scope?: string;
   thread?: string;
   action?: string;
   includeProgress?: boolean;
-  /** Wait until every agent in --from has produced a matching event. */
+  /** Wait until every named author or worker has matched. */
   all?: boolean;
 }
 
@@ -51,9 +54,24 @@ export async function channelWait(
   const sinceSeq =
     opts.afterSeq ?? (await readLastSeq(channelName, ref.project));
   const fromList = parseCsv(opts.from);
+  const workerList = parseCsv(opts.workers);
 
-  if (opts.all && (!fromList || fromList.length === 0)) {
-    throw new Error("--all requires --from <a,b,...>");
+  if (opts.workers !== undefined) {
+    if (!workerList?.length)
+      throw new Error("--workers requires a non-empty worker CSV");
+    if (
+      [opts.from, opts.kind, opts.to, opts.thread, opts.action].some(
+        (v) => v !== undefined,
+      ) ||
+      opts.includeProgress
+    ) {
+      throw new Error(
+        "--workers cannot be combined with event filters (--from/--kind/--to/--thread/--action/--include-progress)",
+      );
+    }
+  }
+  if (opts.all && !workerList?.length && !fromList?.length) {
+    throw new Error("--all requires --from <a,b,...> or --workers <a,b,...>");
   }
 
   const filter: WatchFilter = {
@@ -73,18 +91,54 @@ export async function channelWait(
 
   // --all: wait for one matching event from EACH named agent before returning.
   // Without --all: return on the first matching event (legacy semantics).
-  const pending = opts.all ? new Set(fromList) : null;
+  const pending = workerList
+    ? new Set(workerList)
+    : opts.all
+      ? new Set(fromList)
+      : null;
 
   try {
-    for await (const ev of watchEvents(channelName, filter, {
-      signal: abort.signal,
-      project: ref.project,
-      sinceSeq,
-    })) {
-      console.log(JSON.stringify(ev));
-      if (!pending) return;
-      pending.delete(ev.by);
-      if (pending.size === 0) return;
+    if (workerList && pending) {
+      let previous = new Map<string, boolean>();
+      let initial = true;
+      for await (const workers of watchWorkers({
+        channel: channelName,
+        scope: parseChannelScope(opts.scope),
+        projectKey: ref.project,
+        includeTerminal: true,
+        sinceSeq,
+        signal: abort.signal,
+      })) {
+        if (abort.signal.aborted) break;
+        for (const worker of workers) {
+          if (
+            !initial &&
+            pending.has(worker.workerId) &&
+            worker.terminal &&
+            !previous.get(worker.workerId) &&
+            worker.lastSeq > sinceSeq
+          ) {
+            console.log(JSON.stringify(worker));
+            pending.delete(worker.workerId);
+            if (!opts.all || pending.size === 0) return;
+          }
+        }
+        previous = new Map(
+          workers.map((worker) => [worker.workerId, worker.terminal]),
+        );
+        initial = false;
+      }
+    } else {
+      for await (const ev of watchEvents(channelName, filter, {
+        signal: abort.signal,
+        project: ref.project,
+        sinceSeq,
+      })) {
+        console.log(JSON.stringify(ev));
+        if (!pending) return;
+        pending.delete(ev.by);
+        if (pending.size === 0) return;
+      }
     }
     // Iterator ended without satisfying — timeout
     if (pending && pending.size > 0) {

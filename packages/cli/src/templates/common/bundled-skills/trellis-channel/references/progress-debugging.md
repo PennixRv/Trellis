@@ -127,11 +127,15 @@ wait command starts, capture a barrier before that operation and pass it back:
 ```bash
 BARRIER="$(trellis channel barrier T)"
 # spawn or trigger work that may emit a terminal event
-trellis channel wait T --as main --from check --kind done,error \
+trellis channel wait T --as main --workers check \
   --after-seq "$BARRIER" --timeout 15m
 ```
 
-It wakes on:
+Worker mode waits for a lifecycle transition to terminal, including
+supervisor-authored killed/error events. Ordinary adapter errors and peer turn
+completion remain nonterminal. Use `--workers check,check-cx --all` for a group.
+
+The separate event-filter mode wakes on:
 
 - `message`
 - `done`

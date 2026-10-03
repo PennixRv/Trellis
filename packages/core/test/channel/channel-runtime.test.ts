@@ -511,6 +511,25 @@ describe("listWorkers / watchWorkers", () => {
     expect(active[0]).toMatchObject({ lifecycle: "running", terminal: false });
   });
 
+  it("replays after a barrier once in order across a same-id respawn", async () => {
+    await createChannel({ channel: "replay", by: "main" });
+    const spawned = await appendEvent("replay", { kind: "spawned", by: "main", as: "w", agent: "subnode" });
+    await appendEvent("replay", { kind: "done", by: "w" });
+    await appendEvent("replay", { kind: "spawned", by: "main", as: "w", agent: "subnode" });
+    await appendEvent("replay", { kind: "error", by: "w", message: "adapter failure" });
+    const ac = new AbortController();
+    const gen = watchWorkers({ channel: "replay", sinceSeq: spawned.seq, includeTerminal: true, signal: ac.signal });
+    try {
+      const snapshots = await takeN(gen, 4);
+      expect(snapshots.map((workers) => [workers[0].lastSeq, workers[0].terminal])).toEqual([
+        [spawned.seq, false], [spawned.seq + 1, true], [spawned.seq + 2, false], [spawned.seq + 3, false],
+      ]);
+    } finally {
+      ac.abort();
+      await gen.return();
+    }
+  });
+
   it("watchWorkers yields a snapshot then updates on new events", async () => {
     await createChannel({ channel: "c", by: "main" });
     await spawnWorker(

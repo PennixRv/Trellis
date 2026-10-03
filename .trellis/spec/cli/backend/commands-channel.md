@@ -1236,7 +1236,9 @@ shell quoting, expansion, or commands in them.
 | `post <action>` with invalid action                                                                          | throw `"Invalid thread action '<action>'..."`                                                                         |
 | `post` without `--thread` for non-`opened` action                                                            | throw `"--thread is required unless action is 'opened'"`                                                              |
 | `--context-file <path>` with relative path                                                                   | throw `"--context-file must be absolute: <path>"`                                                                     |
-| `wait --all` without `--from`                                                                                | throw `"--all requires --from <a,b,...>"`                                                                             |
+| `wait --all` without `--from` or `--workers` | throw `"--all requires --from <a,b,...> or --workers <a,b,...>"` |
+| `wait --workers` with empty CSV or event filters | reject; worker lifecycle selection is separate from event-author/routing filtering |
+| `wait --workers a,b [--all] --after-seq N` | core barrier replay; one worker JSON per new terminal transition; ordinary adapter errors/peer done do not satisfy |
 | `wait` timeout                                                                                               | exit 124; if `--all`, stderr `"timeout: still waiting on <csv>"`                                                      |
 | `prune` with >1 of `--all/--empty/--idle/--ephemeral`                                                        | throw `"prune flags are mutually exclusive: <flags>. Pick one."`                                                      |
 | `prune` without `--yes`                                                                                      | print candidates + `(dry-run)` notice; exit 0 without deleting                                                        |
