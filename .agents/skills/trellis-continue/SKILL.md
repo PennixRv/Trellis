@@ -13,9 +13,20 @@ Resume work on the current task — pick up at the right phase/step in `.trellis
 
 ```bash
 python3 ./.trellis/scripts/get_context.py
+python3 ./.trellis/scripts/task.py current --json
 ```
 
 Confirms: current task, git state, recent commits.
+
+Before routing by status, distinguish identity from task binding. A non-null
+`session_source` confirms available identity; only `source=session:...` confirms
+a direct task binding. For `unbound` / `unbound_ambiguous`, review existing task
+artifacts and select by the user's explicit intent. Exit code 1 for ambiguity
+does not mean identity is absent. Do not guess, duplicate tasks, invent identity,
+or edit runtime pointers. Return a planning candidate to the planning gates below;
+use native `task.py start <task>` only when its activation contract permits it.
+An eligible `analysis_only` candidate remains in planning without start.
+If `session_source` is null, report unavailable identity separately.
 
 ## Step 2: Load the Phase Index
 
