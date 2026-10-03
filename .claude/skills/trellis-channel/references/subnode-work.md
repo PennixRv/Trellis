@@ -113,8 +113,8 @@ For `blocked`, `incomplete`, or `error`, include the same base fields plus a
 ## Dispatch And Wait
 
 Inspect the installed role first, then capture a durable event barrier before
-the worker can emit a terminal event. The CLI waits once and replays matching
-events committed after that barrier:
+the worker can emit a terminal event. The CLI waits once for a worker lifecycle
+transition after that barrier, including supervisor-authored terminal events:
 
 ```bash
 trellis channel create subnode-example --by main --cwd "$PWD"
@@ -126,8 +126,8 @@ printf '%s\n' "Read $TASK/subnodes/$WORK_ID/$SUBNODE_ID/brief.json and perform o
   | trellis channel send subnode-example --as main --to "$SUBNODE_ID" \
       --stdin --delivery-mode requireRunningWorker
 
-trellis channel wait subnode-example --as main --from "$SUBNODE_ID" \
-  --kind done,error,killed --after-seq "$BARRIER" --timeout 30m
+trellis channel wait subnode-example --as main --workers "$SUBNODE_ID" \
+  --after-seq "$BARRIER" --timeout 30m
 ```
 
 `channel.subnode` in `.trellis/config.yaml` supplies the role defaults for
@@ -137,8 +137,13 @@ or lifetime needs differ; pass the corresponding `spawn` flag only for a
 one-off override. The generic `channel.worker_guard` remains the fallback for
 ordinary workers and for a subnode key omitted from the project config.
 
+For a group, use `--workers a,b --all` with the barrier captured before dispatch.
+Worker mode emits one terminal worker projection per satisfied target. Ordinary
+adapter errors and peer turn completion do not end the wait. `--from` remains
+an exact event-author filter; it is not a worker lifecycle selector.
+
 Where the host exposes a live wait continuation, capture the same barrier,
-establish one event waiter before triggering the worker, and continue that same
+establish one worker waiter before triggering the worker, and continue that same
 waiter until terminal state. Until it resolves, times out, or errors, the next
 host operation is only that continuation: do not create another waiter or run
 shell/CLI diagnostics, including `channel messages`, worker inspection, or

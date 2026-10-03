@@ -142,12 +142,13 @@ trellis channel wait <name>
   [--timeout <Ns|Nm|Nh|Nms>]              # parsed by parseDuration
   [--after-seq <integer>]                 # replay only events after barrier
   [--from <a,b>]                          # author CSV
+  [--workers <a,b>]                       # worker lifecycle CSV, separate mode
   [--kind <k1,k2>]                        # CSV, OR semantics
   [--thread <key>]                        # forum filter
   [--action <thread-action>]              # forum filter
   [--to <target>]                         # default: own agent (broadcast + me)
   [--include-progress]                    # also wake on progress events
-  [--all]                                 # require every --from to match
+  [--all]                                 # require every author or worker to match
 ```
 
 Behavior:
@@ -155,13 +156,20 @@ Behavior:
 - Streams matching events as JSON, one per line.
 - Default `--to` filter is the caller's own agent (broadcast events still
   match — broadcast + explicit-to-me).
-- `--all` requires `--from` and blocks until every listed agent has produced
-  a matching event.
+- `--all` requires `--from` or `--workers` and blocks until every listed target
+  has matched.
+- `--workers` waits for nonterminal-to-terminal worker lifecycle transitions
+  (`done`, `error`, `killed`, `crashed`) after the durable barrier and emits
+  terminal worker JSON with `workerId` and `lastSeq`. Supervisor author aliases
+  are handled by the core projection. Ordinary adapter errors and peer turn
+  completion are not terminal; previously terminal workers are not counted.
+  This mode rejects `--from`, `--kind`, `--to`, `--thread`, `--action` and
+  `--include-progress`. It does not accept a subnode report or disposition.
 - Without `--after-seq`, the command captures its current event sequence before
   constructing its watcher and ignores prior events. With `--after-seq`, it
   replays matching events whose sequence is greater than that supplied barrier.
 - **Timeout exits 124** and prints `timeout: still waiting on ...` to stderr
-  when `--all` was in play.
+  when `--all` or `--workers` was in play.
 
 ### `workers <name>`
 
