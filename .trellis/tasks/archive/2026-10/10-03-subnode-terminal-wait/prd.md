@@ -14,10 +14,10 @@ Fix explicit worker lifecycle waiting for worker and supervisor terminal events;
 
 ## Acceptance Criteria
 
-- [ ] Supervisor killed/error/crash, subnode done, adapter-error exclusion and multi-worker all regression checks pass.
-- [ ] Legacy author/kind/to filtering, barrier replay and timeout remain covered; workers mode rejects ambiguous event-filter combinations.
-- [ ] Lint, typecheck, build, full tests, impact/change analysis and native installed single/multi-worker historical terminal replay pass.
-- [ ] beta.26 is public for both packages, installed and consumed without changing project workflow choices; source/task/release records are pushed and archived.
+- [x] Supervisor killed/error/crash, subnode done, adapter-error exclusion and multi-worker all regression checks pass.
+- [x] Legacy author/kind/to filtering, barrier replay and timeout remain covered; workers mode rejects ambiguous event-filter combinations.
+- [x] Lint, typecheck, build, full tests, impact/change analysis and native installed single/multi-worker historical terminal replay pass.
+- [x] beta.26 is public for both packages, installed and consumed without changing project workflow choices; source/task/release records are pushed and archived.
 
 ## Notes
 
