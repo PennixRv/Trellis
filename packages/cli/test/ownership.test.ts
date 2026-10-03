@@ -64,8 +64,17 @@ describe("handoff ownership", () => {
     ];
   }
 
-  it("retires the source, claims with a new session, fences the source, and archives after consume", () => {
+  it.each([0, 1, 3])("retires and claims with %i developer-owned candidates while preserving fencing", (candidateCount) => {
     const root = fixture();
+    if (candidateCount > 0) {
+      fs.writeFileSync(path.join(root, ".trellis", ".developer"), "name=fixture-dev\n");
+      for (let index = 0; index < candidateCount; index++) {
+        const name = index === 0 ? "demo" : `backlog-${index}`;
+        const task = path.join(root, ".trellis", "tasks", name);
+        fs.mkdirSync(task, { recursive: true });
+        fs.writeFileSync(path.join(task, "task.json"), JSON.stringify({ id: name, title: name, status: "in_progress", assignee: "fixture-dev", children: [] }) + "\n");
+      }
+    }
     const quiesce = run(root, "codex_source", [...base("quiesce"), "--task", ".trellis/tasks/demo", "--source-session-id", "codex_source"]);
     expect(quiesce.status, quiesce.stderr + quiesce.stdout).toBe(0);
     expect(JSON.parse(run(root, "codex_source", base("status")).stdout).status).toBe("quiescing");
@@ -77,14 +86,26 @@ describe("handoff ownership", () => {
       [path.join(root, ".trellis", "scripts", "task.py"), "current", "--json"],
       { cwd: root, encoding: "utf8", env: { ...process.env, TRELLIS_CONTEXT_ID: "codex_target" } },
     );
-    expect(JSON.parse(beforeClaim.stdout).current_task).toBeNull();
+    const unbound = JSON.parse(beforeClaim.stdout);
+    expect(unbound.source).toBe(candidateCount === 0 ? "none" : candidateCount === 1 ? "unbound" : "unbound_ambiguous");
+    expect(unbound.session_source).toBe("session:codex_target");
+    expect(fs.existsSync(path.join(root, ".trellis", ".runtime", "sessions", "codex_target.json"))).toBe(false);
+    const unboundQuiesce = run(root, "codex_target", [...base("quiesce"), "--handoff-id", "h2", "--task", ".trellis/tasks/demo", "--source-session-id", "codex_target"]);
+    expect(unboundQuiesce.status).toBe(2);
+    expect(JSON.parse(unboundQuiesce.stdout)).toMatchObject({ status: "withheld", reason: "no_direct_current_task" });
+    const noIdentity = spawnSync(python, [path.join(root, ".trellis/scripts/task.py"), "ownership", ...base("quiesce"), "--handoff-id", "h2", "--task", ".trellis/tasks/demo", "--source-session-id", "codex_target"], {
+      cwd: root, encoding: "utf8", env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot },
+    });
+    expect(noIdentity.status).toBe(2);
+    expect(JSON.parse(noIdentity.stdout)).toMatchObject({ status: "withheld", reason: "no_direct_session_identity" });
 
     const sourceCurrent = spawnSync(
       python,
       [path.join(root, ".trellis", "scripts", "task.py"), "current", "--json"],
       { cwd: root, encoding: "utf8", env: { ...process.env, TRELLIS_CONTEXT_ID: "codex_source" } },
     );
-    expect(JSON.parse(sourceCurrent.stdout).current_task).toBeNull();
+    expect(JSON.parse(sourceCurrent.stdout).source).toBe(unbound.source);
+    expect(JSON.parse(sourceCurrent.stdout).session_source).toBe("session:codex_source");
     const oldStart = spawnSync(
       python,
       [path.join(root, ".trellis", "scripts", "task.py"), "start", ".trellis/tasks/demo", "--allow-empty-context"],

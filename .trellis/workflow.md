@@ -200,17 +200,17 @@ Complex task: ask the user if you can create a Trellis task and enter the planni
 <!-- Per-turn breadcrumb: shown when one resumable task exists without a direct session binding. -->
 
 [workflow-state:unbound_task]
-An existing task is assigned to the current developer, but this shell has no direct Trellis session binding. Do not create a duplicate task. Continue reading and working from the existing task artifacts; before any lifecycle write or closure, run the native `task.py start <task>` command once a direct session identity is available. Never edit `.trellis/.runtime/sessions/` manually.
+An existing developer-owned task has no direct session binding. Inspect native `task.py current --json`: a non-null `session_source` means direct identity is already available; an unbound source still means no task binding. Select the existing task from the user's explicit intent; do not guess or create a duplicate. Resume its planning/status gates first. Run native `task.py start <task>` only when its activation contract permits it, after the Planning Seal and implementation authorization for a planning change-bearing task. An eligible `analysis_only` task stays in planning without start. If identity is absent, report that separately; never invent an identity or edit runtime pointers.
 [/workflow-state:unbound_task]
 
 <!-- Per-turn breadcrumb shown when multiple resumable tasks exist without a direct session binding. -->
 
 [workflow-state:unbound_ambiguous]
-Multiple active tasks belong to the current developer, but this shell has no direct Trellis session binding. Do not guess or create a duplicate task. Review the listed candidates and run `python3 ./.trellis/scripts/task.py start <task>` with the intended task once a direct session identity is available.
+Multiple developer-owned tasks have no direct session binding. Inspect native `task.py current --json`: a non-null `session_source` means direct identity is already available; an unbound source still means no task binding. Select the existing task from the user's explicit intent; do not guess or create a duplicate. Resume its planning/status gates first. Run native `task.py start <task>` only when its activation contract permits it, after the Planning Seal and implementation authorization for a planning change-bearing task. An eligible `analysis_only` task stays in planning without start. If identity is absent, report that separately; never invent an identity or edit runtime pointers.
 [/workflow-state:unbound_ambiguous]
 
 [workflow-state:unbound_ambiguous-inline]
-Multiple active tasks belong to the current developer, but this Codex session has no direct Trellis session binding. Do not guess or create a duplicate task. Review the listed candidates and run `python3 ./.trellis/scripts/task.py start <task>` with the intended task once a direct session identity is available.
+Multiple developer-owned tasks have no direct session binding. Inspect native `task.py current --json`: a non-null `session_source` means direct identity is already available; an unbound source still means no task binding. Select the existing task from the user's explicit intent; do not guess or create a duplicate. Resume its planning/status gates first. Run native `task.py start <task>` only when its activation contract permits it, after the Planning Seal and implementation authorization for a planning change-bearing task. An eligible `analysis_only` task stays in planning without start. If identity is absent, report that separately; never invent an identity or edit runtime pointers.
 [/workflow-state:unbound_ambiguous-inline]
 
 <!-- Per-turn breadcrumb: shown when the active task record cannot be read. -->

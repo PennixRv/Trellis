@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .active_task import clear_active_task, clear_active_task_for_context, resolve_active_task, resolve_context_key, set_active_task
+from .active_task import ActiveTask, clear_active_task, clear_active_task_for_context, resolve_active_task, resolve_context_key, set_active_task
 from .continuation_record import (
     ContinuationError,
     SAFE_ID,
@@ -83,6 +83,9 @@ def _direct_context(root: Path, require_task: bool = False) -> tuple[str, Any]:
         raise OwnershipError("session_fallback_untrusted")
     if active.context_key != context_key:
         raise OwnershipError("direct_session_identity_unstable")
+    if active.source_type in {"unbound", "unbound_ambiguous"}:
+        # Candidate paths are recovery context, never an owned session pointer.
+        active = ActiveTask(None, "none", context_key)
     if require_task and not active.task_path:
         raise OwnershipError("no_direct_current_task")
     return context_key, active
@@ -273,14 +276,14 @@ def retire(root: Path, task_id: str, handoff_id: str, core_digest: str, expected
         elif record["archive_observation"] != archive_observation:
             raise OwnershipError("archive observation does not match retirement")
 
-        active = resolve_active_task(root, allow_single_session_fallback=False)
+        _, active = _direct_context(root)
         if active.context_key != actor:
             raise OwnershipError("direct_session_identity_unstable")
         if active.task_path == record["task"]["path"]:
             clear_active_task(root)
         elif active.task_path:
             raise OwnershipError("source task pointer changed during retirement")
-        active = resolve_active_task(root, allow_single_session_fallback=False)
+        _, active = _direct_context(root)
         if active.context_key != actor or active.task_path:
             raise OwnershipError("source task retirement could not be verified; recovery_required")
         record["previous_event_digest"] = record["integrity"]["record_digest"]
@@ -334,7 +337,7 @@ def claim(root: Path, task_id: str, task_path: str, handoff_id: str, core_digest
                 bound = set_active_task(record["task"]["path"], root)
                 if not bound:
                     raise OwnershipError("target task binding failed; recovery_required")
-                active = resolve_active_task(root, allow_single_session_fallback=False)
+                _, active = _direct_context(root)
             if active.context_key != actor or active.task_path != record["task"]["path"]:
                 raise OwnershipError("target task binding could not be verified; recovery_required")
             record["previous_event_digest"] = record["integrity"]["record_digest"]
@@ -361,7 +364,7 @@ def claim(root: Path, task_id: str, task_path: str, handoff_id: str, core_digest
         bound = set_active_task(task["path"], root)
         if not bound:
             raise OwnershipError("target task binding failed; recovery_required")
-        active = resolve_active_task(root, allow_single_session_fallback=False)
+        _, active = _direct_context(root)
         if active.context_key != actor or active.task_path != task["path"]:
             raise OwnershipError("target task binding could not be verified; recovery_required")
         record["previous_event_digest"] = record["integrity"]["record_digest"]

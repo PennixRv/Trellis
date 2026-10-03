@@ -6587,6 +6587,63 @@ print(json.dumps({
     expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
   });
 
+  function seedRecoveryBacklog(count: number): string[] {
+    return Array.from({ length: count }, (_, index) => {
+      const task = `.trellis/tasks/backlog-${index}`;
+      writeProjectFile(`${task}/task.json`, JSON.stringify({
+        id: `backlog-${index}`, title: "Backlog", status: "planning", assignee: "test-dev",
+      }));
+      return task;
+    });
+  }
+
+  it.each([0, 1, 3])("[issue181] current JSON preserves available identity with %i unbound candidates", (count) => {
+    setupTaskRepo();
+    const tasks = seedRecoveryBacklog(count);
+    for (const identity of ["", "recovery-session"]) {
+      const current = spawnSync(pythonCmd, [path.join(tmpDir, ".trellis/scripts/task.py"), "current", "--json"], {
+        cwd: tmpDir, encoding: "utf8", env: sessionEnv({ CODEX_THREAD_ID: identity }),
+      });
+      const payload = JSON.parse(current.stdout) as {
+        source: string; session_source: string | null; current_task: { dir: string; status: string } | null; candidates?: string[];
+      };
+      expect(current.status).toBe(count === 1 ? 0 : 1);
+      expect(payload.source).toBe(count === 0 ? "none" : count === 1 ? "unbound" : "unbound_ambiguous");
+      expect(payload.session_source).toBe(identity ? "session:codex_recovery-session" : null);
+      if (count === 1) expect(payload.current_task).toMatchObject({ dir: tasks[0], status: "planning" });
+      else expect(payload.current_task).toBeNull();
+      if (count > 1) expect(payload.candidates).toEqual(tasks);
+      expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(false);
+    }
+  });
+
+  it.each([1, 3])("[issue181] finishing a prerequisite preserves identity for %i remaining candidates", (count) => {
+    setupTaskRepo();
+    seedRecoveryBacklog(count);
+    writeSessionContext("codex_recovery-session", ".trellis/tasks/issue-106");
+    const taskScript = path.join(tmpDir, ".trellis/scripts/task.py");
+    const options = { cwd: tmpDir, encoding: "utf8" as const, env: sessionEnv({ CODEX_THREAD_ID: "recovery-session" }) };
+    expect(spawnSync(pythonCmd, [taskScript, "finish"], options).status).toBe(0);
+    const current = JSON.parse(spawnSync(pythonCmd, [taskScript, "current", "--json"], options).stdout);
+    expect(current.source).toBe(count === 1 ? "unbound" : "unbound_ambiguous");
+    expect(current.session_source).toBe("session:codex_recovery-session");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis/.runtime/sessions/codex_recovery-session.json"))).toBe(false);
+    expect(JSON.parse(fs.readFileSync(path.join(tmpDir, ".trellis/tasks/backlog-0/task.json"), "utf8")).status).toBe("planning");
+  });
+
+  it("[issue181] clearing an unbound candidate preserves empty session metadata", () => {
+    setupTaskRepo();
+    seedRecoveryBacklog(1);
+    writeSessionContext("codex_recovery-session", "");
+    const runtime = path.join(tmpDir, ".trellis/.runtime/sessions/codex_recovery-session.json");
+    const before = fs.readFileSync(runtime, "utf8");
+    const clear = spawnSync(pythonCmd, ["-c", "import sys; from pathlib import Path; sys.path.insert(0, '.trellis/scripts'); from common.active_task import clear_active_task; clear_active_task(Path.cwd())"], {
+      cwd: tmpDir, encoding: "utf8", env: sessionEnv({ CODEX_THREAD_ID: "recovery-session" }),
+    });
+    expect(clear.status, clear.stderr).toBe(0);
+    expect(fs.readFileSync(runtime, "utf8")).toBe(before);
+  });
+
   it("[session-fallback] multiple session files — refuses to guess, returns none", () => {
     setupTaskRepo();
     writeSessionContext("codex_session_a", ".trellis/tasks/issue-106");

@@ -694,7 +694,7 @@ def resolve_active_task(
         active = _active_from_ref(task_ref, repo_root, "session", context_key)
         if active:
             return active
-        unbound = _resolve_unbound_task(repo_root)
+        unbound = _resolve_unbound_task(repo_root, context_key)
         if unbound is not None:
             return unbound
         return ActiveTask(None, "none", context_key)
@@ -736,8 +736,8 @@ def _resolve_single_session_fallback(repo_root: Path) -> ActiveTask | None:
     return _active_from_ref(task_ref, repo_root, "session-fallback", fallback_key)
 
 
-def _resolve_unbound_task(repo_root: Path) -> ActiveTask | None:
-    """Expose one developer-owned task when no session pointer exists."""
+def _resolve_unbound_task(repo_root: Path, context_key: str | None = None) -> ActiveTask | None:
+    """Expose read-only candidates without discarding a resolved identity."""
     sessions_dir = _runtime_sessions_dir(repo_root)
     if sessions_dir.is_dir():
         session_files = sorted(sessions_dir.glob("*.json"))
@@ -764,8 +764,8 @@ def _resolve_unbound_task(repo_root: Path) -> ActiveTask | None:
         for task in candidates
     ))
     if len(task_paths) == 1:
-        return ActiveTask(task_paths[0], "unbound", None)
-    return ActiveTask(None, "unbound_ambiguous", None, candidate_paths=task_paths)
+        return ActiveTask(task_paths[0], "unbound", context_key)
+    return ActiveTask(None, "unbound_ambiguous", context_key, candidate_paths=task_paths)
 
 
 def _utc_now() -> str:
@@ -834,7 +834,7 @@ def clear_active_task(
         return ActiveTask(None, "none")
 
     previous = resolve_active_task(repo_root, platform_input, platform)
-    if not previous.task_path or not previous.context_key:
+    if previous.source_type != "session" or not previous.task_path or not previous.context_key:
         return previous
 
     context_path = _context_path(repo_root, previous.context_key)

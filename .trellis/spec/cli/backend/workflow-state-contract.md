@@ -119,6 +119,57 @@ Both regexes MUST use the `\1` backreference variant — `[workflow-state:([A-Za
 
 ---
 
+## Scenario: unbound identity and direct binding
+
+### 1. Scope / Trigger
+
+When a session has no pointer, candidate projection must retain identity without
+granting ownership. This prevents false identity failures after finish/archive.
+
+### 2. Signatures
+
+`resolve_active_task(root)` returns `ActiveTask`;
+`_resolve_unbound_task(root, context_key=None)` preserves a supplied key.
+`task.py current --json` exposes `source`, `session_source` and candidates.
+`ownership_record._direct_context(root, require_task=False)` returns a direct-task view.
+
+### 3. Contracts
+
+- A non-null context key / session_source proves identity, not a task binding.
+- Unbound sources remain read-only; unique task_path is a candidate.
+- Ownership normalizes both unbound sources to no direct task and retains identity.
+  Retirement and claim verification reuse this view; clear_active_task clears only source_type=session.
+- Foreign pointers are never borrowed; missing identity remains an error.
+- Recovery selects by explicit intent, then obeys planning/status gates.
+  Eligible analysis_only does not start; a planning change-bearing task needs its seal and authorization.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| Known identity, zero/one/multiple candidates | Identity retained; source none/unbound/unbound_ambiguous; no pointer write |
+| Unknown identity | session_source null; ownership returns no_direct_session_identity |
+| Candidate but operation requires a direct task | no_direct_current_task |
+| Ready ownership record and unbound successor | Native claim may bind the exact recorded task |
+| Ordinary start by a fenced actor | fencing_conflict remains |
+
+### 5. Good / Base / Bad Cases
+
+Good: finish a prerequisite, preserve identity, review backlog and resume its stage.
+Base: no candidates preserves the same identity with source none.
+Bad: treating candidate task_path as an owned pointer or starting an unsealed plan.
+
+### 6. Tests Required
+
+Regression current JSON covers identity availability and zero/one/multiple candidates,
+read-only runtime and finish-to-backlog. Ownership tests cover the complete lifecycle
+with assigned candidates, rejected unbound quiesce, competing claim and fencing.
+
+### 7. Wrong vs Correct
+
+Wrong: infer missing identity from source unbound_ambiguous or grant authority from task_path.
+Correct: read session_source for identity and source_type=session for a direct binding.
+
 ## Per-task workflow resolution
 
 `.trellis/workflow.md` is the **global** workflow. A task may pin a variant
