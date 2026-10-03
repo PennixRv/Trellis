@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.27",
+  "description": "Adopt the official Cognee memory contract and isolate subnode access",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "The Codex channel now uses the official Cognee plugin contract for coordinator memory, verifies formal handoffs through authenticated dataset/data UUID and raw-content proof, and disables the plugin plus COGNEE_* environment inheritance for subnodes.",
+  "migrations": [],
+  "notes": "Run trellis update to refresh the selected workflow and bundled worker guidance. No task or ownership migration is required."
+}

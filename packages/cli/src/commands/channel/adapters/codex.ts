@@ -729,12 +729,7 @@ export function buildCodexArgs(opts: {
   const args = ["app-server"];
   if (opts.model) args.push("-c", `model="${opts.model}"`);
   if (opts.agent === "subnode") {
-    args.push(
-      "-c",
-      'plugins."agentmemory@agentmemory".enabled=false',
-      "-c",
-      "mcp_servers.agentmemory.enabled=false",
-    );
+    args.push("-c", 'plugins."cognee@cognee".enabled=false');
   }
   return args;
 }

@@ -3,7 +3,7 @@
   "description": "Correct the bundled subnode memory isolation guidance",
   "breaking": false,
   "recommendMigrate": false,
-  "changelog": "The trellis-channel worker reference now matches implemented AgentMemory isolation: native Codex adapter and worker environment disable both plugin and standalone MCP. It no longer describes the retired memory-specific env_file.",
+  "changelog": "The trellis-channel worker reference now matches implemented Cognee isolation: the native Codex adapter disables the official plugin for subnodes, and no memory-specific env_file is generated.",
   "migrations": [],
   "notes": "Run trellis update to refresh the bundled trellis-channel reference. No runtime behavior or migration task changes."
 }

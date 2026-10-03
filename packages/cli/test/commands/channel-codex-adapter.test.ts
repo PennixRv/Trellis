@@ -53,15 +53,13 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe("Codex channel adapter", () => {
-  it("isolates AgentMemory from subnode Codex workers", () => {
+  it("isolates Cognee from subnode Codex workers", () => {
     expect(buildCodexArgs({ model: "gpt-6-sol", agent: "subnode" })).toEqual([
       "app-server",
       "-c",
       'model="gpt-6-sol"',
       "-c",
-      'plugins."agentmemory@agentmemory".enabled=false',
-      "-c",
-      "mcp_servers.agentmemory.enabled=false",
+      'plugins."cognee@cognee".enabled=false',
     ]);
     expect(buildCodexArgs({ model: "gpt-6-sol" })).toEqual([
       "app-server",

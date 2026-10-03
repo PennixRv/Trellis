@@ -105,9 +105,8 @@ export function buildWorkerEnv(
   if (config.provider === "codex" && config.agent === "subnode") {
     return {
       ...Object.fromEntries(
-        Object.entries(env).filter(([key]) => !key.startsWith("AGENTMEMORY_")),
+        Object.entries(env).filter(([key]) => !key.startsWith("COGNEE_")),
       ),
-      AGENTMEMORY_SDK_CHILD: "1",
     };
   }
   return env;

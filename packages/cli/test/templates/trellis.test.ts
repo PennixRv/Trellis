@@ -326,8 +326,8 @@ describe("trellis template constants", () => {
     expect(workflow).toContain("`report.json`");
     expect(workflow).toContain("`trellis-research-record`");
     expect(workflow).toContain("### Semantic RecoveryBrief");
-    expect(workflow).toContain("`agentmemory_required` path's");
-    expect(workflow).toContain("exact project/type/content");
+    expect(workflow).toContain("`cognee_required` path's");
+    expect(workflow).toContain("exact dataset/data/content");
     expect(workflow).toContain("taskless handoff");
     expect(workflow).toContain("Evidence is unit-sized");
     expect(workflow).toContain("Planning Seal closure pass");
