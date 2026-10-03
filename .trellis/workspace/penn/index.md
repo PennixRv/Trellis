@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-10-03
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~222 | Active |
+| `journal-1.md` | ~251 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-10-03 | Fix unbound identity recovery and release beta.25 | `60de8057`, `c0f90ba7`, `25489876` | `pennix/v0.7-beta` |
 | 7 | 2026-10-03 | Publish Sol Luna defaults and complete all consumer adoption | `2aa009ec55907a4f193f82c343fd0300e37278cc`, `427a52cae99749544306c848b9cefa2eb7bff3fc`, `35f7e6c1606e156da960c77ad172a8bf053bcb3e`, `6af92b4a` | `pennix/v0.7-beta` |
 | 6 | 2026-10-02 | 独立会话身份与 AgentMemory 合同发布 | `a72c7d5`, `5126222`, `a39818b` | `pennix/v0.7-beta` |
 | 5 | 2026-09-17 | Complete analysis-only workflow route | `d6145143`, `eb8fcbdf` | `task/analysis-only-completion` |

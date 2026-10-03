@@ -220,3 +220,32 @@ Published beta.24 CLI/core via green CI, corrected Marketplace index integrity a
 ### Status
 
 [OK] **Completed**
+
+
+## Session 8: Fix unbound identity recovery and release beta.25
+<!-- trellis-session: v=2 fp=07d0bb8caaf2fae2 -->
+
+**Date**: 2026-10-03
+**Task**: Fix unbound identity recovery and release beta.25
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+Preserve real unbound identity without granting candidate ownership; shared regression gates, Marketplace/docs release, CI npm publish, global beta.25 installation and seven consumers verified.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `60de8057` | fix: preserve identity during unbound recovery |
+| `c0f90ba7` | 0.7.0-beta.25 |
+| `25489876` | chore: consume beta.25 recovery assets |
+
+### Testing
+
+- [OK] core 408 passed / CLI 2194 passed; lint, typecheck, Python lint, build and release gates passed
+
+### Status
+
+[OK] **Completed**
