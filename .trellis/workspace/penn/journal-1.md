@@ -249,3 +249,39 @@ Preserve real unbound identity without granting candidate ownership; shared regr
 ### Status
 
 [OK] **Completed**
+
+
+## Session 9: Complete worker-terminal wait delivery
+<!-- trellis-session: v=2 fp=bf8808258dedef4d -->
+
+**Date**: 2026-10-03
+**Task**: Complete worker-terminal wait delivery
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+Published and installed Trellis beta.26; fixed worker lifecycle waiting and updated seven initialized consumers while retaining their selected workflows.
+
+### Main Changes
+
+- Merged the source fix into the beta branch; updated bundled worker guidance and all authorized consumer paths.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fafcdd32` | fix(channel): wait on worker terminal lifecycle transitions |
+| `3484503d` | chore(trellis): adopt beta.26 worker lifecycle guidance |
+
+### Testing
+
+- [OK] Core 409 passed/1 skipped; CLI 2209 passed/2 skipped; lifecycle, native dry-run, release CI and historical single/multi-worker wait checks passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Proceed to the separately authorized finding-first AgentMemory review after updating the root integration record.
