@@ -1,5 +1,7 @@
 # Owner source acceptance — 2026-10-03
 
+This document first records the accepted local source checkpoint. The user subsequently authorized publication and all affected consumer updates. Marketplace bad3f2d683d9b022dcb882b107cf8d0921881688 and docs e9c7737d8e90f81b8b29dcf246cd98fff95b571d have now been pushed; the native target is 0.7.0-beta.24. Publication/adoption results will be appended after the owner protocols complete. References below to an unpushed/local-only state describe that earlier checkpoint.
+
 The CLI template and Marketplace contract now ship eight profiles: default_model=gpt-6.1-sol; docs_source=gpt-5.6-luna/xhigh; six judgment profiles=high; evidence_synthesis=medium. code_path is removed only from defaults. No production resolver/adapter functions, effort enum, permissions, retries or project-customization behavior changed.
 
 ## Scope and review

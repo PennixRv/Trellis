@@ -25,6 +25,7 @@
   "meta": {
     "delivery_mode": "planned_change",
     "coordination_task": "subnode-provider-config-diagnosis",
-    "source_readiness": "verified_local"
+    "source_readiness": "verified_local",
+    "release_version": "0.7.0-beta.24"
   }
 }
