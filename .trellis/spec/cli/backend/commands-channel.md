@@ -82,24 +82,6 @@ required for fast workers and are covered by core and CLI regression tests.
 
 ## 2. Signatures
 
-### Codex subnode memory isolation
-
-- Scope: `buildCodexArgs({ agent: "subnode" })` adds native CLI configuration;
-  ordinary workers keep their plugin settings.
-- Signature: `codex app-server -c plugins.cognee@cognee.enabled=false`.
-- Contract: strip `COGNEE_*` after environment merging and disable the plugin.
-  These are separate checks because the official plugin can load its private env file.
-- Validation: the native `-c` parser splits dotted keys directly. Embedded TOML
-  quotes become part of the segment; that override succeeds syntactically but
-  does not change the installed plugin. Never treat process startup as proof.
-- Cases: a subnode disables Cognee; an ordinary worker retains its configured
-  state; a quoted plugin segment is invalid for this isolation contract.
-- Tests: keep adapter argv/env regressions and verify the resulting native
-  plugin inventory or a real child session when changing this boundary.
-- Wrong: `plugins."cognee@cognee".enabled=false`. Correct:
-  `plugins.cognee@cognee.enabled=false`. TOML file syntax still needs quotes;
-  this rule applies only to the native CLI override argument.
-
 ### CLI commands (`commands/channel/index.ts`)
 
 ```

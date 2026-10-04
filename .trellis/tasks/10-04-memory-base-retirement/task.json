@@ -1,0 +1,30 @@
+{
+  "id": "memory-base-retirement",
+  "name": "memory-base-retirement",
+  "title": "Retire external memory integration from workflow and Channel",
+  "description": "Execute approved root cognee-memory-base-removal plan: remove dedicated adapter/template requirements, publish CLI/core and update marketplace",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-04",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "delivery_mode": "change_bearing",
+    "execution_class": "complex",
+    "approval_mode": "implementation_approved"
+  }
+}

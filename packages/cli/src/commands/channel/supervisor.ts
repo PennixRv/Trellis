@@ -95,21 +95,13 @@ export interface SupervisorConfig {
 
 type Child = ChildProcessByStdio<Writable, Readable, Readable>;
 
-/** Apply memory isolation after every role/parent environment merge. */
+/** Merge parent, role, and runtime settings in increasing precedence. */
 export function buildWorkerEnv(
   config: Pick<SupervisorConfig, "provider" | "agent" | "env">,
   parent: NodeJS.ProcessEnv,
   runtime: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv {
-  const env = { ...parent, ...config.env, ...runtime };
-  if (config.provider === "codex" && config.agent === "subnode") {
-    return {
-      ...Object.fromEntries(
-        Object.entries(env).filter(([key]) => !key.startsWith("COGNEE_")),
-      ),
-    };
-  }
-  return env;
+  return { ...parent, ...config.env, ...runtime };
 }
 
 const SHUTDOWN_GRACE_MS = 3000;

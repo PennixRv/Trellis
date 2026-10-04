@@ -728,9 +728,6 @@ export function buildCodexArgs(opts: {
 }): string[] {
   const args = ["app-server"];
   if (opts.model) args.push("-c", `model="${opts.model}"`);
-  if (opts.agent === "subnode") {
-    args.push("-c", "plugins.cognee@cognee.enabled=false");
-  }
   return args;
 }
 

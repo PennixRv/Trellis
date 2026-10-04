@@ -854,10 +854,10 @@ describe("update() integration", () => {
     writeProjectFile(
       trellisConfigPath,
       `${readProjectFile(trellisConfigPath).trimEnd()}\n` +
-        "# Project Hindsight mapping\n" +
+        "# Project-owned extension\n" +
         "pennix:\n" +
-        "  memory:\n" +
-        "    bank_id: pennix-project-test\n",
+        "  review:\n" +
+        "    project_id: pennix-project-test\n",
     );
 
     const codexConfigPath = ".codex/config.toml";
@@ -879,13 +879,13 @@ describe("update() integration", () => {
       "When a live Trellis Channel wait returns a host continuation",
     );
     expect(readProjectFile(trellisConfigPath)).toContain(
-      "# Project Hindsight mapping\n" +
+      "# Project-owned extension\n" +
         "pennix:\n" +
-        "  memory:\n" +
-        "    bank_id: pennix-project-test",
+        "  review:\n" +
+        "    project_id: pennix-project-test",
     );
     expect(readProjectFile(trellisConfigPath)).toContain(
-      "bank_id: pennix-project-test",
+      "project_id: pennix-project-test",
     );
     expect(readProjectFile(codexConfigPath)).toContain(
       "[agents]\nenabled = false\nmax_depth = 1",

@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.29",
+  "description": "Use local formal handoff and inherited worker configuration",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Channel workers inherit their native configuration without a product-specific plugin override or environment filter. Bundled worker guidance uses the normal environment merge contract. The custom Codex workflow uses paired local handoff artifacts, source seals, and native task ownership.",
+  "migrations": [],
+  "notes": "Upgrade the CLI and refresh project assets. Refresh an explicitly selected custom workflow from its updated registry revision. Historical task and handoff records are preserved."
+}

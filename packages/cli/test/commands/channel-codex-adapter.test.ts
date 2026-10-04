@@ -53,13 +53,11 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe("Codex channel adapter", () => {
-  it("isolates Cognee from subnode Codex workers", () => {
+  it("keeps subnodes on the native configured app-server path", () => {
     expect(buildCodexArgs({ model: "gpt-6-sol", agent: "subnode" })).toEqual([
       "app-server",
       "-c",
       'model="gpt-6-sol"',
-      "-c",
-      "plugins.cognee@cognee.enabled=false",
     ]);
     expect(buildCodexArgs({ model: "gpt-6-sol" })).toEqual([
       "app-server",
