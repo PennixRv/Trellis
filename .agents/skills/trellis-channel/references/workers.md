@@ -44,11 +44,9 @@ relative sibling file automatically for the provider child. Use this for
 stable role settings so every spawn of that role gets the same environment.
 The file contains plain `KEY=VALUE` lines only; it is not shell code and does
 not perform expansion or interpolation. Do not put credentials in a bundled
-role file. The bundled `subnode` role instead uses the native Codex adapter and
-worker environment boundary to disable the Cognee plugin. No memory-specific
-env_file is generated. The coordinator
-retains its own memory capability and may pass explicitly reviewed, task-minimal
-context to the child.
+role file. The coordinator may pass explicitly reviewed, task-minimal context
+to the child. Parent settings are merged with role settings, then runtime
+settings; later values take precedence.
 
 The success event `spawned` records `pid`, `provider`, `agent`, the injected
 `files`, and the resolved `manifests` so later spectators can audit context.
