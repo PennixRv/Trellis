@@ -285,3 +285,27 @@ Published and installed Trellis beta.26; fixed worker lifecycle waiting and upda
 ### Next Steps
 
 - Proceed to the separately authorized finding-first AgentMemory review after updating the root integration record.
+
+
+## Session 10: Clean migration metadata beta30 release
+<!-- trellis-session: v=2 fp=3db285a1730290cb -->
+
+**Date**: 2026-10-04
+**Task**: Clean migration metadata beta30 release
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+Neutralized seven shipped migration manifest narratives without changing semantics; published beta30 and verified the CLI/core pair, native install and seven preserved consumer workflows. Retained tasks/history and operator modifications; root coordination records final refs.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a62540f5` | docs: remove retired integration names from migration metadata |
+| `aa2b84d85bba3d21cb070ae48c923291be164ade` | 0.7.0-beta.30 |
+
+### Status
+
+[OK] **Completed**
