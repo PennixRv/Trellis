@@ -1,9 +1,9 @@
 {
   "version": "0.7.0-beta.23",
-  "description": "Correct the bundled subnode memory isolation guidance",
+  "description": "Correct the bundled subnode extension-isolation guidance",
   "breaking": false,
   "recommendMigrate": false,
-  "changelog": "The trellis-channel worker reference now matches implemented Cognee isolation: the native Codex adapter disables the official plugin for subnodes, and no memory-specific env_file is generated.",
+  "changelog": "The trellis-channel worker reference now matches the native extension-isolation guidance: the Codex adapter disables the retired extension for subnodes, and no extension-specific env_file is generated.",
   "migrations": [],
   "notes": "Run trellis update to refresh the bundled trellis-channel reference. No runtime behavior or migration task changes."
 }

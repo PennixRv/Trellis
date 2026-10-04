@@ -1,14 +1,14 @@
 {
   "version": "0.7.0-beta.21",
-  "description": "Remove the obsolete Hindsight-only subnode environment asset",
+  "description": "Remove the obsolete subnode environment asset",
   "breaking": false,
   "recommendMigrate": false,
-  "changelog": "Subnode isolation is now implemented by the Codex adapter and worker environment boundary. The generated Hindsight-only `.trellis/agents/subnode.env` is no longer part of the workflow template.",
+  "changelog": "Subnode isolation is now implemented by the Codex adapter and worker environment boundary. The generated `.trellis/agents/subnode.env` is no longer part of the workflow template.",
   "migrations": [
     {
       "type": "safe-file-delete",
       "from": ".trellis/agents/subnode.env",
-      "description": "Remove the obsolete Hindsight-only subnode environment file",
+      "description": "Remove the obsolete subnode environment file",
       "reason": "The same child isolation contract is now enforced by the Trellis Codex adapter and environment builder; only the unmodified generated file is safe to delete.",
       "allowed_hashes": ["b34ec77e748c1fab09e96d9fd6ca4af6ab993472b9d060d89375460d9740ca1f"]
     }

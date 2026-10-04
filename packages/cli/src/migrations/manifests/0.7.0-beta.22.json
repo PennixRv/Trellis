@@ -3,7 +3,7 @@
   "description": "Preserve native session identity when no task is active",
   "breaking": false,
   "recommendMigrate": false,
-  "changelog": "task current --json now exposes session_source independently of the task-pointer source. Taskless formal handoffs can keep their native session identity without creating a task. The Pennix Marketplace workflow uses Cognee exact retrieval proof instead of the retired Hindsight contract.",
+  "changelog": "task current --json now exposes session_source independently of the task-pointer source. Taskless formal handoffs can keep their native session identity without creating a task. The Pennix Marketplace workflow updates formal-handoff verification.",
   "migrations": [],
   "notes": "Run trellis update to refresh task.py. Existing source semantics and exit codes are unchanged. Explicitly refresh the selected Marketplace workflow to its approved commit."
 }

@@ -1,9 +1,9 @@
 {
   "version": "0.7.0-beta.16",
-  "description": "Use Hindsight for coordinator memory and isolate subnode memory hooks",
+  "description": "Refresh coordinator handoff and worker extension boundaries",
   "breaking": false,
   "recommendMigrate": false,
-  "changelog": "**Workflow fixes:**\n- Subnode templates disable Hindsight hooks and MCP tools so evidence workers do not create or consume unsupervised memory.\n- Coordinator-owned Hindsight handoff remains available for explicit project memory writes.\n- The bundled handoff contract is aligned with the Hindsight-backed Pennix workflow.",
+  "changelog": "Refresh bundled coordinator handoff and subnode extension-isolation guidance. These release notes describe the legacy update; current behavior follows the selected workflow.",
   "migrations": [],
   "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
 }
