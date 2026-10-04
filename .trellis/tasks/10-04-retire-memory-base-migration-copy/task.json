@@ -1,0 +1,30 @@
+{
+  "id": "retire-memory-base-migration-copy",
+  "name": "retire-memory-base-migration-copy",
+  "title": "Remove retired memory-base names from Trellis migration metadata",
+  "description": "Sanitize retired external memory-base product wording from shipped Trellis migration metadata while preserving safe legacy-file cleanup behavior; release the corrected CLI/core pair and update every applicable consumer.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "retired-migration-metadata-release-consumer-refresh",
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-04",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "delivery_mode": "change_bearing",
+    "execution_class": "complex",
+    "work_domain": "cli_release"
+  }
+}
