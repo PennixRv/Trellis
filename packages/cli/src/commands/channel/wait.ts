@@ -100,6 +100,7 @@ export async function channelWait(
   try {
     if (workerList && pending) {
       let previous = new Map<string, boolean>();
+      let initial = true;
       for await (const workers of watchWorkers({
         channel: channelName,
         scope: parseChannelScope(opts.scope),
@@ -111,6 +112,7 @@ export async function channelWait(
         if (abort.signal.aborted) break;
         for (const worker of workers) {
           if (
+            !initial &&
             pending.has(worker.workerId) &&
             worker.terminal &&
             !previous.get(worker.workerId) &&
@@ -124,6 +126,7 @@ export async function channelWait(
         previous = new Map(
           workers.map((worker) => [worker.workerId, worker.terminal]),
         );
+        initial = false;
       }
     } else {
       for await (const ev of watchEvents(channelName, filter, {
