@@ -12,8 +12,8 @@
 
 ## Acceptance Criteria
 
-- [ ] 图影响/变更检查及既有 lint/typecheck/test/build/release 门禁通过。
-- [ ] CLI/core 配对 beta 由原生 release helper 发布；registry 可见。
+- [x] 图影响/变更检查及既有 lint/typecheck/test/build/release 门禁通过。
+- [x] CLI/core 配对 beta31 由原生 release helper/CI 发布；registry 配对校验通过。
 
 ## Notes
 

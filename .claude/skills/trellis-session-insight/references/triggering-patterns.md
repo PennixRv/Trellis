@@ -1,6 +1,8 @@
 # Triggering Patterns
 
-Verbatim user phrasings that should make an AI reach for `trellis mem`. Calibrate instinct against these — if a user message hits one of these patterns and you do not reach for `mem`, you probably missed an obvious recall.
+Verbatim user phrasings that suggest local conversation recall. Check the intent
+and available current evidence before calling `trellis mem`; these examples do
+not require an unconditional history search.
 
 Patterns are grouped by the *intent* behind the phrasing, not the surface words. The same intent shows up in different languages and registers.
 
@@ -32,7 +34,8 @@ Reach: `trellis mem search "<decision keyword>"` to find the session, then `extr
 
 ## Cross-session continuation
 
-The user resumed work after a gap and the context is implicit.
+The user resumed work after a gap and the context is implicit. Read the active
+task and current files first; use raw history only for missing discussion.
 
 - "Where were we?"
 - "Continue from last time."
@@ -83,6 +86,11 @@ The user explicitly wants to look back at this task — not as a forced step, on
 Reach: identify the current task's session id (from `.trellis/.runtime/sessions/*.json` or `mem list --task <task-dir>`), then `extract <id> --phase brainstorm` and `--phase implement`. Present a summary — surface concrete file:line citations where possible. Whether to also write the summary somewhere (PRD, spec, notes file) is the user's call; offer, don't auto-write.
 
 ## Anti-patterns: do NOT reach for `mem` here
+
+- "Find our maintained deployment notes" → the configured native knowledge tool.
+- "Save this reusable result to my notebook" → explicit knowledge write through its owner.
+- "Promote this method into a Skill" → verify the evidence, then the source Skill owner.
+- Current task artifacts already answer the question → use those artifacts.
 
 - "What does this function do?" → read the file.
 - "Why is this test failing?" → read the test output and the file.
