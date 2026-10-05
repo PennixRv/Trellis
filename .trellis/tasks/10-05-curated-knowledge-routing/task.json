@@ -1,0 +1,31 @@
+{
+  "id": "curated-knowledge-routing",
+  "name": "curated-knowledge-routing",
+  "title": "澄清历史回溯与人工知识职责",
+  "description": "承接根SiYuan集成任务已批准设计；仅修改共同bundled session-insight及触发参考，配对beta发布和消费者更新，不更改mem/runtime。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-05",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "delivery_mode": "change_bearing",
+    "execution_class": "planned",
+    "implementation_authorized": "true",
+    "planning_scope": "delivery"
+  }
+}

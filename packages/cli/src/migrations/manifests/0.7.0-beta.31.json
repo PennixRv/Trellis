@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.31",
+  "description": "Clarify local conversation recall and curated knowledge ownership",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "The shared session-insight skill selects current project facts, raw local dialogue, and curated knowledge by user intent. It keeps external knowledge writes and promotions explicit, with no mandatory preload or automatic synchronization. Runtime and mem behavior are unchanged.",
+  "migrations": [],
+  "notes": "Upgrade the CLI and refresh generated project assets. Preserve selected workflows, project contracts, tasks and history; no runtime migration is required."
+}
