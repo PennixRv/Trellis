@@ -1685,7 +1685,7 @@ through the existing pending-request parser without a second readiness mechanism
   state; each terminal path asserts that response waiter and pending maps are empty.
 - Existing Codex progress, turn, server-request, and sandbox tests continue to pass.
 - A released build must be installed before the real channel capability sentinel is used as the parent workflow gate;
-  a passing unit test alone does not prove Bash, context-mode, or report-write availability.
+  a passing unit test alone does not prove Bash, configured MCP tools, or report-write availability.
 
 ### Wrong vs Correct
 
