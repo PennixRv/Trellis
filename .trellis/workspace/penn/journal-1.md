@@ -334,3 +334,28 @@ Published paired beta.32 through successful CI, verified packaged init/update, c
 ### Status
 
 [OK] **Completed**
+
+
+## Session 12: Evidence planning, FIFO and CLI defaults delivered
+<!-- trellis-session: v=2 fp=77cec7960bcaff85 -->
+
+**Date**: 2026-10-07
+**Task**: Evidence planning, FIFO and CLI defaults delivered
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+Delivered approved task planning/select and evidence-unit/FIFO contracts, paired beta.35 and seven-consumer rollout; formal audit remains stopped.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0ebe9570` | 0.7.0-beta.34 |
+| `fcccde2b` | chore: pre-release updates |
+| `249a8342` | chore: update project workflow assets to beta.35 |
+
+### Status
+
+[OK] **Completed**

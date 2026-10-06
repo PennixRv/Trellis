@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
-- **Last Active**: 2026-10-06
+- **Total Sessions**: 12
+- **Last Active**: 2026-10-07
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~336 | Active |
+| `journal-1.md` | ~361 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-10-07 | Evidence planning, FIFO and CLI defaults delivered | `0ebe9570`, `fcccde2b`, `249a8342` | `pennix/v0.7-beta` |
 | 11 | 2026-10-06 | Verified continuation and blocking interaction rollout | `ca227ec0`, `8e334547`, `5690f90b` | `pennix/v0.7-beta` |
 | 10 | 2026-10-04 | Clean migration metadata beta30 release | `a62540f5`, `aa2b84d85bba3d21cb070ae48c923291be164ade` | `pennix/v0.7-beta` |
 | 9 | 2026-10-03 | Complete worker-terminal wait delivery | `fafcdd32`, `3484503d` | `pennix/v0.7-beta` |
