@@ -12,9 +12,9 @@
 
 ## Acceptance Criteria
 
-- [ ] Source changes address the recorded behavior at their actual owner.
-- [ ] Appropriate checks, published immutable pin and consumer verification recorded, with host limits explicit.
-- [ ] Scoped commits pushed and native task archived after delivery.
+- [x] Source changes address the recorded behavior at their actual owner.
+- [x] Appropriate checks, published immutable pin and consumer verification recorded, with host limits explicit.
+- [x] Scoped commits pushed and native task archived after delivery.
 
 ## Notes
 
