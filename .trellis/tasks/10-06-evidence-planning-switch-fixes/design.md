@@ -1,0 +1,2 @@
+# Design
+Approved root version 2 owns cross-repository decisions, including the user-approved Channel CLI ergonomics addendum. CLI templates and dogfood Python trees must remain identical. Reuse task meta and ownership checks for native planning and selection, artifact scope for work-unit mapping, report v2 and native Channel facts for acceptance. No scheduler, batch API, scoring, fixed pack limits or state mirrors.

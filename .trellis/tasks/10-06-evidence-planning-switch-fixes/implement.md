@@ -1,0 +1,2 @@
+# Execution
+Refresh graph and run impact before source edits; implement scoped native guards, documented procedures, and the approved CLI defaults/profile inference; run existing regressions and package gates. Commit Marketplace/docs first; paired beta publishing occurs through CI. Root coordinates native reinstall, seven consumer updates and final archive. Initial start uses the currently installed contract with the user's recorded approval.

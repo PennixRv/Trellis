@@ -375,6 +375,27 @@ the current packaged template so `--platform codex` can resolve to
 
 ## Status writer table
 
+### Planning admission and context selection
+
+`common/task_planning.py` owns material revisions in reserved `meta.planning`.
+Native plan seal validates required regular task documents and records the
+current revision; approve records an actual later user approval basis for that
+task/revision. It cannot authenticate chat. Generic create/set-meta cannot
+prefill the reserved record. Start checks explicit classification and matching
+seal/approval for planned/change-bearing tasks BEFORE any pointer/status write.
+Corrupt records, wrong task/revision, or missing approval fail closed; the
+manifest override does not bypass this. Existing in-progress tasks keep their
+authorization. Replan clears seal/approval and advances the material revision;
+minor wording/progress changes do not create a new revision.
+
+Native select uses existing identity/ownership/path checks and only writes the
+session pointer. It preserves status/branch and emits no after_start hook.
+Create --no-start intentionally leaves the pointer unchanged. Channel's
+coordinator procedure pauses refills and drains all already dispatched work
+before a live-task switch; select does not mirror supervisor state. The Hook
+uses the selected task's existing status. Codex inline bans native implement/
+check subagents, while explicit Channel evidence follows the selected workflow.
+
 The table below enumerates every code path that writes `task.json.status` —
 i.e., every path that can change which breadcrumb fires next turn. **Adding
 a new writer requires updating this spec.**
@@ -382,8 +403,8 @@ a new writer requires updating this spec.**
 | # | Writer | File:Line | Value | Trigger |
 |---|--------|-----------|-------|---------|
 | 1 | `cmd_create` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:206` | `"planning"` | `task.py create "<title>"` (also visibly auto-sets the session active-task pointer when session identity is available; `--no-start` skips pointer movement for backlog batching — see R7 in 04-30-workflow-state-commit-gap PRD) |
-| 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py` | `"in_progress"` (gated on prior `"planning"`) | `task.py start <dir>` |
-| 3 | `cmd_replan` | `packages/cli/src/templates/trellis/scripts/task.py` | `"planning"` (gated on prior `"in_progress"`; appends an auditable reason) | `task.py replan <dir> "reason"` |
+| 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py` | `"in_progress"` (prior `"planning"`, explicit classification, applicable current plan seal/approval) | `task.py start <dir>` |
+| 3 | `cmd_replan` | `packages/cli/src/templates/trellis/scripts/task.py` | `"planning"` (prior `"in_progress"`; auditable reason and material plan invalidation) | `task.py replan <dir> "reason"` |
 | 4 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:337` | `"completed"` (unconditional flip + archive `mv`) | `task.py archive <dir>` |
 | 5 | `emptyTaskJson` factory | `packages/cli/src/utils/task-json.ts:54` | `"planning"` (default) | TS callers (init, update) |
 | 6 | `getBootstrapTaskJson` | `packages/cli/src/commands/init.ts:535` | `"in_progress"` (override) | `trellis init` (creator path) |

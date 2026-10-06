@@ -95,7 +95,7 @@ trellis channel create <name> [opts]
   --context-file <abs-path> : absolute context file (repeatable)
   --context-raw <text>      : raw context text (repeatable)
   --cwd <path>           : cwd recorded in create event (default process.cwd())
-  --by <agent>           : creator identity (default "main")
+  --by <agent>           : creator identity (default TRELLIS_CHANNEL_AS or "main")
   --owner-session <id>   : opaque main Codex session owner (optional; exact-match filter key)
   --force                : if channel exists, kill workers + rmrf + recreate
   --ephemeral            : mark for hide-from-list + prune --ephemeral
@@ -108,6 +108,8 @@ trellis channel spawn <name> [opts]
   --agent <name>         : load .trellis/agents/<name>.md (sets provider / as / system prompt;
                            optional role env_file is loaded automatically)
   --provider <p>         : claude | codex (overrides agent)
+  --profile <id>         : select a subnode Codex profile; implies --agent subnode when
+                           --agent is omitted (the role frontmatter supplies provider: codex)
   --as <worker-name>     : worker identifier (default = agent name)
   --cwd <path>           : worker cwd (default process.cwd())
   --model <id>           : model override
@@ -142,7 +144,7 @@ trellis channel spawn <name> [opts]
     or live-worker budget exhausted after expired idle cleanup
 
 trellis channel send <name> [text] [opts]
-  --as <agent>           : sender identity (REQUIRED)
+  --as <agent>           : sender identity (default TRELLIS_CHANNEL_AS or "main")
   --scope <scope>        : project | global
   --to <agents>          : CSV of target worker names (default: broadcast)
   --stdin                : read body from stdin
@@ -153,7 +155,7 @@ trellis channel send <name> [text] [opts]
   → throws if none of stdin/textFile/[text] provided
 
 trellis channel interrupt <name> [text] [opts]
-  --as <agent>           : requester identity (REQUIRED)
+  --as <agent>           : requester identity (default TRELLIS_CHANNEL_AS or "main")
   --to <agent>           : target worker name (REQUIRED)
   --scope <scope>        : project | global
   --stdin                : read replacement instruction from stdin
@@ -163,7 +165,7 @@ trellis channel interrupt <name> [text] [opts]
   → supervisor appends `interrupted` and sends the replacement instruction to the worker
 
 trellis channel wait <name> [opts]
-  --as <agent>           : caller identity (REQUIRED, also default --to)
+  --as <agent>           : caller identity (default TRELLIS_CHANNEL_AS or "main"; also default --to)
   --scope <scope>        : project | global
   --timeout <duration>   : max wait (no timeout = wait indefinitely)
   --after-seq <sequence> : replay only events with seq > this durable barrier
@@ -226,13 +228,13 @@ trellis channel rm <name> [opts]
 
 trellis channel title set <name> [opts]
   --scope <scope>        : project | global
-  --as <agent>           : author identity (default "main")
+  --as <agent>           : author identity (default TRELLIS_CHANNEL_AS or "main")
   --title <text>         : display title; does not change channel address
   → stdout: appended `channel` title event as JSON
 
 trellis channel title clear <name> [opts]
   --scope <scope>        : project | global
-  --as <agent>           : author identity (default "main")
+  --as <agent>           : author identity (default TRELLIS_CHANNEL_AS or "main")
   → stdout: appended `channel` title clear event as JSON
 
 trellis channel prune [opts]
@@ -260,7 +262,7 @@ trellis channel run [name] [opts]
   → on failure (error/killed/timeout): channel preserved, stderr "channel kept for inspection: <path>", exit 1
 
 trellis channel post <name> <action> [opts]
-  --as <agent>           : author identity (REQUIRED)
+  --as <agent>           : author identity (default TRELLIS_CHANNEL_AS or "main")
   --scope <scope>        : project | global
   --thread <key>         : thread key (required except action=opened)
   --title <text>         : thread title (opened)
@@ -279,7 +281,7 @@ trellis channel post <name> <action> [opts]
 
 trellis channel context add <name> [opts]
   --scope <scope>        : project | global
-  --as <agent>           : author identity (default "main")
+  --as <agent>           : author identity (default TRELLIS_CHANNEL_AS or "main")
   --thread <key>         : mutate thread-level context instead of channel-level context
   --file <abs-path>      : absolute context file (repeatable)
   --raw <text>           : raw context text (repeatable)
@@ -287,7 +289,7 @@ trellis channel context add <name> [opts]
 
 trellis channel context delete <name> [opts]
   --scope <scope>        : project | global
-  --as <agent>           : author identity (default "main")
+  --as <agent>           : author identity (default TRELLIS_CHANNEL_AS or "main")
   --thread <key>         : mutate thread-level context instead of channel-level context
   --file <abs-path>      : absolute context file (repeatable)
   --raw <text>           : raw context text (repeatable)
@@ -311,7 +313,7 @@ trellis channel thread <name> <thread> [opts]
   → stdout: one thread timeline summary
 
 trellis channel thread rename <name> <old-thread> <new-thread> [opts]
-  --as <agent>           : author identity (REQUIRED)
+  --as <agent>           : author identity (default TRELLIS_CHANNEL_AS or "main")
   --scope <scope>        : project | global
   → stdout: appended `thread` rename event as JSON
 
