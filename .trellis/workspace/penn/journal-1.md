@@ -309,3 +309,28 @@ Neutralized seven shipped migration manifest narratives without changing semanti
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: Verified continuation and blocking interaction rollout
+<!-- trellis-session: v=2 fp=8c65bd27358b81c7 -->
+
+**Date**: 2026-10-06
+**Task**: Verified continuation and blocking interaction rollout
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+Published paired beta.32 through successful CI, verified packaged init/update, corrected Marketplace registry hashes, updated all seven consumers and preserved native identity/write checks. Current owner task archived; host waiting control limit is explicit.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ca227ec0` | fix: resume loaded Trellis checkpoints without redundant startup |
+| `8e334547` | 0.7.0-beta.32 |
+| `5690f90b` | chore: land beta.32 assets and verified workflow registry |
+
+### Status
+
+[OK] **Completed**
