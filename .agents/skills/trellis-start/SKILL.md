@@ -1,11 +1,17 @@
 ---
 name: trellis-start
-description: "Initializes an AI development session by reading workflow guides, developer identity, git status, active tasks, and project guidelines from .trellis/. Classifies incoming tasks and routes to brainstorm, direct edit, or task workflow. Use when beginning a new coding session, resuming work, starting a new task, or re-establishing project context."
+description: "Initialize missing Trellis context once for a new session or changed project. Read workflow, identity, task and guidelines as needed. Do not invoke for an ordinary continue, new task, or compaction recovery when the current context or summary already supplies the project and checkpoint."
 ---
 
 # Start Session
 
 Initialize a Trellis-managed development session. This platform has no session-start hook, so manually load the equivalent compact context by following these steps.
+
+Run this initialization once when project context is genuinely missing or the
+target project changes. Existing session context and a sufficient compaction
+summary count as loaded context. An ordinary continue or new task in the same
+known project resumes the pending action without repeating these steps. For
+partial missing/conflicting facts, query only the needed owner evidence.
 
 ---
 

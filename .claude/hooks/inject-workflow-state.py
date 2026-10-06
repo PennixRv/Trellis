@@ -74,7 +74,7 @@ from typing import Optional
 # get the full SessionStart overview; this short reminder points the main session
 # at the start skill once and leaves the per-turn state block compact.
 CODEX_NO_TASK_BOOTSTRAP_NOTICE = """<trellis-bootstrap>
-If you have not already loaded Trellis context this session, read the `trellis-start` skill once.
+If Trellis project context is missing, read the `trellis-start` skill once. Current context or a sufficient compaction summary counts as loaded; an ordinary continue resumes its pending action without restarting.
 </trellis-bootstrap>"""
 
 

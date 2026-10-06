@@ -11,7 +11,7 @@ A request to build, implement, fix, refactor, or "go ahead" is not approval to l
 
 For every non-trivial task, the user must respond at least once after the initial request before implementation begins. If no clarification is needed, that response must approve the final planning summary described below.
 
-While any user-owned product, scope, UX, compatibility, risk, or acceptance decision remains unresolved, keep the task in planning. First inventory evidence and decision dependencies. If at least two independent material decisions remain and `pennix-decision-gates` is available, delegate one bounded batch of up to three frontier questions; otherwise ask the single highest-value question. Do not edit product code, dispatch implementation, or run `task.py start` until the decision chain is sealed.
+While any user-owned product, scope, UX, compatibility, risk, or acceptance decision remains unresolved, keep the task in planning. First inventory evidence and decision dependencies. If at least two independent material decisions remain and `pennix-decision-grill` is available, delegate one bounded batch of up to three frontier questions; otherwise ask the single highest-value question. Do not edit product code, dispatch implementation, or run `task.py start` until the decision chain is sealed.
 
 ## Analysis-Only Exception
 
@@ -65,7 +65,7 @@ Use a concise title from the user's request. Both the title and `--description` 
    - product intent still needed from the user
    - scope or risk decisions still needed from the user
    - likely out-of-scope items
-4. If user-owned decisions remain, calculate the independent frontier. Use `pennix-decision-gates` for a bounded batch when two or more independent material decisions are ready; otherwise ask the single highest-value question. Include recommendation and trade-off. Yield only while the answer is unavailable.
+4. If user-owned decisions remain, calculate the independent frontier. Use `pennix-decision-grill` for a bounded batch when two or more independent material decisions are ready; otherwise ask the single highest-value question. Include recommendation and trade-off. Yield only while the answer is unavailable.
 5. When the host returns the current continuation's answer, immediately persist it in `prd.md` or the decision artifact, recheck evidence and conflicts, recalculate the frontier, and continue the same planning loop. Do not create a second Trellis lifecycle for the same decision chain. Stop only for a new unresolved frontier, a real capability or authority block, or a final sealed summary awaiting implementation approval.
 6. When no user-owned decision remains, create or update `design.md` and `implement.md` for complex tasks.
 7. Run the requirement convergence gate, then the PRD convergence pass. Finish with one Planning Seal closure pass.

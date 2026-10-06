@@ -12,6 +12,16 @@
 
 ---
 
+### Continuation and Compaction
+
+Reuse the current conversation or sufficient compaction checkpoint when root,
+task, phase, authorization and pending action are known. An ordinary continue
+resumes that action without repeated startup, task/Git/history or handoff
+validation. Query only missing/conflicting facts for a fresh session, changed
+target or explicit inspection. Native protected writes retain owner identity
+and ownership checks. Never repeat or re-answer consumed pre-compaction user
+input; handle genuinely new input normally. No recovery cache or extra waiter.
+
 ## Trellis System
 
 ### Developer Identity
@@ -234,7 +244,7 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 [workflow-state:planning]
 Load `trellis-brainstorm`; stay in planning.
 If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete the declared evidence work now. Do not wait for a start review or run `task.py start`; when the PRD boundary and acceptance evidence pass, commit task artifacts and archive directly. A protected-target recommendation requires a separate change-bearing task.
-Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; run the Planning Seal closure pass before asking for review. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-gates`, batch only independent frontier questions, and stay in planning. Answers returned by the current continuation must be persisted and fed back into the same planning loop.
+Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; run the Planning Seal closure pass before asking for review. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-grill`, batch only independent frontier questions, and stay in planning. Answers returned by the current continuation must be persisted and fed back into the same planning loop.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start.
 [/workflow-state:planning]
@@ -248,7 +258,7 @@ Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research mani
 [workflow-state:planning-inline]
 Load `trellis-brainstorm`; stay in planning.
 If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete the declared evidence work now. Do not wait for a start review or run `task.py start`; when the PRD boundary and acceptance evidence pass, commit task artifacts and archive directly. A protected-target recommendation requires a separate change-bearing task.
-Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; run the Planning Seal closure pass before asking for review. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-gates`, batch only independent frontier questions, and stay in planning. Answers returned by the current continuation must be persisted and fed back into the same planning loop.
+Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; run the Planning Seal closure pass before asking for review. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-grill`, batch only independent frontier questions, and stay in planning. Answers returned by the current continuation must be persisted and fed back into the same planning loop.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-before-dev`.
 [/workflow-state:planning-inline]
