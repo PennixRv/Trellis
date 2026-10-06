@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.35",
+  "description": "Remove the redundant Channel prune dry-run option",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Channel prune is non-destructive by default; --yes is the only deletion switch. Remove the redundant --dry-run flag (which could not change behavior) and clarify default author flags in the bundled Channel reference. Existing prune command behavior remains a preview unless --yes is supplied.",
+  "migrations": [],
+  "notes": "No runtime migration is required."
+}

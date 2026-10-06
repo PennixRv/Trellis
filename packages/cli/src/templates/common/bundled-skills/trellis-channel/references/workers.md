@@ -150,7 +150,7 @@ echo "Stop refactoring the parser — switch to fixing the failing test in src/f
 
 Flags:
 
-- `--as <agent>` **(required)** — caller identity.
+- `--as <agent>` — caller identity; defaults to `TRELLIS_CHANNEL_AS` or `main`.
 - `--to <agent>` **(required)** — target worker.
 - `--scope <project|global>` — channel scope.
 - `--stdin` / `--text-file <path>` / `[text]` — replacement instruction body.
@@ -254,13 +254,13 @@ running peer.
 Inbox-relevant subcommands:
 
 - `send <channel> [text]` — append a `message` event.
-  - `--as <agent>` **(required)** — author.
+  - `--as <agent>` — author; defaults to `TRELLIS_CHANNEL_AS` or `main`.
   - `--to <agents>` — CSV; one → string, many → array; broadcast if omitted.
   - `--stdin` / `--text-file <path>` / `[text]` — body source.
   - `--delivery-mode <appendOnly|requireKnownWorker|requireRunningWorker>`.
 - `interrupt <channel> [text]` — soft-interrupt redirect (see above).
 - `wait <channel>` — block until matching events arrive.
-  - `--as <agent>` **(required)** — `self` for filter context.
+  - `--as <agent>` — filter identity; defaults to `TRELLIS_CHANNEL_AS` or `main`.
   - `--from <agents>` — CSV authors.
   - `--kind <kind[,kind...]>` — CSV (OR semantics); supports `interrupt`,
     `done`, `progress`, etc.

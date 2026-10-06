@@ -376,8 +376,7 @@ Behavior:
 trellis channel prune
   [--scope project|global]                # omitted: scan every project
   [--all | --empty | --idle <Ns|Nm|Nh|Nd> | --ephemeral]   # mutually exclusive
-  [--yes]                                 # actually delete (default: dry-run)
-  [--dry-run]                             # default true; redundant with default
+  [--yes]                                 # actually delete; omitted means preview
   [--keep <names,csv>]                    # exclusion list
 ```
 

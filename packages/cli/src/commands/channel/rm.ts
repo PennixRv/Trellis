@@ -54,7 +54,6 @@ export interface PruneOptions {
   idleMs?: number;
   /** Remove only channels marked `ephemeral: true` in their create event. */
   ephemeral?: boolean;
-  dryRun?: boolean;
   yes?: boolean;
   keep?: string[];
   scope?: string;
@@ -176,15 +175,8 @@ export async function channelPrune(opts: PruneOptions): Promise<void> {
     console.log(`  ${c.name.padEnd(24)}  ${last}  (${c.reason})`);
   }
 
-  if (opts.dryRun) {
-    console.log(`\n(dry-run) would remove ${candidates.length} channel(s)`);
-    return;
-  }
   if (!opts.yes) {
-    console.log(
-      `\nRefusing to delete ${candidates.length} channel(s) without --yes. ` +
-        `Re-run with --yes (or --dry-run to preview).`,
-    );
+    console.log(`\n(dry-run) would remove ${candidates.length} channel(s)`);
     return;
   }
 

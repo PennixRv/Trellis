@@ -14,6 +14,7 @@ import {
 } from "../../src/commands/channel/context.js";
 import { channelInterrupt } from "../../src/commands/channel/interrupt.js";
 import { channelMessages } from "../../src/commands/channel/messages.js";
+import { channelPrune } from "../../src/commands/channel/rm.js";
 import { channelList } from "../../src/commands/channel/list.js";
 import { channelSend } from "../../src/commands/channel/send.js";
 import { channelSpawn } from "../../src/commands/channel/spawn.js";
@@ -86,6 +87,21 @@ describe("channel storage and forum channels", () => {
     expect(
       fs.existsSync(eventsPath("root-check", projectKey(projectDir))),
     ).toBe(true);
+  });
+
+  it("keeps prune preview as the default and deletes only with --yes", async () => {
+    await createChannel("prune-default", { by: "main" });
+    const eventPath = eventsPath("prune-default", projectKey(projectDir));
+
+    await channelPrune({ all: true });
+    expect(fs.existsSync(eventPath)).toBe(true);
+    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toContain(
+      "(dry-run) would remove 1 channel(s)",
+    );
+
+    vi.mocked(console.log).mockClear();
+    await channelPrune({ all: true, yes: true });
+    expect(fs.existsSync(eventPath)).toBe(false);
   });
 
   it("records and filters the immutable main session owner", async () => {

@@ -619,7 +619,6 @@ export function registerChannelCommand(program: Command): void {
       "remove only channels marked `--ephemeral` at create time",
     )
     .option("--yes", "actually delete (default is dry-run)")
-    .option("--dry-run", "show what would be removed without deleting", true)
     .option(
       "--keep <names>",
       "comma-separated channel names to keep regardless",
@@ -631,7 +630,6 @@ export function registerChannelCommand(program: Command): void {
         idle?: string;
         ephemeral?: boolean;
         yes?: boolean;
-        dryRun?: boolean;
         keep?: string;
         scope?: string;
       };
@@ -642,7 +640,6 @@ export function registerChannelCommand(program: Command): void {
           idleMs: parseDuration(opts.idle),
           ephemeral: opts.ephemeral,
           yes: opts.yes,
-          dryRun: !opts.yes,
           keep: parseCsv(opts.keep),
           scope: opts.scope,
         });
