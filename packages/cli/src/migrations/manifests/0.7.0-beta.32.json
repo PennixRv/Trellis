@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.32",
+  "description": "Resume known checkpoints without repeated initialization",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Start and continue guidance reuses current or compacted context, queries only missing facts, and avoids replaying consumed input. Active planning callers use pennix-decision-grill. Native task identity and protected write checks remain unchanged.",
+  "migrations": [],
+  "notes": "Upgrade the paired CLI/core release and refresh generated assets. Refresh explicitly selected Marketplace workflows through their native owner; preserve task history and user configuration. No runtime migration is required."
+}

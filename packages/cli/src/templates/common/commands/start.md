@@ -2,6 +2,12 @@
 
 Initialize a Trellis-managed development session. This platform has no session-start hook, so manually load the equivalent compact context by following these steps.
 
+Run this initialization once when project context is genuinely missing or the
+target project changes. Existing session context and a sufficient compaction
+summary count as loaded context. An ordinary continue or new task in the same
+known project resumes the pending action without repeating these steps. For
+partial missing/conflicting facts, query only the needed owner evidence.
+
 ---
 
 ## Step 1: Current state

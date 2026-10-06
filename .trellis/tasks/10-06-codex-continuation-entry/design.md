@@ -1,0 +1,1 @@
+Adopt root coordination task 10-06-codex-interaction-continuation-routing/design.md at /home/penn/devel/codex-workflow-optimization/.trellis/tasks/. Owner scope is fixed by this PRD; branch pennix/v0.7-beta. Existing user authorization covers continuous delivery. Checks, release/install, rollback and completion follow that sealed plan. No unresolved user-owned choice remains.

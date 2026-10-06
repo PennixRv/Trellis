@@ -238,9 +238,9 @@ export function resolvePlaceholdersNeutral(
 /** Skill description registry — maps template name to auto-trigger description. */
 const SKILL_DESCRIPTIONS: Record<string, string> = {
   start:
-    "Initializes an AI development session by reading workflow guides, developer identity, git status, active tasks, and project guidelines from .trellis/. Classifies incoming tasks and routes to brainstorm, direct edit, or task workflow. Use when beginning a new coding session, resuming work, starting a new task, or re-establishing project context.",
+    "Initialize missing Trellis context once for a new session or changed project. Read workflow, identity, task and guidelines as needed. Do not invoke for an ordinary continue, new task, or compaction recovery when the current context or summary already supplies the project and checkpoint.",
   continue:
-    "Resume work on the current task. Loads the workflow Phase Index, figures out which phase/step to pick up at, then pulls the step-level detail via get_context.py --mode phase. Use when coming back to an in-progress task and you need to know what to do next.",
+    "Resume the actual pending action from current context or a compaction checkpoint. Query only missing or conflicting task/phase facts. Use when the next action needs recovery; an ordinary continue with a known checkpoint needs no repeated startup or state reload.",
   "finish-work":
     "Wrap up the current session: verify quality gate passed, remind user to commit, archive completed tasks, and record session progress to the developer journal. Use when done coding and ready to end the session.",
   "before-dev":
