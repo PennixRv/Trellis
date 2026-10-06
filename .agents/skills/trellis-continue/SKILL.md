@@ -38,7 +38,8 @@ a direct task binding. For `unbound` / `unbound_ambiguous`, review existing task
 artifacts and select by the user's explicit intent. Exit code 1 for ambiguity
 does not mean identity is absent. Do not guess, duplicate tasks, invent identity,
 or edit runtime pointers. Return a planning candidate to the planning gates below;
-use native `task.py start <task>` only when its activation contract permits it.
+use native `task.py select <task>` to bind planning context after any required
+Channel drain; use `task.py start` only when its activation contract permits it.
 An eligible `analysis_only` candidate remains in planning without start.
 If `session_source` is null, report unavailable identity separately.
 
@@ -60,7 +61,7 @@ Run only when the phase or routing rule is missing; otherwise reuse it.
 - `status=in_progress` + a material unresolved decision → record the reason and run `task.py replan <task> "<reason>"`; do not ask a native question during implementation.
 - `status=planning` + `prd.md` only → decide whether the task is lightweight or complex. Lightweight can move to **1.4** review; complex returns to **1.1** to add `design.md` + `implement.md`.
 - `status=planning` + complex artifacts complete + sub-agent jsonl not curated (empty, or only a legacy `_example` placeholder row) → **1.3**
-- `status=planning` + required artifacts complete + required jsonl curated or inline mode → run the Planning Seal closure pass, then **1.4**; honor existing implementation authorization and ask for start approval only if it is missing.
+- `status=planning` + required artifacts complete + required jsonl curated or inline mode → run the Planning Seal closure pass, then **1.4**. Existing authorization must be a later explicit implementation approval for this task's current sealed material revision. Initial requests, design answers, and parent-task approval do not qualify. Use native plan seal/approve/start; ask only when that approval is missing. A replan invalidates it; minor progress edits do not.
 - `status=in_progress` + implementation not started → **2.1**
 - `status=in_progress` + implementation done, not yet checked → **2.2**
 - `status=in_progress` + check passed → **3.3** (spec update) → **3.4** (commit)

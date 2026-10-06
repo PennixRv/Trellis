@@ -35,7 +35,7 @@ trellis channel create <name>
   [--linked-context-file <abs-path>]      # [deprecated alias]
   [--linked-context-raw  <text>]          # [deprecated alias]
   [--cwd <path>]                          # recorded in create event
-  [--by <agent>]                          # default: main
+  [--by <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--owner-session <id>]                  # opaque main Codex session owner
   [--force]                               # overwrite existing channel
   [--ephemeral]                           # hide from default list, prunable
@@ -76,7 +76,7 @@ Behavior:
 
 ```bash
 trellis channel send <name> [text]
-  --as <agent>                            # REQUIRED — author
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--scope project|global]
   [--to <agents,csv>]                     # default: broadcast
   [--stdin | --text-file <path>]          # body from stdin or file
@@ -137,7 +137,7 @@ emit the event you intend to wait for, then pass it to `wait --after-seq`.
 
 ```bash
 trellis channel wait <name>
-  --as <agent>                            # REQUIRED — self for filter ctx
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--scope project|global]
   [--timeout <Ns|Nm|Nh|Nms>]              # parsed by parseDuration
   [--after-seq <integer>]                 # replay only events after barrier
@@ -254,7 +254,7 @@ trellis channel send T --as A --text-file /tmp/message.md
 
 ```bash
 trellis channel interrupt <name> [text]
-  --as <agent>                            # REQUIRED — caller
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   --to <agent>                            # REQUIRED — target worker
   [--scope project|global]
   [--stdin | --text-file <path>]
@@ -278,6 +278,7 @@ trellis channel spawn <name>
   [--scope project|global]
   [--agent <agent-name>]                  # loads .trellis/agents/<name>.md
   [--provider claude|codex]               # overrides agent file
+  [--profile <id>]                        # subnode Codex profile; implies --agent subnode
   [--as <worker-name>]                    # default: agent name
   [--cwd <path>]
   [--model <id>]
@@ -375,8 +376,7 @@ Behavior:
 trellis channel prune
   [--scope project|global]                # omitted: scan every project
   [--all | --empty | --idle <Ns|Nm|Nh|Nd> | --ephemeral]   # mutually exclusive
-  [--yes]                                 # actually delete (default: dry-run)
-  [--dry-run]                             # default true; redundant with default
+  [--yes]                                 # actually delete; omitted means preview
   [--keep <names,csv>]                    # exclusion list
 ```
 
@@ -397,7 +397,7 @@ Behavior:
 
 ```bash
 trellis channel post <name> <action>
-  --as <agent>                            # REQUIRED
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--scope project|global]
   [--thread <key>]                        # required except action=opened
   [--title <text>]
@@ -444,7 +444,7 @@ trellis channel thread <name> <thread-key>
   [--raw]
 
 trellis channel thread rename <name> <old-thread> <new-thread>
-  --as <agent>                            # REQUIRED
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--scope project|global]
 ```
 
@@ -463,7 +463,7 @@ Behavior:
 
 ```bash
 trellis channel context add <name>
-  [--as <agent>]                          # default: main
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--scope project|global]
   [--thread <key>]                        # thread-level instead of channel-level
   [--file <abs-path>] ...                 # repeatable
@@ -471,7 +471,7 @@ trellis channel context add <name>
                                           # at least one of --file or --raw
 
 trellis channel context delete <name>
-  [--as <agent>]                          # default: main
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--scope project|global]
   [--thread <key>]
   [--file <abs-path>] ...
@@ -494,11 +494,11 @@ Behavior:
 ```bash
 trellis channel title set <name>
   --title <text>                          # REQUIRED
-  [--as <agent>]                          # default: main
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--scope project|global]
 
 trellis channel title clear <name>
-  [--as <agent>]                          # default: main
+  [--as <agent>]                          # default: TRELLIS_CHANNEL_AS or main
   [--scope project|global]
 ```
 

@@ -20,7 +20,26 @@ dependencies, stop conditions, deadline, and `channel_ref`. Set `retry_of`
 only for an explicit manual retry and `counter_of` only for intentional
 counterwork. A retry names an existing, different subnode in the same task and
 `work_id`; counterwork may be initialized independently. The helper supplies
-the immutable task identity and report path.
+the immutable task identity and report path. New units also require `unit_plan`:
+
+```json
+{
+  "unit_plan": {
+    "plan_ref": ".trellis/tasks/09-07-example/design.md#evidence-units",
+    "sizing_rationale": "One bounded dependency inspection with a separately reviewable result."
+  }
+}
+```
+
+The reference must identify an existing regular Markdown document inside this
+task. For multiple scope items, add `grouping_rationale` explaining why every
+item is quick/simple, obviously related, and uses shared context while retaining
+separate conclusions. Record the actual scope mapping and evidence in the task
+plan before initializing briefs; owner domains and slot counts do not determine
+unit counts. Complex or lengthy points need separate units or further splitting.
+The helper checks structure, not the truth of the sizing judgment. Historical
+brief/report readers remain compatible; new init and queue admission require
+the unit plan.
 
 ```bash
 TASK=.trellis/tasks/09-07-example
@@ -117,18 +136,19 @@ the worker can emit a terminal event. The CLI waits once for a worker lifecycle
 transition after that barrier, including supervisor-authored terminal events:
 
 ```bash
-trellis channel create subnode-example --by main --cwd "$PWD"
+trellis channel create subnode-example
 BARRIER="$(trellis channel barrier subnode-example)"
-trellis channel spawn subnode-example --agent subnode --provider codex \
-  --as "$SUBNODE_ID" --cwd "$PWD"
+trellis channel spawn subnode-example --agent subnode --as "$SUBNODE_ID"
 
 printf '%s\n' "Read $TASK/subnodes/$WORK_ID/$SUBNODE_ID/brief.json and perform only that bounded work." \
-  | trellis channel send subnode-example --as main --to "$SUBNODE_ID" \
+  | trellis channel send subnode-example --to "$SUBNODE_ID" \
       --stdin --delivery-mode requireRunningWorker
 
-trellis channel wait subnode-example --as main --workers "$SUBNODE_ID" \
+trellis channel wait subnode-example --workers "$SUBNODE_ID" \
   --after-seq "$BARRIER" --timeout 30m
 ```
+
+When selecting a configured model profile, use `--profile <id>` in place of `--agent subnode`; it implies the subnode role and reads its Codex provider from role frontmatter. Keep the unique worker `--as` for dispatch identity. Omit author `--as` on `send` and `wait` to use `TRELLIS_CHANNEL_AS` or `main`.
 
 `channel.subnode` in `.trellis/config.yaml` supplies the role defaults for
 `max_live_workers` (generated default `8`), `idle_timeout`, `timeout`, and
@@ -137,7 +157,12 @@ or lifetime needs differ; pass the corresponding `spawn` flag only for a
 one-off override. The generic `channel.worker_guard` remains the fallback for
 ordinary workers and for a subnode key omitted from the project config.
 
-For a group, use `--workers a,b --all` with the barrier captured before dispatch.
+For rolling FIFO dispatch, follow `references/multi-target-dispatch.md`: initially
+fill available native capacity, wait for the first terminal worker, review and
+accept it, then refill while other workers continue. Do not use `--all` as an
+ordinary refill prerequisite. Use `--workers a,b --all` only when the intent
+requires draining all already dispatched workers, with the barrier captured
+before dispatch.
 Worker mode emits one terminal worker projection per satisfied target. Ordinary
 adapter errors and peer turn completion do not end the wait. `--from` remains
 an exact event-author filter; it is not a worker lifecycle selector.

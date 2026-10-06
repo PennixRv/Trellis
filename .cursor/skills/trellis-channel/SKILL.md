@@ -35,6 +35,7 @@ trellis channel context list <board> --scope global --thread <thread>
 | "和 codex/claude 讨论一下", "brainstorm with another agent" | `references/workflows.md` |
 | "派一个 implement/check agent", "让 agent review", "spawn a worker" | `references/workflows.md`, then `references/workers.md` |
 | "独立取证", "subnode", "反证/独立审查", "持久化工作节点报告" | `references/subnode-work.md`, then `references/workers.md` |
+| Multiple evidence units, FIFO refill, or task switching with live nodes | `references/subnode-work.md`, then `references/multi-target-dispatch.md` |
 | "开 issue 区 / topic 群 / changelog / board", "make a forum" | `references/forum.md` |
 | "看看这个 thread / linked context", "inspect a thread" | `references/forum.md` |
 | "channel 卡住了 / 没输出 / progress 被截断", "worker stalled" | `references/progress-debugging.md` |
@@ -46,7 +47,7 @@ trellis channel context list <board> --scope global --thread <thread>
 - Use `--context-file` / `--context-raw` and `trellis channel context add/delete/list`. `--linked-context-*` is deprecated terminology.
 - Use `--stdin` or `--text-file` for long messages. Do not put long mixed Chinese/English text in the positional shell argument.
 - Pretty `messages` output is an operator dashboard and may truncate progress. Use `--raw` for audit.
-- `--as` is the speaker or worker handle, depending on the command. Use explicit, stable names when multiple agents or sessions are involved.
+- `--as` is the speaker or worker handle, depending on the command. Author commands default to `TRELLIS_CHANNEL_AS` or `main`; `kill` still requires the target worker, and multi-worker dispatch needs distinct worker names.
 - `--scope project` (default) operates on the current cwd's project bucket; `--scope global` operates on the shared `__global__` bucket. Pick scope deliberately — a global board is invisible from project listings unless `--scope global` is passed.
 - For brainstorm, do multiple pressure-test rounds. One answer plus one confirmation is review, not brainstorm.
 - **Dispatcher wait pattern**: use `--kind done` / `--kind turn_finished` (trellis-emitted system events), NOT a user `--tag` as the completion signal. CLI help lists `phase_done` / `question` as `--tag` examples but only `interrupt` is a reserved tag with hardcoded trellis behavior; the others are opaque user labels. Relying on a worker to run `send --tag <my_signal>` is unreliable — LLM workers commonly write the tag string into prose instead of running the actual CLI command. See `references/command-reference.md` "tag vs kind".
@@ -59,6 +60,7 @@ trellis channel context list <board> --scope global --thread <thread>
 - `references/forum.md` — forum channels, context, title, rename, changelog forums, thread filtering.
 - `references/workers.md` — spawn, agent cards, context injection (`--file` / `--jsonl`), interrupts, kill semantics.
 - `references/subnode-work.md` — bounded independent-evidence subnodes, their task artifacts, coordinator verification, and counterwork.
+- `references/multi-target-dispatch.md` — one-host multi-target procedure, rolling FIFO acceptance, and drain before task selection.
 - `references/progress-debugging.md` — progress/raw inspection, stalled worker diagnosis, OOM guard, exit codes.
 - `references/command-reference.md` — current CLI command reference (every subcommand, every flag, output conventions, scope/type model).
 

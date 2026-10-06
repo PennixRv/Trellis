@@ -363,7 +363,8 @@ def _codex_mode_banner(config: dict) -> str:
     else:
         meaning = (
             "inline: the main session implements/checks directly; "
-            "do not dispatch implement/check sub-agents."
+            "do not dispatch implement/check sub-agents. Explicit Channel independent-evidence "
+            "subnodes follow the selected project workflow and remain available in inline mode."
         )
     return f"<codex-mode>{meaning}</codex-mode>"
 

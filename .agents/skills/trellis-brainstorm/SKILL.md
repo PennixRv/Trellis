@@ -35,6 +35,15 @@ Repository evidence establishes current behavior and technical constraints. The 
 
 When research, audit, review, or investigation is too large to leave one independently useful conclusion in the current bounded session, split it into evidence units. Each unit must have one question or scope, a minimal evidence range, a destination artifact, and a stop condition; write its facts, conclusion or blocker, unknowns, and recovery point before starting another unit. Size units so one normal context window can finish and persist one useful result; do not promise an exact token or time limit. Routine navigation and transient tool output do not need an artifact. Create a child task only when the unit has an independent owner, lifecycle, and acceptance contract.
 
+Persist the unit-to-point mapping in this task's existing plan/matrix before
+dispatch. Include workload rationale, dependencies, minimal evidence, shared
+context, and per-point delivery. Combine points only when each is quick/simple
+and they are obviously related; explain the grouping and bounded total workload.
+Complex or lengthy points need separate units or further splitting. Slots and
+owner domains do not determine unit count. Explicit independent subnodes use
+`trellis-channel`'s unit-plan and multi-target procedure; planning itself does
+not authorize dispatch.
+
 ---
 
 Use this skill during Phase 1 planning to turn the user's request into clear requirements and planning artifacts.
@@ -70,7 +79,11 @@ Use a concise title from the user's request. Both the title and `--description` 
 6. When no user-owned decision remains, create or update `design.md` and `implement.md` for complex tasks.
 7. Run the requirement convergence gate, then the PRD convergence pass. Finish with one Planning Seal closure pass.
 8. Present the final planning summary and stop. Do not run `task.py start` or edit product code in the same turn.
-9. Only a subsequent user message that explicitly approves the latest planning summary authorizes `task.py start` and implementation. If implementation reveals a material unresolved decision, record `decision-needed`, run `task.py replan <task> "<reason>"`, and return through this planning flow; do not open a popup during implementation.
+9. For planned/change-bearing tasks, classify `execution_class=planned` and `delivery_mode=change_bearing` in native task meta, then run `task.py plan seal <task>` after closure. Only a subsequent user message explicitly approving this task's current material plan authorizes `task.py plan approve <task> --revision <n> --basis "<short non-sensitive actual approval basis>"`, followed by `task.py start` and implementation. Initial delivery requests, parent-task approval, and design answers are insufficient. If scope, owner, risk, public behavior, or acceptance materially changes, run `task.py replan <task> "<reason>"`; it invalidates seal/approval. Return through planning, seal the new revision, present it, and obtain later approval. Minor wording, formatting, and progress records do not require resealing. The native record enforces structure, not authenticity of chat approval.
+
+When changing the active task only for planning, use native `task.py select`,
+not start. `create --no-start` intentionally preserves the old pointer. Follow
+the Channel drain procedure before switching with live evidence workers.
 
 Do not invent a project-specific product/spec hierarchy. If the repository already has product, domain, or spec docs, use them. If it does not, proceed with the evidence that exists.
 

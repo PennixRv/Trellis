@@ -50,6 +50,7 @@ From Step 1 you know the current task and status. Check the task directory:
 - **Active task with `task.json.meta.delivery_mode = "analysis_only"`** → keep `planning`, complete the PRD's bounded evidence work, then verify the no-change boundary, commit task artifacts, and archive directly. Do not run `task.py start`; any protected-target change needs a separate change-bearing task.
 - **Active task status `planning` + no `prd.md`** → Phase 1.1. Load the `trellis-brainstorm` skill.
 - **Active task status `planning` + `prd.md` exists** → stay in Phase 1. Lightweight tasks can be PRD-only; complex tasks need `design.md` + `implement.md`. Load the relevant Phase 1 step detail before `task.py start`.
+- **Existing task selected by explicit intent but not bound** → use native `task.py select` for context only. Drain already dispatched Channel units before a real task switch. Planned/change-bearing start requires native plan seal and matching later approval for this task's current material revision; selecting or recovering context does not approve implementation.
 - **Active task status `in_progress`** → Phase 2 step 2.1. Load the step detail:
   ```bash
   python3 ./.trellis/scripts/get_context.py --mode phase --step 2.1 --platform codex

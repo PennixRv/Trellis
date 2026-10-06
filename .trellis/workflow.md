@@ -22,6 +22,36 @@ target or explicit inspection. Native protected writes retain owner identity
 and ownership checks. Never repeat or re-answer consumed pre-compaction user
 input; handle genuinely new input normally. No recovery cache or extra waiter.
 
+## Plan Approval And Task Selection
+
+Classify task meta explicitly as `execution_class=direct|planned` and
+`delivery_mode=change_bearing|analysis_only`; an unclassified old planning task
+needs this once before start. Direct small work and eligible analysis-only work
+retain their existing shortest paths. Existing in-progress tasks are not reset.
+
+For planned/change-bearing work, close decisions and required task artifacts,
+run native `task.py plan seal <task>`, present that material plan, and stop before
+implementation. Only a later explicit user approval for THIS task's CURRENT
+sealed revision authorizes `task.py plan approve <task> --revision <n> --basis
+"<short non-sensitive actual approval basis>"`, then `task.py start`. Initial
+delivery requests, parent-task approval, and design answers do not qualify.
+`--allow-empty-context` overrides only context manifests, never approval.
+The native record enforces structure; chat authenticity remains agent-owned.
+
+Material scope, owner, risk, public behavior, or acceptance changes require
+`task.py replan` and a newly sealed, presented, subsequently approved revision.
+Resealing a sealed planning task declares a new material revision. Wording,
+formatting, progress, and execution evidence do not automatically invalidate it.
+Generic create/set-meta cannot prefill the reserved `meta.planning` record.
+
+Use native `task.py select <task>` for context-only selection: no phase/branch
+change, after_start hook, or implementation authority. `create --no-start`
+deliberately keeps the prior pointer. Save the old checkpoint before switching;
+with live Channel work, pause refills and drain all already dispatched units and
+reservations according to `trellis-channel`'s multi-target procedure, preserving
+pending units and the old phase. Do not kill/retry or automatically restart a
+user-stopped task. Ordinary continue/compaction retains the checkpoint fast path.
+
 ## Trellis System
 
 ### Developer Identity
@@ -54,7 +84,10 @@ Every task has its own directory under `.trellis/tasks/{MM-DD-name}/` holding `t
 ```bash
 # Task lifecycle
 python3 ./.trellis/scripts/task.py create "<title>" [--slug <name>] [--parent <dir>]
-python3 ./.trellis/scripts/task.py start <name>          # set active task (session-scoped when available)
+python3 ./.trellis/scripts/task.py select <name>         # context only, preserve phase
+python3 ./.trellis/scripts/task.py plan seal <name>      # current material plan
+python3 ./.trellis/scripts/task.py plan approve <name> --revision <n> --basis "<actual approval>"
+python3 ./.trellis/scripts/task.py start <name>          # begin only when start gates pass
 python3 ./.trellis/scripts/task.py replan <name> "<reason>" # return material ambiguity to planning
 python3 ./.trellis/scripts/task.py current --source      # show active task and source
 python3 ./.trellis/scripts/task.py finish                # clear active task (triggers after_finish hooks)
@@ -247,6 +280,7 @@ If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete the declar
 Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; run the Planning Seal closure pass before asking for review. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-grill`, batch only independent frontier questions, and stay in planning. Answers returned by the current continuation must be persisted and fed back into the same planning loop.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start.
+Planned/change-bearing start requires native plan seal and matching later approval of this task's current material revision. Selecting context does not approve it.
 [/workflow-state:planning]
 
 <!-- Per-turn breadcrumb: shown throughout Phase 1 when Codex uses its default
@@ -261,6 +295,7 @@ If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete the declar
 Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; run the Planning Seal closure pass before asking for review. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-grill`, batch only independent frontier questions, and stay in planning. Answers returned by the current continuation must be persisted and fed back into the same planning loop.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-before-dev`.
+Planned/change-bearing start requires native plan seal and matching later approval of this task's current material revision. Selecting context does not approve it.
 [/workflow-state:planning-inline]
 
 ### Phase 2: Execute
@@ -294,6 +329,7 @@ Dispatch prompt starts with `Active task: <task path from task.py current>`. Rea
 Flow: `trellis-before-dev` -> edit -> `trellis-check` -> validation -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
 If implementation discovers a material unresolved decision, record `decision-needed`, run `task.py replan <task> "<reason>"`, and return to the planning frontier; native questions are planning-only.
 Do not dispatch implement/check sub-agents in inline mode.
+Explicit Channel independent-evidence subnodes remain available under the selected workflow; required independent evidence cannot be replaced by main-session pass claims.
 Read context: `prd.md` -> `design.md if present` -> `implement.md if present`, plus relevant spec/research loaded by skills.
 [/workflow-state:in_progress-inline]
 
@@ -506,7 +542,8 @@ Skip this step. Context is loaded directly by the `trellis-before-dev` skill in 
 
 This step applies only to change-bearing tasks. An eligible analysis-only task stays in `planning` and, after its evidence work is complete, continues directly to Phase 3.3 without running `task.py start`.
 
-After the Planning Seal closure pass and artifact review, flip the task status to `in_progress`:
+After the Planning Seal closure pass, artifact review, and applicable native
+plan seal/approve gates described above, flip the task status to `in_progress`:
 
 ```bash
 python3 ./.trellis/scripts/task.py start <task-dir>

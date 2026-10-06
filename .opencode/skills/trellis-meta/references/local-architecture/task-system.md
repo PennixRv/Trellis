@@ -43,6 +43,8 @@ The Trellis task system is stored entirely under `.trellis/tasks/` in the user p
 | `children` / `parent` | Parent/child task relationships. |
 | `commit` / `pr_url` | Commit and PR information after completion. |
 | `meta` | Extension fields. |
+| `meta.execution_class` / `meta.delivery_mode` | Explicit task classification; planned/change-bearing start needs current material-plan approval. |
+| `meta.planning` | Reserved native material revision, seal, and later approval; use plan seal/approve, never generic metadata. |
 
 ## Parent / Child Task Trees
 
@@ -81,7 +83,7 @@ The user sees a "current task," but Trellis stores active task state per session
 .trellis/.runtime/sessions/<context-key>.json
 ```
 
-`task.py start` writes the task path into the runtime session file for the current session. `task.py current --source` shows the current task and where it came from. Different AI windows can point to different tasks without overwriting each other.
+`task.py select` writes only the current session's task context; status/branch and implementation authority are unchanged. `task.py start` also enters execution after its admission gates. `task.py current --source` shows the current task and where it came from. Different AI windows can point to different tasks without overwriting each other. Before switching with live Channel work, pause refills and drain already dispatched units/reservations while preserving pending work and the old phase.
 
 If the platform or shell environment has no stable session identity, `task.py start` may be unable to set the active task. The AI should read the error, inspect the platform hook/session environment, and not fall back to a shared global pointer.
 
@@ -107,6 +109,9 @@ Rules:
 
 ```bash
 python3 ./.trellis/scripts/task.py create "<title>" --description "<one-line summary>" --slug <slug>
+python3 ./.trellis/scripts/task.py select <task>
+python3 ./.trellis/scripts/task.py plan seal <task>
+python3 ./.trellis/scripts/task.py plan approve <task> --revision <n> --basis "<actual later approval>"
 python3 ./.trellis/scripts/task.py start <task>
 python3 ./.trellis/scripts/task.py current --source
 python3 ./.trellis/scripts/task.py add-context <task> implement <file> <reason>

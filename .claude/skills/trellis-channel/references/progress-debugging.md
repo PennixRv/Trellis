@@ -127,7 +127,7 @@ wait command starts, capture a barrier before that operation and pass it back:
 ```bash
 BARRIER="$(trellis channel barrier T)"
 # spawn or trigger work that may emit a terminal event
-trellis channel wait T --as main --workers check \
+trellis channel wait T --workers check \
   --after-seq "$BARRIER" --timeout 15m
 ```
 
@@ -146,10 +146,10 @@ The separate event-filter mode wakes on:
 Useful filters:
 
 ```bash
-trellis channel wait T --as main --from check --kind done --timeout 15m
-trellis channel wait T --as main --from check,check-cx --kind done --all --timeout 15m
+trellis channel wait T --from check --kind done --timeout 15m
+trellis channel wait T --from check,check-cx --kind done --all --timeout 15m
 trellis channel wait T --as worker --kind message --timeout 1h
-trellis channel wait T --as main --thread release-note --action status --timeout 10m
+trellis channel wait T --thread release-note --action status --timeout 10m
 ```
 
 Exit codes: `0` matched, `124` timeout, `1`/`2` errors. On `wait --all`
