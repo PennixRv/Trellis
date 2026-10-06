@@ -98,12 +98,18 @@ export function applySubnodeSupervisorDefaults(
   opts: SpawnOptions,
   cwd = process.cwd(),
 ): SpawnOptions {
-  if (opts.agent !== "subnode") return opts;
+  const effectiveOpts =
+    opts.profile !== undefined && opts.agent === undefined
+      ? { ...opts, agent: "subnode" }
+      : opts;
+  if (effectiveOpts.agent !== "subnode") return effectiveOpts;
   const config = loadSubnodeDispatchConfig(cwd);
   return {
-    ...opts,
-    ...(opts.timeoutMs === undefined ? { timeoutMs: config.timeoutMs } : {}),
-    ...(opts.warnBeforeMs === undefined
+    ...effectiveOpts,
+    ...(effectiveOpts.timeoutMs === undefined
+      ? { timeoutMs: config.timeoutMs }
+      : {}),
+    ...(effectiveOpts.warnBeforeMs === undefined
       ? { warnBeforeMs: config.warnBeforeMs }
       : {}),
   };
@@ -236,11 +242,14 @@ export async function channelSpawn(
     );
   }
 
+  const effectiveOpts = applySubnodeSupervisorDefaults(
+    opts,
+    opts.cwd ?? process.cwd(),
+  );
   const subnodeConfig =
-    opts.agent === "subnode"
-      ? loadSubnodeDispatchConfig(process.cwd())
+    effectiveOpts.agent === "subnode"
+      ? loadSubnodeDispatchConfig(effectiveOpts.cwd ?? process.cwd())
       : undefined;
-  const effectiveOpts = applySubnodeSupervisorDefaults(opts);
   const resolved = resolveSpawn(channelName, effectiveOpts);
   if (resolved.provider === "codex") {
     const [createEvent] = await readChannelEvents(channelName, ref.project);
@@ -340,11 +349,11 @@ async function spawnLocked(
     }
   }
 
+  const configuredActor = process.env.TRELLIS_CHANNEL_AS?.trim();
   const spawnedBy =
     opts.by ??
-    (typeof process.env.TRELLIS_CHANNEL_AS === "string" &&
-    process.env.TRELLIS_CHANNEL_AS.length > 0
-      ? process.env.TRELLIS_CHANNEL_AS
+    (configuredActor !== undefined && configuredActor.length > 0
+      ? configuredActor
       : "main");
 
   const configPath = writeSupervisorConfig(

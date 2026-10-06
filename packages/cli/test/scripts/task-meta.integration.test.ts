@@ -143,6 +143,18 @@ describe.skipIf(!hasPython())("task.py meta (task.json.meta access)", () => {
     expect(r.stderr).toContain("=value");
   });
 
+  it("refuses reserved approval metadata and invalid task classifications", () => {
+    for (const pair of ["planning=approved", "planning.approved_revision=1", "execution_class=unknown", "delivery_mode=unknown"]) {
+      const result = runTask(tmp, "create", "invalid approval", "--description", "fixture", "--slug", "reserved", "--meta", pair);
+      expect(result.status, result.stderr).toBe(1);
+    }
+    expect(runTask(tmp, "create", "fixture", "--description", "fixture", "--slug", "fixture").status).toBe(0);
+    const task = `.trellis/tasks/${findTaskDir(tmp, "fixture")}`;
+    const before = fs.readFileSync(path.join(tmp, task, "task.json"), "utf-8");
+    expect(runTask(tmp, "set-meta", task, "planning", "approved").status).toBe(1);
+    expect(fs.readFileSync(path.join(tmp, task, "task.json"), "utf-8")).toBe(before);
+  });
+
   it("set-meta adds a new key and overwrites an existing one", () => {
     const createResult = runTask(
       tmp,

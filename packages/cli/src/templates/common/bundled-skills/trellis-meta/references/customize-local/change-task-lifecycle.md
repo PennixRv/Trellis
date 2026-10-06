@@ -10,6 +10,7 @@ Task lifecycle includes creation, start, context configuration, finish, archive,
 4. `.trellis/scripts/common/task_store.py`
 5. `.trellis/scripts/common/task_utils.py`
 6. The current task's `.trellis/tasks/<task>/task.json`
+7. `.trellis/scripts/common/task_planning.py` for material revisions and start admission
 
 ## Common Needs And Edit Points
 
@@ -23,6 +24,8 @@ Task lifecycle includes creation, start, context configuration, finish, archive,
 | Change default task fields | `.trellis/scripts/common/task_store.py`. |
 | Change task parsing/search | `.trellis/scripts/common/task_utils.py`. |
 | Change active task behavior | `.trellis/scripts/common/active_task.py`. |
+| Select context without starting | Native `task.py select`; preserve phase/branch and drain live Channel work first. |
+| Seal and record later approval of a material plan | Native `task.py plan seal/approve`; reserved `meta.planning`, owned by `common/task_planning.py`. |
 
 ## lifecycle hooks
 
@@ -44,7 +47,7 @@ Hook commands receive the `TASK_JSON_PATH` environment variable, pointing to the
 
 ## Change Task Fields
 
-If the user wants to add project-local fields, prefer putting them under `meta` in `task.json` to avoid breaking existing scripts' assumptions about standard fields.
+If the user wants to add project-local fields, prefer putting them under `meta` in `task.json` to avoid breaking existing scripts' assumptions about standard fields. `meta.planning` is reserved for native seal/approve; do not prefill or overwrite it through generic metadata. Classification uses `execution_class=direct|planned` and `delivery_mode=change_bearing|analysis_only`.
 
 Example:
 
@@ -70,7 +73,8 @@ Active task is session-level state stored in `.trellis/.runtime/sessions/`. Do n
 `cmd_create` in `.trellis/scripts/common/task_store.py` calls `set_active_task` best-effort right after writing the new task directory. The behavior:
 
 - When the calling shell carries session identity (`TRELLIS_CONTEXT_ID` env var, or any platform-specific session env that `resolve_context_key` recognizes — see `active_task.py:_ENV_SESSION_KEYS`), the per-session pointer at `.trellis/.runtime/sessions/<context_key>.json` is rewritten to point at the new task. The task's `status=planning` and `[workflow-state:planning]` fires on the very next `UserPromptSubmit`.
-- When session identity is unavailable (raw CLI invocation outside an AI session, or a platform that doesn't propagate identity to shell), the task directory is still created and `status=planning` is still written, but the active pointer is left untouched. The user can attach the task later with `task.py start <dir>` once they're back in an AI session.
+- When session identity is unavailable (raw CLI invocation outside an AI session, or a platform that doesn't propagate identity to shell), the task directory is still created and `status=planning` is still written, but the active pointer is left untouched. Attach planning context later with `task.py select <dir>` once identity is available; start requires its own phase/approval gates.
+- `create --no-start` deliberately preserves the prior pointer; use select to switch context after saving the checkpoint and draining already dispatched Channel work. Selecting does not change phase/branch, run after_start, or grant implementation authority.
 
 This makes `[workflow-state:planning]` the live breadcrumb during the brainstorm and JSONL curation work that follows `task.py create`. The pre-R7 behavior left the breadcrumb stuck on `no_task` until `task.py start`, so the planning block was effectively dead text.
 

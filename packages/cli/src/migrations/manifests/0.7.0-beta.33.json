@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.33",
+  "description": "Bind evidence units and implementation approval to their actual task",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "New evidence briefs and queues require a task-owned unit plan, workload rationale, and grouping rationale for multiple scope items. FIFO claims cannot skip earlier unclaimed units. Bundled Channel guidance exposes one-host multi-target dispatch, rolling accepted-slot refill, and drain before context selection. Native task select preserves phase/branch; planned change-bearing start requires current material plan seal and later approval, while replan invalidates them. Inline mode explicitly retains authorized Channel evidence.",
+  "migrations": [],
+  "notes": "Upgrade the paired CLI/core release and run trellis update; refresh explicitly selected Marketplace workflows from an immutable ref. Classify legacy planning tasks once before start. Preserve historical reports and existing in-progress tasks; no bulk queue/history migration or scheduler is introduced. Approval records check structural consistency, not chat authenticity. Native ordinary continue/compaction retains its checkpoint fast path."
+}

@@ -26,8 +26,7 @@ trellis channel create design-feedback \
   --type forum \
   --scope global \
   --description "Cross-project design feedback board." \
-  --context-raw "One thread per design topic; close when resolved." \
-  --by main
+  --context-raw "One thread per design topic; close when resolved."
 ```
 
 Use `--scope project` for a board scoped to one repo, `--scope global` for a
@@ -42,7 +41,6 @@ a thread is `opened`; everything afterwards uses the same `--thread` key.
 ```bash
 trellis channel post design-feedback opened \
   --scope global \
-  --as main \
   --thread login-empty-state \
   --title "Empty state on the login screen" \
   --description "Track design feedback for the new login empty state." \
@@ -58,13 +56,11 @@ trellis channel post design-feedback comment \
 
 trellis channel post design-feedback status \
   --scope global \
-  --as main \
   --thread login-empty-state \
   --status closed
 
 trellis channel post design-feedback summary \
   --scope global \
-  --as main \
   --thread login-empty-state \
   --summary "Adopted the option-B layout; ticket TRELLIS-123 owns the fix."
 ```
@@ -187,12 +183,10 @@ wrong key (typo, wrong slug convention, etc.). Threads do not support hard
 deletion — rename is the supported corrective action.
 
 ```bash
-trellis channel thread rename design-feedback old-key new-key \
-  --scope global \
-  --as main
+trellis channel thread rename design-feedback old-key new-key --scope global
 ```
 
-- `--as <agent>` is **required**.
+- Omit `--as` to use `TRELLIS_CHANNEL_AS` or `main`; pass it only to attribute the rename to another actor.
 - `post <name> rename` is rejected — you must use `thread rename`.
 
 ## Deletion Discipline
@@ -216,12 +210,10 @@ trellis channel create release-notes \
   --type forum \
   --scope global \
   --description "Internal release and runtime changelog." \
-  --context-raw "One thread per notable change; close when shipped." \
-  --by main
+  --context-raw "One thread per notable change; close when shipped."
 
 trellis channel post release-notes opened \
   --scope global \
-  --as main \
   --thread release-2026-q1 \
   --title "Channel threads and forum UX in 0.6" \
   --description "Forum channel UX shipped in the 0.6 line." \

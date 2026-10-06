@@ -294,6 +294,12 @@ def _parse_meta_pairs(pairs: list[str] | None) -> dict[str, str] | None:
                 file=sys.stderr,
             )
             return None
+        try:
+            from .task_planning import validate_meta_value
+            validate_meta_value(key, value)
+        except ValueError as exc:
+            print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+            return None
         meta[key] = value
     return meta
 
@@ -662,7 +668,7 @@ def cmd_create(args: argparse.Namespace) -> int:
     if getattr(args, "no_start", False):
         print(
             colored(
-                "Skipped session activation (--no-start); run task.py start when ready.",
+                "Skipped session activation (--no-start); run task.py select to plan, start only when authorized.",
                 Colors.YELLOW,
             ),
             file=sys.stderr,
@@ -1934,6 +1940,12 @@ def cmd_set_meta(args: argparse.Namespace) -> int:
         return 1
     key = args.key
     value = args.value
+    from .task_planning import invalidate_plan, validate_meta_value
+    try:
+        validate_meta_value(key, value)
+    except ValueError as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 1
 
     if not key:
         print(colored("Error: Missing arguments", Colors.RED))
@@ -1959,6 +1971,13 @@ def cmd_set_meta(args: argparse.Namespace) -> int:
     meta = data.get("meta")
     if not isinstance(meta, dict):
         meta = {}
+    if key in {"execution_class", "delivery_mode"} and meta.get(key) != value and "planning" in meta:
+        try:
+            invalidate_plan(data)
+        except ValueError as exc:
+            print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+            return 1
+        meta = data["meta"]
     meta[key] = value
     data["meta"] = meta
     if not write_json(task_json, data):

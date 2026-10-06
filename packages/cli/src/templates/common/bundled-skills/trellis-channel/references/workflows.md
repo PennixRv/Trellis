@@ -9,7 +9,7 @@ Use when the user says "和 codex/claude 讨论一下", "brainstorm", or "拉一
 进来一起看".
 
 ```bash
-trellis channel create brainstorm-storage-layer --by main \
+trellis channel create brainstorm-storage-layer \
   --task .trellis/tasks/05-XX-storage-adapter
 BARRIER="$(trellis channel barrier brainstorm-storage-layer)"
 
@@ -20,10 +20,10 @@ trellis channel spawn brainstorm-storage-layer \
   --as cx-arch --timeout 30m
 
 trellis channel send brainstorm-storage-layer \
-  --as main --to cx-arch --text-file /tmp/brainstorm-r1.md
+  --to cx-arch --text-file /tmp/brainstorm-r1.md
 
 trellis channel wait brainstorm-storage-layer \
-  --as main --kind done --from cx-arch --after-seq "$BARRIER" --timeout 10m
+  --kind done --from cx-arch --after-seq "$BARRIER" --timeout 10m
 ```
 
 Do not stop after one answer. Read the answer, identify vague areas, send a
@@ -53,7 +53,7 @@ Use when the user asks to dispatch implementation or review work.
 
 ```bash
 TASK=.trellis/tasks/05-12-foo
-trellis channel create cr-foo --task "$TASK" --by main
+trellis channel create cr-foo --task "$TASK"
 BARRIER="$(trellis channel barrier cr-foo)"
 
 trellis channel spawn cr-foo \
@@ -61,11 +61,10 @@ trellis channel spawn cr-foo \
   --jsonl "$TASK/check.jsonl" \
   --file "$TASK/prd.md" \
   --file "$TASK/design.md" \
-  --file "$TASK/implement.md" \
-  --cwd "$PWD" --timeout 15m
+  --file "$TASK/implement.md" --timeout 15m
 
-trellis channel send cr-foo --as main --to check --text-file /tmp/cr-brief.md
-trellis channel wait cr-foo --as main --kind done --from check --after-seq "$BARRIER" --timeout 15m
+trellis channel send cr-foo --to check --text-file /tmp/cr-brief.md
+trellis channel wait cr-foo --kind done --from check --after-seq "$BARRIER" --timeout 15m
 trellis channel messages cr-foo --kind message --from check --tag final_answer
 ```
 
@@ -78,7 +77,7 @@ already run.
 Use one channel and distinct worker names.
 
 ```bash
-trellis channel create cr-feature --by main --ephemeral
+trellis channel create cr-feature --ephemeral
 BARRIER="$(trellis channel barrier cr-feature)"
 
 trellis channel spawn cr-feature --agent check \
@@ -89,9 +88,9 @@ trellis channel spawn cr-feature --agent check --provider codex --as check-cx \
   --jsonl "$TASK/check.jsonl" --file "$TASK/prd.md" --file "$TASK/design.md" \
   --timeout 15m
 
-trellis channel send cr-feature --as main --to check --text-file /tmp/cr-brief.md
-trellis channel send cr-feature --as main --to check-cx --text-file /tmp/cr-brief.md
-trellis channel wait cr-feature --as main --kind done --from check,check-cx --all --after-seq "$BARRIER" --timeout 15m
+trellis channel send cr-feature --to check --text-file /tmp/cr-brief.md
+trellis channel send cr-feature --to check-cx --text-file /tmp/cr-brief.md
+trellis channel wait cr-feature --kind done --from check,check-cx --all --after-seq "$BARRIER" --timeout 15m
 ```
 
 `--all` means every listed worker must emit a matching event.

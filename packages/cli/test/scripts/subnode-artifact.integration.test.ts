@@ -33,6 +33,7 @@ function setupRepo(tmp: string): void {
   });
   const taskDir = path.join(tmp, ".trellis", "tasks", "task-a");
   fs.mkdirSync(taskDir, { recursive: true });
+  fs.writeFileSync(path.join(taskDir, "design.md"), "# Evidence units\n\nOne bounded dependency inspection per unit.\n");
   fs.writeFileSync(
     path.join(taskDir, "task.json"),
     JSON.stringify({
@@ -70,6 +71,10 @@ function writeDraft(
     question: "Does the dependency evidence support this change?",
     independence_reason: "The coordinator needs an independent evidence trail.",
     scope: ["inspect dependency metadata"],
+    unit_plan: {
+      plan_ref: ".trellis/tasks/task-a/design.md#evidence-units",
+      sizing_rationale: "One short dependency metadata inspection.",
+    },
     protected_targets: ["packages/cli/src"],
     lens: "dependency evidence",
     evidence_method: "inspect pinned metadata and source references",
@@ -549,6 +554,31 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     expect(missing.stderr).toContain("existing subnode brief");
   });
 
+  it("requires a task-owned unit plan and a rationale for related grouped scopes", () => {
+    const validPlan = { plan_ref: ".trellis/tasks/task-a/design.md", sizing_rationale: "Two quick checks of the same pinned metadata." };
+    for (const [id, overrides] of [
+      ["missing", { unit_plan: null }],
+      ["outside", { unit_plan: { ...validPlan, plan_ref: "README.md" } }],
+      ["group", { scope: ["metadata", "version"], unit_plan: validPlan }],
+    ] as const) {
+      const result = run(tmp, "init", "--task", ".trellis/tasks/task-a", "--work-id", "unit-plan", "--subnode-id", id, "--draft", writeDraft(tmp, `${id}.json`, { ...overrides, channel_ref: { name: "subnode-task-a", scope: "project", worker_handle: id } }));
+      expect(result.status, result.stderr).toBe(1);
+      expect(fs.existsSync(artifactDir(tmp, "unit-plan", id))).toBe(false);
+    }
+    const result = run(tmp, "init", "--task", ".trellis/tasks/task-a", "--work-id", "unit-plan", "--subnode-id", "related", "--draft", writeDraft(tmp, "related.json", { scope: ["metadata", "version"], channel_ref: { name: "subnode-task-a", scope: "project", worker_handle: "related" }, unit_plan: { ...validPlan, grouping_rationale: "Both short checks share the same manifest and retain separate conclusions." } }));
+    expect(result.status, result.stderr).toBe(0);
+    // Historical reports remain readable, but an old brief cannot enter a new queue.
+    const briefPath = path.join(artifactDir(tmp, "unit-plan", "related"), "brief.json");
+    const brief = JSON.parse(fs.readFileSync(briefPath, "utf-8"));
+    delete brief.unit_plan;
+    fs.writeFileSync(briefPath, JSON.stringify(brief) + "\n");
+    const report = writeCompleteReport(tmp, "unit-plan", "related", "old-evidence", "README.md");
+    expect(run(tmp, "validate", "--report", report).status).toBe(0);
+    const queue = run(tmp, "queue", "init", "--task", ".trellis/tasks/task-a", "--work-id", "unit-plan", "--channel-name", "subnode-task-a", "--channel-scope", "project", "--brief", briefPath);
+    expect(queue.status).toBe(1);
+    expect(queue.stderr).toContain("unit_plan");
+  });
+
   it("writes and validates a FIFO queue, one claim per item, and one abandonment", () => {
     for (const [subnodeId, draftName] of [
       ["primary", "queue-primary.json"],
@@ -628,6 +658,11 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     expect(tampered.stderr).toContain("brief digest does not match");
     fs.writeFileSync(primaryBrief, originalPrimary);
 
+    const outOfOrder = run(tmp, "queue", "claim", "--task", ".trellis/tasks/task-a", "--work-id", "queue-audit", "--subnode-id", "secondary");
+    expect(outOfOrder.status).toBe(1);
+    expect(outOfOrder.stderr).toContain("FIFO requires claiming earlier unit");
+    expect(fs.existsSync(path.join(artifactDir(tmp, "queue-audit", "secondary"), "dispatch-claim.json"))).toBe(false);
+
     const claim = run(
       tmp,
       "queue",
@@ -640,6 +675,8 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
       "primary",
     );
     expect(claim.status, claim.stderr).toBe(0);
+    const secondaryClaim = run(tmp, "queue", "claim", "--task", ".trellis/tasks/task-a", "--work-id", "queue-audit", "--subnode-id", "secondary");
+    expect(secondaryClaim.status, secondaryClaim.stderr).toBe(0);
     const duplicateClaim = run(
       tmp,
       "queue",
@@ -679,10 +716,10 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
       "--work-id",
       "queue-audit",
       "--reason",
-      "The coordinator stopped after the first dispatch attempt.",
+      "The coordinator stopped after filling both initial slots.",
       "--dispatched",
       "primary",
-      "--pending",
+      "--dispatched",
       "secondary",
     );
     expect(abandon.status, abandon.stderr).toBe(0);

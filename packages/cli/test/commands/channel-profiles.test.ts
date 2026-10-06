@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { applySubnodeSupervisorDefaults } from "../../src/commands/channel/spawn.js";
 import { resolveSubnodeProfile } from "../../src/commands/channel/profiles.js";
 
 const tempRoots: string[] = [];
@@ -29,6 +30,18 @@ afterEach(() => {
 });
 
 describe("subnode profile resolution", () => {
+  it("infers the subnode role when a profile is the only role selector", () => {
+    const cwd = project();
+    expect(
+      applySubnodeSupervisorDefaults({ profile: "review" }, cwd),
+    ).toMatchObject({ agent: "subnode" });
+    expect(
+      applySubnodeSupervisorDefaults(
+        { agent: "custom", profile: "review" },
+        cwd,
+      ),
+    ).toMatchObject({ agent: "custom" });
+  });
   it("applies explicit model and effort over the selected profile", () => {
     const resolved = resolveSubnodeProfile({
       cwd: project(),

@@ -41,6 +41,11 @@ function parseNonNegativeInteger(value: string): number {
 }
 
 export function registerChannelCommand(program: Command): void {
+  const configuredActor = process.env.TRELLIS_CHANNEL_AS?.trim();
+  const defaultActor =
+    configuredActor === undefined || configuredActor.length === 0
+      ? "main"
+      : configuredActor;
   const channel = program
     .command("channel")
     .description(
@@ -81,7 +86,11 @@ export function registerChannelCommand(program: Command): void {
       [] as string[],
     )
     .option("--cwd <path>", "working directory recorded in the create event")
-    .option("--by <agent>", "agent name recorded as the creator", "main")
+    .option(
+      "--by <agent>",
+      "agent name recorded as the creator (default: TRELLIS_CHANNEL_AS or main)",
+      defaultActor,
+    )
     .option(
       "--owner-session <id>",
       "opaque main Codex session owner (defaults to host session env)",
@@ -127,7 +136,11 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("send <name>")
     .description("Send a message into the channel")
-    .requiredOption("--as <agent>", "agent name sending")
+    .option(
+      "--as <agent>",
+      "agent name sending (default: TRELLIS_CHANNEL_AS or main)",
+      defaultActor,
+    )
     .option("--scope <scope>", "channel scope: project | global")
     .option(
       "--to <agents>",
@@ -201,7 +214,11 @@ export function registerChannelCommand(program: Command): void {
     .description(
       "Block until a matching event or worker terminal transition, or timeout",
     )
-    .requiredOption("--as <agent>", "agent name waiting")
+    .option(
+      "--as <agent>",
+      "agent name waiting (default: TRELLIS_CHANNEL_AS or main)",
+      defaultActor,
+    )
     .option("--scope <scope>", "channel scope: project | global")
     .option("--timeout <duration>", "max wait (e.g. 30s, 2m, 1h)")
     .option(
@@ -271,7 +288,11 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("interrupt <name>")
     .description("Interrupt a worker turn and send a replacement instruction")
-    .requiredOption("--as <agent>", "agent name requesting the interrupt")
+    .option(
+      "--as <agent>",
+      "agent name requesting the interrupt (default: TRELLIS_CHANNEL_AS or main)",
+      defaultActor,
+    )
     .requiredOption("--to <agent>", "target worker name")
     .option("--scope <scope>", "channel scope: project | global")
     .option("--stdin", "read interrupt message body from stdin")
@@ -334,7 +355,7 @@ export function registerChannelCommand(program: Command): void {
     .option("--model <id>", "model override")
     .option(
       "--profile <id>",
-      "subnode Codex profile from .trellis/agents/subnode-profiles.json",
+      "subnode Codex profile from .trellis/agents/subnode-profiles.json (implies --agent subnode)",
     )
     .option(
       "--reasoning-effort <effort>",
@@ -372,6 +393,7 @@ export function registerChannelCommand(program: Command): void {
     .option(
       "--by <agent>",
       "identity recorded as the spawn author (defaults to TRELLIS_CHANNEL_AS env or 'main')",
+      defaultActor,
     )
     .option(
       "--inbox-policy <policy>",
@@ -758,7 +780,11 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("post <name> <action>")
     .description("Append a structured thread event to a forum channel")
-    .requiredOption("--as <agent>", "agent name posting")
+    .option(
+      "--as <agent>",
+      "agent name posting (default: TRELLIS_CHANNEL_AS or main)",
+      defaultActor,
+    )
     .option("--scope <scope>", "channel scope: project | global")
     .option("--thread <key>", "thread key (required except opened)")
     .option("--title <text>", "thread title")
@@ -862,7 +888,11 @@ export function registerChannelCommand(program: Command): void {
   thread
     .command("rename <name> <oldThread> <newThread>")
     .description("Rename a thread inside a forum channel")
-    .requiredOption("--as <agent>", "agent name")
+    .option(
+      "--as <agent>",
+      "agent name (default: TRELLIS_CHANNEL_AS or main)",
+      defaultActor,
+    )
     .option("--scope <scope>", "channel scope: project | global")
     .action(
       async (
@@ -890,7 +920,11 @@ export function registerChannelCommand(program: Command): void {
 
   const addContextOptions = (cmd: Command): Command =>
     cmd
-      .option("--as <agent>", "agent name", "main")
+      .option(
+        "--as <agent>",
+        "agent name (default: TRELLIS_CHANNEL_AS or main)",
+        defaultActor,
+      )
       .option("--scope <scope>", "channel scope: project | global")
       .option(
         "--thread <key>",
@@ -974,7 +1008,11 @@ export function registerChannelCommand(program: Command): void {
   title
     .command("set <name>")
     .description("Set the channel display title")
-    .option("--as <agent>", "agent name", "main")
+    .option(
+      "--as <agent>",
+      "agent name (default: TRELLIS_CHANNEL_AS or main)",
+      defaultActor,
+    )
     .option("--scope <scope>", "channel scope: project | global")
     .requiredOption("--title <text>", "display title")
     .action(async (name: string, raw: Record<string, unknown>) => {
@@ -993,7 +1031,11 @@ export function registerChannelCommand(program: Command): void {
   title
     .command("clear <name>")
     .description("Clear the channel display title")
-    .option("--as <agent>", "agent name", "main")
+    .option(
+      "--as <agent>",
+      "agent name (default: TRELLIS_CHANNEL_AS or main)",
+      defaultActor,
+    )
     .option("--scope <scope>", "channel scope: project | global")
     .action(async (name: string, raw: Record<string, unknown>) => {
       try {

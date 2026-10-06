@@ -30,8 +30,11 @@ describe.skipIf(!hasPython())("task.py replan lifecycle", () => {
     fs.writeFileSync(path.join(repo, ".trellis", ".developer"), "name=tester\n");
     fs.writeFileSync(
       path.join(repo, ".trellis", "tasks", task, "task.json"),
-      JSON.stringify({ id: task, name: task, title: "Replan fixture", status: "in_progress", branch: "pennix/v0.7-beta", meta: {}, children: [] }) + "\n",
+      JSON.stringify({ id: task, name: task, title: "Replan fixture", status: "in_progress", branch: "pennix/v0.7-beta", meta: { execution_class: "planned", delivery_mode: "change_bearing" }, children: [] }) + "\n",
     );
+    for (const name of ["prd.md", "design.md", "implement.md"]) {
+      fs.writeFileSync(path.join(repo, ".trellis", "tasks", task, name), "# Approved fixture\n\nBounded test plan.\n");
+    }
     execFileSync("git", ["init", "-q", repo]);
   });
 
@@ -58,9 +61,29 @@ describe.skipIf(!hasPython())("task.py replan lifecycle", () => {
     expect(event.from_status).toBe("in_progress");
     expect(JSON.parse(fs.readFileSync(path.join(taskPath, "task.json"), "utf-8")).branch).toBe("pennix/v0.7-beta");
 
+    expect(run(["start", task, "--allow-empty-context"]).status).toBe(1);
+    expect(run(["plan", "seal", task]).status).toBe(0);
+    expect(run(["plan", "approve", task, "--revision", "2", "--basis", "Explicit test approval after revised plan"]).status).toBe(0);
     const start = run(["start", task, "--allow-empty-context"]);
     expect(start.status).toBe(0);
     expect(JSON.parse(fs.readFileSync(path.join(taskPath, "task.json"), "utf-8")).status).toBe("in_progress");
+  });
+
+  it("keeps read-only analysis tasks in planning while allowing context selection", () => {
+    const directory = path.join(repo, ".trellis", "tasks", "analysis-only");
+    fs.mkdirSync(directory);
+    const taskJson = path.join(directory, "task.json");
+    fs.writeFileSync(
+      taskJson,
+      JSON.stringify({ id: "analysis-only", name: "analysis-only", status: "planning", branch: null, meta: { execution_class: "direct", delivery_mode: "analysis_only" }, children: [] }) + "\n",
+    );
+    const before = fs.readFileSync(taskJson, "utf-8");
+    const start = run(["start", "analysis-only", "--allow-empty-context"]);
+    expect(start.status).toBe(1);
+    expect(start.stderr).toContain("analysis_only tasks remain in planning");
+    expect(fs.readFileSync(taskJson, "utf-8")).toBe(before);
+    expect(run(["select", "analysis-only"]).status).toBe(0);
+    expect(fs.readFileSync(taskJson, "utf-8")).toBe(before);
   });
 
   it("lists replan in the task help output", () => {
@@ -69,6 +92,39 @@ describe.skipIf(!hasPython())("task.py replan lifecycle", () => {
     expect(help.stdout).toContain(
       'python3 task.py replan <dir> "<reason>"            Return an in-progress task to planning',
     );
+  });
+
+  it("selects planning context without starting, gates current task/revision, and invalidates on replan", () => {
+    const directory = path.join(repo, ".trellis", "tasks", task);
+    const taskJson = path.join(directory, "task.json");
+    const read = () => JSON.parse(fs.readFileSync(taskJson, "utf-8"));
+    fs.writeFileSync(taskJson, JSON.stringify({ ...read(), status: "planning", branch: null }) + "\n");
+    const before = fs.readFileSync(taskJson, "utf-8");
+    expect(run(["select", task]).status).toBe(0);
+    expect(fs.readFileSync(taskJson, "utf-8")).toBe(before);
+    expect(run(["start", task, "--allow-empty-context"]).status).toBe(1);
+    expect(fs.readFileSync(taskJson, "utf-8")).toBe(before);
+    expect(run(["plan", "seal", task]).status).toBe(0);
+    expect(run(["plan", "approve", task, "--revision", "2", "--basis", "Wrong version"]).status).toBe(1);
+    expect(run(["start", task, "--allow-empty-context"]).status).toBe(1);
+    expect(run(["plan", "approve", task, "--revision", "1", "--basis", "User explicitly approved final material plan 1"]).status).toBe(0);
+    // Progress text is not a new material plan and does not demand reapproval.
+    fs.appendFileSync(path.join(directory, "implement.md"), "\nProgress: checks started.\n");
+    const approved = read();
+    const other = path.join(repo, ".trellis", "tasks", "other-task");
+    fs.mkdirSync(other);
+    for (const name of ["prd.md", "design.md", "implement.md"]) fs.copyFileSync(path.join(directory, name), path.join(other, name));
+    fs.writeFileSync(path.join(other, "task.json"), JSON.stringify({ ...approved, id: "other-task", name: "other-task" }) + "\n");
+    expect(run(["start", "other-task", "--allow-empty-context"]).status).toBe(1);
+    expect(JSON.parse(run(["current", "--json"]).stdout).current_task.dir).toBe(`.trellis/tasks/${task}`);
+    expect(run(["start", task, "--allow-empty-context"]).status).toBe(0);
+    expect(run(["replan", task, "Material owner change"]).status).toBe(0);
+    expect(read().meta.planning).toEqual({ revision: 2 });
+    expect(run(["start", task, "--allow-empty-context"]).status).toBe(1);
+    expect(run(["select", "missing-task"]).status).toBe(1);
+    fs.mkdirSync(path.join(repo, ".trellis", "tasks", "archive"));
+    fs.renameSync(other, path.join(repo, ".trellis", "tasks", "archive", "other-task"));
+    expect(run(["select", ".trellis/tasks/archive/other-task"]).status).toBe(1);
   });
 
   it("rejects invalid preconditions without changing task state", () => {

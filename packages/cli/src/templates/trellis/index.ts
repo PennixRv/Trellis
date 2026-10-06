@@ -53,6 +53,9 @@ export const commonContextProjection = readTemplate(
   "scripts/common/context_projection.py",
 );
 export const commonTaskStore = readTemplate("scripts/common/task_store.py");
+export const commonTaskPlanning = readTemplate(
+  "scripts/common/task_planning.py",
+);
 export const commonSessionContext = readTemplate(
   "scripts/common/session_context.py",
 );
@@ -133,6 +136,7 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("common/task_context.py", commonTaskContext);
   scripts.set("common/context_projection.py", commonContextProjection);
   scripts.set("common/task_store.py", commonTaskStore);
+  scripts.set("common/task_planning.py", commonTaskPlanning);
   scripts.set("common/session_context.py", commonSessionContext);
   scripts.set("common/continuation_record.py", commonContinuationRecord);
   scripts.set("common/ownership_record.py", commonOwnershipRecord);

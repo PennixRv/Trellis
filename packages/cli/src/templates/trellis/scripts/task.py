@@ -8,7 +8,10 @@ Usage:
     python3 task.py add-context <dir> <file> <path> [reason] # Add jsonl entry
     python3 task.py validate <dir>              # Validate jsonl files
     python3 task.py list-context <dir>          # List jsonl entries
-    python3 task.py start <dir>                 # Set active task, record current branch
+    python3 task.py select <dir>                # Select an existing task without starting it
+    python3 task.py plan seal <dir>             # Seal the current material plan
+    python3 task.py plan approve <dir> --revision N --basis "approval"
+    python3 task.py start <dir>                 # Start an approved task, record current branch
     python3 task.py replan <dir> "<reason>"     # Return an in-progress task to planning
     python3 task.py current [--source] [--json] # Show active task
     python3 task.py ownership <operation> ...   # Manage formal handoff task ownership
@@ -59,7 +62,10 @@ from common.io import (
     read_json_checked,
     write_json,
 )
-from common.task_utils import resolve_task_dir, run_task_hooks
+from common.task_utils import is_within_tasks_dir, resolve_task_dir, run_task_hooks
+from common.task_planning import (
+    PlanningError, approve_plan, invalidate_plan, require_start_approval, seal_plan,
+)
 from common.tasks import iter_active_tasks, children_progress
 from common.workflow_selection import WORKFLOW_ID_RE, workflow_md_for_task
 
@@ -194,6 +200,58 @@ def _record_start_state(
         )
 
 
+def _active_task_target(task_input: str, repo_root: Path) -> tuple[Path, dict]:
+    """Resolve a live task and enforce the native mutation boundary."""
+    target = resolve_task_dir(task_input, repo_root)
+    if target is None or not is_within_tasks_dir(target, repo_root):
+        raise PlanningError("target must be a direct active task directory")
+    task_json = target / FILE_TASK_JSON
+    if task_json.is_symlink():
+        raise PlanningError("refusing symlinked task.json")
+    data, reason = read_json_checked(task_json)
+    if data is None:
+        raise PlanningError(describe_json_read_failure(task_json, reason)[0])
+    if data.get("status") not in {"planning", "in_progress"}:
+        raise PlanningError("target task must be planning or in_progress")
+    assert_task_mutation_allowed(repo_root, target)
+    return target, data
+
+
+def cmd_select(args: argparse.Namespace) -> int:
+    """Bind context only; Channel drain is owned by the coordinator procedure."""
+    repo_root = get_repo_root()
+    try:
+        target, _data = _active_task_target(args.dir, repo_root)
+        active = set_active_task(target.relative_to(repo_root.resolve()).as_posix(), repo_root)
+        if not active:
+            raise PlanningError("failed to select current task")
+    except (PlanningError, OwnershipError, OSError, ValueError) as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 1
+    print(colored(f"✓ Task selected without starting: {active.task_path}", Colors.GREEN))
+    return 0
+
+
+def cmd_plan(args: argparse.Namespace) -> int:
+    repo_root = get_repo_root()
+    try:
+        target, data = _active_task_target(args.dir, repo_root)
+        if data.get("status") != "planning":
+            raise PlanningError("plan seal/approve requires planning; use replan for a material change")
+        if args.plan_command == "seal":
+            revision = seal_plan(data, target)
+        else:
+            approve_plan(data, target, args.revision, args.basis)
+            revision = args.revision
+        if not write_json(target / FILE_TASK_JSON, data):
+            raise PlanningError("could not write planning record")
+    except (PlanningError, OwnershipError, OSError, ValueError) as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 1
+    print(colored(f"✓ Plan {args.plan_command}: revision {revision}", Colors.GREEN))
+    return 0
+
+
 def cmd_start(args: argparse.Namespace) -> int:
     """Set active task."""
     repo_root = get_repo_root()
@@ -222,6 +280,19 @@ def cmd_start(args: argparse.Namespace) -> int:
     except (OwnershipError, OSError) as exc:
         print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
         return 2
+
+    # Reject before writing either the session pointer or task status. The
+    # manifest override below never supplies implementation authorization.
+    try:
+        if not is_within_tasks_dir(full_path, repo_root) or (full_path / FILE_TASK_JSON).is_symlink():
+            raise PlanningError("start requires a direct active task with regular task.json")
+        task_data, reason = read_json_checked(full_path / FILE_TASK_JSON)
+        if task_data is None:
+            raise PlanningError(describe_json_read_failure(full_path / FILE_TASK_JSON, reason)[0])
+        require_start_approval(task_data, full_path)
+    except (PlanningError, OSError, ValueError) as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 1
 
     # Context-manifest gate (#573): a seeded-but-uncurated implement/check
     # manifest means every sub-agent dispatched for this task runs with zero
@@ -338,6 +409,12 @@ def cmd_replan(args: argparse.Namespace) -> int:
             ),
             file=sys.stderr,
         )
+        return 1
+
+    try:
+        invalidate_plan(data)
+    except PlanningError as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
         return 1
 
     event = {
@@ -803,6 +880,9 @@ def show_usage() -> None:
 
 Usage:
   python3 task.py create <title> --description <desc>  Create new task directory (both required, non-empty)
+  python3 task.py select <dir>                       Select context without starting
+  python3 task.py plan seal <dir>                    Seal the current material plan
+  python3 task.py plan approve <dir> --revision N --basis "approval"
   python3 task.py create <title> --description <desc> --package <pkg>   Create task for a specific package
   python3 task.py create <title> --description <desc> --parent <dir>    Create task as child of parent
   python3 task.py create <title> --description <desc> --no-start        Create without making it active in this session
@@ -964,6 +1044,18 @@ def main() -> int:
     p_listctx = subparsers.add_parser("list-context", help="List context entries")
     p_listctx.add_argument("dir", help="Task directory")
 
+    p_select = subparsers.add_parser("select", help="Select a task without changing its phase")
+    p_select.add_argument("dir", help="Existing active task directory")
+
+    p_plan = subparsers.add_parser("plan", help="Seal or record later approval of a material plan")
+    plan_sub = p_plan.add_subparsers(dest="plan_command", required=True)
+    p_seal = plan_sub.add_parser("seal", help="Seal the current material plan revision")
+    p_seal.add_argument("dir", help="Planning task directory")
+    p_approve = plan_sub.add_parser("approve", help="Record actual later user approval")
+    p_approve.add_argument("dir", help="Planning task directory")
+    p_approve.add_argument("--revision", type=int, required=True)
+    p_approve.add_argument("--basis", required=True, help="Short non-sensitive basis for real approval")
+
     # start
     p_start = subparsers.add_parser("start", help="Set active task")
     p_start.add_argument("dir", help="Task directory")
@@ -1124,6 +1216,8 @@ def main() -> int:
         "add-context": cmd_add_context,
         "validate": cmd_validate,
         "list-context": cmd_list_context,
+        "select": cmd_select,
+        "plan": cmd_plan,
         "start": cmd_start,
         "replan": cmd_replan,
         "current": cmd_current,

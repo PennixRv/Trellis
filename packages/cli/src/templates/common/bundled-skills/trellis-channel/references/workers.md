@@ -106,8 +106,7 @@ trellis channel spawn cr-example --agent check --provider codex --as check-cx \
   --file "$TASK/prd.md" \
   --file "$TASK/design.md" \
   --file "$TASK/implement.md" \
-  --jsonl "$TASK/check.jsonl" \
-  --cwd "$PWD" --timeout 30m
+  --jsonl "$TASK/check.jsonl" --timeout 30m
 ```
 
 The `spawned` event records both the literal `files` array and any `manifests`
@@ -128,7 +127,7 @@ channel:
 trellis channel spawn cr-feature --agent check --as check-claude
 trellis channel spawn cr-feature --agent check --provider codex --as check-cx
 
-trellis channel wait cr-feature --as main \
+trellis channel wait cr-feature \
   --from check-claude,check-cx --kind done --all --timeout 15m
 ```
 

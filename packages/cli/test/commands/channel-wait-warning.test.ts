@@ -28,6 +28,7 @@ interface TmpEnv {
   projectDir: string;
   oldRoot: string | undefined;
   oldProject: string | undefined;
+  oldActor: string | undefined;
 }
 
 function setup(): TmpEnv {
@@ -38,9 +39,11 @@ function setup(): TmpEnv {
   fs.mkdirSync(projectDir);
   const oldRoot = process.env.TRELLIS_CHANNEL_ROOT;
   const oldProject = process.env.TRELLIS_CHANNEL_PROJECT;
+  const oldActor = process.env.TRELLIS_CHANNEL_AS;
+  delete process.env.TRELLIS_CHANNEL_AS;
   process.env.TRELLIS_CHANNEL_ROOT = path.join(tmpDir, "channels");
   delete process.env.TRELLIS_CHANNEL_PROJECT;
-  return { tmpDir, projectDir, oldRoot, oldProject };
+  return { tmpDir, projectDir, oldRoot, oldProject, oldActor };
 }
 
 function teardown(env: TmpEnv): void {
@@ -48,6 +51,8 @@ function teardown(env: TmpEnv): void {
   else process.env.TRELLIS_CHANNEL_ROOT = env.oldRoot;
   if (env.oldProject === undefined) delete process.env.TRELLIS_CHANNEL_PROJECT;
   else process.env.TRELLIS_CHANNEL_PROJECT = env.oldProject;
+  if (env.oldActor === undefined) delete process.env.TRELLIS_CHANNEL_AS;
+  else process.env.TRELLIS_CHANNEL_AS = env.oldActor;
   fs.rmSync(env.tmpDir, { recursive: true, force: true });
 }
 
@@ -406,6 +411,65 @@ describe("channelWait kind union (CLI)", () => {
     );
 
     expect(console.log).toHaveBeenCalledWith(2);
+  });
+
+  it("defaults author identity to the current actor when --as is omitted", async () => {
+    await createChannel("send-default-actor", { by: "main" });
+    process.env.TRELLIS_CHANNEL_AS = "coordinator";
+
+    const createProgram = new Command();
+    registerChannelCommand(createProgram);
+    await createProgram.parseAsync([
+      "node",
+      "trellis",
+      "channel",
+      "create",
+      "create-default-actor",
+    ]);
+    const createEvent = (
+      await readChannelEvents(
+        "create-default-actor",
+        projectKey(env.projectDir),
+      )
+    )[0];
+    expect(createEvent).toMatchObject({ kind: "create", by: "coordinator" });
+
+    const sendProgram = new Command();
+    registerChannelCommand(sendProgram);
+    await sendProgram.parseAsync([
+      "node",
+      "trellis",
+      "channel",
+      "send",
+      "send-default-actor",
+      "hello",
+    ]);
+
+    const message = (
+      await readChannelEvents("send-default-actor", projectKey(env.projectDir))
+    ).find((event) => event.kind === "message");
+    expect(message).toMatchObject({ by: "coordinator", text: "hello" });
+  });
+
+  it("defaults author identity to main when the actor environment is unset or blank", async () => {
+    await createChannel("send-main-default", { by: "main" });
+    process.env.TRELLIS_CHANNEL_AS = "  \t";
+    const program = new Command();
+    registerChannelCommand(program);
+
+    await program.parseAsync([
+      "node",
+      "trellis",
+      "channel",
+      "send",
+      "send-main-default",
+      "hello",
+    ]);
+
+    const message = (
+      await readChannelEvents("send-main-default", projectKey(env.projectDir))
+    ).find((event) => event.kind === "message");
+    expect(message).toMatchObject({ kind: "message", by: "main" });
   });
 
   it("invalid CSV member surfaces the existing invalid-kind error", async () => {

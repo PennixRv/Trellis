@@ -1573,7 +1573,7 @@ describe("regression: JSON read/write failure reporting", () => {
     expect(r.stderr).toContain("not valid JSON");
   });
 
-  it("[audit] start still activates a task with a corrupt task.json but says why status and branch stayed", () => {
+  it("[audit] start refuses a corrupt task.json before changing the session pointer", () => {
     const env = { TRELLIS_CONTEXT_ID: "json-io-start" };
     expect(
       runTask(
@@ -1593,12 +1593,10 @@ describe("regression: JSON read/write failure reporting", () => {
     fs.writeFileSync(taskJsonPath(name), "{ not json");
 
     const r = runTask(["start", name], env);
-    // Tolerant: the session pointer is the point of the command.
-    expect(r.status).toBe(0);
-    expect(r.stdout).toContain("Current task set to");
-    // Observable: without this the absent status line reads as "not in planning".
+    expect(r.status).not.toBe(0);
+    expect(r.stdout).not.toContain("Current task set to");
     expect(r.stderr).toContain("not valid JSON");
-    expect(r.stderr).toContain("task.json not updated");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime", "sessions", "json-io-start.json"))).toBe(false);
   });
 
   it("[audit] current --json carries a read-failure signal and stays silent when healthy", () => {
@@ -1618,7 +1616,7 @@ describe("regression: JSON read/write failure reporting", () => {
       ).status,
     ).toBe(0);
     const name = `${datePrefix}-live`;
-    expect(runTask(["start", name], env).status).toBe(0);
+    expect(runTask(["select", name], env).status).toBe(0);
 
     const healthy = runTask(["current", "--json"], env);
     expect(healthy.status).toBe(0);
@@ -1679,6 +1677,10 @@ describe("regression: JSON read/write failure reporting", () => {
           env,
         ).status,
       ).toBe(0);
+      for (const name of [`${datePrefix}-one`, `${datePrefix}-two`]) {
+        expect(runTask(["set-meta", name, "execution_class", "direct"], env).status).toBe(0);
+        expect(runTask(["set-meta", name, "delivery_mode", "change_bearing"], env).status).toBe(0);
+      }
       expect(runTask(["start", `${datePrefix}-one`], env).status).toBe(0);
 
       const sessionsDir = path.join(tmpDir, ".trellis", ".runtime", "sessions");
@@ -2916,6 +2918,7 @@ describe("regression: current-task path normalization", () => {
           title: "Issue 106 task",
           status: "in_progress",
           package: null,
+          meta: { execution_class: "direct", delivery_mode: "change_bearing" },
         },
         null,
         2,
@@ -3307,7 +3310,7 @@ describe("regression: current-task path normalization", () => {
 
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "r7-idem" --description "regression fixture" --slug r7-idem --assignee test-dev`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "r7-idem" --description "regression fixture" --slug r7-idem --assignee test-dev --meta execution_class=direct --meta delivery_mode=change_bearing`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -8851,7 +8854,7 @@ print(len(entries))
       ),
     ) as { hookSpecificOutput: { additionalContext: string } };
     expect(defaultRun.hookSpecificOutput.additionalContext).toContain(
-      "<codex-mode>inline: the main session implements/checks directly; do not dispatch implement/check sub-agents.</codex-mode>",
+      "<codex-mode>inline: the main session implements/checks directly; do not dispatch implement/check sub-agents. Explicit Channel independent-evidence subnodes follow the selected project workflow and remain available in inline mode.</codex-mode>",
     );
 
     // Legacy sub-agent alias → the auto-dispatch banner.
@@ -8984,7 +8987,7 @@ print(len(entries))
 
     // Simulate a bare "origin" remote whose default branch is main, while
     // the local checkout stays on a feature branch (#399 item 1 repro).
-    const remotePath = path.join(tmpDir, "..", "origin-bare.git");
+    const remotePath = path.join(tmpDir, "origin-bare.git");
     execSync(`git init -q --bare ${JSON.stringify(remotePath)}`, {
       cwd: tmpDir,
     });
@@ -12797,6 +12800,10 @@ describe("regression: a linked worktree inherits developer identity", () => {
         slug,
         "--description",
         "worktree identity fixture",
+        "--meta",
+        "execution_class=direct",
+        "--meta",
+        "delivery_mode=change_bearing",
         "--slug",
         slug,
         "--no-start",

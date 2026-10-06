@@ -632,6 +632,29 @@ def _validate_disposition_data(
     _require_text(disposition.get("decided_at"), "disposition.decided_at", max_len=128)
 
 
+def _validate_unit_plan(brief: dict[str, Any], task_dir: Path, repo_root: Path) -> None:
+    """New dispatch admission only; historical report readers remain compatible."""
+    plan = brief.get("unit_plan")
+    if not isinstance(plan, dict):
+        _fail("new evidence unit requires unit_plan")
+    reference = _require_text(plan.get("plan_ref"), "unit_plan.plan_ref", max_len=1024)
+    locator = reference.partition("#")[0]
+    relative = Path(locator)
+    if relative.is_absolute() or ".." in relative.parts or "\\" in locator:
+        _fail("unit_plan.plan_ref must be a repository-relative task document")
+    document = repo_root / relative
+    lexical_task = _task_lexical_from_resolved(task_dir, repo_root)
+    _assert_no_subpath_symlinks(lexical_task, document)
+    if not document.is_file() or document.suffix != ".md":
+        _fail("unit_plan.plan_ref must identify a regular document in this task")
+    if document.stat().st_size > MAX_REPORT_BYTES:
+        _fail("unit_plan.plan_ref document exceeds the byte limit")
+    _require_text(document.read_text(encoding="utf-8"), "unit_plan.plan_ref document", max_len=MAX_REPORT_BYTES)
+    _require_text(plan.get("sizing_rationale"), "unit_plan.sizing_rationale")
+    if len(brief["scope"]) > 1:
+        _require_text(plan.get("grouping_rationale"), "unit_plan.grouping_rationale")
+
+
 def _init(args: argparse.Namespace) -> None:
     repo_root = get_repo_root()
     task_dir = resolve_task_dir(args.task, repo_root)
@@ -659,6 +682,7 @@ def _init(args: argparse.Namespace) -> None:
     brief["role_id"] = "subnode"
     brief["report_path"] = _relative_to_repo(node_dir / "report.json", repo_root)
     _validate_brief_data(brief, task_dir, node_dir, repo_root)
+    _validate_unit_plan(brief, task_dir, repo_root)
     for directory in (task_dir / "subnodes", task_dir / "subnodes" / work_id, node_dir):
         if directory.is_symlink():
             _fail(f"refusing symlinked artifact directory: {directory}")
@@ -709,6 +733,7 @@ def _queue_init(args: argparse.Namespace) -> None:
         subnode_id = _require_id(brief.get("subnode_id"), "brief.subnode_id")
         if brief_task_dir != task_dir:
             _fail(f"queue item {subnode_id} brief belongs to another task")
+        _validate_unit_plan(brief, task_dir, repo_root)
         if brief.get("work_id") != work_id:
             _fail(f"queue item {subnode_id} brief belongs to another work")
         if subnode_id in seen:
@@ -764,6 +789,13 @@ def _queue_claim(args: argparse.Namespace) -> None:
     item = next((candidate for candidate in items if candidate["subnode_id"] == subnode_id), None)
     if item is None:
         _fail(f"subnode is not listed in the queue: {subnode_id}")
+    for previous in items:
+        if previous is item:
+            break
+        previous_claim = task_dir / "subnodes" / args.work_id / previous["subnode_id"] / "dispatch-claim.json"
+        _assert_no_subpath_symlinks(task_dir, previous_claim)
+        if not previous_claim.is_file():
+            _fail(f"FIFO requires claiming earlier unit first: {previous['subnode_id']}")
     claim_path = task_dir / "subnodes" / args.work_id / subnode_id / "dispatch-claim.json"
     _assert_no_subpath_symlinks(task_dir, claim_path)
     claim = {
