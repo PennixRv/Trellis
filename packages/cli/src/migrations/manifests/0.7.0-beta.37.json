@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.37",
+  "description": "Complete workflow contract landing after beta36 release boundary",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Complete the Channel delivery, core strict-send, and bundled workflow asset landing from the preceding beta release.",
+  "migrations": [],
+  "notes": "No runtime migration is required."
+}
