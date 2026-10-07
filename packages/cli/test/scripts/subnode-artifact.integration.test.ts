@@ -252,6 +252,16 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     expect(rejectedLegacy.stderr).toContain("schema_version must be 2");
   });
 
+  it("rejects explicit bearer and credential assignments before artifact writes", () => {
+    for (const question of ["Bearer SYNTHETIC_CANARY", "password=SYNTHETIC_CANARY", 'secret: "SYNTHETIC_CANARY"']) {
+      const draft = writeDraft(tmp, "credential-draft.json", { question });
+      const result = run(tmp, "init", "--task", ".trellis/tasks/task-a", "--work-id", "credential-test", "--subnode-id", "primary", "--draft", draft);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("credential");
+      expect(fs.existsSync(artifactDir(tmp, "credential-test", "primary"))).toBe(false);
+    }
+  });
+
   it.each(["uncertainties", "corrections", "checkpoint"])("keeps unresolved %s out of accepted dispositions", (field) => {
     const draft = writeDraft(tmp, "concern.json");
     expect(run(tmp, "init", "--task", "task-a", "--work-id", "concern", "--subnode-id", "primary", "--draft", draft).status).toBe(0);

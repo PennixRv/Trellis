@@ -173,16 +173,8 @@ Never express binary certainty when evidence is incomplete. Use "most likely", "
 
 ## After Analysis: Immediate Actions
 
-**IMPORTANT**: After completing the analysis above, you MUST immediately:
+Record verified findings in the active task. Update a spec only when the finding establishes a reusable, executable contract owned by that project and the current task authorizes the change. Routine progress and one-off observations stay in task records.
 
-1. **Update spec/guides** - Don't just list TODOs, actually update the relevant files:
-   - If it's a cross-platform issue → update `cross-platform-thinking-guide.md`
-   - If it's a cross-layer issue → update `cross-layer-thinking-guide.md`
-   - If it's a code reuse issue → update `code-reuse-thinking-guide.md`
-   - If it's domain-specific → update `backend/*.md` or `frontend/*.md`
+Consumer projects do not sync specs into Trellis templates. When working on the Trellis source itself, update a corresponding template under `packages/cli/src/templates/markdown/` only if it exists and the change is intended for generated consumers. Keep root coordination contracts in their owner; do not copy them into component specs.
 
-2. **Sync templates** - After updating `.trellis/spec/`, sync to `src/templates/markdown/spec/`
-
-3. **Commit the spec updates** - This is the primary output, not just the analysis text
-
-> **The analysis is worthless if it stays in chat. The value is in the updated specs.**
+Follow the task's existing commit and release process. This skill does not independently authorize source changes, commits, publication, or new tickets.

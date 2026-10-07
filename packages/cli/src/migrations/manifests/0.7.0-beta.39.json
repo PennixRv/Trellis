@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.39",
+  "description": "Release submodule preflight and bounded credential diagnostics",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Check recursive submodule publication before tagging; minimize sensitive diagnostic and ticket content.",
+  "migrations": [],
+  "notes": "No runtime migration is required. Update generated assets through native Trellis update."
+}

@@ -124,7 +124,7 @@ fatal: remote error: upload-pack: not our ref <SHA>
 fatal: Fetched in submodule path '<name>', but it did not contain <SHA>. Direct fetching of that commit failed.
 ```
 
-This is per-submodule. Pushing `docs-site` but forgetting `marketplace` (or vice versa) still fails. Verify all submodules before `pnpm release`:
+This is per-submodule. Pushing `docs-site` but forgetting `marketplace` (or vice versa) still fails. The release entry enforces initialization, matching committed pointers and remote-branch ancestry before build, version changes or tagging. It fetches/prunes each recursive submodule's origin and rejects unavailable remotes or unpublished commits. Manual diagnosis uses:
 
 ```bash
 git submodule foreach 'git fetch origin -q; sha=$(git rev-parse HEAD); \

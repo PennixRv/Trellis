@@ -34,6 +34,8 @@ SECRET_PATTERNS = (
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"),
+    re.compile(r"\bBearer\s+[A-Za-z0-9._~+/-]+=*", re.IGNORECASE),
+    re.compile(r'''["']?\b(?:password|secret|api[_-]?key|access[_-]?token|authorization)["']?\s*[:=]\s*(?:"[^"\r\n]+"|'[^'\r\n]+'|[^\s,;}]+)''', re.IGNORECASE),
 )
 TERMINAL_LIFECYCLES = {"done", "error", "killed", "crashed"}
 DISPOSITION_OUTCOMES = {"accepted", "rejected", "deferred"}

@@ -89,6 +89,20 @@ describe("channel storage and forum channels", () => {
     ).toBe(true);
   });
 
+  it("preserves message delivery while redacting formatted and raw diagnostics", async () => {
+    await createChannel("private-protocol", { by: "main" });
+    await channelSend("private-protocol", { as: "main", text: "Bearer SYNTHETIC_CANARY" });
+    const events = await readChannelEvents("private-protocol", projectKey(projectDir));
+    expect(events.some((event) => event.text === "Bearer SYNTHETIC_CANARY")).toBe(true);
+    for (const raw of [false, true]) {
+      vi.mocked(console.log).mockClear();
+      await channelMessages("private-protocol", { raw });
+      const output = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(output).not.toContain("SYNTHETIC_CANARY");
+      expect(output).toContain("REDACTED");
+    }
+  });
+
   it("keeps prune preview as the default and deletes only with --yes", async () => {
     await createChannel("prune-default", { by: "main" });
     const eventPath = eventsPath("prune-default", projectKey(projectDir));
@@ -940,8 +954,6 @@ describe("channel stdout pump", () => {
 
     expect(order).toEqual([
       "timeout",
-      "line:captured-line",
-      "line:captured-tail",
       "finalize",
       "cleanup",
       "exit",
@@ -1032,7 +1044,7 @@ describe("channel stdout pump", () => {
     releaseLines(true);
     await finalized;
 
-    expect(logged).toEqual(["first\n", "final-without-newline\n"]);
+    expect(logged).toEqual([]);
     expect(adapter.parseLine.mock.calls.map(([line]) => line)).toEqual([
       "first",
       "final-without-newline",

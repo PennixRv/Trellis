@@ -40,7 +40,7 @@
  * version/tag mismatch. Version equality is checked first; npm existence
  * decides per-package skip.
  */
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +55,18 @@ const YELLOW = "\x1b[33m";
 const GREEN = "\x1b[32m";
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
+
+export function checkSubmodules(repoRoot = REPO_ROOT) {
+  const status = execFileSync("git", ["submodule", "status", "--recursive"], {
+    cwd: repoRoot, encoding: "utf-8",
+  });
+  if (status.split("\n").some((line) => line && line[0] !== " ")) {
+    throw new Error("Submodules must be initialized, clean and match committed pointers before release");
+  }
+  execFileSync("git", ["submodule", "foreach", "--recursive", "--quiet",
+    'git fetch --prune origin --quiet && test -n "$(git for-each-ref --contains HEAD --format="%(refname)" refs/remotes/origin/)"',
+  ], { cwd: repoRoot, stdio: "pipe" });
+}
 
 function readJSON(p) {
   return JSON.parse(fs.readFileSync(p, "utf-8"));
@@ -368,4 +380,6 @@ async function main() {
   fail(`unknown command: ${cmd}`);
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

@@ -307,7 +307,6 @@ export function startStdoutPump(args: {
     child.stdout,
     async (line: string) => {
       if (processLines && !(await processLines)) return;
-      log.write(line + "\n");
       const result = adapter.parseLine(line, adapterCtx);
       await applyParseResult(
         channelName,
@@ -322,7 +321,9 @@ export function startStdoutPump(args: {
     },
     async (err) => {
       shutdown.claim("crash");
-      log.write(`[supervisor] stdout line handler failed: ${err.message}\n`);
+      log.write(
+        "[supervisor] stdout line handler failed (detail in sanitized error event)\n",
+      );
       await appendEvent(
         channelName,
         {

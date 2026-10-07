@@ -19,6 +19,7 @@ import type { Readable, Writable } from "node:stream";
 
 import {
   DEFAULT_INBOX_POLICY,
+  redactDiagnostic,
   type InboxPolicy,
 } from "@pennixrv/trellis-core/channel";
 
@@ -292,15 +293,9 @@ export async function runSupervisor(
   });
 
   const logPath = workerFile(channelName, workerName, "log", project);
-  const log = fs.createWriteStream(logPath);
+  const log = fs.createWriteStream(logPath, { mode: 0o600 });
   const resolvedProvider = resolveProviderPath(adapter.provider, config.cwd);
-  const resolvedProviderDisplay = [
-    resolvedProvider.command,
-    ...resolvedProvider.prefixArgs,
-  ].join(" ");
-  log.write(
-    `[supervisor] starting ${adapter.provider} (resolved: ${resolvedProviderDisplay}) ${args.join(" ")}\n`,
-  );
+  log.write(`[supervisor] starting ${adapter.provider}\n`);
 
   const child = spawn(
     resolvedProvider.command,
@@ -381,7 +376,11 @@ export async function runSupervisor(
   // lines. Node fires `error` on next tick when spawn fails (ENOENT etc.),
   // and if no listener is attached by then the supervisor dies with an
   // unhandled error and leaves a stale .pid behind.
-  child.stderr.on("data", (b: Buffer) => log.write(b));
+  child.stderr.on("data", (b: Buffer) =>
+    log.write(
+      `[supervisor] worker stderr: ${b.length} bytes (content omitted)\n`,
+    ),
+  );
   child.once("spawn", () => {
     settleSpawn();
   });
@@ -391,7 +390,7 @@ export async function runSupervisor(
     // owns process.exit; subsequent fires must be no-ops or we'd queue
     // duplicate error events.
     if (spawnFailed || shutdown.isShuttingDown()) return;
-    log.write(`[supervisor] worker error: ${err.message}\n`);
+    log.write(redactDiagnostic(`[supervisor] worker error: ${err.message}\n`));
     if (!child.pid) {
       // Pre-spawn failure (ENOENT / EACCES): emit ONE `error` event,
       // skip the misleading `spawned{pid:undefined}`, clean up, and exit
@@ -623,7 +622,9 @@ export async function runSupervisor(
       await adapter.handshake({ child, ctx: adapterCtx, view });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      log.write(`[supervisor] adapter handshake failed: ${msg}\n`);
+      log.write(
+        redactDiagnostic(`[supervisor] adapter handshake failed: ${msg}\n`),
+      );
       // Codex #4 fix: emit an `error` event with the handshake message
       // BEFORE requesting shutdown — otherwise the channel only sees a
       // `killed{reason:"crash"}` with no detail on what went wrong.
@@ -714,6 +715,9 @@ export function writeSupervisorConfig(
 ): string {
   const p = workerFile(channelName, workerName, "config", project);
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(config, null, 2), "utf-8");
+  fs.writeFileSync(p, JSON.stringify(config, null, 2), {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
   return p;
 }

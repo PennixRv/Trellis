@@ -5193,8 +5193,9 @@ print(json.dumps({
         path.join(tmpDir, ".trellis", ".runtime", "shell-tickets", ticketName),
         "utf-8",
       ),
-    ) as { command: string };
-    expect(ticket.command).toContain(unicodeProbe);
+    ) as Record<string, unknown>;
+    expect(ticket).not.toHaveProperty("command");
+    expect(JSON.stringify(ticket)).not.toContain(unicodeProbe);
 
     const startOutput = execSync(
       `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,

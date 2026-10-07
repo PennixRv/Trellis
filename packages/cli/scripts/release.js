@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeNext } from "./bump-versions.js";
+import { checkSubmodules } from "./release-preflight.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLI_DIR = path.resolve(__dirname, "..");
@@ -156,6 +157,7 @@ function main() {
   console.log(`releasing ${type} from branch "${branch}"`);
 
   assertNextVersionManifest(type);
+  checkSubmodules();
   run("node scripts/check-manifest-continuity.js");
   docsGuard(type);
   run("pnpm build");

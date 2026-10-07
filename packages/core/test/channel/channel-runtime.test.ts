@@ -63,6 +63,16 @@ describe("readChannelEvents pagination", () => {
     env.cleanup();
   });
 
+  it("persists sanitized diagnostics while protocol messages remain replayable", async () => {
+    await createChannel({ channel: "sensitive", by: "main" });
+    await appendEvent("sensitive", { kind: "error", by: "worker", message: "Bearer SYNTHETIC_CANARY" });
+    await appendEvent("sensitive", { kind: "progress", by: "worker", detail: { password: "SYNTHETIC_CANARY" } });
+    await sendMessage({ channel: "sensitive", by: "main", text: "Bearer SYNTHETIC_CANARY" });
+    const events = await readChannelEvents({ channel: "sensitive" });
+    expect(JSON.stringify(events.filter((event) => ["error", "progress"].includes(event.kind)))).not.toContain("SYNTHETIC_CANARY");
+    expect(events.some((event) => event.text === "Bearer SYNTHETIC_CANARY")).toBe(true);
+  });
+
   async function seed(): Promise<void> {
     await createChannel({ channel: "c", by: "main" }); // seq 1
     for (let i = 0; i < 5; i++) {

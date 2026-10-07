@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
 import chalk from "chalk";
+import { redactDiagnostic } from "@pennixrv/trellis-core/channel";
 
 import {
   parseChannelKind,
@@ -47,7 +48,9 @@ export async function channelMessages(
     throw new Error(`Channel '${channelName}' not found at ${file}`);
   }
 
-  const all = await readChannelEvents(channelName, ref.project);
+  const all = redactDiagnostic(
+    await readChannelEvents(channelName, ref.project),
+  );
 
   const fromList = parseCsv(opts.from);
 
@@ -105,7 +108,7 @@ export async function channelMessages(
       signal: abort.signal,
       project: ref.project,
     })) {
-      printEvent(ev, opts.raw ?? false);
+      printEvent(redactDiagnostic(ev), opts.raw ?? false);
     }
   }
 }

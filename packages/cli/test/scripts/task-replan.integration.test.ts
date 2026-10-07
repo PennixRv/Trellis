@@ -185,10 +185,16 @@ describe.skipIf(!hasPython())("task.py replan lifecycle", () => {
       input: JSON.stringify({
         conversation_id: "replan-ticket",
         cwd: repo,
-        command: `.trellis/scripts/task.py replan ${task} decision-needed`,
+        command: `.trellis/scripts/task.py replan ${task} decision-needed && echo password=SYNTHETIC_CANARY`,
       }),
     });
     expect(ticket.status, ticket.stderr).toBe(0);
+    const tickets = path.join(repo, ".trellis", ".runtime", "shell-tickets");
+    const [ticketName] = fs.readdirSync(tickets);
+    const contents = fs.readFileSync(path.join(tickets, ticketName), "utf-8");
+    expect(contents).not.toContain("SYNTHETIC_CANARY");
+    expect(JSON.parse(contents)).not.toHaveProperty("command");
+    expect(JSON.parse(contents)).not.toHaveProperty("host_cwd");
 
     const replan = run(["replan", task, "decision-needed"], false);
     expect(replan.status, replan.stderr).toBe(0);

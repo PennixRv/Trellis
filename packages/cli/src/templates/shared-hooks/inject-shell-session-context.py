@@ -236,9 +236,6 @@ def _write_ticket(
         # the root we actually resolved keeps the containment check meaningful
         # without trusting a field the host may not populate.
         "cwd": str(root),
-        # Kept separately so a wrong host cwd stays visible when debugging.
-        "host_cwd": _string_value(hook_input.get("cwd")),
-        "command": command,
         "subcommands": subcommands,
         "created_at_epoch": now,
         "expires_at_epoch": now + TICKET_TTL_SECONDS,
