@@ -203,24 +203,22 @@ describe("durable idempotency", () => {
   describe("strict delivery replay", () => {
     it("does not duplicate undeliverable events when sendMessage is replayed", async () => {
       await createChannel({ channel: "c", by: "main" });
-      const first = await sendMessage({
+      await expect(sendMessage({
         channel: "c",
         by: "main",
         text: "hi",
         to: ["ghost-a", "ghost-b"],
         deliveryMode: "requireKnownWorker",
         idempotencyKey: "cmd-strict",
-      });
-      const replay = await sendMessage({
+      })).rejects.toThrow("Strict delivery failed for message 2");
+      await expect(sendMessage({
         channel: "c",
         by: "main",
         text: "hi",
         to: ["ghost-a", "ghost-b"],
         deliveryMode: "requireKnownWorker",
         idempotencyKey: "cmd-strict",
-      });
-
-      expect(replay.seq).toBe(first.seq);
+      })).rejects.toThrow("Strict delivery failed for message 2");
 
       const events = await readChannelEvents({ channel: "c" });
       const undeliverable = events.filter((e) => e.kind === "undeliverable");
@@ -234,22 +232,22 @@ describe("durable idempotency", () => {
 
     it("uses the persisted message target when a strict send replay drifts", async () => {
       await createChannel({ channel: "c", by: "main" });
-      await sendMessage({
+      await expect(sendMessage({
         channel: "c",
         by: "main",
         text: "hi",
         to: "ghost-a",
         deliveryMode: "requireKnownWorker",
         idempotencyKey: "cmd-drift",
-      });
-      await sendMessage({
+      })).rejects.toThrow("ghost-a");
+      await expect(sendMessage({
         channel: "c",
         by: "main",
         text: "hi",
         to: "ghost-b",
         deliveryMode: "requireKnownWorker",
         idempotencyKey: "cmd-drift",
-      });
+      })).rejects.toThrow("ghost-a");
 
       const events = await readChannelEvents({ channel: "c" });
       const undeliverable = events.filter((e) => e.kind === "undeliverable");

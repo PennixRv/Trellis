@@ -135,18 +135,18 @@ describe("sendMessage delivery modes", () => {
 
   it("requireKnownWorker signals undeliverable for unknown targets", async () => {
     await createChannel({ channel: "c", by: "main" });
-    const msg = await sendMessage({
+    await expect(sendMessage({
       channel: "c",
       by: "main",
       text: "hi",
       to: "ghost",
       deliveryMode: "requireKnownWorker",
-    });
+    })).rejects.toThrow("Strict delivery failed");
     const events = await readChannelEvents({ channel: "c" });
     const undeliverable = events.find((e) => e.kind === "undeliverable");
     expect(undeliverable).toMatchObject({
       targetWorker: "ghost",
-      messageSeq: msg.seq,
+      messageSeq: 2,
       reason: "worker-unknown",
     });
   });
@@ -163,18 +163,18 @@ describe("sendMessage delivery modes", () => {
       worker: "w",
       reason: "explicit-kill",
     });
-    const msg = await sendMessage({
+    await expect(sendMessage({
       channel: "c",
       by: "main",
       text: "hi",
       to: "w",
       deliveryMode: "requireRunningWorker",
-    });
+    })).rejects.toThrow("Strict delivery failed");
     const events = await readChannelEvents({ channel: "c" });
     const undeliverable = events.find((e) => e.kind === "undeliverable");
     expect(undeliverable).toMatchObject({
       targetWorker: "w",
-      messageSeq: msg.seq,
+      messageSeq: 4,
       reason: "worker-terminal",
     });
   });

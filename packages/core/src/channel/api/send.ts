@@ -63,6 +63,9 @@ export async function sendMessage(
         ref.project,
       );
     }
+    if (failures.length > 0) {
+      throw new Error(`Strict delivery failed for message ${event.seq}: ${failures.map((failure) => `${failure.targetWorker} (${failure.reason})`).join(", ")}`);
+    }
   }
 
   return event;
