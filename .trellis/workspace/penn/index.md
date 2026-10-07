@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-10-07
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~361 | Active |
+| `journal-1.md` | ~386 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-10-07 | 工作流审查修复交付收尾 | `3703c14c`, `cc99dcd5`, `5a66cb1d` | `pennix/v0.7-beta` |
 | 12 | 2026-10-07 | Evidence planning, FIFO and CLI defaults delivered | `0ebe9570`, `fcccde2b`, `249a8342` | `pennix/v0.7-beta` |
 | 11 | 2026-10-06 | Verified continuation and blocking interaction rollout | `ca227ec0`, `8e334547`, `5690f90b` | `pennix/v0.7-beta` |
 | 10 | 2026-10-04 | Clean migration metadata beta30 release | `a62540f5`, `aa2b84d85bba3d21cb070ae48c923291be164ade` | `pennix/v0.7-beta` |
