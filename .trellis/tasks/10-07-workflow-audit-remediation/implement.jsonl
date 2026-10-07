@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cli/backend/filesystem-safety.md", "reason": "数据、迁移与运行态安全写入"}
+{"file": ".trellis/spec/cli/backend/commands-channel.md", "reason": "Channel lifecycle与协议边界"}

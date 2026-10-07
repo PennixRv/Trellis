@@ -10,6 +10,13 @@ lifecycle, and the final result. A subnode owns one evidence report and its own
 append-only worklog. This is a behavioral contract; do not add `--sandbox` or
 claim that path restrictions enforce it.
 
+Keep credentials out of briefs, reports, worklogs and Channel messages. The artifact
+validator rejects known private-key/token, Bearer and explicit credential-assignment
+syntax; it does not recognize arbitrary secret values. Channel protocol messages keep
+their original bytes for delivery in private local storage. Operator message views,
+error/progress persistence and logs redact known credential syntax or omit raw worker
+content; this is not general-purpose secret detection or private-path anonymization.
+
 ## Artifact Setup
 
 Before spawning, the coordinator must use an active task (`planning` or

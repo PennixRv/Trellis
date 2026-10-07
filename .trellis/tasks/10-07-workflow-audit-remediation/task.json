@@ -1,0 +1,48 @@
+{
+  "id": "workflow-audit-remediation",
+  "name": "workflow-audit-remediation",
+  "title": "工作流审查修复：Trellis安全、任务与Channel合同",
+  "description": "根协调任务10-07-workflow-audit-remediation的T1-T8工作包及Marketplace/docs发布；用户本轮明确授权完成统一方案后直接实施与发布安装。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-07",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "seal": {
+        "revision": 1,
+        "task_id": "workflow-audit-remediation",
+        "task_name": "10-07-workflow-audit-remediation",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-07T10:38:35.660260+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "本owner落实根已封口方案版本1，用户本轮明确授权完成统一方案和资产后直接全量推进；本任务流程例外，不声称seal后另有回答。",
+      "approved_at": "2026-10-07T10:38:35.751956+00:00"
+    }
+  }
+}
