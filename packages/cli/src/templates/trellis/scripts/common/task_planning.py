@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +81,7 @@ def seal_plan(data: dict[str, Any], task_dir: Path) -> int:
             "task_id": data.get("id") or task_dir.name,
             "task_name": task_dir.name,
             "documents": documents,
+            "document_digests": {name: sha256((task_dir / name).read_bytes()).hexdigest() for name in documents},
             "execution_class": execution,
             "delivery_mode": delivery,
             "sealed_at": datetime.now(timezone.utc).isoformat(),
@@ -100,6 +102,8 @@ def _require_seal(data: dict[str, Any], task_dir: Path) -> dict[str, Any]:
         raise PlanningError("plan classification changed; reseal the material plan")
     if seal.get("documents") != _plan_documents(task_dir, execution, delivery):
         raise PlanningError("sealed plan documents do not match this task")
+    if seal.get("document_digests") != {name: sha256((task_dir / name).read_bytes()).hexdigest() for name in seal["documents"]}:
+        raise PlanningError("sealed plan content changed or lacks content digests; reseal the material plan")
     return record
 
 

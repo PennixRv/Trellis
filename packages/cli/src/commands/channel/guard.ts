@@ -186,8 +186,9 @@ export function loadWorkerGuardConfig(
   let content: string;
   try {
     content = fs.readFileSync(configPath, "utf-8");
-  } catch {
-    return undefined;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
   }
   return parseWorkerGuardSection(content);
 }
@@ -329,8 +330,9 @@ export function loadSubnodeDispatchConfig(cwd: string): SubnodeDispatchConfig {
   let content = "";
   try {
     content = fs.readFileSync(configPath, "utf-8");
-  } catch {
+  } catch (error) {
     // Existing projects without the section still get the procedure default.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   const fromConfig = parseSubnodeDispatchSection(content);
   return {
@@ -432,13 +434,12 @@ export function scanLiveWorkers(
   const bucket = opts.root
     ? path.join(opts.root, project)
     : projectDir(project);
-  if (!fs.existsSync(bucket)) return [];
-
   let entries: string[];
   try {
     entries = fs.readdirSync(bucket);
-  } catch {
-    return [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
   }
 
   const out: LiveWorker[] = [];
@@ -451,17 +452,19 @@ export function scanLiveWorkers(
     const dir = path.join(bucket, entry);
     try {
       if (!fs.statSync(dir).isDirectory()) continue;
-    } catch {
-      continue;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
     }
-    const events = path.join(dir, "events.jsonl");
-    if (!fs.existsSync(events)) continue;
     let workers: WorkerState[];
     try {
-      const all = readFileEventsSync(events);
+      const all = readFileEventsSync(path.join(dir, "events.jsonl"));
       workers = reduceWorkerRegistry(all).workers;
-    } catch {
-      continue;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw new Error(`Cannot inspect worker registry for channel '${entry}'`, {
+        cause: error,
+      });
     }
     for (const state of workers) {
       if (state.terminal || isTerminalLifecycle(state.lifecycle)) continue;
@@ -522,8 +525,9 @@ function readReservationWorkers(
   let files: string[];
   try {
     files = fs.readdirSync(dir);
-  } catch {
-    return [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
   }
   const workers: WorkerState[] = [];
   for (const file of files) {
@@ -547,12 +551,14 @@ function readReservationWorkers(
 function readFileEventsSync(file: string): ChannelEvent[] {
   const text = fs.readFileSync(file, "utf-8");
   const events: ChannelEvent[] = [];
-  for (const line of text.split("\n")) {
+  const lines = text.split("\n");
+  for (const [index, line] of lines.entries()) {
     if (!line.trim()) continue;
     try {
       events.push(JSON.parse(line) as ChannelEvent);
-    } catch {
-      continue;
+    } catch (error) {
+      if (index === lines.length - 1 && !text.endsWith("\n")) continue;
+      throw error;
     }
   }
   return events;
@@ -562,8 +568,9 @@ function readPid(p: string): number | undefined {
   try {
     const n = Number(fs.readFileSync(p, "utf-8").trim());
     return Number.isFinite(n) && n > 0 ? n : undefined;
-  } catch {
-    return undefined;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
   }
 }
 
@@ -735,17 +742,8 @@ export async function enforceSpawnBudget(
     { project, ...(input.now !== undefined ? { now: input.now } : {}) },
   );
 
-  // Re-probe after cleanup so we don't double-count workers that have
-  // been signalled but haven't actually torn down their pid files yet.
-  // Wait briefly for the SIGTERM to translate into pid-file removal; if
-  // a worker is taking its grace period, just exclude killed workers
-  // from the count.
-  const killedIds = new Set(
-    cleanup.killed.map((w) => `${w.channel}::${w.workerId}`),
-  );
-  const remaining = scanLiveWorkers(scanOpts).filter(
-    (w) => !killedIds.has(`${w.channel}::${w.workerId}`),
-  );
+  // A signal is a request, not confirmation that a process freed its slot.
+  const remaining = scanLiveWorkers(scanOpts);
 
   const allowed =
     input.policy.maxLiveWorkers <= 0 ||

@@ -132,6 +132,7 @@ export function parseCodexLine(line: string, ctx: CodexCtx): ParseResult {
   let msg: JsonRpcInbound;
   try {
     msg = JSON.parse(trimmed) as JsonRpcInbound;
+    if (!isObject(msg)) return { events: [] };
   } catch {
     return {
       events: [

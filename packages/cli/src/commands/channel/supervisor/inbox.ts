@@ -73,8 +73,7 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
     if (!text && (!isInterrupt || !interruptText)) continue;
 
     // Block until the adapter says it can accept input (e.g. codex
-    // thread/start has produced a threadId). Drop the message if we
-    // never get ready before being aborted.
+    // thread/start has produced a threadId). Failed delivery keeps its cursor.
     if (!adapter.isReady(ctx)) {
       const deadline = Date.now() + 60_000;
       while (
@@ -85,11 +84,21 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
         await sleep(25);
       }
       if (!adapter.isReady(ctx)) {
-        // never became ready; advance the cursor anyway so we don't
-        // re-attempt this exact event on next start.
-        cursor = ev.seq;
-        writeInboxCursor(channelName, workerName, cursor);
-        continue;
+        await appendEvent(channelName, {
+          kind: "progress",
+          by: workerName,
+          detail: {
+            kind: "delivery_failed",
+            inputSeq: ev.seq,
+            reason: signal.aborted
+              ? "aborted-before-ready"
+              : "adapter-not-ready",
+          },
+        });
+        if (signal.aborted) return;
+        throw new Error(
+          "Worker input delivery failed: adapter did not become ready",
+        );
       }
     }
 
@@ -98,8 +107,19 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
       if (signal.aborted) return;
     }
 
-    if (isInterrupt) {
-      const aborted = args.turnTracker?.abortCurrent();
+    let turn: ReturnType<TurnTracker["begin"]> | undefined;
+    try {
+      const encoded = isInterrupt
+        ? adapter.encodeInterruptMessage(interruptText, ctx)
+        : adapter.encodeUserMessage(text, ctx);
+      await new Promise<void>((resolve, reject) =>
+        child.stdin.write(encoded, (error) =>
+          error ? reject(error) : resolve(),
+        ),
+      );
+      const aborted = isInterrupt
+        ? args.turnTracker?.abortCurrent()
+        : undefined;
       if (aborted) {
         await appendEvent(channelName, {
           kind: "turn_finished",
@@ -110,18 +130,7 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
           outcome: "aborted",
         });
       }
-      await appendEvent(channelName, {
-        kind: "interrupted",
-        by: workerName,
-        worker: workerName,
-        ...(aborted?.turnId ? { turnId: aborted.turnId } : {}),
-        reason: "user",
-        method: "stdin",
-        outcome: aborted ? "interrupted" : "no-active-turn",
-      });
-    }
-    let turn = args.turnTracker?.begin(ev.seq);
-    try {
+      turn = args.turnTracker?.begin(ev.seq);
       if (turn) {
         await appendEvent(channelName, {
           kind: "turn_started",
@@ -131,14 +140,20 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
           turnId: turn.turnId,
         });
       }
-      child.stdin.write(
-        isInterrupt
-          ? adapter.encodeInterruptMessage(interruptText, ctx)
-          : adapter.encodeUserMessage(text, ctx),
-      );
+      if (isInterrupt) {
+        await appendEvent(channelName, {
+          kind: "interrupted",
+          by: workerName,
+          worker: workerName,
+          ...(aborted?.turnId ? { turnId: aborted.turnId } : {}),
+          reason: "user",
+          method: "stdin",
+          outcome: aborted ? "interrupted" : "no-active-turn",
+        });
+      }
       cursor = ev.seq;
       writeInboxCursor(channelName, workerName, cursor);
-    } catch {
+    } catch (error) {
       if (turn) {
         args.turnTracker?.finish();
         await appendEvent(channelName, {
@@ -151,8 +166,16 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
         }).catch(() => undefined);
         turn = undefined;
       }
-      // stdin closed, worker exiting — bail out
-      return;
+      await appendEvent(channelName, {
+        kind: "progress",
+        by: workerName,
+        detail: {
+          kind: "delivery_failed",
+          inputSeq: ev.seq,
+          reason: "encode-or-write-failed",
+        },
+      }).catch(() => undefined);
+      throw error;
     }
   }
 }
@@ -182,15 +205,11 @@ function writeInboxCursor(
   workerName: string,
   seq: number,
 ): void {
-  try {
-    fs.writeFileSync(
-      workerFile(channelName, workerName, "inbox-cursor"),
-      String(seq),
-      "utf-8",
-    );
-  } catch {
-    // ignore — cursor is best-effort; worst case we replay a message
-  }
+  fs.writeFileSync(
+    workerFile(channelName, workerName, "inbox-cursor"),
+    String(seq),
+    "utf-8",
+  );
 }
 
 function sleep(ms: number): Promise<void> {

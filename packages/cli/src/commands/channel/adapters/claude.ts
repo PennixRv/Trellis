@@ -85,6 +85,8 @@ export function parseClaudeLine(line: string): ParseResult {
     };
   }
 
+  if (typeof msg !== "object" || msg === null || Array.isArray(msg))
+    return { events: [] };
   switch (msg.type) {
     case "system":
       return handleSystem(msg);

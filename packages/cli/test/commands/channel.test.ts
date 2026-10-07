@@ -212,6 +212,14 @@ describe("channel storage and forum channels", () => {
     }
   });
 
+  it("rejects Codex resume before creating worker artifacts", async () => {
+    await createChannel("codex-resume", { by: "main", ownerSession: "owner" });
+    await expect(channelSpawn("codex-resume", { provider: "codex", as: "worker", cwd: projectDir, resume: "prior-thread" })).rejects.toThrow("do not support --resume");
+    for (const suffix of ["config", "pid", "reservation"]) {
+      expect(fs.existsSync(workerFile("codex-resume", "worker", suffix, projectKey(projectDir)))).toBe(false);
+    }
+  });
+
   it("does not apply the Codex owner preflight to a Claude worker", async () => {
     await createChannel("ownerless-claude", { by: "main" });
 
@@ -350,12 +358,12 @@ describe("channel storage and forum channels", () => {
   it("writes undeliverable events for strict CLI delivery mode", async () => {
     await createChannel("strict-send", { by: "main" });
 
-    await channelSend("strict-send", {
+    await expect(channelSend("strict-send", {
       as: "main",
       text: "hello",
       to: "ghost",
       deliveryMode: "requireKnownWorker",
-    });
+    })).rejects.toThrow("Strict delivery failed for message 2");
 
     const events = await readChannelEvents(
       "strict-send",
@@ -568,6 +576,46 @@ describe("channel storage and forum channels", () => {
     ).toHaveLength(1);
   });
 
+  it("leaves ordinary adapter errors non-terminal and synthesizes a real cold exit", async () => {
+    await createChannel("error-exit", { by: "main" });
+    const child = { stdin: new PassThrough(), exitCode: 0, signalCode: null, kill: vi.fn() };
+    const shutdown = createShutdown({ channelName: "error-exit", workerName: "worker", getChild: () => child as never, log: { write: noop }, graceMs: 1 });
+    await applyParseResult("error-exit", "worker", { events: [{ kind: "error", payload: { message: "ordinary turn failure" } }] }, child as never, shutdown);
+    expect(shutdown.hasTerminalEvent()).toBe(false);
+    expect(shutdown.isShuttingDown()).toBe(false);
+    await shutdown.finalizeOnExit(1, null);
+    expect((await readChannelEvents("error-exit")).at(-1)).toMatchObject({ kind: "error", synthesized: true, exit_code: 1 });
+  });
+
+  it("starts shutdown when stdout processing fails", async () => {
+    await createChannel("stdout-error", { by: "main" });
+    const child = { stdout: new PassThrough(), stdin: new PassThrough(), exitCode: 0, signalCode: null, kill: vi.fn() };
+    const shutdown = createShutdown({ channelName: "stdout-error", workerName: "worker", getChild: () => child as never, log: { write: noop }, graceMs: 1 });
+    const drain = startStdoutPump({ channelName: "stdout-error", workerName: "worker", child: child as never, adapter: { parseLine: () => { throw new Error("synthetic parser failure"); } } as never, adapterCtx: undefined, shutdown, log: { write: noop } });
+    child.stdout.end("payload\n");
+    await drain;
+    expect(shutdown.isShuttingDown()).toBe(true);
+    expect(child.stdin.writableEnded).toBe(true);
+  });
+
+  it.each(["encode", "write", "readiness-abort"])("does not report interrupt delivery success on %s failure", async (failure) => {
+    await createChannel("failed-input", { by: "main" });
+    await channelInterrupt("failed-input", { as: "main", to: "worker", text: "stop" });
+    const abort = new AbortController();
+    const child = { stdin: { write: (_input: string, callback: (error?: Error) => void) => callback(new Error("write failed")) } };
+    const adapter = {
+      isReady: () => { if (failure === "readiness-abort") { abort.abort(); return false; } return true; },
+      encodeInterruptMessage: () => { if (failure === "encode") throw new Error("encode failed"); return "stop"; },
+    };
+    const watcher = runInboxWatcher({ channelName: "failed-input", workerName: "worker", adapter: adapter as never, ctx: undefined, child: child as never, signal: abort.signal, turnTracker: new TurnTracker() });
+    if (failure === "readiness-abort") await watcher;
+    else await expect(watcher).rejects.toThrow(`${failure} failed`);
+    const events = await readChannelEvents("failed-input");
+    expect(events.some((event) => event.kind === "interrupted")).toBe(false);
+    expect(events.at(-1)).toMatchObject({ kind: "progress", detail: { kind: "delivery_failed" } });
+    expect(fs.existsSync(workerFile("failed-input", "worker", "inbox-cursor"))).toBe(false);
+  });
+
   it("persists adapter session IDs as durable bindings", async () => {
     await createChannel("session-bindings", { by: "main" });
     await applyParseResult(
@@ -605,7 +653,7 @@ describe("channel storage and forum channels", () => {
       "2",
     );
     const abort = new AbortController();
-    const stdinWrite = vi.fn();
+    const stdinWrite = vi.fn((_text: string, callback: (error?: Error) => void) => callback());
     const child = {
       stdin: { write: stdinWrite },
     };
@@ -661,21 +709,22 @@ describe("channel storage and forum channels", () => {
         outcome: "aborted",
       },
       {
+        kind: "turn_started",
+        worker: "worker",
+        inputSeq: 3,
+        turnId: "msg:3",
+      },
+      {
         kind: "interrupted",
         worker: "worker",
         turnId: "msg:2",
         method: "stdin",
         outcome: "interrupted",
       },
-      {
-        kind: "turn_started",
-        worker: "worker",
-        inputSeq: 3,
-        turnId: "msg:3",
-      },
     ]);
     expect(stdinWrite).toHaveBeenCalledWith(
       JSON.stringify({ interrupt: "stop" }),
+      expect.any(Function),
     );
   });
 
@@ -690,7 +739,7 @@ describe("channel storage and forum channels", () => {
     tracker.begin(2);
     fs.writeFileSync(workerFile("queued-turns", "worker", "inbox-cursor"), "2");
     const abort = new AbortController();
-    const stdinWrite = vi.fn();
+    const stdinWrite = vi.fn((_text: string, callback: (error?: Error) => void) => callback());
     const child = {
       stdin: { write: stdinWrite },
     };
@@ -747,7 +796,7 @@ describe("channel storage and forum channels", () => {
       { kind: "turn_finished", inputSeq: 2, turnId: "msg:2" },
       { kind: "turn_started", inputSeq: 3, turnId: "msg:3" },
     ]);
-    expect(stdinWrite).toHaveBeenCalledWith(JSON.stringify({ text: "second" }));
+    expect(stdinWrite).toHaveBeenCalledWith(JSON.stringify({ text: "second" }), expect.any(Function));
   });
 });
 

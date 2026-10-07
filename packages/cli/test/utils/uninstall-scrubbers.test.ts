@@ -389,6 +389,15 @@ describe("scrubOpencodePackageJson", () => {
 });
 
 describe("scrubManagedMarkdownBlock", () => {
+  it("leaves duplicate and reordered managed markers untouched", () => {
+    for (const input of [
+      `${TEST_BLOCK_START}\na\n${TEST_BLOCK_END}\n${TEST_BLOCK_START}\nb\n${TEST_BLOCK_END}\n`,
+      `${TEST_BLOCK_END}\nuser\n${TEST_BLOCK_START}\na\n${TEST_BLOCK_END}\n`,
+    ]) {
+      expect(scrubManagedMarkdownBlock(input, TEST_BLOCK_START, TEST_BLOCK_END))
+        .toEqual({ content: input, fullyEmpty: false });
+    }
+  });
   it("removes the managed block and preserves user markdown", () => {
     const input = `# User Guidance
 

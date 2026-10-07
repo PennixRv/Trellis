@@ -452,6 +452,13 @@ export function scrubManagedMarkdownBlock(
   startMarker: string,
   endMarker: string,
 ): ScrubResult {
+  if (
+    content.split(startMarker).length !== 2 ||
+    content.split(endMarker).length !== 2 ||
+    content.indexOf(endMarker) < content.indexOf(startMarker)
+  ) {
+    return { content, fullyEmpty: false };
+  }
   const start = content.indexOf(startMarker);
   if (start === -1) {
     return { content, fullyEmpty: false };

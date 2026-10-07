@@ -252,6 +252,11 @@ export async function channelSpawn(
       : undefined;
   const resolved = resolveSpawn(channelName, effectiveOpts);
   if (resolved.provider === "codex") {
+    if (effectiveOpts.resume !== undefined) {
+      throw new Error(
+        "Codex Channel workers do not support --resume; spawn a fresh worker attempt",
+      );
+    }
     const [createEvent] = await readChannelEvents(channelName, ref.project);
     if (
       !createEvent ||
@@ -378,7 +383,7 @@ async function spawnLocked(
       idleTimeoutMs,
       spawnedBy,
       ...(opts.inboxPolicy ? { inboxPolicy: opts.inboxPolicy } : {}),
-      ...(resolved.env ? { env: resolved.env } : {}),
+      ...(resolved.env ? { roleEnvKeys: Object.keys(resolved.env) } : {}),
       ...(opts.agent ? { agent: opts.agent } : {}),
       ...(resolved.contextFiles.length > 0
         ? { contextFiles: resolved.contextFiles }
@@ -424,6 +429,7 @@ async function spawnLocked(
       // regardless of where the supervisor's process.cwd() ends up.
       env: {
         ...process.env,
+        ...resolved.env,
         TRELLIS_CHANNEL_PROJECT: project,
       },
     },

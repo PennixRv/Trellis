@@ -90,6 +90,7 @@ import {
 } from "../utils/managed-paths.js";
 import {
   loadWorkflowProvenance,
+  writeWorkflowProvenance,
   workflowProvenanceMismatches,
 } from "../utils/workflow-provenance.js";
 import {
@@ -138,106 +139,6 @@ const LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES = new Set<string>([
   // false "modified by you" conflict.
   "c1f511b1cfc1902f2147da159f09cc51f380b0c9e341cdb3ac5dea5233f3e307",
 ]);
-const CODEX_WORKFLOW_STATE_HOOK_PATH = ".codex/hooks/inject-workflow-state.py";
-const LEGACY_PENNIX_CODEX_DISPATCH_SIGNATURES = [
-  "def _resolve_codex_dispatch_mode(config: dict, repo_root: Path | None = None) -> str:",
-  "from common.config import get_workflow_dispatch_mode",
-  "return get_workflow_dispatch_mode(root, config=config)",
-] as const;
-const LEGACY_PENNIX_ACTIVE_TASK_GUARD =
-  "    active = _resolve_active_task(root, input_data)\n" +
-  "    if not active.task_path:\n" +
-  "        return None";
-const PENNIX_AMBIGUITY_PROJECTION =
-  "    active = _resolve_active_task(root, input_data)\n" +
-  '    if active.source_type == "unbound_ambiguous":\n' +
-  '        candidates = ", ".join(active.candidate_paths)\n' +
-  '        return candidates, "unbound_ambiguous", active.source\n' +
-  "    if not active.task_path:\n" +
-  "        return None";
-const LEGACY_PENNIX_BREADCRUMB_HEADER =
-  '    header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"';
-const PENNIX_AMBIGUITY_BREADCRUMB_HEADER =
-  '    if status == "unbound_ambiguous":\n' +
-  '        header = f"Status: {status}\\nCandidates: {task_id}"\n' +
-  "    else:\n" +
-  '        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"';
-
-interface LegacyPennixCodexHookMigration {
-  content: string;
-  needsUpdate: boolean;
-}
-
-/**
- * Preserve the historical Pennix Codex hook while adding the one projection
- * it predates. This is intentionally stricter than hash tracking: the Hook
- * carried a Pennix-specific dispatch resolver, so pristine installations were
- * correctly classified as locally modified and never received issue #180.
- */
-function migrateLegacyPennixCodexWorkflowHook(
-  relativePath: string,
-  existingContent: string,
-): LegacyPennixCodexHookMigration | null {
-  if (
-    relativePath !== CODEX_WORKFLOW_STATE_HOOK_PATH ||
-    !LEGACY_PENNIX_CODEX_DISPATCH_SIGNATURES.every((signature) =>
-      existingContent.includes(signature),
-    )
-  ) {
-    return null;
-  }
-
-  const hasProjection = existingContent.includes(PENNIX_AMBIGUITY_PROJECTION);
-  const hasHeader = existingContent.includes(
-    PENNIX_AMBIGUITY_BREADCRUMB_HEADER,
-  );
-  if (hasProjection && hasHeader) {
-    return { content: existingContent, needsUpdate: false };
-  }
-  if (
-    (!hasProjection &&
-      !existingContent.includes(LEGACY_PENNIX_ACTIVE_TASK_GUARD)) ||
-    (!hasHeader && !existingContent.includes(LEGACY_PENNIX_BREADCRUMB_HEADER))
-  ) {
-    return null;
-  }
-
-  return {
-    content: existingContent
-      .replace(LEGACY_PENNIX_ACTIVE_TASK_GUARD, PENNIX_AMBIGUITY_PROJECTION)
-      .replace(
-        LEGACY_PENNIX_BREADCRUMB_HEADER,
-        PENNIX_AMBIGUITY_BREADCRUMB_HEADER,
-      ),
-    needsUpdate: !hasProjection || !hasHeader,
-  };
-}
-
-/** Keep recognized Pennix Hook customizations in the desired template map. */
-function preserveLegacyPennixCodexWorkflowHook(
-  cwd: string,
-  templates: Map<string, string>,
-): void {
-  if (!templates.has(CODEX_WORKFLOW_STATE_HOOK_PATH)) {
-    return;
-  }
-  const hookPath = path.join(cwd, CODEX_WORKFLOW_STATE_HOOK_PATH);
-  if (!fs.existsSync(hookPath)) {
-    return;
-  }
-  try {
-    const migration = migrateLegacyPennixCodexWorkflowHook(
-      CODEX_WORKFLOW_STATE_HOOK_PATH,
-      fs.readFileSync(hookPath, "utf-8"),
-    );
-    if (migration) {
-      templates.set(CODEX_WORKFLOW_STATE_HOOK_PATH, migration.content);
-    }
-  } catch {
-    // The normal conflict path reports unreadable or concurrently changed files.
-  }
-}
-
 // Paths that should never be touched (true user data)
 // spec/ is user-customized content created during init; update should never modify it
 const PROTECTED_PATHS = [
@@ -341,6 +242,11 @@ function isKnownUntrackedTemplate(
   if (relativePath !== FILE_NAMES.AGENTS) {
     return false;
   }
+  if (
+    countOccurrences(existingContent, TRELLIS_BLOCK_START) !== 1 ||
+    countOccurrences(existingContent, TRELLIS_BLOCK_END) !== 1
+  )
+    return false;
 
   const managedBlock = getTrellisManagedBlock(existingContent);
   if (!managedBlock) {
@@ -1074,7 +980,6 @@ async function collectTemplateFiles(
   if (platforms.has("codex")) {
     preserveCodexAgentModelKeys(cwd, files);
     preserveCodexProjectConfig(cwd, files);
-    preserveLegacyPennixCodexWorkflowHook(cwd, files);
   }
 
   preserveExistingClaudeStatusLine(cwd, files);
@@ -1135,7 +1040,20 @@ async function resolveWorkflowUpdateTemplate(
         ? provenance.registry
         : undefined,
   });
-  const mismatches = workflowProvenanceMismatches(provenance, template);
+  const nativeVersionTransition =
+    template.id === NATIVE_WORKFLOW_ID &&
+    template.source === "bundled" &&
+    provenance.ref !== template.ref &&
+    compareVersions(provenance.ref, template.ref) !== null;
+  const mismatches = workflowProvenanceMismatches(provenance, template).filter(
+    (mismatch) =>
+      !(
+        nativeVersionTransition &&
+        (mismatch === "ref" ||
+          (mismatch === "template integrity" &&
+            hashes[PATHS.WORKFLOW_GUIDE_FILE] === provenance.content_sha256))
+      ),
+  );
   if (mismatches.length > 0) {
     throw new Error(
       `Workflow provenance verification failed: ${mismatches.join(", ")}.`,
@@ -1145,6 +1063,27 @@ async function resolveWorkflowUpdateTemplate(
   return template.id === NATIVE_WORKFLOW_ID
     ? workflowMdTemplate
     : template.content;
+}
+
+function refreshNativeWorkflowProvenance(cwd: string): void {
+  const record = loadWorkflowProvenance(cwd);
+  if (
+    record?.source_kind !== "bundled" ||
+    record.workflow_id !== NATIVE_WORKFLOW_ID
+  )
+    return;
+  const workflowPath = path.join(cwd, PATHS.WORKFLOW_GUIDE_FILE);
+  if (
+    fs.existsSync(workflowPath) &&
+    fs.readFileSync(workflowPath, "utf-8") ===
+      replacePythonCommandLiterals(workflowMdTemplate)
+  ) {
+    writeWorkflowProvenance(cwd, {
+      ...record,
+      ref: VERSION,
+      content_sha256: computeHash(workflowMdTemplate),
+    });
+  }
 }
 
 /**
@@ -1191,16 +1130,23 @@ function analyzeChanges(
       }
     } else {
       const existingContent = fs.readFileSync(fullPath, "utf-8");
-      const legacyPennixHook = migrateLegacyPennixCodexWorkflowHook(
-        relativePath,
-        existingContent,
-      );
+      const markers =
+        relativePath === FILE_NAMES.AGENTS
+          ? [TRELLIS_BLOCK_START, TRELLIS_BLOCK_END]
+          : relativePath === COPILOT_INSTRUCTIONS_PATH
+            ? [COPILOT_INSTRUCTIONS_BLOCK_START, COPILOT_INSTRUCTIONS_BLOCK_END]
+            : null;
       if (
-        legacyPennixHook?.needsUpdate &&
-        newContent === legacyPennixHook.content
+        markers &&
+        mergeManagedMarkdownBlock(
+          existingContent,
+          newContent,
+          markers[0],
+          markers[1],
+        ) === null
       ) {
         change.status = "changed";
-        result.autoUpdateFiles.push(change);
+        result.changedFiles.push(change);
         continue;
       }
       if (existingContent === newContent) {
@@ -1834,7 +1780,11 @@ export function classifyMigrations(
 
       if (newExists) {
         // Target exists - check if it only contains unmodified template files
-        if (isDirectorySafeToReplace(cwd, item.to, hashes, templates)) {
+        if (
+          isDirectorySafeToReplace(cwd, item.to, hashes, templates) &&
+          (!dirMatchesCurrentTemplates(cwd, item.to, templates) ||
+            isDirectorySafeToReplace(cwd, item.from, hashes, templates))
+        ) {
           // Safe to delete target and rename source
           result.auto.push(item);
         } else {
@@ -2100,6 +2050,17 @@ export async function executeMigrations(
         fs.existsSync(newPath) &&
         dirMatchesCurrentTemplates(cwd, item.to, templates)
       ) {
+        if (
+          !isDirectorySafeToReplace(cwd, item.from, loadHashes(cwd), templates)
+        ) {
+          result.skipped++;
+          console.log(
+            chalk.yellow(
+              "  ○ Preserved modified migration source: " + item.from,
+            ),
+          );
+          continue;
+        }
         removeDirectoryRecursive(oldPath);
 
         const hashes = loadHashes(cwd);
@@ -2673,6 +2634,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       }
     }
     if (zcodeConfigured) printZcodeSetupHint();
+    if (!options.dryRun) refreshNativeWorkflowProvenance(cwd);
     return;
   }
 
@@ -2875,6 +2837,30 @@ export async function update(options: UpdateOptions): Promise<void> {
       const action = await promptConflictResolution(file, options, applyToAll);
 
       if (action === "overwrite") {
+        const markers =
+          file.relativePath === FILE_NAMES.AGENTS
+            ? [TRELLIS_BLOCK_START, TRELLIS_BLOCK_END]
+            : file.relativePath === COPILOT_INSTRUCTIONS_PATH
+              ? [
+                  COPILOT_INSTRUCTIONS_BLOCK_START,
+                  COPILOT_INSTRUCTIONS_BLOCK_END,
+                ]
+              : null;
+        if (
+          markers &&
+          mergeManagedMarkdownBlock(
+            fs.readFileSync(file.path, "utf-8"),
+            file.newContent,
+            markers[0],
+            markers[1],
+          ) === null
+        ) {
+          throw new Error(
+            "Refusing ambiguous managed Markdown markers in " +
+              file.relativePath +
+              "; use --create-new or repair the markers.",
+          );
+        }
         fs.writeFileSync(file.path, file.newContent);
         if (
           file.relativePath.endsWith(".sh") ||
@@ -2917,6 +2903,8 @@ export async function update(options: UpdateOptions): Promise<void> {
 
   // Update version file
   updateVersionFile(cwd);
+
+  refreshNativeWorkflowProvenance(cwd);
 
   // Update template hashes for new, auto-updated, and overwritten files
   const filesToHash = new Map<string, string>(unchangedFileHashRepairs);

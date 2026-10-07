@@ -404,18 +404,17 @@ def _validate_brief_file(
 def _validate_evidence(value: Any) -> set[str]:
     if not isinstance(value, list):
         _fail("report.evidence must be a list")
-    identities: set[tuple[str, str]] = set()
+    identities: set[str] = set()
     for index, item in enumerate(value):
         if not isinstance(item, dict):
             _fail(f"report.evidence[{index}] must be an object")
         evidence_id = _require_text(item.get("id"), f"report.evidence[{index}].id", max_len=128)
-        locator = _require_text(item.get("locator"), f"report.evidence[{index}].locator")
+        _require_text(item.get("locator"), f"report.evidence[{index}].locator")
         _require_text(item.get("summary"), f"report.evidence[{index}].summary")
-        identity = (evidence_id, locator)
-        if identity in identities:
+        if evidence_id in identities:
             _fail("report.evidence contains a duplicate evidence identity")
-        identities.add(identity)
-    return {evidence_id for evidence_id, _locator in identities}
+        identities.add(evidence_id)
+    return identities
 
 
 def _validate_id_list(value: Any, field: str) -> list[str]:
@@ -429,16 +428,20 @@ def _validate_id_list(value: Any, field: str) -> list[str]:
     return result
 
 
-def _validate_typed_notes(value: Any, field: str) -> None:
+def _validate_typed_notes(value: Any, field: str, evidence: set[str]) -> list[str]:
     if not isinstance(value, list):
         _fail(f"report.{field} must be a list")
+    concerns: list[str] = []
     for index, item in enumerate(value):
         if not isinstance(item, dict):
             _fail(f"report.{field}[{index}] must be an object")
         _require_id(item.get("id"), f"report.{field}[{index}].id")
         _require_text(item.get("type"), f"report.{field}[{index}].type", max_len=64)
         _require_text(item.get("detail"), f"report.{field}[{index}].detail")
-        _validate_id_list(item.get("evidence_ids", []), f"report.{field}[{index}].evidence_ids")
+        references = _validate_id_list(item.get("evidence_ids", []), f"report.{field}[{index}].evidence_ids")
+        if any(reference not in evidence for reference in references):
+            concerns.append(f"{field}_evidence_unresolved")
+    return concerns
 
 
 def _validate_checkpoint(node_dir: Path, evidence_ids: set[str], scope: list[str]) -> list[str]:
@@ -463,6 +466,7 @@ def _validate_checkpoint(node_dir: Path, evidence_ids: set[str], scope: list[str
         return ["missing_worklog_checkpoint"]
     concerns: list[str] = []
     checkpoint_ids: set[str] = set()
+    checkpoint_scope: set[str] = set()
     for match in matches:
         try:
             checkpoint = json.loads(match.group("payload"))
@@ -500,8 +504,11 @@ def _validate_checkpoint(node_dir: Path, evidence_ids: set[str], scope: list[str
                 allow_empty=True,
             )
             _require_text(checkpoint.get("safe_resume_point"), "worklog checkpoint.safe_resume_point")
+            checkpoint_scope.update(covered_scope)
         except ArtifactError:
             concerns.append("malformed_worklog_checkpoint")
+    if not set(scope).issubset(checkpoint_scope):
+        concerns.append("checkpoint_scope_incomplete")
     return sorted(set(concerns))
 
 
@@ -562,18 +569,23 @@ def _validate_report_data(
             concerns.append("finding_without_evidence")
         if any(value not in evidence for value in finding_evidence):
             concerns.append("finding_evidence_unresolved")
-    _validate_typed_notes(report.get("uncertainties"), "uncertainties")
-    _validate_typed_notes(report.get("corrections"), "corrections")
+    concerns.extend(_validate_typed_notes(report.get("uncertainties"), "uncertainties", evidence))
+    concerns.extend(_validate_typed_notes(report.get("corrections"), "corrections", evidence))
     if status == "complete" and not evidence:
         _fail("a complete report requires at least one evidence item")
     if status == "complete" and not findings:
         _fail("a complete report requires at least one finding")
     if status != "complete":
-        _require_text_list(
+        completed = _require_text_list(
             report.get("completed_scope"),
             "report.completed_scope",
             allow_empty=True,
         )
+        if len(completed) != len(set(completed)) or any(item not in brief["scope"] for item in completed):
+            _fail("report.completed_scope must contain unique assigned scope items")
+        covered = {item["scope"] for item in assessment if item["status"] == "covered"}
+        if set(completed) != covered:
+            concerns.append("completed_scope_assessment_mismatch")
         _require_text(report.get("blocker"), "report.blocker")
     return evidence, sorted(set(concerns))
 
@@ -689,7 +701,7 @@ def _init(args: argparse.Namespace) -> None:
         if directory.exists() and not directory.is_dir():
             _fail(f"artifact path component is not a directory: {directory}")
         try:
-            directory.mkdir(exist_ok=True)
+            directory.mkdir(exist_ok=directory != node_dir)
         except OSError as exc:
             _fail(f"could not create artifact directory {directory}: {exc}")
     brief_path = node_dir / "brief.json"
@@ -875,7 +887,9 @@ def _validate(args: argparse.Namespace) -> None:
 
 def _disposition(args: argparse.Namespace) -> None:
     repo_root = get_repo_root()
-    report, _evidence, brief, node_dir, _concerns = _validate_report_file(args.report, repo_root)
+    report, _evidence, brief, node_dir, concerns = _validate_report_file(args.report, repo_root)
+    if args.outcome == "accepted" and (report["status"] != "complete" or concerns):
+        _fail("cannot accept a non-complete report or unresolved validation concerns: " + ", ".join(concerns))
     disposition_path = node_dir / "disposition.json"
     if disposition_path.exists() or disposition_path.is_symlink():
         _fail(f"disposition already exists and cannot be replaced: {disposition_path}")

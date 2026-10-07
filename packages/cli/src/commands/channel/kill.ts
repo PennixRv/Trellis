@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { isSupervisorProcess } from "./guard.js";
+import { readProcessIdentity } from "./process-identity.js";
 
 import { appendEvent } from "./store/events.js";
 import { withLock } from "./store/lock.js";
@@ -41,13 +43,21 @@ async function killLocked(
   project: string,
 ): Promise<void> {
   const pidPath = workerFile(channelName, opts.as, "pid", project);
-  if (!fs.existsSync(pidPath)) {
+  const workerPidPath = workerFile(channelName, opts.as, "worker-pid", project);
+  if (!fs.existsSync(pidPath) && !fs.existsSync(workerPidPath)) {
     throw new Error(
       `Worker '${opts.as}' not running in channel '${channelName}'`,
     );
   }
-  const supervisorPid = Number(fs.readFileSync(pidPath, "utf-8").trim());
-  if (!supervisorPid || !alive(supervisorPid)) {
+  const supervisorPid = fs.existsSync(pidPath)
+    ? Number(fs.readFileSync(pidPath, "utf-8").trim())
+    : 0;
+  if (
+    !supervisorPid ||
+    !alive(supervisorPid) ||
+    !isSupervisorProcess(supervisorPid, channelName, opts.as)
+  ) {
+    await terminateRecordedChild(channelName, opts.as, project);
     await appendEvent(
       channelName,
       {
@@ -55,6 +65,7 @@ async function killLocked(
         by: `cli:kill`,
         message: `supervisor lost (pid ${supervisorPid})`,
         worker: opts.as,
+        synthesized: true,
       },
       project,
     );
@@ -64,22 +75,7 @@ async function killLocked(
 
   if (opts.force) {
     // Also kill the inner worker so it doesn't become an orphan.
-    const workerPidPath = workerFile(
-      channelName,
-      opts.as,
-      "worker-pid",
-      project,
-    );
-    if (fs.existsSync(workerPidPath)) {
-      const wpid = Number(fs.readFileSync(workerPidPath, "utf-8").trim());
-      if (wpid && alive(wpid)) {
-        try {
-          process.kill(wpid, "SIGKILL");
-        } catch {
-          // already dead
-        }
-      }
-    }
+    await terminateRecordedChild(channelName, opts.as, project);
     try {
       process.kill(supervisorPid, "SIGKILL");
     } catch {
@@ -117,6 +113,7 @@ async function killLocked(
     // Grace expired — force kill. Supervisor's onShutdown handler never
     // got to fire (or it deadlocked), so we write the `killed` event from
     // the CLI side to keep the channel log truthful.
+    await terminateRecordedChild(channelName, opts.as, project);
     try {
       process.kill(supervisorPid, "SIGKILL");
     } catch {
@@ -148,6 +145,34 @@ function alive(pid: number): boolean {
   }
 }
 
+async function terminateRecordedChild(
+  channel: string,
+  worker: string,
+  project: string,
+): Promise<void> {
+  const pidPath = workerFile(channel, worker, "worker-pid", project);
+  if (!fs.existsSync(pidPath)) return;
+  const pid = Number(fs.readFileSync(pidPath, "utf-8").trim());
+  if (!Number.isSafeInteger(pid) || pid <= 0)
+    throw new Error(
+      "Cannot verify orphan worker PID; recovery files preserved",
+    );
+  if (!alive(pid)) return;
+  const identityPath = workerFile(channel, worker, "worker-identity", project);
+  const expected = fs.existsSync(identityPath)
+    ? fs.readFileSync(identityPath, "utf-8").trim()
+    : undefined;
+  if (!expected || readProcessIdentity(pid) !== expected)
+    throw new Error(
+      "Cannot verify orphan worker process identity; recovery files preserved",
+    );
+  process.kill(pid, "SIGKILL");
+  const deadline = Date.now() + KILL_GRACE_MS;
+  while (alive(pid) && Date.now() < deadline) await sleep(POLL_INTERVAL_MS);
+  if (alive(pid))
+    throw new Error("Orphan worker did not exit; recovery files preserved");
+}
+
 function cleanupFiles(
   channelName: string,
   worker: string,
@@ -160,6 +185,7 @@ function cleanupFiles(
   for (const suffix of [
     "pid",
     "worker-pid",
+    "worker-identity",
     "config",
     "system-prompt.md",
     "spawnlock",

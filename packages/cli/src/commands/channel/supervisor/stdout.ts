@@ -201,7 +201,7 @@ export async function applyParseResult(
     // racing `child.on("exit") → finalizeOnExit` can't see
     // `terminalEmitted=false` and synthesise a duplicate fallback while
     // we're in the middle of writing the real terminal event.
-    if (ev.kind === "done" || ev.kind === "error") {
+    if (ev.kind === "done") {
       shutdown.markTerminalEmitted();
     }
     await appendEvent(
@@ -321,6 +321,7 @@ export function startStdoutPump(args: {
       );
     },
     async (err) => {
+      shutdown.claim("crash");
       log.write(`[supervisor] stdout line handler failed: ${err.message}\n`);
       await appendEvent(
         channelName,
@@ -331,6 +332,7 @@ export function startStdoutPump(args: {
         },
         project,
       ).catch(() => undefined);
+      await shutdown.request("SIGTERM", "crash");
     },
     signal,
   );

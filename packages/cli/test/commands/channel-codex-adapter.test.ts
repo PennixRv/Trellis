@@ -20,6 +20,10 @@ function parse(line: Record<string, unknown>, ctx = createCodexCtx()) {
   return parseCodexLine(JSON.stringify(line), ctx);
 }
 
+it.each(["null", "[]", "42", '"text"'])("ignores a non-object Codex stdout value: %s", (input) => {
+  expect(parseCodexLine(input, createCodexCtx()).events).toEqual([]);
+});
+
 class FakeCodexChild extends EventEmitter {
   readonly stdin = new PassThrough();
   readonly stdout = new PassThrough();

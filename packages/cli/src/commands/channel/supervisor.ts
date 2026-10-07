@@ -31,6 +31,7 @@ import type {
 } from "./profiles.js";
 import { getAdapter, type Provider } from "./adapters/index.js";
 import { appendEvent } from "./store/events.js";
+import { readProcessIdentity } from "./process-identity.js";
 import { workerFile } from "./store/paths.js";
 import { scheduleSupervisorIdleTimer } from "./supervisor/idle.js";
 import { runInboxWatcher } from "./supervisor/inbox.js";
@@ -55,6 +56,8 @@ export interface SupervisorConfig {
   systemPrompt: string;
   /** Extra env vars (TRELLIS_HOOKS=0 etc. are added automatically). */
   env?: Record<string, string>;
+  /** Names from an explicitly trusted agent env_file; values stay in process env. */
+  roleEnvKeys?: string[];
   /** Optional model override. */
   model?: string;
   reasoningEffort?: ReasoningEffort;
@@ -97,11 +100,50 @@ type Child = ChildProcessByStdio<Writable, Readable, Readable>;
 
 /** Merge parent, role, and runtime settings in increasing precedence. */
 export function buildWorkerEnv(
-  config: Pick<SupervisorConfig, "provider" | "agent" | "env">,
+  config: Pick<SupervisorConfig, "provider" | "agent" | "env" | "roleEnvKeys">,
   parent: NodeJS.ProcessEnv,
   runtime: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv {
-  return { ...parent, ...config.env, ...runtime };
+  const common = new Set([
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TERM",
+    "COLORTERM",
+    "NO_COLOR",
+    "XDG_CONFIG_HOME",
+    "XDG_CACHE_HOME",
+    "XDG_DATA_HOME",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+  ]);
+  const providerPrefix =
+    config.provider === "claude"
+      ? /^(?:ANTHROPIC|CLAUDE)_/
+      : /^(?:OPENAI|CODEX|AZURE_OPENAI)_/;
+  const explicit = new Set(config.roleEnvKeys ?? []);
+  const selected: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(parent)) {
+    if (
+      value !== undefined &&
+      (common.has(key) || providerPrefix.test(key) || explicit.has(key))
+    ) {
+      selected[key] = value;
+    }
+  }
+  return { ...selected, ...config.env, ...runtime };
 }
 
 const SHUTDOWN_GRACE_MS = 3000;
@@ -429,10 +471,12 @@ export async function runSupervisor(
   // into `shutdown.request` instead of using Node's default behaviour
   // (which would orphan the child and skip the `killed` event).
   process.on("SIGTERM", () => {
-    void shutdown.request(
-      "SIGTERM",
-      readExternalShutdownReason(channelName, workerName, project),
-    );
+    const reason = readExternalShutdownReason(channelName, workerName, project);
+    if (reason === "idle-timeout") {
+      idleTimerRef.current?.expireIfIdle();
+      return;
+    }
+    void shutdown.request("SIGTERM", reason);
   });
   process.on("SIGINT", () => void shutdown.request("SIGINT", "explicit-kill"));
   // SIGHUP arrives when the parent terminal closes — without this
@@ -463,6 +507,15 @@ export async function runSupervisor(
       workerFile(channelName, workerName, "worker-pid", project),
       String(child.pid),
     );
+    const childIdentity = child.pid
+      ? readProcessIdentity(child.pid)
+      : undefined;
+    if (childIdentity)
+      fs.writeFileSync(
+        workerFile(channelName, workerName, "worker-identity", project),
+        childIdentity,
+        { mode: 0o600 },
+      );
 
     await appendEvent(
       channelName,
@@ -559,6 +612,9 @@ export async function runSupervisor(
     signal: inboxAbort.signal,
     inboxPolicy: config.inboxPolicy ?? DEFAULT_INBOX_POLICY,
     turnTracker,
+  }).catch(async () => {
+    inboxAbort.abort();
+    await shutdown.request("SIGTERM", "crash");
   });
 
   // ── adapter handshake (no initial user prompt) ──
@@ -607,6 +663,7 @@ async function cleanup(channelName: string, workerName: string): Promise<void> {
   for (const suffix of [
     "pid",
     "worker-pid",
+    "worker-identity",
     "config",
     "system-prompt.md",
     "spawnlock",

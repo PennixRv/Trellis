@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildClaudeArgs,
+  parseClaudeLine,
   INLINE_SYSTEM_PROMPT_MAX_CHARS,
   shouldUseSystemPromptFile,
 } from "../../src/commands/channel/adapters/claude.js";
 
 describe("Claude channel adapter buildClaudeArgs", () => {
+  it.each(["null", "[]", "42", '"text"'])("ignores a non-object stdout value: %s", (input) => {
+    expect(parseClaudeLine(input).events).toEqual([]);
+  });
   it("inlines the system prompt when no prompt file is given", () => {
     const args = buildClaudeArgs({ systemPrompt: "agent body" });
     expect(args).toContain("--append-system-prompt");

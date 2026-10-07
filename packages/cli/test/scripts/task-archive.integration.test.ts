@@ -113,6 +113,40 @@ describe.skipIf(!hasPython())(
       fs.rmSync(tmp, { recursive: true, force: true });
     });
 
+    it("enforces handoff ownership before any archive mutation", () => {
+      makeTask(tmp, "owned-task", "owned task\n");
+      fs.writeFileSync(path.join(tmp, ".gitignore"), "__pycache__/\n");
+      execFileSync("python3", ["-c", [
+        "import sys; from pathlib import Path",
+        "sys.path.insert(0, '.trellis/scripts')",
+        "from common.ownership_record import _new_record, _write, _record_path",
+        "root = Path.cwd()",
+        "record = _new_record({'id': 'owned-task', 'path': '.trellis/tasks/owned-task', 'status': 'in_progress'}, 'handoff-test', 'sha256:' + 'a' * 64, 'source')",
+        "record.update(state='consumed', consumer_session_id='owner', consumer_context_key='owner')",
+        "_write(_record_path(root, 'owned-task', 'handoff-test'), record)",
+      ].join("\n")], { cwd: tmp });
+      git(tmp, "add", ".trellis/scripts", ".trellis/tasks", ".trellis/config.yaml");
+      git(tmp, "commit", "-q", "-m", "initial");
+      const taskJson = path.join(tmp, ".trellis/tasks/owned-task/task.json");
+      const before = fs.readFileSync(taskJson, "utf-8");
+      const beforeGit = git(tmp, "status", "--porcelain");
+      for (const identity of ["other", undefined]) {
+        const environment = { ...process.env };
+        for (const key of Object.keys(environment)) {
+          if (/SESSION|THREAD|CONVERSATION|CONTEXT|^DSH_/.test(key)) Reflect.deleteProperty(environment, key);
+        }
+        if (identity) environment.TRELLIS_CONTEXT_ID = identity;
+        const result = spawnSync("python3", [".trellis/scripts/task.py", "archive", "owned-task", "--no-commit"], { cwd: tmp, encoding: "utf-8", env: environment });
+        expect(result.status, result.stderr).toBe(1);
+        expect(result.stderr).toMatch(/fencing_conflict|no_direct_session_identity/);
+        expect(fs.readFileSync(taskJson, "utf-8")).toBe(before);
+        expect(git(tmp, "status", "--porcelain")).toBe(beforeGit);
+      }
+      const result = spawnSync("python3", [".trellis/scripts/task.py", "archive", "owned-task", "--no-commit"], { cwd: tmp, encoding: "utf-8", env: { ...process.env, TRELLIS_CONTEXT_ID: "owner" } });
+      expect(result.status, result.stderr).toBe(0);
+      expect(fs.existsSync(taskJson)).toBe(false);
+    });
+
     it("does not bundle dirty changes from other task dirs (scope-creep fix)", () => {
       makeTask(tmp, "task-a", "task A prd\n");
       makeTask(tmp, "task-b", "task B prd v1\n");

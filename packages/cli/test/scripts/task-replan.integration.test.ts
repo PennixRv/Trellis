@@ -109,7 +109,7 @@ describe.skipIf(!hasPython())("task.py replan lifecycle", () => {
     expect(run(["start", task, "--allow-empty-context"]).status).toBe(1);
     expect(run(["plan", "approve", task, "--revision", "1", "--basis", "User explicitly approved final material plan 1"]).status).toBe(0);
     // Progress text is not a new material plan and does not demand reapproval.
-    fs.appendFileSync(path.join(directory, "implement.md"), "\nProgress: checks started.\n");
+    fs.appendFileSync(path.join(directory, "execution.md"), "\nProgress: checks started.\n");
     const approved = read();
     const other = path.join(repo, ".trellis", "tasks", "other-task");
     fs.mkdirSync(other);
@@ -125,6 +125,26 @@ describe.skipIf(!hasPython())("task.py replan lifecycle", () => {
     fs.mkdirSync(path.join(repo, ".trellis", "tasks", "archive"));
     fs.renameSync(other, path.join(repo, ".trellis", "tasks", "archive", "other-task"));
     expect(run(["select", ".trellis/tasks/archive/other-task"]).status).toBe(1);
+  });
+
+  it.each(["prd.md", "design.md", "implement.md"])("rejects changed sealed content in %s before approve or start", (document) => {
+    const directory = path.join(repo, ".trellis", "tasks", task);
+    const taskJson = path.join(directory, "task.json");
+    const data = JSON.parse(fs.readFileSync(taskJson, "utf-8"));
+    fs.writeFileSync(taskJson, JSON.stringify({ ...data, status: "planning" }) + "\n");
+    expect(run(["plan", "seal", task]).status).toBe(0);
+    expect(run(["plan", "approve", task, "--revision", "1", "--basis", "Explicit test approval"]).status).toBe(0);
+    const before = fs.readFileSync(taskJson, "utf-8");
+    fs.appendFileSync(path.join(directory, document), "\nChanged scope.\n");
+    for (const args of [["plan", "approve", task, "--revision", "1", "--basis", "Old approval"], ["start", task, "--allow-empty-context"]]) {
+      const result = run(args);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("sealed plan content changed");
+      expect(fs.readFileSync(taskJson, "utf-8")).toBe(before);
+    }
+    expect(run(["plan", "seal", task]).status).toBe(0);
+    expect(run(["plan", "approve", task, "--revision", "2", "--basis", "Revised test approval"]).status).toBe(0);
+    expect(run(["start", task, "--allow-empty-context"]).status).toBe(0);
   });
 
   it("rejects invalid preconditions without changing task state", () => {

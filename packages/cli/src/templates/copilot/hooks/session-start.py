@@ -244,12 +244,10 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
         )
 
     task_json_path = task_dir / "task.json"
-    task_data: dict = {}
-    if task_json_path.is_file():
-        try:
-            task_data = json.loads(task_json_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, PermissionError):
-            pass  # Optional task metadata; fall back to generic status.
+    from common.io import read_json_checked
+    task_data, _reason = read_json_checked(task_json_path)
+    if task_data is None or not isinstance(task_data.get("status"), str) or not task_data["status"].strip():
+        return f"Status: TASK_ERROR\nTask: {task_ref}\nNext: Repair the existing task record through its owner before continuing; do not create a replacement task."
 
     task_title = task_data.get("title", task_ref)
     task_status = task_data.get("status", "unknown")
@@ -384,13 +382,15 @@ def _build_compact_current_state(
     active = _resolve_active_task(trellis_dir, hook_input)
     if active.task_path:
         task_dir = _resolve_task_dir(trellis_dir, active.task_path)
-        status = "unknown"
+        status = "task_error"
         task_json = task_dir / "task.json"
         if task_json.is_file():
             try:
                 data = json.loads(task_json.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
-                    status = str(data.get("status") or "unknown")
+                    value = data.get("status")
+                    if isinstance(value, str) and value.strip():
+                        status = value
             except (json.JSONDecodeError, OSError):
                 pass  # Optional task metadata; fall back to generic status.
         lines.append(f"Current task: {_repo_relative(repo_root, task_dir)}; status={status}.")
@@ -499,11 +499,15 @@ def main() -> None:
         hook_input = json.loads(sys.stdin.read())
         if not isinstance(hook_input, dict):
             hook_input = {}
-        project_dir = Path(_normalize_windows_shell_path(hook_input.get("cwd", "."))).resolve()
+        raw_cwd = hook_input.get("cwd")
+        project_dir = Path(_normalize_windows_shell_path(raw_cwd if isinstance(raw_cwd, str) and raw_cwd else ".")).resolve()
     except (json.JSONDecodeError, KeyError):
         hook_input = {}
         project_dir = Path(".").resolve()
 
+    project_dir = next((candidate for candidate in (project_dir, *project_dir.parents) if (candidate / ".trellis").is_dir()), None)
+    if project_dir is None or not (project_dir / ".trellis" / "scripts" / "common" / "active_task.py").is_file():
+        return
     configure_project_encoding(project_dir)
 
     trellis_dir = project_dir / ".trellis"

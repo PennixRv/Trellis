@@ -358,6 +358,22 @@ describe("scanLiveWorkers + enforceSpawnBudget (integration)", () => {
     teardown(env);
   });
 
+  it.each(["EACCES", "EIO"])("refuses an unreadable valid registry (%s) instead of assuming spare capacity", async (code) => {
+    await createChannel("unreadable", { by: "main" });
+    const read = fs.readFileSync;
+    vi.spyOn(fs, "readFileSync").mockImplementation((...args: Parameters<typeof fs.readFileSync>) => {
+      if (String(args[0]).endsWith("events.jsonl")) throw Object.assign(new Error("synthetic read failure"), { code });
+      return read(...args);
+    });
+    await expect(enforceSpawnBudget({ projectKey: env.projectKey, policy: { idleTimeoutMs: 0, maxLiveWorkers: 8 } })).rejects.toThrow("Cannot inspect worker registry");
+  });
+
+  it("refuses a malformed complete registry record", async () => {
+    await createChannel("malformed", { by: "main" });
+    fs.appendFileSync(path.join(env.channelsRoot, env.projectKey, "malformed", "events.jsonl"), "null\n");
+    expect(() => scanLiveWorkers({ projectKey: env.projectKey })).toThrow("Cannot inspect worker registry");
+  });
+
   it("scans live workers that have a non-terminal projection + alive pid", async () => {
     await createChannel("c1", { by: "main" });
     await appendEvent(
@@ -492,7 +508,7 @@ describe("scanLiveWorkers + enforceSpawnBudget (integration)", () => {
     expect(events.some((e) => e.kind === "killed")).toBe(false);
   });
 
-  it("enforceSpawnBudget cleans expired idle workers, then permits a spawn", async () => {
+  it("keeps the budget occupied until an idle cleanup actually frees the process", async () => {
     await createChannel("c4", { by: "main" });
     await appendEvent(
       "c4",
@@ -514,7 +530,8 @@ describe("scanLiveWorkers + enforceSpawnBudget (integration)", () => {
       isSupervisorProcess: verifySupervisor,
     });
     expect(result.cleaned).toHaveLength(1);
-    expect(result.allowed).toBe(true);
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toHaveLength(1);
   });
 
   it("cleanupExpiredIdleWorkers removes shutdown-reason sidecar when SIGTERM fails", async () => {

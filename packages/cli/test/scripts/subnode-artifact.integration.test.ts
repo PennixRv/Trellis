@@ -252,6 +252,72 @@ describe.skipIf(!hasPython())("subnode_artifact.py", () => {
     expect(rejectedLegacy.stderr).toContain("schema_version must be 2");
   });
 
+  it.each(["uncertainties", "corrections", "checkpoint"])("keeps unresolved %s out of accepted dispositions", (field) => {
+    const draft = writeDraft(tmp, "concern.json");
+    expect(run(tmp, "init", "--task", "task-a", "--work-id", "concern", "--subnode-id", "primary", "--draft", draft).status).toBe(0);
+    const reportPath = writeCompleteReport(tmp, "concern", "primary", "source", "README.md");
+    const dir = artifactDir(tmp, "concern", "primary");
+    if (field === "checkpoint") {
+      const worklog = path.join(dir, "worklog.md");
+      fs.writeFileSync(worklog, fs.readFileSync(worklog, "utf-8").replace('"covered_scope":["inspect dependency metadata"]', '"covered_scope":[]'));
+    } else {
+      const report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
+      report[field] = [{ id: "unresolved", type: "source", detail: "Unverified source reference.", evidence_ids: ["missing"] }];
+      fs.writeFileSync(reportPath, JSON.stringify(report));
+    }
+    const validated = run(tmp, "validate", "--report", reportPath);
+    expect(validated.status, validated.stderr).toBe(0);
+    expect(validated.stdout).toContain(field === "checkpoint" ? "checkpoint_scope_incomplete" : `${field}_evidence_unresolved`);
+    const args = ["disposition", "--report", reportPath, "--outcome", "accepted", "--terminal-lifecycle", "done", "--terminal-seq", "17", "--terminal-at", "2026-10-07T00:00:00Z", "--check", "report_validation", "--check", "source_recheck", "--check", "protected_target_check", "--reason", "Independent review."];
+    const accepted = run(tmp, ...args);
+    expect(accepted.status).toBe(1);
+    expect(accepted.stderr).toContain("cannot accept");
+    expect(fs.existsSync(path.join(dir, "disposition.json"))).toBe(false);
+    args[args.indexOf("accepted")] = "rejected";
+    expect(run(tmp, ...args).status).toBe(0);
+  });
+
+  it("rejects reused evidence IDs and inconsistent early completed scope", () => {
+    expect(run(tmp, "init", "--task", "task-a", "--work-id", "integrity", "--subnode-id", "primary", "--draft", writeDraft(tmp, "integrity.json")).status).toBe(0);
+    const reportPath = writeCompleteReport(tmp, "integrity", "primary", "source", "README.md");
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
+    report.evidence.push({ ...report.evidence[0], locator: "different.md" });
+    fs.writeFileSync(reportPath, JSON.stringify(report));
+    expect(run(tmp, "validate", "--report", reportPath).stderr).toContain("duplicate evidence identity");
+    report.evidence.pop();
+    report.status = "incomplete";
+    report.blocker = "Stopped before completion.";
+    for (const completed of [["outside"], [report.scope[0], report.scope[0]]]) {
+      report.completed_scope = completed;
+      fs.writeFileSync(reportPath, JSON.stringify(report));
+      expect(run(tmp, "validate", "--report", reportPath).status).toBe(1);
+    }
+    report.completed_scope = [];
+    fs.writeFileSync(reportPath, JSON.stringify(report));
+    expect(run(tmp, "validate", "--report", reportPath).stdout).toContain("completed_scope_assessment_mismatch");
+  });
+
+  it("admits only one concurrent initializer for an immutable attempt", () => {
+    const draft = writeDraft(tmp, "concurrent.json");
+    const result = spawnSync("python3", ["-c", [
+      "import sys; from pathlib import Path; from types import SimpleNamespace; from threading import Barrier; from concurrent.futures import ThreadPoolExecutor",
+      "sys.path.insert(0, '.trellis/scripts'); import subnode_artifact as artifact",
+      "barrier = Barrier(2); original = Path.mkdir",
+      "def mkdir(path, *args, **kwargs):",
+      "    if path.name == 'primary': barrier.wait(timeout=5)",
+      "    return original(path, *args, **kwargs)",
+      "Path.mkdir = mkdir",
+      "args = SimpleNamespace(task='task-a', work_id='race', subnode_id='primary', draft=sys.argv[1])",
+      "def initialize(_):",
+      "    try: artifact._init(args); return 'created'",
+      "    except artifact.ArtifactError: return 'rejected'",
+      "with ThreadPoolExecutor(2) as pool: results = list(pool.map(initialize, range(2)))",
+      "assert sorted(results) == ['created', 'rejected'], results",
+    ].join("\n"), draft], { cwd: tmp, encoding: "utf-8" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(fs.readFileSync(path.join(artifactDir(tmp, "race", "primary"), "brief.json"), "utf-8")).subnode_id).toBe("primary");
+  });
+
   it("binds a worker handle and creates one coordinator disposition", () => {
     const mismatch = run(
       tmp,

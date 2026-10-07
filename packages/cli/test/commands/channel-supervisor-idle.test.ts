@@ -91,6 +91,21 @@ describe("scheduleSupervisorIdleTimer", () => {
     expect(shutdown.request).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects a stale guard request after a new turn starts or finishes", () => {
+    const shutdown = fakeShutdown();
+    const handle = scheduleSupervisorIdleTimer({ idleTimeoutMs: 1000, shutdown, isChildExited: () => false, log: silentLog });
+    const tracker = new TurnTracker({ onIdleExit: handle.pause, onIdleEnter: handle.reset });
+    vi.advanceTimersByTime(999);
+    tracker.begin(1);
+    vi.advanceTimersByTime(5000);
+    expect(handle.expireIfIdle()).toBe(false);
+    tracker.finish();
+    expect(handle.expireIfIdle()).toBe(false);
+    expect(shutdown.request).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(shutdown.request).toHaveBeenCalledTimes(1);
+  });
+
   it("does not fire after cancel()", () => {
     const shutdown = fakeShutdown();
     const handle = scheduleSupervisorIdleTimer({

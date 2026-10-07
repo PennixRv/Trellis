@@ -325,11 +325,11 @@ describe("trellis template constants", () => {
     expect(workflow).toContain("`worklog.md`");
     expect(workflow).toContain("`report.json`");
     expect(workflow).toContain("`trellis-research-record`");
-    expect(workflow).toContain("### Semantic RecoveryBrief");
-    expect(workflow).toContain("local source boundary");
-    expect(workflow).toContain("paired JSON/prompt");
-    expect(workflow).toContain("taskless handoff");
     expect(workflow).toContain("Evidence is unit-sized");
+    expect(workflow).toContain("Local report delivery/validation failures isolate");
+    expect(workflow).toContain("pause global admission until reconciled");
+    expect(workflow).not.toContain("ctx_recovery_brief");
+    expect(workflow).not.toContain("Semantic RecoveryBrief");
     expect(workflow).toContain("Planning Seal closure pass");
     expect(workflow).toContain("[workflow-state:planning]");
     expect(workflow).toContain("[workflow-state:in_progress]");

@@ -1333,6 +1333,13 @@ def cmd_archive(args: argparse.Namespace) -> int:
             Colors.RED), file=sys.stderr)
         return 1
 
+    from .ownership_record import OwnershipError, assert_task_mutation_allowed
+    try:
+        assert_task_mutation_allowed(repo_root, task_dir)
+    except (OwnershipError, OSError, ValueError) as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 1
+
     # Check the destination before anything below mutates task state. The
     # mover refuses a collision too, but by then this command has already
     # marked the task completed, re-parented its children and cleared the

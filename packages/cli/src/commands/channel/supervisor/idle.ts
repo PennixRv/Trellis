@@ -24,6 +24,8 @@ export interface SupervisorIdleProbe {
 }
 
 export interface IdleTimerHandle {
+  /** Accept an external idle-cleanup request only after the owner's idle TTL. */
+  expireIfIdle(): boolean;
   /** Restart the timer because the worker just finished a turn. */
   reset(): void;
   /** Suspend the timer because the worker is mid-turn. */
@@ -53,35 +55,45 @@ export function scheduleSupervisorIdleTimer(
       reset: () => undefined,
       pause: () => undefined,
       cancel: () => undefined,
+      expireIfIdle: () => false,
     };
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancelled = false;
+  let idleDeadline: number | undefined;
 
   const clear = (): void => {
+    idleDeadline = undefined;
     if (timer) {
       clearTimeout(timer);
       timer = undefined;
     }
   };
 
-  const fire = (): void => {
+  const expireIfIdle = (): boolean => {
+    if (
+      cancelled ||
+      idleDeadline === undefined ||
+      performance.now() < idleDeadline ||
+      shutdown.isShuttingDown() ||
+      isChildExited()
+    )
+      return false;
+    idleDeadline = undefined;
     timer = undefined;
-    if (cancelled) return;
-    if (shutdown.isShuttingDown() || isChildExited()) {
-      return;
-    }
     log.write(
       `[supervisor] idle timeout ${idleTimeoutMs}ms reached, requesting shutdown\n`,
     );
     void shutdown.request("SIGTERM", "idle-timeout");
+    return true;
   };
 
   const start = (): void => {
     if (cancelled) return;
     clear();
-    timer = setTimeout(fire, idleTimeoutMs);
+    idleDeadline = performance.now() + idleTimeoutMs;
+    timer = setTimeout(expireIfIdle, idleTimeoutMs);
     // Don't keep the supervisor alive solely for the idle timer; if
     // every other handle has gone away the worker has nothing to do.
     timer.unref?.();
@@ -91,6 +103,7 @@ export function scheduleSupervisorIdleTimer(
   start();
 
   return {
+    expireIfIdle,
     reset: start,
     pause: clear,
     cancel: () => {

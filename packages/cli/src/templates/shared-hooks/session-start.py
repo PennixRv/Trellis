@@ -429,8 +429,8 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
         return (
             "Status: NO ACTIVE TASK\n"
             "Next-Action: Classify the current turn before creating any Trellis task. "
-            "Simple conversation / small task asks only whether this turn should create a Trellis task. "
-            "Complex task asks whether task creation and planning are allowed."
+            "Simple conversation needs no task; bounded direct work uses the applicable direct path. "
+            "Create a task for complex work only when task creation/planning is authorized."
         )
 
     task_ref = active.task_path
@@ -443,12 +443,10 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
         )
 
     task_json_path = task_dir / "task.json"
-    task_data = {}
-    if task_json_path.is_file():
-        try:
-            task_data = json.loads(task_json_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, PermissionError):
-            pass  # Optional task metadata; fall back to generic status.
+    from common.io import read_json_checked
+    task_data, _reason = read_json_checked(task_json_path)
+    if task_data is None or not isinstance(task_data.get("status"), str) or not task_data["status"].strip():
+        return f"Status: TASK_ERROR\nTask: {task_ref}\nNext-Action: Repair the existing task record through its owner before continuing; do not create a replacement task."
 
     task_title = task_data.get("title", task_ref)
     task_status = task_data.get("status", "unknown")
@@ -719,13 +717,15 @@ def _build_compact_current_state(
     active = _resolve_active_task(trellis_dir, input_data)
     if active.task_path:
         task_dir = _resolve_task_dir(trellis_dir, active.task_path)
-        status = "unknown"
+        status = "task_error"
         task_json = task_dir / "task.json"
         if task_json.is_file():
             try:
                 data = json.loads(task_json.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
-                    status = str(data.get("status") or "unknown")
+                    value = data.get("status")
+                    if isinstance(value, str) and value.strip():
+                        status = value
             except (json.JSONDecodeError, OSError):
                 pass  # Optional task metadata; fall back to generic status.
         lines.append(f"Current task: {_repo_relative(repo_root, task_dir)}; status={status}.")
@@ -871,7 +871,12 @@ def main():
             project_dir = Path(_normalize_windows_shell_path(val)).resolve()
             break
     if project_dir is None:
-        project_dir = Path(_normalize_windows_shell_path(hook_input.get("cwd", "."))).resolve()
+        raw_cwd = hook_input.get("cwd")
+        project_dir = Path(_normalize_windows_shell_path(raw_cwd if isinstance(raw_cwd, str) and raw_cwd else ".")).resolve()
+
+    project_dir = next((candidate for candidate in (project_dir, *project_dir.parents) if (candidate / ".trellis").is_dir()), None)
+    if project_dir is None or not (project_dir / ".trellis" / "scripts" / "common" / "active_task.py").is_file():
+        return
 
     trellis_dir = project_dir / ".trellis"
     context_key = _resolve_context_key(trellis_dir, hook_input)

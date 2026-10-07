@@ -697,7 +697,7 @@ describe("update() integration", () => {
     expect(fs.readFileSync(targetFull, "utf-8")).toBe(templateContent);
   });
 
-  it("[issue-180] auto-updates the recognized legacy Pennix Codex hook without force", async () => {
+  it("updates a tracked pristine legacy Pennix hook to the whole current template", async () => {
     await init({ yes: true, force: true, codex: true });
 
     const currentHook = readProjectFile(CODEX_WORKFLOW_STATE_HOOK);
@@ -705,20 +705,20 @@ describe("update() integration", () => {
     expect(legacyHook).toContain("get_workflow_dispatch_mode");
     expect(legacyHook).not.toContain("unbound_ambiguous");
     writeProjectFile(CODEX_WORKFLOW_STATE_HOOK, legacyHook);
+    const legacyHashes = readHashesV2(hashFilePath());
+    legacyHashes[CODEX_WORKFLOW_STATE_HOOK] = computeHash(legacyHook);
+    writeHashesV2(hashFilePath(), legacyHashes);
 
     await update({ dryRun: true });
     expect(readProjectFile(CODEX_WORKFLOW_STATE_HOOK)).toBe(legacyHook);
 
     await update({});
     const upgradedHook = readProjectFile(CODEX_WORKFLOW_STATE_HOOK);
-    expect(upgradedHook).toContain("get_workflow_dispatch_mode");
+    expect(upgradedHook).toBe(currentHook);
     expect(upgradedHook).toContain(
       'if active.source_type == "unbound_ambiguous":',
     );
     expect(upgradedHook).toContain("Candidates: {task_id}");
-    expect(upgradedHook).toContain(
-      '    else:\n        header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"',
-    );
     expect(upgradedHook).not.toContain(
       '    else:\n    header = f"Status: {status}"',
     );
@@ -1024,6 +1024,37 @@ describe("update() integration", () => {
 
     expect(fs.readFileSync(agentsPath, "utf-8")).toBe(malformed);
     expect(fs.readFileSync(`${agentsPath}.new`, "utf-8")).toBe(agentsMdContent);
+  });
+
+  it("does not auto-overwrite duplicate AGENTS blocks even when hash-tracked", async () => {
+    await setupProject();
+    const agentsPath = projectFile(FILE_NAMES.AGENTS);
+    const legacy = removeSubagentsSection(fs.readFileSync(agentsPath, "utf-8"));
+    const original = `# User\n${legacy}\n${legacy}\nKeep this.\n`;
+    fs.writeFileSync(agentsPath, original);
+    const hashes = readHashesV2(hashFilePath());
+    hashes[FILE_NAMES.AGENTS] = computeHash(original);
+    writeHashesV2(hashFilePath(), hashes);
+    await update({ createNew: true });
+    expect(fs.readFileSync(agentsPath, "utf-8")).toBe(original);
+    expect(fs.existsSync(`${agentsPath}.new`)).toBe(true);
+  });
+
+  it("preserves custom source content when a rename-dir target is current", async () => {
+    await init({ yes: true, force: true, codex: true });
+    fs.rmSync(projectFile(".agents/skills"), { recursive: true, force: true });
+    const source = ".pi/skills/custom.txt";
+    const target = ".agents/skills/current.txt";
+    writeProjectFile(source, "user knowledge");
+    writeProjectFile(target, "current template");
+    const migration = { type: "rename-dir" as const, from: ".pi/skills", to: ".agents/skills" };
+    const templates = new Map([[target, "current template"]]);
+    const classified = classifyMigrations([migration], tmpDir, {}, templates);
+    expect(classified.auto).toHaveLength(0);
+    expect(classified.conflict).toHaveLength(1);
+    await executeMigrations(classified, tmpDir, { skipAll: true }, templates);
+    expect(readProjectFile(source)).toBe("user knowledge");
+    expect(readProjectFile(target)).toBe("current template");
   });
 
   it("#8 updates version file after successful update", async () => {
@@ -1851,6 +1882,27 @@ describe("update() integration", () => {
     expect(
       fs.existsSync(path.join(backupDir, ".opencode", "node_modules")),
     ).toBe(false);
+  });
+
+  it("updates an older native workflow version without relaxing source integrity", async () => {
+    await setupProject();
+    const provenancePath = projectFile(PATHS.WORKFLOW_PROVENANCE_FILE);
+    const record = { schema_version: 1, workflow_id: "native", source_kind: "bundled", registry: "bundled:trellis", ref: "0.7.0-beta.34", path: "bundled:trellis/workflow.md", content_sha256: computeHash(workflowMdTemplate) };
+    fs.writeFileSync(provenancePath, JSON.stringify(record));
+    await update({ force: true });
+    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8"))).toMatchObject({ ...record, ref: VERSION });
+    const oldWorkflow = "# Pristine older native workflow\n";
+    fs.writeFileSync(projectFile(PATHS.WORKFLOW_GUIDE_FILE), oldWorkflow);
+    const hashes = readHashesV2(hashFilePath());
+    hashes[PATHS.WORKFLOW_GUIDE_FILE] = computeHash(oldWorkflow);
+    writeHashesV2(hashFilePath(), hashes);
+    fs.writeFileSync(provenancePath, JSON.stringify({ ...record, content_sha256: computeHash(oldWorkflow) }));
+    await update({ force: true });
+    expect(fs.readFileSync(projectFile(PATHS.WORKFLOW_GUIDE_FILE), "utf-8")).toBe(replacePythonCommandLiterals(workflowMdTemplate));
+    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8"))).toMatchObject({ ...record, ref: VERSION });
+    fs.writeFileSync(provenancePath, JSON.stringify({ ...record, content_sha256: "0".repeat(64) }));
+    await expect(update({ force: true })).rejects.toThrow("template integrity");
+    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8")).ref).toBe(record.ref);
   });
 
   it("#workflow-md-r4 updates workflow.md as one runtime template when hash-tracked", async () => {

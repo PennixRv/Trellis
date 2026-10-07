@@ -365,7 +365,10 @@ export function registerChannelCommand(program: Command): void {
       "--reasoning-effort-reason <text>",
       "reason required when the effective reasoning effort is xhigh",
     )
-    .option("--resume <id>", "resume an existing session/thread id")
+    .option(
+      "--resume <id>",
+      "resume an existing Claude session (unsupported for Codex workers)",
+    )
     .option(
       "--sandbox <mode>",
       "codex-only: worker sandbox mode: read-only | workspace-write | danger-full-access (default workspace-write)",
