@@ -419,17 +419,19 @@ def status(root: Path | None, task_id: str, handoff_id: str, core_digest: str) -
 def assert_task_mutation_allowed(root: Path, task_path: Path) -> None:
     """Reject ordinary task pointer changes that would bypass ownership fencing."""
     actor = resolve_context_key()
-    if not actor:
-        return
     try:
         task_id = _safe_task_id(task_path.name)
     except ContinuationError:
         return
     relative = task_path.relative_to(root).as_posix()
     records_dir = root / ".trellis" / ".runtime" / "handoff-ownership" / task_id
-    if not records_dir.is_dir() or records_dir.is_symlink():
+    if records_dir.is_symlink():
+        raise OwnershipError("ownership record directory is unsafe")
+    if not records_dir.is_dir():
         return
     for record_path in sorted(records_dir.glob("*.json")):
+        if not actor:
+            raise OwnershipError("no_direct_session_identity: task has handoff ownership fencing")
         if record_path.is_symlink():
             raise OwnershipError("ownership record is unsafe")
         record = _decode(record_path)
