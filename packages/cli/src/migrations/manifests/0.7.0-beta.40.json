@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.40",
+  "description": "Durable owned Codex session relationships and binding readiness",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Record new owned Codex bindings outside removable Channels and expose exact historical descendants through channel sessions; wait for persisted binding before turn delivery.",
+  "migrations": [],
+  "notes": "Tracking starts at activation. No pre-upgrade history import or recovery; use native Trellis update for generated assets."
+}

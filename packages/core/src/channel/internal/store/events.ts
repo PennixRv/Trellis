@@ -2,13 +2,9 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 
 import { withLock } from "./lock.js";
+import { recordSessionBinding } from "./session-relations.js";
 import { redactDiagnostic } from "./diagnostics.js";
-import {
-  channelDir,
-  eventsPath,
-  lockPath,
-  seqSidecarPath,
-} from "./paths.js";
+import { channelDir, eventsPath, lockPath, seqSidecarPath } from "./paths.js";
 import { reconcileSeq, truncateIncompleteTail, writeSidecar } from "./seq.js";
 import type {
   ChannelType,
@@ -445,13 +441,20 @@ export async function appendEvent(
     const existing = findIdempotentEvent(jsonl, partial);
     if (existing !== undefined) return existing;
 
+    if (partial.kind === "session_bound") {
+      await recordSessionBinding(readAllEvents(jsonl), partial);
+    }
+
     const lastSeq = await reconcileSeq(jsonl, sidecar);
     const event = {
       ...(partial.kind === "error" || partial.kind === "progress" ? redactDiagnostic(partial) : partial),
       seq: lastSeq + 1,
       ts: partial.ts ?? new Date().toISOString(),
     } as ChannelEvent;
-    await fsp.appendFile(jsonl, JSON.stringify(event) + "\n", { encoding: "utf-8", mode: 0o600 });
+    await fsp.appendFile(jsonl, JSON.stringify(event) + "\n", {
+      encoding: "utf-8",
+      mode: 0o600,
+    });
     await writeSidecar(sidecar, event.seq);
     return event;
   });
@@ -547,9 +550,7 @@ export async function readChannelEvents(
 
   const { afterSeq, beforeSeq, limit } = pagination;
   if (afterSeq !== undefined && beforeSeq !== undefined) {
-    throw new Error(
-      "readChannelEvents: pass only one of afterSeq / beforeSeq",
-    );
+    throw new Error("readChannelEvents: pass only one of afterSeq / beforeSeq");
   }
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 0)) {
     throw new Error("readChannelEvents: limit must be a non-negative integer");

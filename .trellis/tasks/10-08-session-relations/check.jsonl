@@ -1,0 +1,4 @@
+{"file":".trellis/spec/core/backend/index.md","reason":"Required relation owner, filesystem and public API contracts"}
+{"file":".trellis/spec/cli/backend/commands-channel.md","reason":"Required relation owner, filesystem and public API contracts"}
+{"file":".trellis/spec/cli/backend/filesystem-safety.md","reason":"Required relation owner, filesystem and public API contracts"}
+{"file":".trellis/spec/cli/backend/trellis-core-sdk.md","reason":"Required relation owner, filesystem and public API contracts"}

@@ -6,6 +6,24 @@ paths:
 ---
 # `trellis channel` — Multi-Agent Collaboration Runtime (Code Spec)
 
+## Durable billing relationships (beta.40)
+
+`channel sessions [--owner-session <id>] [--json]` uses the public core
+`listSessionDescendants` query. Owner defaults only to actual `CODEX_THREAD_ID`
+or `CODEX_SESSION_ID`; missing or invalid identity fails. No task, cwd, channel,
+scope, or project key is needed. The relation store survives Channel cleanup and
+is internal to core; clients receive `trackingSince` and explicit coverage.
+
+Every new owned Codex `session_bound` persists an exact parent/child relation
+under the Channel-root metadata lock before acknowledging the binding. Conflicts,
+cycles, corruption, or write failures reject the binding. The Codex adapter's
+`threadId` alone is insufficient readiness: `sessionPersisted` becomes true only
+after the supervisor successfully persists the session event and both session-ID
+files. Failed persistence leaves readiness false and shuts down the worker;
+queued turns cannot pass `isReady` or `encodeUserMessage`. Unowned channels and
+other providers retain their existing lifecycle. Pre-activation history is not
+imported or reconstructed.
+
 Executable contracts for `packages/cli/src/commands/channel/`. Read this
 before editing any file under that path. Trigger qualifies for mandatory
 code-spec depth (new command surface + cross-layer event contract + infra

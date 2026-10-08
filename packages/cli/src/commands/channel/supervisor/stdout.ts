@@ -257,6 +257,7 @@ export async function applyParseResult(
         persistThreadId,
       );
     }
+    if (persistSessionId) result.side.onSessionPersisted?.();
     if (reply) {
       for (const r of reply) {
         try {

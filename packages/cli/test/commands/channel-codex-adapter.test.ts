@@ -20,9 +20,12 @@ function parse(line: Record<string, unknown>, ctx = createCodexCtx()) {
   return parseCodexLine(JSON.stringify(line), ctx);
 }
 
-it.each(["null", "[]", "42", '"text"'])("ignores a non-object Codex stdout value: %s", (input) => {
-  expect(parseCodexLine(input, createCodexCtx()).events).toEqual([]);
-});
+it.each(["null", "[]", "42", '"text"'])(
+  "ignores a non-object Codex stdout value: %s",
+  (input) => {
+    expect(parseCodexLine(input, createCodexCtx()).events).toEqual([]);
+  },
+);
 
 class FakeCodexChild extends EventEmitter {
   readonly stdin = new PassThrough();
@@ -57,6 +60,23 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe("Codex channel adapter", () => {
+  it("does not allow a turn until the supervisor confirms durable session persistence", () => {
+    const adapter = getAdapter("codex");
+    const ctx = createCodexCtx();
+    ctx.pending.set(1, "thread/start");
+    const result = parse({ id: 1, result: { thread: { id: "child" } } }, ctx);
+    expect(ctx.threadId).toBe("child");
+    expect(adapter.isReady(ctx)).toBe(false);
+    expect(() => encodeCodexUserMessage(ctx, "queued")).toThrow(
+      "not persisted",
+    );
+    result.side?.onSessionPersisted?.();
+    expect(adapter.isReady(ctx)).toBe(true);
+    expect(
+      JSON.parse(encodeCodexUserMessage(ctx, "queued").line),
+    ).toMatchObject({ method: "turn/start" });
+  });
+
   it("keeps subnodes on the native configured app-server path", () => {
     expect(buildCodexArgs({ model: "gpt-6-sol", agent: "subnode" })).toEqual([
       "app-server",
@@ -653,6 +673,7 @@ describe("Codex channel adapter", () => {
     expect(parse(notification, ctx).events).toEqual([]);
 
     ctx.threadId = "thread-1";
+    ctx.sessionPersisted = true;
     encodeCodexUserMessage(ctx, "try again");
     expect(parse(notification, ctx).events).toHaveLength(1);
   });

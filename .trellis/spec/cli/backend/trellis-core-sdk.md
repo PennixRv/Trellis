@@ -200,6 +200,17 @@ Release/versioning details live in `release-process.md`.
 
 ## Tests
 
+`channel.listSessionDescendants({ ownerSessionId })` returns schema version 1,
+the exact owner, unique sorted Codex descendant `sessionIds`/`sessionCount`, and
+`trackingSince`/`coverage` (`since_activation` or `not_started`). This read-only
+query has no project/task/Channel scope. Relationships come only from new owned
+Codex `session_bound` metadata, including retries, and survive Channel prune or
+force-create. They live at Channel-root `.session-relations.json`, outside
+removable Channel directories, with a shared metadata lock, private atomic
+replacement, and rejection of corruption, conflicting parents, and cycles.
+No transcript recovery or pre-activation completeness is promised. Consumers
+use the public API/CLI and must not read or independently write this store.
+
 Core behavior should be tested in `packages/core` when the behavior can run without CLI rendering. CLI tests should cover option parsing, terminal output, command orchestration, and integration with template/migration flows.
 
 If a CLI test duplicates a pure core test, move the pure assertion to core and keep only the CLI-specific behavior in the CLI test.

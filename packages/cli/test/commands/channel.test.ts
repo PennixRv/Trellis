@@ -1,6 +1,7 @@
 import { spawn as spawnChild } from "node:child_process";
 import { once } from "node:events";
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
@@ -8,6 +9,16 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createChannel } from "../../src/commands/channel/create.js";
+import {
+  appendEvent,
+  listSessionDescendants,
+} from "@pennixrv/trellis-core/channel";
+import {
+  createCodexCtx,
+  parseCodexLine,
+  encodeCodexUserMessage,
+} from "../../src/commands/channel/adapters/codex.js";
+import { getAdapter } from "../../src/commands/channel/adapters/index.js";
 import {
   channelContextAdd,
   channelContextList,
@@ -89,11 +100,61 @@ describe("channel storage and forum channels", () => {
     ).toBe(true);
   });
 
+  it("keeps a Codex inbox turn blocked through failed binding and only readies after durable success", async () => {
+    await createChannel("binding", { ownerSession: "root", by: "main" });
+    await appendEvent("binding", {
+      kind: "spawned",
+      by: "main",
+      as: "w",
+      provider: "codex",
+    });
+    const ctx = createCodexCtx();
+    ctx.pending.set(1, "thread/start");
+    const result = parseCodexLine(
+      JSON.stringify({ id: 1, result: { thread: { id: "child" } } }),
+      ctx,
+    );
+    const child = { stdin: new PassThrough() } as Parameters<
+      typeof applyParseResult
+    >[3];
+    const shutdown = {} as Parameters<typeof applyParseResult>[4];
+    vi.spyOn(fsp, "rename").mockRejectedValueOnce(
+      new Error("binding write failed"),
+    );
+    await expect(
+      applyParseResult("binding", "w", result, child, shutdown),
+    ).rejects.toThrow("binding write failed");
+    expect(getAdapter("codex").isReady(ctx)).toBe(false);
+    expect(() => encodeCodexUserMessage(ctx, "queued")).toThrow(
+      "not persisted",
+    );
+    expect(
+      (await listSessionDescendants({ ownerSessionId: "root" })).sessionIds,
+    ).toEqual([]);
+    await applyParseResult("binding", "w", result, child, shutdown);
+    expect(
+      (await listSessionDescendants({ ownerSessionId: "root" })).sessionIds,
+    ).toEqual(["child"]);
+    expect(getAdapter("codex").isReady(ctx)).toBe(true);
+    await channelPrune({ all: true, yes: true });
+    expect(
+      (await listSessionDescendants({ ownerSessionId: "root" })).sessionIds,
+    ).toEqual(["child"]);
+  });
+
   it("preserves message delivery while redacting formatted and raw diagnostics", async () => {
     await createChannel("private-protocol", { by: "main" });
-    await channelSend("private-protocol", { as: "main", text: "Bearer SYNTHETIC_CANARY" });
-    const events = await readChannelEvents("private-protocol", projectKey(projectDir));
-    expect(events.some((event) => event.text === "Bearer SYNTHETIC_CANARY")).toBe(true);
+    await channelSend("private-protocol", {
+      as: "main",
+      text: "Bearer SYNTHETIC_CANARY",
+    });
+    const events = await readChannelEvents(
+      "private-protocol",
+      projectKey(projectDir),
+    );
+    expect(
+      events.some((event) => event.text === "Bearer SYNTHETIC_CANARY"),
+    ).toBe(true);
     for (const raw of [false, true]) {
       vi.mocked(console.log).mockClear();
       await channelMessages("private-protocol", { raw });
@@ -142,7 +203,10 @@ describe("channel storage and forum channels", () => {
       kind: "create",
       ownerSessionId: "main-a",
     });
-    const forumEvents = await readChannelEvents("forum", projectKey(projectDir));
+    const forumEvents = await readChannelEvents(
+      "forum",
+      projectKey(projectDir),
+    );
     expect(forumEvents[0]).not.toHaveProperty("ownerSessionId");
 
     vi.mocked(console.log).mockClear();
@@ -152,7 +216,9 @@ describe("channel storage and forum channels", () => {
       json: true,
       ownerSession: "main-a",
     });
-    const listed = JSON.parse(String(vi.mocked(console.log).mock.calls[0]?.[0])) as {
+    const listed = JSON.parse(
+      String(vi.mocked(console.log).mock.calls[0]?.[0]),
+    ) as {
       name: string;
       project: string;
       ownerSessionId?: string;
@@ -163,7 +229,9 @@ describe("channel storage and forum channels", () => {
       ]),
     );
     expect(listed).toHaveLength(2);
-    expect(listed.every((entry) => entry.ownerSessionId === "main-a")).toBe(true);
+    expect(listed.every((entry) => entry.ownerSessionId === "main-a")).toBe(
+      true,
+    );
     expect(new Set(listed.map((entry) => entry.project)).size).toBe(2);
   });
 
@@ -215,7 +283,9 @@ describe("channel storage and forum channels", () => {
       const project = projectKey(projectDir);
       for (const suffix of ["config", "pid", "reservation"]) {
         expect(
-          fs.existsSync(workerFile("ownerless-codex", "worker", suffix, project)),
+          fs.existsSync(
+            workerFile("ownerless-codex", "worker", suffix, project),
+          ),
         ).toBe(false);
       }
     } finally {
@@ -228,9 +298,20 @@ describe("channel storage and forum channels", () => {
 
   it("rejects Codex resume before creating worker artifacts", async () => {
     await createChannel("codex-resume", { by: "main", ownerSession: "owner" });
-    await expect(channelSpawn("codex-resume", { provider: "codex", as: "worker", cwd: projectDir, resume: "prior-thread" })).rejects.toThrow("do not support --resume");
+    await expect(
+      channelSpawn("codex-resume", {
+        provider: "codex",
+        as: "worker",
+        cwd: projectDir,
+        resume: "prior-thread",
+      }),
+    ).rejects.toThrow("do not support --resume");
     for (const suffix of ["config", "pid", "reservation"]) {
-      expect(fs.existsSync(workerFile("codex-resume", "worker", suffix, projectKey(projectDir)))).toBe(false);
+      expect(
+        fs.existsSync(
+          workerFile("codex-resume", "worker", suffix, projectKey(projectDir)),
+        ),
+      ).toBe(false);
     }
   });
 
@@ -372,12 +453,14 @@ describe("channel storage and forum channels", () => {
   it("writes undeliverable events for strict CLI delivery mode", async () => {
     await createChannel("strict-send", { by: "main" });
 
-    await expect(channelSend("strict-send", {
-      as: "main",
-      text: "hello",
-      to: "ghost",
-      deliveryMode: "requireKnownWorker",
-    })).rejects.toThrow("Strict delivery failed for message 2");
+    await expect(
+      channelSend("strict-send", {
+        as: "main",
+        text: "hello",
+        to: "ghost",
+        deliveryMode: "requireKnownWorker",
+      }),
+    ).rejects.toThrow("Strict delivery failed for message 2");
 
     const events = await readChannelEvents(
       "strict-send",
@@ -407,10 +490,7 @@ describe("channel storage and forum channels", () => {
       textFile: bodyFile,
     });
 
-    const events = await readChannelEvents(
-      "file-post",
-      projectKey(projectDir),
-    );
+    const events = await readChannelEvents("file-post", projectKey(projectDir));
     expect(events.at(-1)).toMatchObject({
       kind: "thread",
       action: "comment",
@@ -502,10 +582,7 @@ describe("channel storage and forum channels", () => {
     });
     await channelTitleClear("defaults", {});
 
-    const events = await readChannelEvents(
-      "defaults",
-      projectKey(projectDir),
-    );
+    const events = await readChannelEvents("defaults", projectKey(projectDir));
     expect(events.slice(-4).map((event) => event.by)).toEqual([
       "main",
       "main",
@@ -515,9 +592,7 @@ describe("channel storage and forum channels", () => {
 
     vi.mocked(console.log).mockClear();
     await channelContextList("defaults", {});
-    expect(vi.mocked(console.log).mock.calls[0]?.[0]).toBe(
-      "raw  channel note",
-    );
+    expect(vi.mocked(console.log).mock.calls[0]?.[0]).toBe("raw  channel note");
   });
 
   it("records turn_finished and runs completion cleanup when a worker emits done", async () => {
@@ -592,43 +667,126 @@ describe("channel storage and forum channels", () => {
 
   it("leaves ordinary adapter errors non-terminal and synthesizes a real cold exit", async () => {
     await createChannel("error-exit", { by: "main" });
-    const child = { stdin: new PassThrough(), exitCode: 0, signalCode: null, kill: vi.fn() };
-    const shutdown = createShutdown({ channelName: "error-exit", workerName: "worker", getChild: () => child as never, log: { write: noop }, graceMs: 1 });
-    await applyParseResult("error-exit", "worker", { events: [{ kind: "error", payload: { message: "ordinary turn failure" } }] }, child as never, shutdown);
+    const child = {
+      stdin: new PassThrough(),
+      exitCode: 0,
+      signalCode: null,
+      kill: vi.fn(),
+    };
+    const shutdown = createShutdown({
+      channelName: "error-exit",
+      workerName: "worker",
+      getChild: () => child as never,
+      log: { write: noop },
+      graceMs: 1,
+    });
+    await applyParseResult(
+      "error-exit",
+      "worker",
+      {
+        events: [
+          { kind: "error", payload: { message: "ordinary turn failure" } },
+        ],
+      },
+      child as never,
+      shutdown,
+    );
     expect(shutdown.hasTerminalEvent()).toBe(false);
     expect(shutdown.isShuttingDown()).toBe(false);
     await shutdown.finalizeOnExit(1, null);
-    expect((await readChannelEvents("error-exit")).at(-1)).toMatchObject({ kind: "error", synthesized: true, exit_code: 1 });
+    expect((await readChannelEvents("error-exit")).at(-1)).toMatchObject({
+      kind: "error",
+      synthesized: true,
+      exit_code: 1,
+    });
   });
 
   it("starts shutdown when stdout processing fails", async () => {
     await createChannel("stdout-error", { by: "main" });
-    const child = { stdout: new PassThrough(), stdin: new PassThrough(), exitCode: 0, signalCode: null, kill: vi.fn() };
-    const shutdown = createShutdown({ channelName: "stdout-error", workerName: "worker", getChild: () => child as never, log: { write: noop }, graceMs: 1 });
-    const drain = startStdoutPump({ channelName: "stdout-error", workerName: "worker", child: child as never, adapter: { parseLine: () => { throw new Error("synthetic parser failure"); } } as never, adapterCtx: undefined, shutdown, log: { write: noop } });
+    const child = {
+      stdout: new PassThrough(),
+      stdin: new PassThrough(),
+      exitCode: 0,
+      signalCode: null,
+      kill: vi.fn(),
+    };
+    const shutdown = createShutdown({
+      channelName: "stdout-error",
+      workerName: "worker",
+      getChild: () => child as never,
+      log: { write: noop },
+      graceMs: 1,
+    });
+    const drain = startStdoutPump({
+      channelName: "stdout-error",
+      workerName: "worker",
+      child: child as never,
+      adapter: {
+        parseLine: () => {
+          throw new Error("synthetic parser failure");
+        },
+      } as never,
+      adapterCtx: undefined,
+      shutdown,
+      log: { write: noop },
+    });
     child.stdout.end("payload\n");
     await drain;
     expect(shutdown.isShuttingDown()).toBe(true);
     expect(child.stdin.writableEnded).toBe(true);
   });
 
-  it.each(["encode", "write", "readiness-abort"])("does not report interrupt delivery success on %s failure", async (failure) => {
-    await createChannel("failed-input", { by: "main" });
-    await channelInterrupt("failed-input", { as: "main", to: "worker", text: "stop" });
-    const abort = new AbortController();
-    const child = { stdin: { write: (_input: string, callback: (error?: Error) => void) => callback(new Error("write failed")) } };
-    const adapter = {
-      isReady: () => { if (failure === "readiness-abort") { abort.abort(); return false; } return true; },
-      encodeInterruptMessage: () => { if (failure === "encode") throw new Error("encode failed"); return "stop"; },
-    };
-    const watcher = runInboxWatcher({ channelName: "failed-input", workerName: "worker", adapter: adapter as never, ctx: undefined, child: child as never, signal: abort.signal, turnTracker: new TurnTracker() });
-    if (failure === "readiness-abort") await watcher;
-    else await expect(watcher).rejects.toThrow(`${failure} failed`);
-    const events = await readChannelEvents("failed-input");
-    expect(events.some((event) => event.kind === "interrupted")).toBe(false);
-    expect(events.at(-1)).toMatchObject({ kind: "progress", detail: { kind: "delivery_failed" } });
-    expect(fs.existsSync(workerFile("failed-input", "worker", "inbox-cursor"))).toBe(false);
-  });
+  it.each(["encode", "write", "readiness-abort"])(
+    "does not report interrupt delivery success on %s failure",
+    async (failure) => {
+      await createChannel("failed-input", { by: "main" });
+      await channelInterrupt("failed-input", {
+        as: "main",
+        to: "worker",
+        text: "stop",
+      });
+      const abort = new AbortController();
+      const child = {
+        stdin: {
+          write: (_input: string, callback: (error?: Error) => void) =>
+            callback(new Error("write failed")),
+        },
+      };
+      const adapter = {
+        isReady: () => {
+          if (failure === "readiness-abort") {
+            abort.abort();
+            return false;
+          }
+          return true;
+        },
+        encodeInterruptMessage: () => {
+          if (failure === "encode") throw new Error("encode failed");
+          return "stop";
+        },
+      };
+      const watcher = runInboxWatcher({
+        channelName: "failed-input",
+        workerName: "worker",
+        adapter: adapter as never,
+        ctx: undefined,
+        child: child as never,
+        signal: abort.signal,
+        turnTracker: new TurnTracker(),
+      });
+      if (failure === "readiness-abort") await watcher;
+      else await expect(watcher).rejects.toThrow(`${failure} failed`);
+      const events = await readChannelEvents("failed-input");
+      expect(events.some((event) => event.kind === "interrupted")).toBe(false);
+      expect(events.at(-1)).toMatchObject({
+        kind: "progress",
+        detail: { kind: "delivery_failed" },
+      });
+      expect(
+        fs.existsSync(workerFile("failed-input", "worker", "inbox-cursor")),
+      ).toBe(false);
+    },
+  );
 
   it("persists adapter session IDs as durable bindings", async () => {
     await createChannel("session-bindings", { by: "main" });
@@ -649,7 +807,15 @@ describe("channel storage and forum channels", () => {
       sessionId: "codex-session-1",
     });
     expect(
-      fs.readFileSync(workerFile("session-bindings", "worker", "session-id", projectKey(projectDir)), "utf8"),
+      fs.readFileSync(
+        workerFile(
+          "session-bindings",
+          "worker",
+          "session-id",
+          projectKey(projectDir),
+        ),
+        "utf8",
+      ),
     ).toBe("codex-session-1");
   });
 
@@ -667,7 +833,9 @@ describe("channel storage and forum channels", () => {
       "2",
     );
     const abort = new AbortController();
-    const stdinWrite = vi.fn((_text: string, callback: (error?: Error) => void) => callback());
+    const stdinWrite = vi.fn(
+      (_text: string, callback: (error?: Error) => void) => callback(),
+    );
     const child = {
       stdin: { write: stdinWrite },
     };
@@ -753,7 +921,9 @@ describe("channel storage and forum channels", () => {
     tracker.begin(2);
     fs.writeFileSync(workerFile("queued-turns", "worker", "inbox-cursor"), "2");
     const abort = new AbortController();
-    const stdinWrite = vi.fn((_text: string, callback: (error?: Error) => void) => callback());
+    const stdinWrite = vi.fn(
+      (_text: string, callback: (error?: Error) => void) => callback(),
+    );
     const child = {
       stdin: { write: stdinWrite },
     };
@@ -804,13 +974,19 @@ describe("channel storage and forum channels", () => {
     abort.abort();
     await watcher;
 
-    const events = await readChannelEvents("queued-turns", projectKey(projectDir));
+    const events = await readChannelEvents(
+      "queued-turns",
+      projectKey(projectDir),
+    );
     expect(events.slice(-3)).toMatchObject([
       { kind: "done", by: "worker" },
       { kind: "turn_finished", inputSeq: 2, turnId: "msg:2" },
       { kind: "turn_started", inputSeq: 3, turnId: "msg:3" },
     ]);
-    expect(stdinWrite).toHaveBeenCalledWith(JSON.stringify({ text: "second" }), expect.any(Function));
+    expect(stdinWrite).toHaveBeenCalledWith(
+      JSON.stringify({ text: "second" }),
+      expect.any(Function),
+    );
   });
 });
 

@@ -1,4 +1,6 @@
 // Public channel API surface.
+export { listSessionDescendants } from "./internal/store/session-relations.js";
+export type { SessionDescendants } from "./internal/store/session-relations.js";
 export { redactDiagnostic } from "./internal/store/diagnostics.js";
 
 export type {

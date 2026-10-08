@@ -19,6 +19,8 @@ export interface AdapterEvent {
 export interface AdapterSideEffect {
   persistSessionId?: string;
   persistThreadId?: string;
+  /** Confirm adapter readiness only after all binding writes have succeeded. */
+  onSessionPersisted?: () => void;
   /** Lines (already newline-terminated) the adapter wants written to worker stdin. */
   reply?: string[];
   /** Resolutions to pending outgoing requests, keyed by id. */

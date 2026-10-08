@@ -193,7 +193,7 @@ const codexAdapter: WorkerAdapter<CodexCtx> = {
     }
   },
   isReady(ctx) {
-    return Boolean(ctx.threadId);
+    return Boolean(ctx.threadId) && ctx.sessionPersisted;
   },
   parseLine(line, ctx) {
     return parseCodexLine(line, ctx);

@@ -29,7 +29,10 @@ import { channelTitleClear, channelTitleSet } from "./title.js";
 import { runSupervisor } from "./supervisor.js";
 import { channelBarrier, channelWait, parseDuration } from "./wait.js";
 import { parseCsv } from "./store/schema.js";
-import { parseInboxPolicy } from "@pennixrv/trellis-core/channel";
+import {
+  listSessionDescendants,
+  parseInboxPolicy,
+} from "@pennixrv/trellis-core/channel";
 
 function parseNonNegativeInteger(value: string): number {
   if (!/^\d+$/.test(value)) {
@@ -51,6 +54,47 @@ export function registerChannelCommand(program: Command): void {
     .description(
       "Multi-agent collaboration runtime — spawn / coordinate / interrupt worker agents through a shared event log",
     );
+
+  channel
+    .command("sessions")
+    .description(
+      "Read durable Codex descendant sessions across projects and removed channels",
+    )
+    .option(
+      "--owner-session <id>",
+      "main session owner (defaults to host session env)",
+    )
+    .option(
+      "--json",
+      "output machine-readable history coverage and session IDs",
+    )
+    .action(async (opts: { ownerSession?: string; json?: boolean }) => {
+      try {
+        const ownerSessionId = [
+          opts.ownerSession,
+          process.env.CODEX_THREAD_ID,
+          process.env.CODEX_SESSION_ID,
+        ]
+          .map((value) => value?.trim())
+          .find((value) => Boolean(value));
+        if (!ownerSessionId)
+          throw new Error(
+            "An owner session is required (--owner-session or host session env)",
+          );
+        const history = await listSessionDescendants({ ownerSessionId });
+        console.log(
+          opts.json
+            ? JSON.stringify(history)
+            : `${history.sessionCount} descendant session(s); coverage=${history.coverage}; tracking since=${history.trackingSince ?? "not started"}`,
+        );
+      } catch (err) {
+        console.error(
+          chalk.red("Error:"),
+          err instanceof Error ? err.message : err,
+        );
+        process.exitCode = 1;
+      }
+    });
 
   channel
     .command("create <name>")

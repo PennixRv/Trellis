@@ -63,6 +63,8 @@ export interface CodexCtx {
   terminalErrorSeen: boolean;
   /** Last-known thread id (used to scope future requests). */
   threadId?: string;
+  /** A received thread ID is not ready until the supervisor commits its binding. */
+  sessionPersisted: boolean;
   /** Monotonic outbound id allocator. */
   nextId: number;
 }
@@ -81,6 +83,7 @@ export function createCodexCtx(): CodexCtx {
     finalMessageSeen: false,
     pendingDone: false,
     terminalErrorSeen: false,
+    sessionPersisted: false,
     nextId: 1,
   };
 }
@@ -247,10 +250,14 @@ function handleResponse(msg: JsonRpcInbound, ctx: CodexCtx): ParseResult {
       const threadId = (thread.id ?? thread.sessionId) as string | undefined;
       if (threadId) {
         ctx.threadId = threadId;
+        ctx.sessionPersisted = false;
         side.persistThreadId = threadId;
         // Treat thread id == session id for adapter consumers (codex uses
         // same UUIDv7 for both in observed traces).
         side.persistSessionId = threadId;
+        side.onSessionPersisted = () => {
+          ctx.sessionPersisted = true;
+        };
       }
     }
   }
@@ -693,9 +700,9 @@ export function encodeCodexUserMessage(
   ctx: CodexCtx,
   text: string,
 ): { id: number; line: string } {
-  if (!ctx.threadId) {
+  if (!ctx.threadId || !ctx.sessionPersisted) {
     throw new Error(
-      "Codex adapter: thread/start has not completed; cannot send user message yet",
+      "Codex adapter: session binding is not persisted; cannot send user message yet",
     );
   }
   ctx.finalMessageSeen = false;
