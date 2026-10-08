@@ -8024,10 +8024,9 @@ print(len(entries))
     );
     expect(match).toBeTruthy();
     const body = match?.[1] ?? "";
-    expect(body).toMatch(/Lightweight: `prd\.md` can be enough/);
-    expect(body).toMatch(
-      /Complex: finish `prd\.md`, `design\.md`, and `implement\.md`/,
-    );
+    expect(body).toContain("For `analysis_only`, complete the bounded evidence work");
+    expect(body).toContain("For change-bearing work, lightweight tasks may use `prd.md`");
+    expect(body).toContain("complex tasks need `design.md` and `implement.md`");
     expect(body).toContain(
       "curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start",
     );
@@ -8066,7 +8065,7 @@ print(len(entries))
         "utf-8",
       );
       expect(content, relativePath).toContain(
-        "Sub-agent-dispatch tasks have real curated entries in both `implement.jsonl` and `check.jsonl`; seed-only manifests are not ready.",
+        "`implement.jsonl` and `check.jsonl` must each contain at least one real spec/research entry before `task.py start`",
       );
     }
   });
@@ -8089,7 +8088,7 @@ print(len(entries))
         "utf-8",
       );
       expect(content, relativePath).toContain(
-        "Run the requirement convergence gate, then the PRD convergence pass.",
+        "run the requirement convergence and PRD passes",
       );
       expect(content, relativePath).toContain("## PRD Convergence Pass");
       expect(content, relativePath).toContain(
@@ -8099,7 +8098,7 @@ print(len(entries))
         "Preserve every file:line anchor, decision, constraint, requirement ID, and acceptance-criteria mapping.",
       );
       expect(content, relativePath).toContain(
-        "no unresolved temporary brainstorm sections, no duplicate facts across sections",
+        "After the pass, read `prd.md` top to bottom and verify that no fact is repeated across sections",
       );
     }
   });

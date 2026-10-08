@@ -10,11 +10,11 @@ A request to build, implement, fix, refactor, or "go ahead" is not approval to l
 
 For every non-trivial task, the user must respond at least once after the initial request before implementation begins. If no clarification is needed, that response must approve the final planning summary described below.
 
-While any user-owned product, scope, UX, compatibility, risk, or acceptance decision remains unresolved, keep the task in planning. First inventory evidence and decision dependencies. If at least two independent material decisions remain and `pennix-decision-grill` is available, delegate one bounded batch of up to three frontier questions; otherwise ask the single highest-value question. Do not edit product code, dispatch implementation, or run `task.py start` until the decision chain is sealed.
+Keep the task in planning while a user-owned choice needed to define the requested work remains unresolved. For `analysis_only`, findings, recommendations, and open product options do not block evidence work or require a sealed decision chain. For change-bearing work, inventory evidence and decision dependencies; batch independent material questions with `pennix-decision-grill` when useful, and do not implement or run `task.py start` until change decisions are sealed and approved.
 
 ## Analysis-Only Exception
 
-When `task.json.meta.delivery_mode = "analysis_only"` exactly and the PRD names a bounded evidence deliverable plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems, task-creation consent authorizes that evidence work. Keep status `planning`, record and verify the evidence, commit task artifacts, and archive directly; do not run `task.py start` or wait for a second implementation approval. This exception is eligible only when there is no material user decision, design or implementation plan, cross-owner coordination, security or deployment change, release or credential action, or protected downstream task. Otherwise use normal complex planning.
+When `task.json.meta.delivery_mode = "analysis_only"` exactly and the PRD names a bounded evidence deliverable plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems, task-creation consent authorizes that evidence work. Keep status `planning`, record and verify the evidence, commit task artifacts, and archive directly; do not run `task.py start` or wait for a second implementation approval. This route remains eligible regardless of complexity, cross-owner scope, multiple evidence units, or whether findings include recommendations or unresolved product choices. Record these in task artifacts without changing protected targets, deploying, releasing, altering credentials, or mutating external systems. The initial request authorizes the requested main-session research; do not require a second implementation approval, Planning Seal, or `task.py start`. If independent subnode evidence is requested, freeze its dispatch plan in the task and obtain explicit approval before any spawn/send; that approval authorizes only the listed evidence dispatch. A later implementation request needs a change-bearing task and its normal Planning Seal and implementation approval gates.
 
 ## Non-Negotiable Evidence Rule
 
@@ -60,12 +60,11 @@ Use a concise title from the user's request. Both the title and `--description` 
    - product intent still needed from the user
    - scope or risk decisions still needed from the user
    - likely out-of-scope items
-4. If user-owned decisions remain, calculate the independent frontier. Use `pennix-decision-grill` for a bounded batch when two or more independent material decisions are ready; otherwise ask the single highest-value question. Include recommendation and trade-off. Yield only while the answer is unavailable.
-5. When the host returns the current continuation's answer, persist it in `prd.md` or the decision artifact, recheck evidence and conflicts, recalculate the frontier, and continue the same planning loop. Stop only for a new unresolved frontier, a real capability or authority block, or a final sealed summary awaiting implementation approval.
-6. When no user-owned decision remains, create or update `design.md` and `implement.md` for complex tasks.
-7. Run the requirement convergence gate, then the PRD convergence pass. Finish with one Planning Seal closure pass.
-8. Present the final planning summary and stop. Do not run `task.py start` or edit product code in the same turn.
-9. Only a subsequent user message that explicitly approves the latest planning summary authorizes `task.py start` and implementation. If implementation reveals a material unresolved decision, record `decision-needed`, run `task.py replan <task> "<reason>"`, and return through this planning flow; do not open a popup during implementation.
+4. If the requested research scope or method depends on an unresolved user-owned choice, ask only that material question; otherwise proceed with the evidence work already requested. Use `pennix-decision-grill` to batch independent choices only when needed to define the requested work. A research recommendation or open product choice can be reported as a finding without being decided or sealed for implementation.
+5. If the user requests independent subnode evidence, first freeze the dispatch plan in the task: question, evidence-unit mapping and grouping rationale, brief scope/stop conditions/destinations, concurrency and FIFO refill/acceptance method. Obtain the user's explicit approval of that frozen plan before any spawn/send. This approval covers only the listed evidence dispatch; material changes to units, scope, method, owner, risk, or acceptance require reapproval. Main-session evidence work may continue while dispatch approval is pending.
+6. When a needed answer returns, persist it, recheck evidence, and continue the same task.
+7. For `analysis_only`, record and verify the declared evidence and no-change boundary in planning; do not require a Planning Seal, implementation approval, or `task.py start` merely because the research is complex.
+8. For change-bearing work, resolve material decisions, create/update complex-task artifacts, run the requirement convergence and PRD passes, then close and present the Planning Seal. Stop before implementation. Only later explicit approval of this task's current sealed revision authorizes native plan approval and `task.py start`; material changes require `task.py replan` and approval of its newly sealed revision.
 
 Do not invent a project-specific product/spec hierarchy. If the repository already has product, domain, or spec docs, use them. If it does not, proceed with the evidence that exists.
 
@@ -84,9 +83,7 @@ Do not ask process questions such as whether to search, inspect files, or contin
 
 Recommendations are not default selections. Never choose a recommended product decision on the user's behalf merely because the user asked for implementation.
 
-Do not manufacture clarification questions when the request and repository evidence already resolve every decision. In that case, proceed directly to the final planning summary, which still requires a subsequent explicit approval.
-
-The final review is a required phase-transition gate, not a prohibited process question. Task-creation consent, the initial implementation request, and approval given before the latest final summary do not satisfy this gate.
+Do not manufacture clarification questions when the request and repository evidence already resolve the scope and method. For `analysis_only`, proceed with the requested evidence work; no final implementation review or approval is required. The final review and subsequent approval are phase-transition gates for change-bearing implementation only.
 
 ## Requirement Convergence Gate
 
@@ -99,11 +96,11 @@ Before final review, verify all of the following:
 - blocking open questions are empty
 - technical unknowns are researched or explicitly deferred without changing MVP behavior
 
-Lightweight tasks may omit `design.md` and `implement.md`; they may not skip evidence inspection, requirement convergence, final review, or fresh implementation approval.
+For `analysis_only`, the task PRD may stay bounded to evidence and the protected-target no-change boundary; no implementation review or approval is required. Change-bearing tasks retain their applicable evidence, convergence, final review, and fresh implementation approval gates.
 
 The final planning summary must show Goal, In Scope, Out of Scope, Acceptance Criteria, Key Decisions, relevant Risks or Deferred Items, and artifact status.
 
-The Planning Seal closure pass reconciles `task.json`, `prd.md`, `design.md`, `implement.md`, research, decision records, and manifests; verifies targets, branches, dependencies, release, validation, rollback, dynamic-fact dispositions, and replan triggers; and fixes every material decision to an owner and outcome. No `TBD`, `TODO`, `decision-needed`, unowned option, unspecified branch, open implementation path, validation gap, or conditional acceptance may remain. Any material discovery invalidates the seal and returns to planning.
+For change-bearing work, the Planning Seal reconciles task artifacts, targets, branches, dependencies, release, validation, rollback, dynamic facts, and material decisions before implementation. It is not an eligibility or completion gate for `analysis_only` evidence work.
 
 ## Artifact Rules
 
@@ -152,15 +149,14 @@ After the pass, read `prd.md` top to bottom and verify that no fact is repeated 
 
 ## Quality Bar
 
-Before declaring planning ready:
+Before declaring change-bearing planning ready:
 
-- `prd.md` contains testable acceptance criteria.
-- `prd.md` has passed the PRD convergence pass: no unresolved temporary brainstorm sections, no duplicate facts across sections, and no lost anchors, decisions, or acceptance mappings.
-- Repository-answerable questions have already been answered through inspection.
-- Blocking open questions are empty.
-- Complex tasks have `design.md` and `implement.md`.
-- Sub-agent-dispatch tasks have real curated entries in both `implement.jsonl` and `check.jsonl`; seed-only manifests are not ready.
-- The latest final planning summary has been presented to the user.
-- In a subsequent message, the user explicitly approved that summary for implementation.
+- `prd.md` contains testable acceptance criteria and has passed the PRD convergence pass.
+- Repository-answerable questions have been answered; blocking implementation questions are resolved.
+- Complex change-bearing tasks have `design.md` and `implement.md`; sub-agent-dispatch implementation tasks have curated manifests.
+- The Planning Seal and final summary cover the implementation target, validation, and rollback.
+- The user subsequently approved this task's current sealed plan.
+
+For `analysis_only`, verify the declared evidence deliverable and protected-target no-change boundary, then proceed to complete the research in planning without an implementation summary approval.
 
 Do not start implementation merely because the user originally asked for implementation.

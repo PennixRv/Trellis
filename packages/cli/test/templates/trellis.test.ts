@@ -169,7 +169,7 @@ describe("trellis template constants", () => {
     for (const status of ["planning", "planning-inline"]) {
       const breadcrumb = workflowStateBreadcrumb(status);
       expect(breadcrumb).toContain(marker);
-      expect(breadcrumb).toContain("Do not wait for a start review");
+      expect(breadcrumb).toContain("Do not run a Planning Seal or wait for implementation approval");
       expect(breadcrumb).toContain("archive directly");
     }
     for (const name of ["start", "continue", "finish-work", "brainstorm"]) {
@@ -185,27 +185,28 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).toContain(
       "change-bearing implementation waits for `task.py start`",
     );
+    const continuation = commonTemplates.get("continue") ?? "";
+    expect(continuation).toContain("only for a change-bearing decision");
+    expect(continuation).toContain("`analysis_only` work completes its evidence");
   });
 
-  it("routes complex analysis requests through normal planning", () => {
+  it("keeps complex research in evidence mode and gates only requested subnode dispatch", () => {
     const brainstorm =
       getSkillTemplates().find((template) => template.name === "brainstorm")
         ?.content ?? "";
     for (const content of [workflowMdTemplate, brainstorm]) {
-      expect(content).toContain("material user decision");
-      expect(content).toContain("cross-owner coordination");
-      expect(content).toContain("release or credential action");
-      expect(content).toContain("normal complex planning");
-      expect(content).toContain("Planning Seal closure pass");
+      expect(content).toContain('`task.json.meta.delivery_mode = "analysis_only"`');
+      expect(content).toContain("cross-owner");
+      expect(content).toContain("no-change boundary");
     }
-    expect(brainstorm).toContain(
-      "When the host returns the current continuation's answer",
-    );
-    expect(brainstorm).not.toContain("stop the turn for native input");
+    expect(workflowMdTemplate).toContain("Complexity, cross-owner scope, multiple evidence units");
+    expect(workflowMdTemplate).toContain("Do not run a Planning Seal");
+    expect(brainstorm).toContain("regardless of complexity");
+    expect(brainstorm).toContain("explicit approval of that frozen plan");
+    expect(brainstorm).toContain("only the listed evidence dispatch");
+    expect(brainstorm).toContain("implementation approval gates");
     expect(workflowMdTemplate).toContain("evidence units");
-    expect(workflowMdTemplate).toContain(
-      "static decisions and implementation paths are locked",
-    );
+    expect(workflowMdTemplate).toContain("change-bearing");
   });
 
   it("keeps direct small work bounded across bundled and Marketplace workflows", () => {
@@ -252,9 +253,9 @@ describe("trellis template constants", () => {
     expect(workflow).toContain(
       '`task.json.meta.delivery_mode = "analysis_only"` exactly',
     );
-    expect(workflow).toContain(
-      "Complex research, cross-owner coordination, design, release, credential, or material-decision work is not eligible",
-    );
+    expect(workflow).toContain("Complexity, cross-owner scope, multiple units");
+    expect(workflow).toContain("Before any requested subnode spawn/send");
+    expect(workflow).toContain("Approval covers only the named evidence briefs");
     expect(workflow).toContain("After each answer, persist the decision,");
     expect(workflow).toContain(
       "run `python3 ./.trellis/scripts/task.py replan",

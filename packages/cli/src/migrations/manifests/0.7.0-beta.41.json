@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.41",
+  "description": "Read-only research completion and explicit subnode dispatch approval",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Allow complex and cross-owner analysis-only work to complete in planning without implementation approval. Require a frozen, explicitly approved evidence plan before requested subnode dispatch; preserve change-bearing Planning Seal and approval.",
+  "migrations": [],
+  "notes": "No migrations. Research remains bounded by the protected-target no-change contract."
+}

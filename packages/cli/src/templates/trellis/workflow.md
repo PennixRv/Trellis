@@ -208,11 +208,9 @@ Phase 3: Finish  → verify, update spec, commit, and wrap up
 
 ### Analysis-only tasks
 
-An analysis-only task is eligible only when `task.json.meta.delivery_mode = "analysis_only"` exactly and its `prd.md` names the evidence deliverable plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems. Task creation consent authorizes that bounded evidence work, not protected-target changes.
+An analysis-only task is eligible when `task.json.meta.delivery_mode = "analysis_only"` exactly and its `prd.md` names the evidence deliverable plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems. Complexity, cross-owner scope, multiple evidence units, recommendations, or unresolved product choices do not make it ineligible. The user's research request authorizes the requested main-session evidence work.
 
-The exception is invalid when the work still needs a material user decision, design or implementation plan, cross-owner coordination, security or deployment change, release or credential action, or a protected downstream task. "Research" and a deferred source edit do not override this classification; use normal complex planning when any condition applies.
-
-Keep an eligible analysis-only task in `planning`: write its research, audit, or design evidence; verify its acceptance criteria and boundary; commit task artifacts; then archive directly. Do not run `task.py start`, configure implementation context, or wait for a second implementation approval. If the evidence recommends a protected-target change, record the recommendation and create a separate change-bearing task before doing it.
+Keep the task in `planning`: write and verify its research, audit, or design evidence, commit task artifacts, and archive directly. Do not run `task.py start`, configure implementation context, require a Planning Seal, or wait for a second implementation approval. If independent subnode evidence is requested, freeze the dispatch plan in the task and obtain explicit approval before any spawn/send; that approval authorizes only the listed evidence dispatch. If the evidence recommends a protected-target change, record the recommendation and create a separate change-bearing task before doing it.
 
 ### Planning Artifacts
 
@@ -276,8 +274,8 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 
 [workflow-state:planning]
 Load `trellis-brainstorm`; stay in planning.
-If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete the declared evidence work now. Do not wait for a start review or run `task.py start`; when the PRD boundary and acceptance evidence pass, commit task artifacts and archive directly. A protected-target recommendation requires a separate change-bearing task.
-Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; run the Planning Seal closure pass before asking for review. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-grill`, batch only independent frontier questions, and stay in planning. Answers returned by the current continuation must be persisted and fed back into the same planning loop.
+If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete bounded evidence work regardless of complexity or cross-owner scope; the PRD names the evidence deliverable and protected-target no-change boundary. Do not run a Planning Seal or wait for implementation approval. A protected-target recommendation requires a separate change-bearing task.
+For `analysis_only`, complete the bounded evidence work regardless of complexity or cross-owner scope; its PRD names the evidence deliverable and protected-target no-change boundary. Do not run a Planning Seal or wait for implementation approval. For change-bearing work, lightweight tasks may use `prd.md`; complex tasks need `design.md` and `implement.md` plus the Planning Seal before implementation review. Research recommendations and open product choices may be recorded without sealing them as implementation decisions. Persist answers needed to define the requested work and continue the same planning loop.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start.
 Planned/change-bearing start requires native plan seal and matching later approval of this task's current material revision. Selecting context does not approve it.
@@ -291,8 +289,8 @@ Planned/change-bearing start requires native plan seal and matching later approv
 
 [workflow-state:planning-inline]
 Load `trellis-brainstorm`; stay in planning.
-If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete the declared evidence work now. Do not wait for a start review or run `task.py start`; when the PRD boundary and acceptance evidence pass, commit task artifacts and archive directly. A protected-target recommendation requires a separate change-bearing task.
-Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; run the Planning Seal closure pass before asking for review. If `decision-needed` items or an unsealed decision graph remain, load `pennix-decision-grill`, batch only independent frontier questions, and stay in planning. Answers returned by the current continuation must be persisted and fed back into the same planning loop.
+If `task.json.meta.delivery_mode = "analysis_only"` exactly, complete bounded evidence work regardless of complexity or cross-owner scope; the PRD names the evidence deliverable and protected-target no-change boundary. Do not run a Planning Seal or wait for implementation approval. A protected-target recommendation requires a separate change-bearing task.
+For `analysis_only`, complete the bounded evidence work regardless of complexity or cross-owner scope; its PRD names the evidence deliverable and protected-target no-change boundary. Do not run a Planning Seal or wait for implementation approval. For change-bearing work, lightweight tasks may use `prd.md`; complex tasks need `design.md` and `implement.md` plus the Planning Seal before implementation review. Research recommendations and open product choices may be recorded without sealing them as implementation decisions. Persist answers needed to define the requested work and continue the same planning loop.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-before-dev`.
 Planned/change-bearing start requires native plan seal and matching later approval of this task's current material revision. Selecting context does not approve it.
@@ -385,7 +383,7 @@ When a user request matches one of these intents inside an active task, route fi
 
 ### Guardrails
 
-- Only an eligible `task.json.meta.delivery_mode = "analysis_only"` task may complete while `planning`; it may write evidence artifacts, but any protected-target change requires a separate change-bearing task.
+- `analysis_only` tasks may complete in `planning` when their PRD names bounded evidence and a protected-target no-change boundary; complexity, cross-owner scope, multiple evidence units, and recommendations do not make them ineligible. Any protected-target change requires a separate change-bearing task.
 - Task creation approval is not implementation approval; change-bearing implementation waits for `task.py start` after artifact review.
 - PRD-only is valid for lightweight tasks; complex tasks need `design.md` + `implement.md`.
 - Planning must be persisted to task artifacts; checks must run before reporting completion.
@@ -440,7 +438,7 @@ The brainstorm skill will guide you to:
 - Keep `prd.md` focused on requirements and acceptance criteria
 - For complex tasks, produce `design.md` and `implement.md` before implementation starts
 - For read-heavy work, split long investigation into evidence units and persist each unit's conclusion or recovery point before continuing
-- Before review or `task.py start`, run the Planning Seal closure pass across all task artifacts and lock targets, branches, dependencies, release, validation, rollback, dynamic-fact handling, and every material decision
+- Before change-bearing implementation review or `task.py start`, run the Planning Seal closure pass across task artifacts and lock targets, branches, dependencies, release, validation, rollback, dynamic-fact handling, and implementation decisions; `analysis_only` does not use this gate
 
 When considering a parent/child split:
 - Use a parent task when one request contains several independently verifiable deliverables.
@@ -566,7 +564,7 @@ If `task.py start` errors with a session-identity message (no context key from h
 | `research/` has artifacts (complex tasks) | recommended |
 | `design.md` exists (complex tasks) | ✅ |
 | `implement.md` exists (complex tasks) | ✅ |
-| Planning Seal closure pass recorded; static decisions and implementation paths are locked | ✅ |
+| Change-bearing task: Planning Seal closure pass recorded; static implementation decisions and paths are locked | ✅ |
 
 [Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code, DeepSeek Harness]
 
