@@ -384,3 +384,28 @@ T1–T8审查修复、beta39官方发布、七消费者和用户安装验收；�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: Durable historical Codex billing beta.40 delivery
+<!-- trellis-session: v=2 fp=78d69fddf66a7b2f -->
+
+**Date**: 2026-10-08
+**Task**: Durable historical Codex billing beta.40 delivery
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+Published and installed beta.40 durable Codex session relations; native CLI and installed CCH integration verified, preserving partial historical totals across channel cleanup. Tracking begins with new acknowledged bindings; no previous history imported. Consumer assets updated and registered temporary artifacts cleaned.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0f31c85f` | fix(channel): retain exact owned Codex session descendants |
+| `a04054b0` | 0.7.0-beta.40 |
+| `231ea8bf` | docs: record beta.40 billing acceptance and refresh project assets |
+
+### Status
+
+[OK] **Completed**
