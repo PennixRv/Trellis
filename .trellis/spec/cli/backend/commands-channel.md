@@ -8,11 +8,26 @@ paths:
 
 ## Durable billing relationships (beta.40)
 
+### Scope / Trigger
+
+Changes to owned Codex binding, readiness, cleanup, or historical billing queries
+must preserve the following shared core/CLI contract.
+
+### Signatures
+
 `channel sessions [--owner-session <id>] [--json]` uses the public core
 `listSessionDescendants` query. Owner defaults only to actual `CODEX_THREAD_ID`
 or `CODEX_SESSION_ID`; missing or invalid identity fails. No task, cwd, channel,
 scope, or project key is needed. The relation store survives Channel cleanup and
 is internal to core; clients receive `trackingSince` and explicit coverage.
+
+### Contracts
+
+Schema version 1 returns the exact `ownerSessionId`, unique sorted `sessionIds`,
+matching `sessionCount`, and `trackingSince`/`coverage`. Missing store returns
+`[]`, `0`, `null`, and `not_started`; recorded relations return `since_activation`.
+Core owns `.session-relations.json` under the shared Channel root, independent
+of project buckets and removable logs. No CCH relationship writer exists.
 
 Every new owned Codex `session_bound` persists an exact parent/child relation
 under the Channel-root metadata lock before acknowledging the binding. Conflicts,
@@ -23,6 +38,33 @@ files. Failed persistence leaves readiness false and shuts down the worker;
 queued turns cannot pass `isReady` or `encodeUserMessage`. Unowned channels and
 other providers retain their existing lifecycle. Pre-activation history is not
 imported or reconstructed.
+
+### Validation & Error Matrix
+
+| Input/state | Required result |
+| --- | --- |
+| Missing/invalid owner | CLI nonzero; no invented identity |
+| Same exact parent/child again | Idempotent; count unchanged |
+| Different parent, cycle, corrupt store, failed rename | Reject binding; no ready turn |
+| Unowned Channel or non-Codex provider | Existing lifecycle, no relation insertion |
+
+### Good / Base / Bad Cases
+
+Good: prune a Channel and query its owner's descendants from another project.
+Base: no new bindings returns `not_started`. Bad: replace a failed write with a
+guessed session or claim that the activation timestamp proves old coverage.
+
+### Tests Required
+
+`core/test/channel/session-relations.test.ts` asserts retention, dedup, retries,
+descendants, concurrency, parent/cycle rejection, private mode, and atomic failure.
+CLI adapter/supervisor tests assert that a received thread ID is not ready, failed
+persistence cannot encode a turn, and successful persistence releases readiness.
+
+### Wrong vs Correct
+
+Wrong: `Boolean(threadId)` grants readiness. Correct: thread identity plus a
+successful persisted-binding acknowledgement grants readiness.
 
 Executable contracts for `packages/cli/src/commands/channel/`. Read this
 before editing any file under that path. Trigger qualifies for mandatory
