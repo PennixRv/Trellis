@@ -136,9 +136,13 @@ For `blocked`, `incomplete`, or `error`, include the same base fields plus a
 `blocker` string. Never use
 `accepted`, `rejected`, or `deferred` as a report status.
 
+## Dispatch Approval
+
+A request for research authorizes main-session evidence work; it does not by itself approve a subnode dispatch plan that has not yet been presented. Before any subnode `spawn` or `send`, persist and present the frozen plan in the active task. It must identify the research question, exact evidence-unit-to-scope mapping and grouping rationale, each brief's evidence range/sources, stop condition and report destination, concurrency/slot strategy, initial fill and FIFO refill/acceptance rules, and material dependencies. Record the user's explicit approval in that artifact. Approval is limited to the listed evidence work and grants no implementation authority. A material change to units, scope, method, owner, risk, or acceptance requires a newly frozen plan and approval before further affected dispatch. The main session may continue its own evidence work while awaiting dispatch approval.
+
 ## Dispatch And Wait
 
-Inspect the installed role first, then capture a durable event barrier before
+After the frozen plan is approved, inspect the installed role first, then capture a durable event barrier before
 the worker can emit a terminal event. The CLI waits once for a worker lifecycle
 transition after that barrier, including supervisor-authored terminal events:
 

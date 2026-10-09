@@ -1,0 +1,9 @@
+# Consumer footprint alignment
+
+- Native `trellis update --create-new` upgraded this dogfood consumer from beta.40 to beta.41, including all configured platform Skill/continuation projections. No CLI/core product source or dependency changed; the already published beta.41 remains the installed release.
+- Native `trellis workflow --verify` passed for bundled native beta.41; subsequent update dry-run reports already up to date and preserves the prior `.opencode/package.json` deletion.
+- The two existing corrections from `/home/penn/devel/Trellis` were read and adopted byte-for-byte into the canonical workflow-state spec and historical decision-chain PRD. They reconcile the already published analysis-only rule; no new task gate is introduced.
+- Marketplace standalone retained its four prior edits in commit `15aa709`, merged published main, and resolved to the exact accepted active source tree in `85d17acef228127cabe62bc409a16b6cf24f1d29`. Four tests and all registry digests passed, and main was pushed. This checkout's marketplace submodule now points there. Original working-copy content remains in Git history, not a backup directory.
+- `pnpm lint`, `pnpm typecheck`, and `git diff --check` passed. GitNexus detect-changes identified changed documents/templates but no indexed symbol overlap; this is a documentation/template change, not a claim of a clean tree or validated runtime graph. No function/class/method changed, so symbol impact is inapplicable.
+- Native start initially refused the empty implementation/check manifests under this source repository's automatic context setting. The main host used the supported explicit `--allow-empty-context` option for this inline generated-asset task; no identity or runtime file was fabricated.
+- Root coordination owns the subsequent source publication, secondary checkout fast-forward, installation comparison, and cleanup receipt.

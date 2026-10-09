@@ -50,13 +50,13 @@ Run only when the phase or routing rule is missing; otherwise reuse it.
 
 `get_context.py` shows the active task's `status` field. Route by `status` + artifact presence. This command replaces the user needing to remember the Trellis flow; it does not itself approve implementation.
 
-- `status=planning` + `task.json.meta.delivery_mode = "analysis_only"` → first confirm the task still satisfies the bounded evidence-only eligibility rule; then complete the PRD's evidence work, verify its acceptance criteria and no-change boundary, and archive directly. Do not run `task.py start`; a protected-target change requires a separate change-bearing task.
+- `status=planning` + `task.json.meta.delivery_mode = "analysis_only"` → verify the PRD's bounded evidence deliverable and protected-target no-change boundary, then complete the evidence and archive directly regardless of complexity or cross-owner scope. Do not run `task.py start`; a protected-target change requires a separate change-bearing task.
 - `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
-- `status=planning` + a recorded `decision-needed` or unsealed decision chain → return to the planning frontier and load `pennix-decision-grill` when independent material questions can be batched.
+- `status=planning` + a recorded `decision-needed` or unsealed decision chain → return to `pennix-decision-grill` only for a change-bearing decision or a user-owned choice that materially defines the requested research scope or method; research recommendations and open product choices alone do not trigger the gate.
 - `status=in_progress` + a material unresolved decision → record the reason and run `task.py replan <task> "<reason>"`; do not ask a native question during implementation.
 - `status=planning` + `prd.md` only → decide whether the task is lightweight or complex. Lightweight can move to **1.4** review; complex returns to **1.1** to add `design.md` + `implement.md`.
 - `status=planning` + complex artifacts complete + sub-agent jsonl not curated (empty, or only a legacy `_example` placeholder row) → **1.3**
-- `status=planning` + required artifacts complete + required jsonl curated or inline mode → run the Planning Seal closure pass, then **1.4**. Existing authorization must be a later explicit implementation approval for this task's current sealed material revision. Initial requests, design answers, and parent-task approval do not qualify. Use native plan seal/approve/start; ask only when that approval is missing. A replan invalidates it; minor progress edits do not.
+- `status=planning` + required artifacts complete + required jsonl curated or inline mode → for change-bearing work, run the Planning Seal closure pass, then **1.4**; require later explicit implementation approval for the current sealed revision and use native plan seal/approve/start. `analysis_only` work completes its evidence and archives without this path. A replan invalidates change-bearing approval; minor progress edits do not.
 - `status=in_progress` + implementation not started → **2.1**
 - `status=in_progress` + implementation done, not yet checked → **2.2**
 - `status=in_progress` + check passed → **3.3** (spec update) → **3.4** (commit)

@@ -446,7 +446,7 @@ Which breadcrumbs actually fire in normal flow:
 | `unbound_task` | ✅ reachable | Read-only pseudo-status; emitted only with no session JSON and exactly one developer-owned resumable task. It never writes a pointer or permits lifecycle mutation. |
 | `unbound_ambiguous` | ✅ reachable | Read-only pseudo-status; emitted only with no session JSON and two or more developer-owned resumable tasks. The Hook must render all candidate paths and never downgrade it to `no_task`. |
 | `task_error` | ✅ reachable | Pseudo-status; emitted when a session task pointer resolves to a directory whose `task.json` cannot be read or has no usable `status`. |
-| `planning` | ✅ reachable | After `cmd_create` (which now auto-sets the session pointer when available) and before `cmd_start`. An explicit `task.json.meta.delivery_mode = "analysis_only"` task remains in this status only for PRD-bounded evidence work with no material decision, plan, cross-owner/security/deployment/release/credential action, or protected downstream task; it then archives directly without `cmd_start`. Complex analysis uses normal planning and the Planning Seal before start. `planning-inline` is the Codex inline-mode breadcrumb body for the same task status. |
+| `planning` | ✅ reachable | After `cmd_create` (which now auto-sets the session pointer when available) and before `cmd_start`. An explicit `task.json.meta.delivery_mode = "analysis_only"` task remains here for bounded evidence work with a protected-target no-change boundary, regardless of complexity, cross-owner scope, recommendations, or unresolved product choices; it completes and archives without `cmd_start` or implementation approval. Only requested subnode dispatch needs a separately approved frozen dispatch plan. Change-bearing work retains the Planning Seal and implementation approval before start. `planning-inline` is the Codex inline-mode breadcrumb body for the same task status. |
 | `in_progress` | ✅ reachable | After `cmd_start`, until `cmd_archive`. `in_progress-inline` is the Codex inline-mode breadcrumb body for the same task status. |
 | `completed` | ❌ DEAD in normal flow | `cmd_archive` writes `status="completed"` and immediately moves the task dir to `archive/`. The session-pointer cleanup in `clear_task_from_sessions` runs before the move, so the resolver loses the pointer in the same call. The block body in workflow.md is preserved for a future status-transition redesign (e.g. an explicit `in_progress → completed` command) but no current code path produces it. |
 | `stale_<source_type>` | ✅ reachable (rare) | Synthesized when the session pointer references a deleted task directory. Emits the generic body via `build_breadcrumb` because no `stale_*` tag is shipped. |
@@ -514,13 +514,14 @@ nested Trellis sub-agents.
 
 - Edit `.trellis/workflow.md` `[workflow-state:STATUS]` blocks for breadcrumb
   body changes; never touch the parser scripts.
-- Keep the `analysis_only` exception explicit in workflow text: it remains
-  `planning`, permits only eligible PRD-bounded evidence artifacts, and routes
-  a material decision, plan, cross-owner/security/deployment/release/credential
-  action, or protected-target change to normal complex planning.
-- Keep the planning breadcrumb and walkthrough synchronized for evidence-unit
-  persistence and the Planning Seal; a returned native answer continues the
-  same decision chain and does not create a second lifecycle.
+- Keep `analysis_only` explicit in workflow text: it remains `planning`, permits
+  bounded evidence artifacts regardless of complexity/cross-owner scope, and
+  prohibits protected-target changes. Do not route research recommendations or
+  unresolved product choices through implementation approval. A requested
+  subnode dispatch needs a frozen plan and explicit approval before spawn/send.
+- Keep the planning breadcrumb and walkthrough synchronized: evidence work does
+  not need a Planning Seal, while change-bearing work retains it; a returned
+  native answer continues the same decision chain and does not create a second lifecycle.
 - Keep `trellis update` whole-file behavior for hash-tracked `workflow.md`.
   Breadcrumb tag updates alone are insufficient because platform routing
   markers outside those tags are runtime input too.
