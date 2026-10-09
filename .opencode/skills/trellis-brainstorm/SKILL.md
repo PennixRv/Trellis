@@ -11,7 +11,7 @@ A request to build, implement, fix, refactor, or "go ahead" is not approval to l
 
 For every non-trivial task, the user must respond at least once after the initial request before implementation begins. If no clarification is needed, that response must approve the final planning summary described below.
 
-Keep the task in planning while a user-owned choice needed to define the requested work remains unresolved. For `analysis_only`, findings, recommendations, and open product options do not block evidence work or require a sealed decision chain. For change-bearing work, inventory evidence and decision dependencies; batch independent material questions with `pennix-decision-grill` when useful, and do not implement or run `task.py start` until change decisions are sealed and approved.
+Keep the task in planning while a user-owned choice needed to define the requested work remains unresolved. For `analysis_only`, findings, recommendations, and open product options do not block evidence work or require a sealed decision chain. For other work, screen consequential user-owned choices with `pennix-decision-grill`, including a single choice; it owns progressive decision method, not task lifecycle. Do not implement or run `task.py start` until change decisions are sealed and approved.
 
 ## Analysis-Only Exception
 
@@ -74,9 +74,9 @@ Use a concise title from the user's request. Both the title and `--description` 
    - product intent still needed from the user
    - scope or risk decisions still needed from the user
    - likely out-of-scope items
-4. If the requested research scope or method depends on an unresolved user-owned choice, ask only that material question; otherwise proceed with the evidence work already requested. Use `pennix-decision-grill` to batch independent choices only when needed to define the requested work. A research recommendation or open product choice can be reported as a finding without being decided or sealed for implementation.
+4. Screen genuine user-owned decisions; resolve repository facts and settled local details directly. Use `pennix-decision-grill` progressively: dependency readiness first, then impact/priority; ask only the coherent current frontier and reassess after answers. For bounded research, ask only when its requested scope or method depends on the choice; findings and recommendations need no implementation decision.
 5. If the user requests independent subnode evidence, first freeze the dispatch plan in the task: question, evidence-unit mapping and grouping rationale, brief scope/stop conditions/destinations, concurrency and FIFO refill/acceptance method. Obtain the user's explicit approval of that frozen plan before any spawn/send. This approval covers only the listed evidence dispatch; material changes to units, scope, method, owner, risk, or acceptance require reapproval. Main-session evidence work may continue while dispatch approval is pending.
-6. When a needed answer returns, persist it, recheck evidence, and continue the same task. Do not create a second lifecycle for the same decision chain.
+6. When a needed answer returns, persist it and the affected dependencies, recheck evidence, and continue the same task. Before substantial evidence work, save the current decision, known answers, missing facts, return point and stop condition. Use bounded local/web evidence or explicitly approved independent subnodes; they establish facts, not user decisions. An empty ready frontier can mean missing evidence, not planning closure. Do not create a second lifecycle for the same decision chain.
 7. For `analysis_only`, record and verify the declared evidence and no-change boundary in planning; do not require `design.md`, `implement.md`, a Planning Seal, implementation approval, or `task.py start` merely because the research is complex.
 8. For change-bearing work, resolve material decisions, create/update complex-task artifacts, run the requirement convergence and PRD passes, then close and present the Planning Seal. Stop before implementation. Only a later explicit approval for this task's current sealed revision authorizes native plan approval and `task.py start`. Initial requests, parent-task approvals, and design answers do not qualify. Material changes require `task.py replan` and approval of its newly sealed revision; progress and wording edits do not.
 
@@ -88,7 +88,7 @@ Do not invent a project-specific product/spec hierarchy. If the repository alrea
 
 ## Question Rules
 
-Ask one bounded batch per message: include up to three independent material frontier questions. Ask exactly one question only when it is the sole remaining material decision or later decisions depend on its answer.
+Ask one to three independent, coherent, ready decisions per round, ordered by impact. One high-priority decision is sufficient even when other choices exist; never fill a batch just to reach a count. Dependent questions wait for the preceding answer, and later rounds may discover new branches. Use the host's blocking native question tool; never choose by elapsed time or an unanswered required decision.
 
 Each question must include:
 
