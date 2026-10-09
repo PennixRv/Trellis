@@ -100,6 +100,15 @@ undifferentiated blobs:
 
 ### 2. Whole-file workflow.md update and AGENTS.md managed-block merge
 
+`init` and `update` call `reportAgentsOverride(cwd)` from `utils/managed-paths.ts`.
+This is a same-directory diagnostic, not a Codex hierarchy resolver: a non-empty
+regular `AGENTS.override.md` is reported as the effective source shadowing the
+materialized `AGENTS.md`; an empty override falls back. Unsafe/unreadable override
+paths report unknown capability and are never read through or changed. Report it
+even in a no-op update. Do not rewrite the override or user prose to make generated
+rules active. Init/update integration fixtures cover non-empty, blank and nested
+project boundaries while preserving file contents.
+
 These two runtime-facing files have different update contracts:
 
 - **`.trellis/workflow.md`** stays on the normal whole-file template path. `collectTemplateFiles` resolves the selected workflow from `.trellis/workflow-provenance.json` and verifies its id, source, ref, path, and content hash before inserting it. Native workflows and legacy hash-tracked projects use the bundled `workflowMdTemplate`. Legacy untracked custom workflows without provenance are omitted from the desired-file map, so update cannot replace them with native bytes. `analyzeChanges` then decides whether to auto-update, prompt, skip, or create `.new`; do not partially merge only `[workflow-state:*]` blocks.

@@ -1,0 +1,53 @@
+{
+  "id": "agents-effective-source-owner",
+  "name": "agents-effective-source-owner",
+  "title": "AGENTS 有效源与项目能力前提修复",
+  "description": "承接根任务10-09-agents-skills-layering-remediation：SAG-02项目与SAG-06，规划override诊断、图工具能力前提及beta.43发布，不实施。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-09",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "delivery_mode": "change_bearing",
+    "execution_class": "planned",
+    "planning": {
+      "revision": 2,
+      "seal": {
+        "revision": 2,
+        "task_id": "agents-effective-source-owner",
+        "task_name": "10-09-agents-effective-source-owner",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "73ede76b677bc50618fdbc823c1fca90797ec66a6127649d470a3a4e35f4e69f",
+          "design.md": "9ac0a2cf383c5c3e2adee8652768375b64dcf0a50c23dc018e5793e92c79bacf",
+          "implement.md": "a4f7f150af0ffc8af6418997f6bbbca8878d517e3afe8e8581303fbe8f2b1435"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-09T15:28:34.843774+00:00"
+      },
+      "approved_revision": 2,
+      "approval_basis": "用户明确批准已展示完整修订包，推进修复发布安装与收敛",
+      "approved_at": "2026-10-09T15:33:28.866481+00:00"
+    }
+  }
+}
