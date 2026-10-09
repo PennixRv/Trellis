@@ -11,7 +11,7 @@ Native beta.41 dogfood update, retain reviewed existing research contract correc
 
 ## Acceptance Criteria
 
-- [ ] Both project native dry-run/provenance pass; accepted contracts/source Git pushed, existing work preserved and retired backups cleared; no runtime release needed.
+- [x] Both project native dry-run/provenance pass; accepted contracts/source Git pushed, existing work preserved and retired backups cleared; no runtime release needed.
 
 ## Notes
 
