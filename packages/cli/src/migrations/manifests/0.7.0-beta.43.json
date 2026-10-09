@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.43",
+  "description": "Effective AGENTS source diagnostics and progressive decisions",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Report non-empty same-directory AGENTS overrides without modifying user rules. Screen genuine user decisions progressively and escalate material execution ambiguity through native replan. Keep project graph checks capability-aware.",
+  "migrations": [],
+  "notes": "No migrations. Existing task state, user-owned AGENTS text and overrides are preserved."
+}

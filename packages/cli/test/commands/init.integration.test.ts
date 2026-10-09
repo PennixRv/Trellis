@@ -175,6 +175,24 @@ describe("init() integration", () => {
     expect(content.match(/<!-- TRELLIS:END -->/g)).toHaveLength(1);
   });
 
+  it.each(["# Override rules\n", " \n\t"])(
+    "preserves override %j and distinguishes effective from materialized rules",
+    async (override) => {
+      const overridePath = path.join(tmpDir, "AGENTS.override.md");
+      fs.writeFileSync(overridePath, override);
+      const warn = vi.spyOn(console, "warn").mockImplementation(noop);
+      await init({ yes: true });
+      expect(fs.readFileSync(overridePath, "utf-8")).toBe(override);
+      expect(
+        fs.readFileSync(path.join(tmpDir, FILE_NAMES.AGENTS), "utf-8"),
+      ).toBe(agentsMdContent);
+      const diagnostics = warn.mock.calls.flat().join("\n");
+      expect(diagnostics.includes("materialized but shadowed")).toBe(
+        Boolean(override.trim()),
+      );
+    },
+  );
+
   it("preserves malformed AGENTS.md markers and creates a merge sidecar", async () => {
     const malformed =
       "# Local Instructions\n\n<!-- TRELLIS:START -->\nUnfinished\n";
@@ -185,6 +203,25 @@ describe("init() integration", () => {
 
     expect(fs.readFileSync(agentsPath, "utf-8")).toBe(malformed);
     expect(fs.readFileSync(`${agentsPath}.new`, "utf-8")).toBe(agentsMdContent);
+  });
+
+  it("does not mistake a parent override for the selected nested project source", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "AGENTS.override.md"),
+      "# Parent rules\n",
+    );
+    const nested = path.join(tmpDir, "nested");
+    fs.mkdirSync(nested);
+    vi.mocked(process.cwd).mockReturnValue(nested);
+    const warn = vi.spyOn(console, "warn").mockImplementation(noop);
+    await init({ yes: true });
+    expect(fs.existsSync(path.join(nested, FILE_NAMES.AGENTS))).toBe(true);
+    expect(warn.mock.calls.flat().join("\n")).not.toContain(
+      "materialized but shadowed",
+    );
+    expect(
+      fs.readFileSync(path.join(tmpDir, "AGENTS.override.md"), "utf-8"),
+    ).toBe("# Parent rules\n");
   });
 
   it("#1a writes .gitattributes with the journal merge=union rule (#415)", async () => {

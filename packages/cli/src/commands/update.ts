@@ -85,6 +85,7 @@ import {
   cleanupEmptyDirs,
   getManagedMarkdownBlock,
   mergeManagedMarkdownBlock,
+  reportAgentsOverride,
   TRELLIS_BLOCK_END,
   TRELLIS_BLOCK_START,
 } from "../utils/managed-paths.js";
@@ -2274,6 +2275,7 @@ export async function update(options: UpdateOptions): Promise<void> {
 
   console.log(chalk.cyan("\nTrellis Update"));
   console.log(chalk.cyan("══════════════\n"));
+  reportAgentsOverride(cwd);
 
   // Set up proxy before any network calls (npm version check)
   setupProxy();

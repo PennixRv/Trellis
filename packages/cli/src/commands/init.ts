@@ -24,6 +24,7 @@ import { VERSION } from "../constants/version.js";
 import { agentsMdContent } from "../templates/markdown/index.js";
 import {
   mergeManagedMarkdownBlock,
+  reportAgentsOverride,
   TRELLIS_BLOCK_END,
   TRELLIS_BLOCK_START,
 } from "../utils/managed-paths.js";
@@ -2103,6 +2104,7 @@ function askInput(prompt: string): Promise<string> {
 }
 
 async function createRootFiles(cwd: string): Promise<void> {
+  reportAgentsOverride(cwd);
   const agentsPath = path.join(cwd, FILE_NAMES.AGENTS);
   const existed = fs.existsSync(agentsPath);
   const mergedContent = existed

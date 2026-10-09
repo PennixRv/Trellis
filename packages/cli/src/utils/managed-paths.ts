@@ -6,6 +6,29 @@ import { isManagedPath, isManagedRootDir } from "../configurators/index.js";
 export const TRELLIS_BLOCK_START = "<!-- TRELLIS:START -->";
 export const TRELLIS_BLOCK_END = "<!-- TRELLIS:END -->";
 
+/** Report Codex's same-directory override without changing user-owned rules. */
+export function reportAgentsOverride(cwd: string): void {
+  const override = path.join(cwd, "AGENTS.override.md");
+  try {
+    const stat = fs.lstatSync(override);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      console.warn(
+        `⚠ Cannot verify effective AGENTS source: ${override} is not a regular file.`,
+      );
+    } else if (fs.readFileSync(override, "utf-8").trim()) {
+      console.warn(
+        `⚠ Effective AGENTS source: ${override}; AGENTS.md is materialized but shadowed. The override is preserved.`,
+      );
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(
+        `⚠ Cannot verify effective AGENTS source: ${override} is unreadable; it is preserved.`,
+      );
+    }
+  }
+}
+
 /** Return the first complete managed block, if the document has one. */
 export function getManagedMarkdownBlock(
   content: string,

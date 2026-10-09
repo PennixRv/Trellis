@@ -249,6 +249,24 @@ describe("update() integration", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  it.each(["# Override rules\n", " \n\t"])(
+    "reports effective override %j even in a no-op update without mutating rules",
+    async (override) => {
+      await setupProject();
+      const agents = readProjectFile(FILE_NAMES.AGENTS);
+      writeProjectFile("AGENTS.override.md", override);
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      await update({});
+      expect(readProjectFile("AGENTS.override.md")).toBe(override);
+      expect(readProjectFile(FILE_NAMES.AGENTS)).toBe(agents);
+      expect(
+        warn.mock.calls.flat().join("\n").includes("materialized but shadowed"),
+      ).toBe(Boolean(override.trim()));
+    },
+  );
+
   it("#1 same version update is a true no-op (zero file changes, no backup)", async () => {
     await setupProject();
 
