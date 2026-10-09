@@ -409,3 +409,29 @@ Published and installed beta.40 durable Codex session relations; native CLI and 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: AGENTS effective source and progressive planning
+<!-- trellis-session: v=2 fp=f5fb1a3ffe84e568 -->
+
+**Date**: 2026-10-10
+**Task**: AGENTS effective source and progressive planning
+**Package**: cli
+**Branch**: `pennix/v0.7-beta`
+
+### Summary
+
+Completed approved AGENTS override diagnostics, capability-aware project graph guidance, progressive planning entry and immediate native execution escalation. CLI/core beta.43 released through successful CI and installed; project assets synced, Marketplace/docs pinned. Graph and actual model behavior not_run; deterministic CLI and full test checks passed.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `92fcddc2` | chore: pre-release updates |
+| `c97e3d11` | 0.7.0-beta.43 |
+| `66f9b45a` | chore: synchronize beta.43 project assets and verification |
+| `7fc835cd` | docs: scope project graph checks to available trusted capability |
+
+### Status
+
+[OK] **Completed**

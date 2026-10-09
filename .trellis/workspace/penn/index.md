@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
-- **Last Active**: 2026-10-08
+- **Total Sessions**: 15
+- **Last Active**: 2026-10-10
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~411 | Active |
+| `journal-1.md` | ~437 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-10-10 | AGENTS effective source and progressive planning | `92fcddc2`, `c97e3d11`, `66f9b45a`, `7fc835cd` | `pennix/v0.7-beta` |
 | 14 | 2026-10-08 | Durable historical Codex billing beta.40 delivery | `0f31c85f`, `a04054b0`, `231ea8bf` | `pennix/v0.7-beta` |
 | 13 | 2026-10-07 | 工作流审查修复交付收尾 | `3703c14c`, `cc99dcd5`, `5a66cb1d` | `pennix/v0.7-beta` |
 | 12 | 2026-10-07 | Evidence planning, FIFO and CLI defaults delivered | `0ebe9570`, `fcccde2b`, `249a8342` | `pennix/v0.7-beta` |
