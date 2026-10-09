@@ -1,0 +1,29 @@
+{
+  "id": "bounded-in-progress-amendment-workflow",
+  "name": "bounded-in-progress-amendment-workflow",
+  "title": "在途补充规则工作流同步",
+  "description": "Owner task for the Marketplace workflow and bundled CLI template synchronization; coordinated by the root task.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-09",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "direct",
+    "delivery_mode": "change_bearing"
+  }
+}
