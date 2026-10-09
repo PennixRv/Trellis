@@ -9,6 +9,10 @@ Managed by Trellis. Edits outside this block are preserved; edits inside may be 
 
 <!-- TRELLIS:END -->
 
+## GitNexus 能力前提（项目维护）
+
+以下自动生成 GitNexus 段的图检查要求仅在可信、已部署且可用的工具与当前索引下适用。缺少能力、离线或仅有只读权限时，使用有界本地源码、调用方和测试证据，明确记录图检查 `not_run` 及其限制；不得将其报告为图验收通过。初始化、安装、下载 latest runner、重建索引属于独立的显式操作，不能由下文的过时提示隐式触发。
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
