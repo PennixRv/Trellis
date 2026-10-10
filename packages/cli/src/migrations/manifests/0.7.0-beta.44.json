@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.44",
+  "description": "Bounded Codex memory queries and workflow asset boundaries",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Read Codex JSONL memory queries in bounded passes, preserve compaction and repeated-turn semantics, enforce context character budgets, and clarify managed asset, dispatch, archive acceptance, and bulk research boundaries.",
+  "migrations": [],
+  "notes": "No migrations. Existing session data, task state, and user-owned workflow files are preserved."
+}

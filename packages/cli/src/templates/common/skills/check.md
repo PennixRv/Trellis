@@ -1,6 +1,6 @@
 # Code Quality Check
 
-Comprehensive quality verification for recently written code. Combines spec compliance, cross-layer safety, and pre-commit checks.
+Verify the task's affected behavior against the current implementation, applicable specs, and acceptance criteria.
 
 ---
 
@@ -10,6 +10,11 @@ Comprehensive quality verification for recently written code. Combines spec comp
 git diff --name-only HEAD
 git status
 ```
+
+Use the diff as the entry point. Follow the affected behavior through existing
+implementation, necessary callers, configuration, tests, documentation and
+generated consumers. Expand when evidence of an existing problem could affect
+the task result; do not default to a whole-module or whole-repository audit.
 
 ## Step 2: Read Task Artifacts and Applicable Specs
 
@@ -35,6 +40,12 @@ Read the specific guideline files referenced — the index is a pointer, not the
 
 Run the project's lint, type-check, and test commands. Fix any failures before proceeding.
 
+Choose checks by changed behavior and risk. When the task includes installation,
+release or a live workflow, verify its normal entry and required endpoint;
+isolated tests do not prove those endpoints. A clean bootstrap or destructive
+cleanup applies only when required by the task and authorized. Reuse valid
+results and distinguish checks run, not run, blocked, or limited.
+
 ## Step 4: Review Against Checklist
 
 ### Code Quality
@@ -47,9 +58,9 @@ Run the project's lint, type-check, and test commands. Fix any failures before p
 
 ### Test Coverage
 
-- [ ] New function → unit test added?
-- [ ] Bug fix → regression test added?
-- [ ] Changed behavior → existing tests updated?
+- [ ] Non-trivial behavior and material risks covered by meaningful checks?
+- [ ] Bug fix has a regression that reaches the failing path?
+- [ ] Existing tests updated when their behavior changed, without duplicating trivial implementation?
 
 ### Spec Sync
 
@@ -62,7 +73,7 @@ Run the project's lint, type-check, and test commands. Fix any failures before p
 - [ ] Any tidying of code the task did not require?
 - [ ] Any abstraction, config or extension point added for a case that does not exist yet?
 - [ ] Any speculative fallback for a state that cannot occur?
-- [ ] Any file changed that the acceptance criteria do not mention?
+- [ ] Each changed file serves the task or a necessary consumer, even if the AC do not name it individually?
 - [ ] Any workaround added at the caller instead of a fix where the behavior actually lives?
 
 ## Step 5: Cross-Layer Dimensions (if applicable)
@@ -99,6 +110,12 @@ Skip this step if your change is confined to a single layer.
 ## Step 6: Report and Fix
 
 Report every violation you find. Then:
+
+Verify important findings against current requirements, actual sources, callers
+and relevant counterevidence before prioritizing. Separate observed facts from
+inferences; a rule's presence, a zero call count or an intentional behavior is
+not by itself proof of a defect. Record task-relevant findings and their effect
+on acceptance; new consequential scope choices follow the task's decision gate.
 
 - Mechanical and local (lint nit, missing type, wrong import, dead branch, failing assertion) → fix in place, then re-run project checks.
 - Design or judgment (naming a shared concept, moving a module boundary, changing a public interface, reassigning where behavior lives) → record the evidence and your recommendation, and stop. Do not rewrite it silently.

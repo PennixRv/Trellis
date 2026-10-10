@@ -16,7 +16,7 @@ This prints:
 - **Git status** — quick visual on what's dirty.
 - **Recent commits** — you'll need their hashes in Step 4 for `--commit`.
 
-If `--mode record` surfaces other completed tasks not tied to the current session, surface them to the user with a one-shot confirmation: "These N tasks look done — archive them too in this round? [y/N]". Default is no; the current active task is always archived in Step 3 regardless.
+If `--mode record` surfaces other completed tasks not tied to the current session, surface them to the user with a one-shot confirmation: "These N tasks look done — archive them too in this round? [y/N]". Default is no; archive the current task only after the acceptance check below.
 
 ## Step 2: Sanity check — classify dirty paths
 
@@ -44,13 +44,28 @@ Then route:
   > "FYI, dirty files outside this task's scope — leaving them for the other window: `<list>`."
 - **Genuinely unsure** — ask the user once: "Are `<list>` this task's work I forgot to commit, or another window's? (commit / ignore)" — then route per their answer.
 
+### Acceptance check before archive
+
+Compare the task's PRD-defined endpoint and required acceptance criteria with
+actual evidence in its records and verification results. Reuse valid results;
+state which checks ran, did not run, were blocked, or had limited coverage.
+Installation, publishing, project updates or live execution require their own
+evidence when they are part of the authorized endpoint; static readiness or
+isolated tests cannot stand in for them. Clean bootstrap/cleanup is conditional
+on the task goal and authorization, not an automatic finishing step.
+
+If a required criterion is unmet or lacks sufficient evidence, return to the
+corresponding work and leave the task unarchived. Reporting a limitation does
+not satisfy a required criterion. Keep this conclusion in the existing task
+record; do not add a separate acceptance receipt.
+
 ## Step 3: Archive task(s)
 
 ```bash
 {{PYTHON_CMD}} ./.trellis/scripts/task.py archive <task-name>
 ```
 
-At minimum: the current active task (if any). Plus any extra tasks the user confirmed in Step 1. Each archive produces a `chore(task): archive ...` commit via the script's auto-commit.
+Archive the current active task and any extra tasks confirmed in Step 1 only when their required acceptance has been verified. Each archive produces a `chore(task): archive ...` commit via the script's auto-commit.
 
 If there is no active task and the user did not confirm any cleanup archives, skip this step.
 
