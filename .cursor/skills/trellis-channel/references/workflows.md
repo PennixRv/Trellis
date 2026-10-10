@@ -3,6 +3,13 @@
 Use these patterns by intent. Prefer durable channels for multi-round work and
 `channel run` for one-shot questions.
 
+The selected project workflow owns the dispatch and evidence contract. Under
+`codex-subnode-channel`, the main session implements/checks inline and explicitly
+approved independent evidence uses the subnode brief/report/acceptance path in
+`subnode-work.md`. The generic agent examples below do not override that path.
+Codex Channel workers disable their own native multi-agent features to prevent
+recursion; main-session inline mode does not disable explicit Channel evidence.
+
 ## Pattern A: Multi-round Brainstorm
 
 Use when the user says "和 codex/claude 讨论一下", "brainstorm", or "拉一个 agent
@@ -49,7 +56,10 @@ needed.
 
 ## Pattern B: Implement / Check Agent
 
-Use when the user asks to dispatch implementation or review work.
+Use only when the selected workflow permits Channel implement/check dispatch
+and the task authorizes it, such as a Channel-driven workflow. Under
+`codex-subnode-channel`, use an approved independent-evidence subnode instead;
+ordinary implementation/checking stays in the main session.
 
 ```bash
 TASK=.trellis/tasks/05-12-foo
@@ -74,7 +84,9 @@ already run.
 
 ## Pattern C: Parallel Reviewers
 
-Use one channel and distinct worker names.
+Use one channel and distinct worker names only under the same permitted
+dispatch contract as Pattern B. These generic check workers are not the default
+review path for `codex-subnode-channel`.
 
 ```bash
 trellis channel create cr-feature --ephemeral

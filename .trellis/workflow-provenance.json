@@ -3,7 +3,7 @@
   "workflow_id": "native",
   "source_kind": "bundled",
   "registry": "bundled:trellis",
-  "ref": "0.7.0-beta.43",
+  "ref": "0.7.0-beta.45",
   "path": "bundled:trellis/workflow.md",
   "content_sha256": "a8e3b73282c8ca47f0acaa188f8f40add0afb040ee8ffbdcc3aefcf17760b366"
 }

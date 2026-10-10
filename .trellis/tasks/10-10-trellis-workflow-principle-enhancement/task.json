@@ -1,0 +1,53 @@
+{
+  "id": "trellis-workflow-principle-enhancement",
+  "name": "trellis-workflow-principle-enhancement",
+  "title": "增强工作流审查、验收、资源指引与授权语义",
+  "description": "负责根 workflow-principle-enhancement 方案中已核验的 Trellis 模板、继承的 Marketplace/docs 发布改动和 Codex mem 修正；当前仅规划，等本任务封口修订获得后续明确批准后再实施。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-10",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 2,
+      "seal": {
+        "revision": 2,
+        "task_id": "trellis-workflow-principle-enhancement",
+        "task_name": "10-10-trellis-workflow-principle-enhancement",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "ce0244612abd6085deefb32181ef2fc1c48eca0df9b6f8eb631d36a7c87af999",
+          "design.md": "47de82956d28b0aba2a98d9a45a3fb3f5ccd74e1cc70596345d15d5b33863497",
+          "implement.md": "a99faec0a5632a2cc78ce1ec1181ac21581ce9856617165e51f9027ac6d1b67a"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-10T13:50:01.184237+00:00"
+      },
+      "approved_revision": 2,
+      "approval_basis": "用户明确批准当前已封口 revision 2 完整修订包进入实施，并授权按计划修复、提交推送、必要发布、重装、落点更新与任务收敛。",
+      "approved_at": "2026-10-10T14:09:47.154968+00:00"
+    }
+  }
+}

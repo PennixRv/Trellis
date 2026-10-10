@@ -4,10 +4,11 @@ When the user wants to change AI entry points, auto-trigger rules, or explicit c
 
 Before editing, classify the skill you are about to touch:
 
-- **Bundled upstream skill** — `trellis-meta`, `trellis-spec-bootstrap`, `trellis-session-insight`, `trellis-channel`. Source of truth lives in the Trellis CLI repo under `packages/cli/src/templates/common/bundled-skills/<name>/`; auto-dispatched to every platform's skill root by `getBundledSkillTemplates()` on `trellis init` / `trellis update`. Local edits here are tracked by `.trellis/.template-hashes.json` and will be flagged on the next update.
-- **Project-local skill** — anything else under `.{platform}/skills/`. Owned by the user; not refreshed by `trellis update`.
+- **Bundled multi-file skill** — `trellis-meta`, `trellis-spec-bootstrap`, `trellis-session-insight`, `trellis-channel`, `trellis-research-record`. Source lives under `packages/cli/src/templates/common/bundled-skills/<name>/`; `getBundledSkillTemplates()` distributes it to each platform skill root on init/update.
+- **Other Trellis-managed entry** — single-file skills such as `trellis-check` and `trellis-before-dev`, command-backed skills such as `trellis-finish-work`, and platform-specific entries. Their sources live under `common/skills/`, `common/commands/` or the relevant platform template directory. Configurators generate them and update tracks their template hashes too.
+- **Project-local entry** — content created by the project outside the managed template set, owned by the user and not refreshed by `trellis update`. Its directory or absence from a short bundled-name list does not establish ownership.
 
-The remainder of this file uses "skill" for the local file; the override and conflict rules differ between the two cases.
+The remainder uses "skill" for the local file. Confirm its actual source and generated-file ownership before choosing the edit path.
 
 ## Read These Files First
 
@@ -15,7 +16,7 @@ The remainder of this file uses "skill" for the local file; the override and con
 2. Target platform skill/command/prompt/workflow directory
 3. Related agent or hook files
 4. Whether project rules already exist in `.trellis/spec/`
-5. `.trellis/.template-hashes.json` — confirms whether the skill you are about to edit is upstream-owned (entry present) or project-local (entry absent)
+5. `.trellis/.template-hashes.json` and the relevant template/configurator — a hash entry confirms management; a missing entry alone does not prove project ownership.
 
 ## Which Entry Type To Choose
 
@@ -25,7 +26,7 @@ The remainder of this file uses "skill" for the local file; the override and con
 | User wants to trigger manually with a command | Add or modify a command/prompt/workflow. |
 | Team project conventions | Prefer `.trellis/spec/` or a project-local skill — never a bundled skill directory. |
 | Tweak a bundled skill (`trellis-meta` et al.) for the user's own project | Create a project-local sibling skill (different name) that overrides intent, or edit `.trellis/spec/`. Edits inside the bundled skill directory survive only until the next `trellis update` and will need a "keep" choice each time. |
-| Contribute the change back upstream | Edit `packages/cli/src/templates/common/bundled-skills/<name>/` in the Trellis CLI repo, not the deployed copy. |
+| Contribute the change back upstream | Edit its actual bundled, common skill/command or platform template source in the Trellis CLI repo, not the deployed copy. |
 | Change Trellis flow semantics | Synchronize `.trellis/workflow.md`. |
 
 ## Modify A Skill
@@ -50,12 +51,12 @@ Do not write vague descriptions such as "helpful project skill"; they can trigge
 
 ### Bundled vs. Project-Local
 
-The same directory shape is used by two very different ownership models:
+The same directory shape can contain different ownership models:
 
-| Aspect | Bundled (`trellis-meta`, `trellis-spec-bootstrap`, `trellis-session-insight`, `trellis-channel`) | Project-local |
+| Aspect | Trellis-managed entry | Project-local |
 | --- | --- | --- |
-| Source of truth | `packages/cli/src/templates/common/bundled-skills/<name>/` in Trellis CLI repo | Inside the user project itself |
-| Dispatch | Auto-dispatched to every platform skill root by `getBundledSkillTemplates()` (`packages/cli/src/templates/common/index.ts`) on `trellis init` / `trellis update` | Created by the user (or another skill) and never moved |
+| Source of truth | Actual bundled, common skill/command or platform template in the Trellis CLI repo | Inside the user project itself |
+| Generation | Bundled files use `getBundledSkillTemplates()`; other entries use the platform configurator on init/update | Created by the user (or another skill) |
 | Hash tracking | Every file recorded in `.trellis/.template-hashes.json`; conflict prompt on update | Not tracked |
 | Editing locally | Allowed but will be marked "modified by user" on next update | Free editing |
 | The right way to customize | Add a *new* project-local skill with a *different* name that supplements (or supersedes) the bundled one | Edit the file directly |
@@ -92,7 +93,7 @@ If a command only repeats workflow rules, prefer making it reference/read `.trel
 | ZCode | `.zcode/skills/`, `.zcode/commands/` |
 | Kilo / Antigravity / Devin | workflows + skills |
 
-Every directory above is a deploy target for the four bundled skills. Each platform receives a full copy on `trellis init` and refresh on `trellis update`; nothing has to be wired by hand.
+The bundled multi-file skills are distributed to each supported platform skill root on init/update; other managed entries follow that platform's configurator. Read the actual template set rather than inferring it from a fixed count.
 
 ## Add A Project-Local Skill
 
@@ -111,8 +112,9 @@ Pick a name that does **not** collide with the bundled set:
 - `trellis-spec-bootstrap`
 - `trellis-session-insight`
 - `trellis-channel`
+- `trellis-research-record`
 
-A reused name causes `getBundledSkillTemplates()` to overwrite the project-local copy on the next update. A common convention is to prefix the project name: `acme-trellis-deploy`, `acme-trellis-onboarding`.
+Also avoid names of generated single-file or platform entries. A collision becomes managed template content or an update conflict; it is not a durable override. A common convention is to prefix the project name: `acme-trellis-deploy`, `acme-trellis-onboarding`.
 
 ## Notes
 

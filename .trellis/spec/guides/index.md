@@ -75,7 +75,7 @@ These guides help you **ask the right questions before coding**.
 2. **Ignoring design comments**: Flagging intentional behavior documented in code comments as bugs
 3. **Variable misreading**: Not tracing a variable to its actual definition (e.g., Map keyed by path vs name)
 
-**Verification rule**: Every CRITICAL/WARNING finding must be verified against the actual code before prioritizing. Budget ~35% false-positive rate for AI reviews.
+**Verification rule**: Every CRITICAL/WARNING finding must be verified against the actual code before prioritizing.
 
 ---
 

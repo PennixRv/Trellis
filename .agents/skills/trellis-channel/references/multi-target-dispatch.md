@@ -2,8 +2,12 @@
 
 Use after the user has authorized independent evidence and the task owns a
 reviewed unit mapping. Read `subnode-work.md` for artifact and acceptance rules.
-Codex inline mode governs native implement/check agents; it does not disable
-explicit Channel evidence. Missing independent reports cannot be replaced by
+Codex inline workflows skip native implement/check dispatch and keep ordinary
+implementation/checking in the main session; inline mode does not disable
+explicit Channel evidence. Channel implement/check workers belong to a
+separately selected Channel-driven workflow, not `codex-subnode-channel`.
+Codex Channel workers disable their own native multi-agent features to prevent
+recursive dispatch. Missing independent reports cannot be replaced by
 main-session pass claims.
 
 ## Prepare And Dispatch In One Host Call

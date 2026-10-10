@@ -22,10 +22,12 @@ Each phase contains numbered steps, such as `1.3 Configure context`. These numbe
 
 ## Skill Routing
 
-`workflow.md` separates routing by platform capability:
+Read the selected `workflow.md` and current task phase to determine routing;
+platform capability alone does not select the implementation/check path:
 
-- Platforms with sub-agent support: dispatch `trellis-implement` by default for implementation and `trellis-check` for checking.
-- Platforms without sub-agent support: the main session reads skills such as `trellis-before-dev`, then executes directly.
+- A workflow that selects native sub-agent dispatch uses its platform-supported `trellis-implement` / `trellis-check` path.
+- An inline workflow has the main session read `trellis-before-dev`, implement and check directly. Explicit Channel independent evidence remains subject to that workflow's authorization and acceptance contract.
+- A Channel-driven workflow is a separate selected variant; generic Channel examples do not override an inline workflow.
 
 When changing local AI behavior, update the routing descriptions in `workflow.md` first, then check whether the corresponding platform skill, command, or agent files need to stay in sync.
 
@@ -59,7 +61,7 @@ Common changes:
 | Add a phase | Update the Phase Index, phase body, routing, and state blocks. |
 | Change task creation policy | Update the `no_task` state block and Phase 1 description. |
 | Change the default implementation/check path | Update Phase 2 and skill routing. |
-| Change the wrap-up flow | Update Phase 3 and `finish-work` related descriptions. Note the current split: Phase 3.4 = AI-driven code commits (batched, user-confirmed), Phase 3.5 = `/finish-work` (archive + record session). `/finish-work` refuses to run if the working tree is dirty. |
+| Change the wrap-up flow | Update Phase 3 and `finish-work` descriptions together. Follow the selected workflow's commit/push authorization; finish-work checks acceptance and classifies task-related versus unrelated dirty paths before archive and journal recording. |
 | Change platform differences | Update routing descriptions grouped by platform. |
 
 After editing, make the AI reread `.trellis/workflow.md`; do not assume the flow from the old conversation is still valid.

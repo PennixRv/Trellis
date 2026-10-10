@@ -63,6 +63,29 @@ intent, including any minimal source-note status/version/target-link update.
 Existing authorized task/spec duties do not acquire an extra confirmation gate.
 Verify each target independently; do not introduce automatic synchronization.
 
+## Bulk history and resource boundaries
+
+For bulk or remote history research, first define the project path, platform,
+date range, question and required session types. Start with metadata and a small
+sample to verify the stored structure; filter before extracting bodies. Confirm
+main-session versus child-session scope from actual metadata, not file counts.
+
+Choose the processing location and authorized destination before reading a
+large corpus. Process one bounded unit at a time, retain only needed results,
+and transfer only the requested material. Test the intended bulk path on small
+or synthetic data and observe memory/output before scaling. On resource
+pressure, stop the affected work, preserve its checkpoint and reduce the unit;
+do not continue a remote scan or increase concurrency blindly.
+
+`--limit` limits displayed rows, not scan work or a process memory budget.
+Codex small-output `search`/`context` avoid accumulating all dialogue bodies,
+but per-record parsing, fingerprints/index metadata and output still cost
+memory. Full `extract`/phase results and the other platform adapters may retain
+complete dialogue arrays. Do not promise constant memory or infer an earlier
+OOM's cause from these limits alone. Preserve the source logs; raw dialogue,
+credentials and runtime data do not belong in Git. Historical findings still
+require current-source verification and do not authorize automatic write-back.
+
 ## How to call it
 
 Full CLI reference is in `references/cli-quick-reference.md`. The 80% case is one of:
