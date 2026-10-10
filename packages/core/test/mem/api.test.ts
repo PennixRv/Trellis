@@ -14,6 +14,8 @@ import {
 } from "vitest";
 import * as nodeFs from "node:fs";
 import * as nodePath from "node:path";
+import { selectContextTurns } from "../../src/mem/context.js";
+import { searchInDialogue } from "../../src/mem/search.js";
 
 const { fakeHome } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -193,6 +195,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  nodeFs.rmSync(nodePath.join(fakeHome, ".codex"), { recursive: true, force: true });
   nodeFs.rmSync(CLAUDE_PROJECTS, { recursive: true, force: true });
   nodeFs.rmSync(nodePath.join(fakeHome, ".pi"), {
     recursive: true,
@@ -206,6 +209,84 @@ afterEach(() => {
 
 afterAll(() => {
   nodeFs.rmSync(fakeHome, { recursive: true, force: true });
+});
+
+describe("Codex bounded queries", () => {
+  const id = "codex-bounded";
+  const file = nodePath.join(fakeHome, ".codex", "sessions", `rollout-2026-04-15T10-00-00-${id}.jsonl`);
+  const filter = { platform: "codex" as const, cwd: projectCwd };
+  const message = (text: string, role = "user"): Record<string, unknown> => ({
+    type: "message", role, content: [{ type: "input_text", text }],
+  });
+
+  function seedCodex(): void {
+    writeJsonl(file, [
+      { payload: { id, cwd: projectCwd }, timestamp: "2026-04-15T10:00:00Z" },
+      { payload: message("orchard repeated") },
+      { payload: message("orchard repeated") },
+      { payload: message("orchard assistant", "assistant") },
+      { type: "compacted", payload: { replacement_history: [
+        message("orchard oldest"), message("orchard repeated"), message("orchard repeated"),
+      ] } },
+      { payload: message("orchard newest") },
+      { type: "compacted", payload: { replacement_history: [
+        message("orchard even older"), message("orchard oldest"), message("orchard repeated"), message("orchard repeated"),
+      ] } },
+      { type: "response_item", payload: { type: "agent_message", content: [
+        { type: "input_text", text: "Message Type: NEW_TASK\nPayload:\n" },
+        { type: "encrypted_content" },
+      ] } },
+    ]);
+  }
+
+  it("keeps compaction recovery, repeated turns, excerpt order and warnings", () => {
+    seedCodex();
+    const full = extractMemDialogue({ sessionId: id, filter });
+    expect(full.turns.filter((turn) => turn.kind !== "marker").map((turn) => turn.text)).toEqual([
+      "orchard even older", "orchard oldest", "orchard repeated", "orchard repeated", "orchard assistant", "orchard newest",
+    ]);
+    const searched = searchMemSessions({ keyword: "orchard", filter: { ...filter, limit: 1 } });
+    expect(searched.totalMatches).toBe(1);
+    expect(searched.matches[0]?.hit).toEqual(searchInDialogue(full.turns, "orchard"));
+    expect(searched.matches[0]?.hit.userCount).toBe(5);
+    expect(searched.matches[0]?.hit.excerpts.map((entry) => entry.snippet)).toEqual([
+      "orchard even older", "orchard oldest", "orchard repeated",
+    ]);
+    for (const grep of [undefined, "orchard", "compaction"]) {
+      for (const maxChars of [0, 1, 20, 6000]) {
+        const context = readMemContext({ sessionId: id, filter, grep, turns: 2, around: 1, maxChars, includeChildren: true });
+        const expected = selectContextTurns(full.turns, grep, 2, 1, maxChars);
+        expect(context.turns).toEqual(expected.turns);
+        expect(context.totalTurns).toBe(full.totalTurns);
+        expect(context.totalHitTurns).toBe(expected.totalHitTurns);
+        expect(context.budgetUsed).toBe(expected.budgetUsed);
+        expect(context.warnings).toEqual(full.warnings);
+      }
+    }
+    expect(full.warnings.map((warning) => warning.code)).toEqual([
+      "codex-compaction-assistant-dropped", "codex-inter-agent-encrypted",
+    ]);
+  });
+
+  it("keeps global search ranking and exact counts with a small output limit", () => {
+    writeJsonl(file, [
+      { payload: { id, cwd: projectCwd }, timestamp: "2026-04-15T10:00:00Z" },
+      ...Array.from({ length: 256 }, (_, i) => ({ payload: message(`orchard ${i} ` + "x".repeat(4096)) })),
+    ]);
+    const bestId = "codex-best";
+    writeJsonl(file.replace(id, bestId), [
+      { payload: { id: bestId, cwd: projectCwd }, timestamp: "2026-04-15T11:00:00Z" },
+      { payload: message("orchard orchard orchard") },
+    ]);
+    const result = searchMemSessions({ keyword: "orchard", filter: { ...filter, limit: 1 } });
+    expect(result.totalMatches).toBe(2);
+    expect(result.matches.map((match) => match.session.id)).toEqual([bestId]);
+    const context = readMemContext({ sessionId: id, filter, turns: 1, around: 0, maxChars: 200 });
+    expect(context.totalTurns).toBe(256);
+    expect(context.budgetUsed).toBeLessThanOrEqual(200);
+    expect(context.turns[0]?.idx).toBe(0);
+    expect(extractMemDialogue({ sessionId: id, filter }).turns).toHaveLength(256);
+  });
 });
 
 // ---------- OpenCode sub-agent fixture ----------

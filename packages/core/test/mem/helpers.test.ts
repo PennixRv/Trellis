@@ -10,12 +10,13 @@ import { describe, it, expect } from "vitest";
 
 import { isBootstrapTurn, stripInjectionTags } from "../../src/mem/dialogue.js";
 import { inRange, inRangeOverlap, sameProject } from "../../src/mem/filter.js";
+import { selectContextTurns } from "../../src/mem/context.js";
 import {
   chunkAround,
   relevanceScore,
   searchInDialogue,
 } from "../../src/mem/search.js";
-import type { MemFilter } from "../../src/mem/types.js";
+import type { DialogueTurn, MemFilter } from "../../src/mem/types.js";
 
 // =============================================================================
 // relevanceScore
@@ -352,5 +353,36 @@ describe("searchInDialogue", () => {
     }));
     const r = searchInDialogue(turns, "FOO", 3);
     expect(r.excerpts.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("selectContextTurns", () => {
+  it.each([0, 1, 5, 12, 14, 15, 20, 101, 6000])(
+    "includes truncation notation within maxChars=%i",
+    (maxChars) => {
+      const result = selectContextTurns([
+        { role: "user", text: "x".repeat(9000) },
+        { role: "assistant", text: "y".repeat(9000) },
+      ], undefined, 2, 0, maxChars);
+      expect(result.budgetUsed).toBeLessThanOrEqual(maxChars);
+      expect(result.budgetUsed).toBe(result.turns.reduce((n, turn) => n + turn.text.length, 0));
+      if (maxChars === 0) expect(result.turns).toEqual([]);
+      if (maxChars === 1) expect(result.turns[0]?.text).toBe("x");
+      if (maxChars === 6000) expect(result.turns[0]?.text).toBe("x".repeat(3000) + "\n…[+6000 chars]");
+    },
+  );
+
+  it("preserves user-first hit ranking and chronological surrounding turns", () => {
+    const turns: DialogueTurn[] = [
+      { role: "user", text: "foo" },
+      { role: "assistant", text: "foo foo foo" },
+      { role: "user", text: "foo foo" },
+    ];
+    const result = selectContextTurns(turns, "foo", 1, 1, 128);
+    expect(result.totalHitTurns).toBe(3);
+    expect(result.turns).toEqual([
+      { idx: 1, ...turns[1], isHit: false },
+      { idx: 2, ...turns[2], isHit: true },
+    ]);
   });
 });

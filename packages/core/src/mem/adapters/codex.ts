@@ -23,6 +23,7 @@
  */
 
 import * as fs from "node:fs";
+import { createHash } from "node:crypto";
 import * as path from "node:path";
 
 import {
@@ -35,7 +36,7 @@ import { inRangeOverlap, sameProject } from "../filter.js";
 import { readJsonl, readJsonlFirst } from "../internal/jsonl.js";
 import { CODEX_SESSIONS, walkDir } from "../internal/paths.js";
 import { parseTaskPyCommandsAll } from "../phase.js";
-import { searchInDialogue } from "../search.js";
+import { createDialogueSearch } from "../search.js";
 import type {
   DialogueRole,
   DialogueTurn,
@@ -197,23 +198,41 @@ function buildTurnFromMessage(
 class CodexTurnPool {
   private turns: DialogueTurn[] = [];
   private readonly counts = new Map<string, number>();
+  private appended = 0;
+  private prefix = 0;
+
+  constructor(
+    private readonly onTurn?: (turn: DialogueTurn, index: number) => void,
+  ) {}
 
   push(turn: DialogueTurn): void {
-    this.turns.push(turn);
+    if (this.onTurn) this.onTurn(turn, this.appended++);
+    else this.turns.push(turn);
     this.bump(turn);
   }
 
   get length(): number {
-    return this.turns.length;
+    return this.onTurn ? this.appended + this.prefix : this.turns.length;
+  }
+
+  get recoveredPrefixLength(): number {
+    return this.prefix;
   }
 
   toArray(): DialogueTurn[] {
     return this.turns;
   }
 
+  private key(turn: DialogueTurn): string {
+    // Query dedupe retains fingerprints, never full dialogue text keys.
+    return this.onTurn
+      ? createHash("sha256").update(turn.role).update("\0").update(turn.text).digest("hex")
+      : turnKey(turn);
+  }
+
   private bump(turn: DialogueTurn): void {
     if (turn.kind === "marker") return;
-    const k = turnKey(turn);
+    const k = this.key(turn);
     this.counts.set(k, (this.counts.get(k) ?? 0) + 1);
   }
 
@@ -238,7 +257,7 @@ class CodexTurnPool {
       if (!role) continue;
       const turn = buildTurnFromMessage(role, item.content);
       if (!turn) continue;
-      const k = turnKey(turn);
+      const k = this.key(turn);
       const alreadyInPool = this.counts.get(k) ?? 0;
       const used = consumed.get(k) ?? 0;
       if (used < alreadyInPool) {
@@ -249,7 +268,11 @@ class CodexTurnPool {
       consumed.set(k, used + 1);
     }
     if (recovered.length > 0) {
-      this.turns = [...recovered, ...this.turns];
+      if (this.onTurn) {
+        this.prefix += recovered.length;
+        // Negative indices preserve prepend order even across later compactions.
+        recovered.forEach((turn, i) => this.onTurn?.(turn, i - this.prefix));
+      } else this.turns = [...recovered, ...this.turns];
       for (const turn of recovered) this.bump(turn);
     }
     return recovered;
@@ -325,7 +348,21 @@ export function codexExtractDialogue(
 export function codexSearch(s: MemSessionInfo, kw: string): SearchHit {
   // No warnings sink: search fans out over the whole corpus and a per-session
   // notice would be printed thousands of times.
-  return searchInDialogue(codexExtractDialogue(s), kw);
+  const search = createDialogueSearch(kw);
+  visitCodexDialogue(s, (turn, index) => search.add(turn, index));
+  return search.result();
+}
+
+/** Internal query traversal. Add prefixLength to emitted indices to obtain
+ * final dialogue indices; emission order itself is not chronological. */
+export function visitCodexDialogue(
+  s: MemSessionInfo,
+  onTurn: (turn: DialogueTurn, index: number) => void,
+  warnings?: MemWarning[],
+): { totalTurns: number; prefixLength: number } {
+  const pool = new CodexTurnPool(onTurn);
+  scanCodexTurns(s, pool, warnings);
+  return { totalTurns: pool.length, prefixLength: pool.recoveredPrefixLength };
 }
 
 /**
@@ -348,6 +385,16 @@ export function collectCodexTurnsAndEvents(
 } {
   const pool = new CodexTurnPool();
   const events: TaskPyEvent[] = [];
+  scanCodexTurns(s, pool, warnings, events);
+  return { turns: pool.toArray(), events };
+}
+
+function scanCodexTurns(
+  s: MemSessionInfo,
+  pool: CodexTurnPool,
+  warnings?: MemWarning[],
+  events?: TaskPyEvent[],
+): void {
   let encryptedInterAgent = 0;
 
   readJsonl<CodexEvent>(s.filePath, (obj) => {
@@ -355,7 +402,7 @@ export function collectCodexTurnsAndEvents(
       const rh = obj.payload?.replacement_history;
       const recovered = Array.isArray(rh) ? pool.absorbRetainedHistory(rh) : [];
       if (recovered.length > 0) {
-        for (const ev of events) ev.turnIndex += recovered.length;
+        for (const ev of events ?? []) ev.turnIndex += recovered.length;
         if (!recovered.some((t) => t.role === "assistant")) {
           pushWarningOnce(
             warnings,
@@ -391,6 +438,7 @@ export function collectCodexTurnsAndEvents(
     }
 
     if (p.type === "function_call") {
+      if (!events) return;
       const fnName = p.name;
       if (fnName !== "exec_command" && fnName !== "shell") return;
       const cmd = commandFromCodexArguments(p.arguments);
@@ -424,6 +472,4 @@ export function collectCodexTurnsAndEvents(
       `session ${s.id}: ${encryptedInterAgent} inter-agent message payload(s) are stored encrypted by Codex and cannot be read back — the instructions driving this multi-agent run are not recoverable from the rollout.`,
     );
   }
-
-  return { turns: pool.toArray(), events };
 }

@@ -167,7 +167,11 @@ function main() {
   // (parallel in-progress work, runtime artifacts) must never be swept into
   // "chore: pre-release updates" (#303). Staging .trellis/ only ever goes
   // through safe_commit.py's precise allowlist, never a blanket `git add -A`.
-  run("git add -A -- . ':!docs-site' ':!marketplace' ':(exclude,glob).trellis/**'");
+  // Stage from the repository root so a synchronized core change ships with
+  // the CLI tag; keep docs, marketplace, and runtime task state out.
+  run("git add -A -- . ':!docs-site' ':!marketplace' ':(exclude,glob).trellis/**'", {
+    cwd: path.resolve(CLI_DIR, "../.."),
+  });
   if (hasGitDiff()) {
     run("git commit -m 'chore: pre-release updates'");
   }

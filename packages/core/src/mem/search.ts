@@ -60,26 +60,38 @@ export function searchInDialogue(
   maxExcerpts = 3,
   chunkChars = 400,
 ): SearchHit {
-  const dialogue = turns.filter((t) => t.kind !== "marker");
-  const tokens = kw.toLowerCase().split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) {
-    return {
-      count: 0,
-      userCount: 0,
-      asstCount: 0,
-      totalTurns: dialogue.length,
-      excerpts: [],
-    };
-  }
+  const search = createDialogueSearch(kw, maxExcerpts, chunkChars);
+  turns.forEach((turn, index) => search.add(turn, index));
+  return search.result();
+}
 
+/** Internal incremental search with bounded excerpts and stable turn ordering. */
+export function createDialogueSearch(
+  kw: string,
+  maxExcerpts = 3,
+  chunkChars = 400,
+): {
+  add: (turn: DialogueTurn, index: number) => void;
+  result: () => SearchHit;
+} {
+  const tokens = kw.toLowerCase().split(/\s+/).filter(Boolean);
   let userCount = 0;
   let asstCount = 0;
-  const userExcerpts: SearchExcerpt[] = [];
-  const asstExcerpts: SearchExcerpt[] = [];
+  let totalTurns = 0;
+  interface OrderedExcerpt {
+    index: number;
+    order: number;
+    excerpt: SearchExcerpt;
+  }
+  const userExcerpts: OrderedExcerpt[] = [];
+  const asstExcerpts: OrderedExcerpt[] = [];
 
-  for (const t of dialogue) {
+  const add = (t: DialogueTurn, index: number): void => {
+    if (t.kind === "marker") return;
+    totalTurns++;
+    if (tokens.length === 0) return;
     const hay = t.text.toLowerCase();
-    if (!tokens.every((tok) => hay.includes(tok))) continue;
+    if (!tokens.every((tok) => hay.includes(tok))) return;
 
     const hitPositions: { idx: number; tok: string }[] = [];
     const tokenFreq = new Map<string, number>();
@@ -124,25 +136,33 @@ export function searchInDialogue(
       if (b.rarity !== a.rarity) return b.rarity - a.rarity;
       return a.start - b.start;
     });
-    for (const c of candidates) {
+    const excerpts = t.role === "user" ? userExcerpts : asstExcerpts;
+    for (const [order, c] of candidates.slice(0, maxExcerpts).entries()) {
       let snippet = t.text.slice(c.start, c.end).trim();
       if (c.truncated) {
         if (c.start > 0) snippet = "…" + snippet;
         if (c.end < t.text.length) snippet += "…";
       }
-      (t.role === "user" ? userExcerpts : asstExcerpts).push({
-        role: t.role,
-        snippet,
+      excerpts.push({
+        index,
+        order,
+        excerpt: { role: t.role, snippet },
       });
     }
-  }
+    excerpts.sort((a, b) => a.index - b.index || a.order - b.order);
+    excerpts.splice(maxExcerpts);
+  };
 
-  const excerpts = [...userExcerpts, ...asstExcerpts].slice(0, maxExcerpts);
   return {
-    count: userCount + asstCount,
-    userCount,
-    asstCount,
-    totalTurns: dialogue.length,
-    excerpts,
+    add,
+    result: () => ({
+      count: userCount + asstCount,
+      userCount,
+      asstCount,
+      totalTurns,
+      excerpts: [...userExcerpts, ...asstExcerpts]
+        .slice(0, maxExcerpts)
+        .map((entry) => entry.excerpt),
+    }),
   };
 }
