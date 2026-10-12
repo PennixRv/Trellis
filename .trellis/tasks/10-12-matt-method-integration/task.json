@@ -1,0 +1,53 @@
+{
+  "id": "matt-method-integration",
+  "name": "matt-method-integration",
+  "title": "Integrate curated methods into Trellis templates",
+  "description": "Apply the approved Matt Skills method fusion to common Trellis brainstorm, check, and break-loop templates.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "packages/cli/src/templates/common/skills/brainstorm.md,packages/cli/src/templates/common/skills/check.md,packages/cli/src/templates/common/skills/break-loop.md",
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-12",
+  "completedAt": null,
+  "branch": "task/matt-method-integration",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "seal": {
+        "revision": 1,
+        "task_id": "matt-method-integration",
+        "task_name": "10-12-matt-method-integration",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "b2cf61bb3b34a47dc289109f50f6505d6e08f419d1ad813d67e0f9006f4ff118",
+          "design.md": "2dad27d56fa4c490919bf3f357c5465c290ac21f6d2731b7c2cf30576b7a86e6",
+          "implement.md": "9febf3efa117a4d64e7badcdc16fc255d1ab7604bf7953073c2503ab7670791c"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-12T11:17:01.567596+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "Approved full Matt Skills integration package, including Trellis method fusion, lifecycle collection, release and project update.",
+      "approved_at": "2026-10-12T11:17:24.603375+00:00"
+    }
+  }
+}

@@ -8,6 +8,18 @@ For every non-trivial task, the user must respond at least once after the initia
 
 Keep the task in planning while a user-owned choice needed to define the requested work remains unresolved. For `analysis_only`, findings, recommendations, and open product options do not block evidence work or require a sealed decision chain. For other work, screen consequential user-owned choices with `pennix-decision-grill`, including a single choice; it owns progressive decision method, not task lifecycle. Do not implement or run `task.py start` until change decisions are sealed and approved.
 
+## Idea-to-Plan Route
+
+When the input is an idea, suspected gap, review finding, or loosely stated improvement, route it through the smallest complete chain:
+
+1. State the user outcome and the concrete problem or gap in one sentence.
+2. Separate repository-answerable facts from user-owned choices; inspect the repository, task history, and applicable specs before asking about facts.
+3. Record the current evidence and its recovery point in the natural task artifact: research matrix for research, PRD/design for planning, and the diff or Git history for code.
+4. Screen only the choices that change scope, owner, risk, public behavior, release, or acceptance through `$pennix-decision-grill`.
+5. Define observable acceptance, boundaries, rollback, and the next dependency-ready action; then use the normal seal and approval gate.
+
+An issue discovered while doing this work is not automatically part of the task. Compare its owner, target, risk, and acceptance with the sealed scope. Record every consequential finding and ask whether it should be included; a same-owner, reversible, low-risk correction may use the existing in-progress addition rule. Otherwise use `task.py replan` and reseal before dependent implementation.
+
 ## Analysis-Only Exception
 
 When `task.json.meta.delivery_mode = "analysis_only"` exactly and the PRD names a bounded evidence deliverable plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems, task-creation consent authorizes that evidence work. Do not require a second planning approval or run `task.py start`: perform the declared research, audit, or design work while status remains `planning`, record the evidence, verify acceptance criteria and the boundary, commit task artifacts, and archive directly. If the evidence recommends a protected-target change, record it and create a separate change-bearing task before doing it.
