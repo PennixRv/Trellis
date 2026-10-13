@@ -1,14 +1,14 @@
-# Workspace Index
+# 工作区索引（Workspace Index）
 
-> Records of all AI Agent work records across all developers
+> 记录所有开发者的 AI Agent 工作记录。
 
 ---
 
-## Overview
+## 概览（Overview）
 
-This directory tracks records for all developers working with AI Agents on this project.
+本目录跟踪本项目所有使用 AI Agent 的开发者记录。
 
-### File Structure
+### 文件结构（File Structure）
 
 ```
 workspace/
@@ -23,98 +23,98 @@ workspace/
 
 ---
 
-## Active Developers
+## 活跃开发者（Active Developers）
 
-| Developer | Last Active | Sessions | Active File |
+| 开发者（Developer） | 最近活动（Last Active） | 会话（Sessions） | 活动文件（Active File） |
 |-----------|-------------|----------|-------------|
-| (none yet) | - | - | - |
+| （暂无） | - | - | - |
 
 ---
 
-## Getting Started
+## 开始使用（Getting Started）
 
-### For New Developers
+### 新开发者（For New Developers）
 
-Run the initialization script:
+运行初始化脚本：
 
 ```bash
 python3 ./.trellis/scripts/init_developer.py <your-name>
 ```
 
-This will:
-1. Create your identity file (gitignored)
-2. Create your progress directory
-3. Create your personal index
-4. Create initial journal file
+此命令将：
+1. 创建身份文件（由 git 忽略）
+2. 创建进度目录
+3. 创建个人索引
+4. 创建初始日志文件
 
-### For Returning Developers
+### 已有开发者（For Returning Developers）
 
-1. Get your developer name:
+1. 获取开发者名称：
    ```bash
    python3 ./.trellis/scripts/get_developer.py
    ```
 
-2. Read your personal index:
+2. 阅读个人索引：
    ```bash
    cat .trellis/workspace/$(python3 ./.trellis/scripts/get_developer.py)/index.md
    ```
 
 ---
 
-## Guidelines
+## 指南（Guidelines）
 
-### Journal File Rules
+### 日志文件规则（Journal File Rules）
 
-- **Max 2000 lines** per journal file
-- When limit is reached, create `journal-{N+1}.md`
-- Update your personal `index.md` when creating new files
+- 每个日志文件最多 **2000 行**
+- 达到上限后创建 `journal-{N+1}.md`
+- 创建新文件时更新个人 `index.md`
 
-### Session Record Format
+### 会话记录格式（Session Record Format）
 
-Each session should include:
-- Summary: One-line description
-- Branch: Which branch the work was done on
-- Main Changes: What was modified
-- Git Commits: Commit hashes and messages
-- Next Steps: What to do next
+每个会话应包含：
+- 摘要（Summary）：一行描述
+- 分支（Branch）：工作的分支
+- 主要变更（Main Changes）：修改内容
+- Git 提交（Git Commits）：提交哈希和消息
+- 下一步（Next Steps）：后续工作
 
 ---
 
-## Session Template
+## 会话模板（Session Template）
 
-Use this template when recording sessions:
+记录会话时使用以下模板：
 
 ```markdown
-## Session {N}: {Title}
+## 会话（Session） {N}：{Title}
 
-**Date**: YYYY-MM-DD
-**Task**: {task-name}
-**Branch**: `{branch-name}`
+**日期（Date）**: YYYY-MM-DD
+**任务（Task）**: {task-name}
+**分支（Branch）**: `{branch-name}`
 
-### Summary
+### 摘要（Summary）
 
 {One-line summary}
 
-### Main Changes
+### 主要变更（Main Changes）
 
 - {Change 1}
 - {Change 2}
 
-### Git Commits
+### Git 提交（Git Commits）
 
 | Hash | Message |
 |------|---------|
 | `abc1234` | {commit message} |
 
-### Testing
+### 测试（Testing）
 
 - [OK] {Test result}
 
-### Status
+### 状态（Status）
 
 [OK] **Completed** / # **In Progress** / [P] **Blocked**
 
-### Next Steps
+### 下一步（Next Steps）
 
 - {Next step 1}
 - {Next step 2}
@@ -122,4 +122,4 @@ Use this template when recording sessions:
 
 ---
 
-**Language**: All documentation must be written in **English**.
+**语言（Language）**：所有文档默认使用**简体中文**。

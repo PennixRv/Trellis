@@ -67,7 +67,7 @@ describe("trellis template constants", () => {
 
   function inProgressBreadcrumb(): string {
     const inProgressMatch =
-      /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/.exec(
+      /^\[workflow-state:in_progress\]\n([\s\S]*?)^\[\/workflow-state:in_progress\]/m.exec(
         workflowMdTemplate,
       );
     if (!inProgressMatch) {
@@ -78,7 +78,8 @@ describe("trellis template constants", () => {
 
   function workflowStateBreadcrumb(status: string): string {
     const match = new RegExp(
-      `\\[workflow-state:${status}\\]([\\s\\S]*?)\\[/workflow-state:${status}\\]`,
+      `^\\[workflow-state:${status}\\]\\n([\\s\\S]*?)^\\[/workflow-state:${status}\\]`,
+      "m",
     ).exec(workflowMdTemplate);
     if (!match) {
       throw new Error(`${status} breadcrumb block must exist in workflow.md`);
@@ -164,13 +165,13 @@ describe("trellis template constants", () => {
     );
 
     expect(workflowMdTemplate).toContain(marker);
-    expect(workflowMdTemplate).toContain("no-change boundary");
-    expect(workflowMdTemplate).toContain("separate change-bearing task");
+    expect(workflowMdTemplate).toContain("受保护目标不变边界");
+    expect(workflowMdTemplate).toContain("另建 change-bearing 任务");
     for (const status of ["planning", "planning-inline"]) {
       const breadcrumb = workflowStateBreadcrumb(status);
       expect(breadcrumb).toContain(marker);
-      expect(breadcrumb).toContain("Do not run a Planning Seal or wait for implementation approval");
-      expect(breadcrumb).toContain("archive directly");
+      expect(breadcrumb).toContain("不要运行 Planning Seal 或等待实施批准");
+      expect(breadcrumb).toContain("完成有界证据工作");
     }
     for (const name of ["start", "continue", "finish-work", "brainstorm"]) {
       const content = commonTemplates.get(name) ?? "";
@@ -183,7 +184,7 @@ describe("trellis template constants", () => {
       ).toContain("separate change-bearing task");
     }
     expect(workflowMdTemplate).toContain(
-      "change-bearing implementation waits for `task.py start`",
+      "change-bearing 实施需等待资产审查后的 `task.py start`",
     );
     const continuation = commonTemplates.get("continue") ?? "";
     expect(continuation).toContain("only for a change-bearing decision");
@@ -194,18 +195,19 @@ describe("trellis template constants", () => {
     const brainstorm =
       getSkillTemplates().find((template) => template.name === "brainstorm")
         ?.content ?? "";
-    for (const content of [workflowMdTemplate, brainstorm]) {
-      expect(content).toContain('`task.json.meta.delivery_mode = "analysis_only"`');
-      expect(content).toContain("cross-owner");
-      expect(content).toContain("no-change boundary");
-    }
-    expect(workflowMdTemplate).toContain("Complexity, cross-owner scope, multiple evidence units");
-    expect(workflowMdTemplate).toContain("Do not run a Planning Seal");
+    expect(workflowMdTemplate).toContain('`task.json.meta.delivery_mode = "analysis_only"`');
+    expect(workflowMdTemplate).toContain("跨 owner");
+    expect(workflowMdTemplate).toContain("受保护目标不变边界");
+    expect(brainstorm).toContain('`task.json.meta.delivery_mode = "analysis_only"`');
+    expect(brainstorm).toContain("cross-owner");
+    expect(brainstorm).toContain("no-change boundary");
+    expect(workflowMdTemplate).toContain("复杂度、跨 owner 范围、多个证据单元");
+    expect(workflowMdTemplate).toContain("不要运行 Planning Seal");
     expect(brainstorm).toContain("regardless of complexity");
     expect(brainstorm).toContain("explicit approval of that frozen plan");
     expect(brainstorm).toContain("only the listed evidence dispatch");
     expect(brainstorm).toContain("implementation approval gates");
-    expect(workflowMdTemplate).toContain("evidence units");
+    expect(workflowMdTemplate).toContain("证据单元");
     expect(workflowMdTemplate).toContain("change-bearing");
   });
 
@@ -229,12 +231,12 @@ describe("trellis template constants", () => {
     ];
 
     for (const workflow of workflows) {
-      expect(workflow).toContain("Direct small work");
-      expect(workflow).toContain("immediate verification");
-      expect(workflow).toContain("ownership");
-      expect(workflow).toContain("release");
-      expect(workflow).toContain("credentials");
-      expect(workflow).toContain("durable record");
+      expect(workflow).toMatch(/Direct small work|直接小任务/);
+      expect(workflow).toMatch(/immediate verification|立即验证/);
+      expect(workflow).toMatch(/ownership|owner/);
+      expect(workflow).toMatch(/release|发布/);
+      expect(workflow).toMatch(/credentials|凭据/);
+      expect(workflow).toMatch(/durable record|持久记录/);
     }
   });
 
@@ -348,8 +350,8 @@ describe("trellis template constants", () => {
     // whenever a project hook is unavailable or untrusted.
     const block = inProgressBreadcrumb();
     expect(block).toContain("Active task:");
-    expect(workflowMdTemplate).toContain("native Codex `SubagentStart`");
-    expect(workflowMdTemplate).toContain("child-side pull fallback");
+    expect(workflowMdTemplate).toContain("原生 Codex `SubagentStart`");
+    expect(workflowMdTemplate).toContain("子代理侧读取为后备");
   });
 
   it("[codex-native-subagents] Codex uses the native hook implement block, while class-2 platforms stay pull-based", () => {
@@ -414,22 +416,20 @@ describe("trellis template constants", () => {
         `${label} must not use hook/plugin auto-handles 2.1 guidance`,
       ).not.toContain(label);
     }
-    expect(pullBasedBlock).toContain(
-      "The pull-based sub-agent definition auto-handles the context load requirement",
-    );
-    expect(workflowMdTemplate).toContain("default continuable background mode");
-    expect(workflowMdTemplate).toContain("native settlement notice");
-    expect(workflowMdTemplate).toContain("optional companion plugin");
-    expect(workflowMdTemplate).toContain("once per dependent child id");
-    expect(workflowMdTemplate).toContain("Without `trellis_wait`");
+    expect(pullBasedBlock).toContain("拉取式子代理定义会自动处理上下文加载");
+    expect(workflowMdTemplate).toContain("默认可继续的后台模式");
+    expect(workflowMdTemplate).toContain("原生结算通知");
+    expect(workflowMdTemplate).toContain("可选伴随插件");
+    expect(workflowMdTemplate).toContain("对每个依赖子代理 ID 调用一次");
+    expect(workflowMdTemplate).toContain("没有 `trellis_wait` 时");
     expect(workflowMdTemplate).toContain("run_in_background: false");
     expect(workflowMdTemplate).toContain(
-      "Never simulate waiting with shell sleep, polling loops",
+      "不得用 shell sleep、轮询循环",
     );
     expect(workflowMdTemplate).not.toContain("Start-Sleep");
     expect(workflowMdTemplate).toContain("trellis-agent-<role>");
     expect(workflowMdTemplate).toContain(
-      "on Claude Code: use the Task/Agent tool, never the Skill tool",
+      "Claude Code 使用 Task/Agent 工具，不使用 Skill 工具",
     );
     expect(hookAutoBlock).toContain("codex-sub-agent");
     expect(hookAutoBlock).toContain("SubagentStart");
@@ -458,14 +458,14 @@ describe("trellis template constants", () => {
     // to a sub-agent that is already doing the requested work.
     const block = inProgressBreadcrumb();
     expect(block).toContain(
-      "only when `codex.dispatch_mode: auto` is explicitly selected",
+      "仅在明确选择 `codex.dispatch_mode: auto` 时使用此块",
     );
-    expect(block).toContain("Sub-agent self-exemption");
-    expect(block).toContain("already running as `trellis-implement`");
-    expect(block).toContain("do NOT spawn another `trellis-implement`");
-    expect(block).toContain("already running as `trellis-check`");
-    expect(block).toContain("do NOT spawn another `trellis-check`");
-    expect(block).toContain("main session only");
+    expect(block).toContain("子代理自豁免");
+    expect(block).toContain("当前已经是 `trellis-implement`");
+    expect(block).toContain("不得再派发 `trellis-implement`");
+    expect(block).toContain("当前已经是 `trellis-check`");
+    expect(block).toContain("不得再派发 `trellis-check`");
+    expect(block).toContain("只有主会话负责派发");
   });
 
   it("ships the structured subnode v2 report and checkpoint contract", () => {
@@ -484,64 +484,64 @@ describe("trellis template constants", () => {
   });
 
   it("[issue-237] workflow.md Phase 2 dispatch steps require prompt recursion guards", () => {
-    expect(workflowMdTemplate).toContain("**Dispatch prompt guard**");
+    expect(workflowMdTemplate).toContain("**派发提示约束**");
     expect(workflowMdTemplate).toContain(
-      "already the `trellis-implement` sub-agent",
+      "已经是 `trellis-implement` 子代理",
     );
     expect(workflowMdTemplate).toContain(
-      "not spawn another `trellis-implement` / `trellis-check`",
+      "不得再派发 `trellis-implement` / `trellis-check`",
     );
     expect(workflowMdTemplate).toContain(
-      "already the `trellis-check` sub-agent",
+      "已经是 `trellis-check` 子代理",
     );
     expect(workflowMdTemplate).toContain(
-      "not spawn another `trellis-check` / `trellis-implement`",
+      "不得再派发其他 `trellis-check` / `trellis-implement`",
     );
   });
 
   it("workflow.md documents parent child task tree responsibilities", () => {
-    expect(workflowMdTemplate).toContain("### Parent / Child Task Trees");
+    expect(workflowMdTemplate).toContain("### 父子任务树（Parent / Child Task Trees）");
     expect(workflowMdTemplate).toContain(
-      "several independently verifiable deliverables",
+      "多个可独立验证的交付物",
     );
     expect(workflowMdTemplate).toContain(
-      "Parent/child structure is not a dependency system",
+      "父子结构不是依赖系统",
     );
     expect(workflowMdTemplate).toContain("--parent <parent-dir>");
     expect(workflowMdTemplate).toContain(
       "task.py add-subtask <parent> <child>",
     );
     expect(workflowMdTemplate).toContain(
-      "start the child that owns the next independently verifiable deliverable",
+      "启动拥有下一个交付物的子任务",
     );
   });
 
   it("workflow.md step 1.1 includes parent child split guidance", () => {
     const step = stepSection("1.1");
-    expect(step).toContain("When considering a parent/child split");
-    expect(step).toContain("Parent tasks own source requirements");
-    expect(step).toContain("Child tasks own actual deliverables");
-    expect(step).toContain("Parent/child structure is not a dependency system");
-    expect(step).toContain("Do not start the parent unless");
+    expect(step).toContain("考虑拆分父子任务时");
+    expect(step).toContain("父任务负责原始需求");
+    expect(step).toContain("子任务负责可以独立规划");
+    expect(step).toContain("父子结构不是依赖系统");
+    expect(step).toContain("除非父任务本身有直接实施工作");
   });
 
   it("workflow.md planning breadcrumbs mention parent child split guidance", () => {
     const planning = workflowStateBreadcrumb("planning");
     const planningInline = workflowStateBreadcrumb("planning-inline");
     for (const block of [planning, planningInline]) {
-      expect(block).toContain("Multi-deliverable scope");
+      expect(block).toContain("多交付物范围");
       expect(block).toContain(
-        "parent task plus independently verifiable child tasks",
+        "父任务和可独立验证的子任务",
       );
-      expect(block).toContain("not implied by tree position");
+      expect(block).toContain("不能从树结构位置推断");
     }
   });
 
   it("workflow.md ships a task_error breadcrumb that repairs the existing task", () => {
     const taskError = workflowStateBreadcrumb("task_error");
-    expect(taskError).toContain("Do not create or activate another task");
-    expect(taskError).toContain("repair its task.json");
-    expect(taskError).toContain("valid JSON object with a non-empty status");
+    expect(taskError).toContain("不要创建或激活其他任务");
+    expect(taskError).toContain("修复其 task.json");
+    expect(taskError).toContain("有效 JSON 对象，且 status 非空");
   });
 
   it("gitignoreTemplate contains ignore patterns", () => {

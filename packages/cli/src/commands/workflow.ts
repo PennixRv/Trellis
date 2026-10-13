@@ -369,7 +369,7 @@ const REQUIRED_WORKFLOW_STATE_IDS = [
  */
 function warnAboutMissingMarkers(content: string, relPath: string): void {
   const problems: string[] = [];
-  if (!content.includes("## Phase Index")) {
+  if (!/^## (?:Phase Index|阶段索引（Phase Index）)\s*$/m.test(content)) {
     problems.push('missing "## Phase Index" section');
   }
   if (!/^#### \d+\.\d+/m.test(content)) {

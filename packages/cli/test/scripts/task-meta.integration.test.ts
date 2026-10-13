@@ -84,6 +84,36 @@ describe.skipIf(!hasPython())("task.py meta (task.json.meta access)", () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
+  it("creates a Chinese-first PRD without changing task schema or user text", () => {
+    const r = runTask(
+      tmp,
+      "create",
+      "原始标题",
+      "--slug",
+      "chinese-prd",
+      "--description",
+      "Keep this exact description.",
+    );
+    expect(r.status, r.stderr).toBe(0);
+    const dir = findTaskDir(tmp, "chinese-prd");
+    const prd = fs.readFileSync(
+      path.join(tmp, ".trellis/tasks", dir, "prd.md"),
+      "utf-8",
+    );
+    expect(prd).toContain("# 原始标题");
+    expect(prd).toContain("## 目标（Goal）");
+    expect(prd).toContain("## 需求（Requirements）");
+    expect(prd).toContain("## 验收标准（Acceptance Criteria）");
+    expect(prd).toContain("Keep this exact description.");
+    expect(readTaskJson(tmp, dir)).toMatchObject({
+      title: "原始标题",
+      status: "planning",
+    });
+    const fallback = runTask(tmp, "create", "无描述", "--slug", "empty-goal");
+    expect(fallback.status).toBe(1);
+    expect(fallback.stderr).toContain("--description is required");
+  });
+
   it("create --meta (repeatable) populates task.json.meta", () => {
     const r = runTask(
       tmp,
@@ -144,15 +174,44 @@ describe.skipIf(!hasPython())("task.py meta (task.json.meta access)", () => {
   });
 
   it("refuses reserved approval metadata and invalid task classifications", () => {
-    for (const pair of ["planning=approved", "planning.approved_revision=1", "execution_class=unknown", "delivery_mode=unknown"]) {
-      const result = runTask(tmp, "create", "invalid approval", "--description", "fixture", "--slug", "reserved", "--meta", pair);
+    for (const pair of [
+      "planning=approved",
+      "planning.approved_revision=1",
+      "execution_class=unknown",
+      "delivery_mode=unknown",
+    ]) {
+      const result = runTask(
+        tmp,
+        "create",
+        "invalid approval",
+        "--description",
+        "fixture",
+        "--slug",
+        "reserved",
+        "--meta",
+        pair,
+      );
       expect(result.status, result.stderr).toBe(1);
     }
-    expect(runTask(tmp, "create", "fixture", "--description", "fixture", "--slug", "fixture").status).toBe(0);
+    expect(
+      runTask(
+        tmp,
+        "create",
+        "fixture",
+        "--description",
+        "fixture",
+        "--slug",
+        "fixture",
+      ).status,
+    ).toBe(0);
     const task = `.trellis/tasks/${findTaskDir(tmp, "fixture")}`;
     const before = fs.readFileSync(path.join(tmp, task, "task.json"), "utf-8");
-    expect(runTask(tmp, "set-meta", task, "planning", "approved").status).toBe(1);
-    expect(fs.readFileSync(path.join(tmp, task, "task.json"), "utf-8")).toBe(before);
+    expect(runTask(tmp, "set-meta", task, "planning", "approved").status).toBe(
+      1,
+    );
+    expect(fs.readFileSync(path.join(tmp, task, "task.json"), "utf-8")).toBe(
+      before,
+    );
   });
 
   it("set-meta adds a new key and overwrites an existing one", () => {

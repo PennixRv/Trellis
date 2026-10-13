@@ -232,8 +232,10 @@ Absent a per-task pin **and** the personal/team default keys, every consumer
 resolves to the global `.trellis/workflow.md` — output is byte-identical to a
 project without the feature.
 Variant files must satisfy the same parser contract as `workflow.md` (marker
-syntax above, `## Phase Index`, `#### X.Y` step headings, platform markers);
+syntax above, supported Phase Index headings, `#### X.Y` step headings, platform markers);
 `trellis workflow --save` warns at save time when markers are missing.
+
+阶段标题接受完整的旧英文行或中文优先双语行：`## Phase Index` / `## 阶段索引（Phase Index）`，以及 `## Phase 1: Plan` / `## 阶段一：规划（Phase 1: Plan）`。Python 阶段提取、三套 SessionStart Hook、OpenCode 和保存校验器使用同一组允许标题；相似前缀不能代替完整标题。`workflow-heading.integration.test.ts` 覆盖双格式、边界和面包屑去除。
 
 ---
 

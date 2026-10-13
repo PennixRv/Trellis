@@ -86,7 +86,7 @@ const CODEX_SUBNODE_SHA256 = createHash("sha256")
   .update(CODEX_SUBNODE_CONTENT)
   .digest("hex");
 
-function stubMarketplaceFetch(): void {
+function stubMarketplaceFetch(tddContent = TDD_CONTENT): void {
   const index = {
     version: 1,
     templates: [
@@ -96,7 +96,7 @@ function stubMarketplaceFetch(): void {
         name: "TDD Workflow",
         description: "red/green/refactor",
         path: "workflows/tdd/workflow.md",
-        sha256: TDD_SHA256,
+        sha256: createHash("sha256").update(tddContent).digest("hex"),
       },
       {
         id: "codex-subnode-channel",
@@ -116,7 +116,7 @@ function stubMarketplaceFetch(): void {
         return new Response(JSON.stringify(index), { status: 200 });
       }
       if (url.endsWith("workflows/tdd/workflow.md")) {
-        return new Response(TDD_CONTENT, { status: 200 });
+        return new Response(tddContent, { status: 200 });
       }
       if (url.endsWith("workflows/codex-subnode-channel/workflow.md")) {
         return new Response(CODEX_SUBNODE_CONTENT, { status: 200 });
@@ -439,9 +439,7 @@ describe("trellis workflow integration", () => {
     try {
       await expect(
         runWorkflowCommand({ template: "tdd", ...MARKETPLACE_OPTIONS }),
-      ).rejects.toThrow(
-        WorkflowCommandError,
-      );
+      ).rejects.toThrow(WorkflowCommandError);
 
       // File must remain untouched, and hash must not have been re-stamped.
       expect(fs.readFileSync(wfPath, "utf-8")).toBe("# My custom edits");
@@ -469,9 +467,7 @@ describe("trellis workflow integration", () => {
     try {
       await expect(
         runWorkflowCommand({ template: "tdd", ...MARKETPLACE_OPTIONS }),
-      ).rejects.toThrow(
-        WorkflowCommandError,
-      );
+      ).rejects.toThrow(WorkflowCommandError);
       expect(fs.readFileSync(wfPath, "utf-8")).toBe("# My custom edits");
     } finally {
       Object.defineProperty(process.stdin, "isTTY", {
@@ -551,9 +547,7 @@ describe("trellis workflow integration", () => {
     captureStderr();
     await expect(
       runWorkflowCommand({ save: "tdd", ...MARKETPLACE_OPTIONS }),
-    ).rejects.toThrow(
-      /already exists.*--force/,
-    );
+    ).rejects.toThrow(/already exists.*--force/);
     expect(fs.readFileSync(libPath, "utf-8")).toBe(
       "# my locally-tuned tdd variant",
     );
@@ -587,6 +581,21 @@ describe("trellis workflow integration", () => {
     expect(
       fs.existsSync(path.join(tmpDir, ".trellis", "workflows", "tdd.md")),
     ).toBe(true);
+  });
+
+  it.each([
+    ["## Phase Index", false],
+    ["## 阶段索引（Phase Index）", false],
+    ["## Phase Index notes", true],
+    ["## 阶段索引（Phase Index）附录", true],
+  ])("--save validates the complete heading %s", async (heading, missing) => {
+    stubMarketplaceFetch(TDD_CONTENT.replace("## Phase Index", heading));
+    await init({ yes: true });
+    const stderr = captureStderr();
+    await runWorkflowCommand({ save: "tdd", ...MARKETPLACE_OPTIONS });
+    expect(stderr.text().includes('missing "## Phase Index" section')).toBe(
+      missing,
+    );
   });
 
   it("--save native emits no marker warning (all parser markers present)", async () => {

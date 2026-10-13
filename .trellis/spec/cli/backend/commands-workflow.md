@@ -173,7 +173,7 @@ Marker validation contract (`--save` only; warn, never block):
 
 - After writing the library file, `--save` checks the saved content for the
   runtime parser markers and prints a single stderr warning listing whatever
-  is missing: `## Phase Index`, at least one `#### X.Y` step heading, and the
+  is missing: a supported Phase Index heading, at least one `#### X.Y` step heading, and the
   six native `[workflow-state:*]` blocks (`no_task`, `planning`,
   `planning-inline`, `in_progress`, `in_progress-inline`, `completed`).
 - The file is still written and the command exits 0 — consumers degrade to
@@ -182,9 +182,8 @@ Marker validation contract (`--save` only; warn, never block):
 
 Runtime parser contract:
 
-- Every workflow template must keep `## Phase Index`, `## Phase 1: Plan`,
-  `#### X.Y` step headings, platform marker syntax, and all required
-  `[workflow-state:*]` blocks.
+- 阶段索引完整标题接受 `## Phase Index` 或 `## 阶段索引（Phase Index）`；阶段一起点接受 `## Phase 1: Plan` 或 `## 阶段一：规划（Phase 1: Plan）`。只接受完整行，不按英文子串猜测标题。两种形式都保留 `#### X.Y` 步骤编号、平台标记语法和所有必需的 `[workflow-state:*]` 块。
+- 新生成的用户文档模板使用简体中文正文与中文优先双语标题；机器字段、命令、路径、代码示例和标记保持合同。已存在的用户 PRD、workspace 和 spec 不作语言迁移；workflow 更新继续遵守哈希与用户冲突保护。
 - SessionStart, per-turn workflow-state hooks, `trellis-start`, and
   `get_context.py --mode phase` read the resolved workflow file (the active
   task's `.trellis/workflows/<id>.md` when selected, else the current

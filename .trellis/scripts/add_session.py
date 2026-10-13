@@ -97,8 +97,8 @@ MARKER_PREFIX = "<!-- trellis-session:"
 # fingerprint mixed in the calendar date; see compute_record_fingerprint.
 MARKER_VERSION = 2
 LEGACY_MARKER_RE = re.compile(r"^<!-- trellis-session: fp=([0-9a-f]{16}) -->$")
-ENTRY_DATE_RE = re.compile(r"^\*\*Date\*\*: (\d{4}-\d{2}-\d{2})\s*$")
-SESSION_HEADING_RE = re.compile(r"^## Session (\d+):", re.MULTILINE)
+ENTRY_DATE_RE = re.compile(r"^\*\*(?:Date|日期（Date）)\*\*: (\d{4}-\d{2}-\d{2})\s*$")
+SESSION_HEADING_RE = re.compile(r"^## (?:Session|会话（Session）) (\d+)(?::|：)", re.MULTILINE)
 
 # Recording states, in the order the operation walks them.
 STATE_ABSENT = "absent"
@@ -170,7 +170,7 @@ def _max_session_in_index(content: str) -> int:
 
 
 def _max_session_in_journal(content: str) -> int:
-    """Highest `## Session N:` heading in a journal body (0 when none)."""
+    """Highest old or new session heading in a journal body (0 when none)."""
     numbers = [int(m.group(1)) for m in SESSION_HEADING_RE.finditer(content)]
     return max(numbers) if numbers else 0
 
@@ -195,7 +195,7 @@ def count_journal_files(dev_dir: Path, active_num: int) -> str:
     for f in files:
         filename = f.name
         lines = len(f.read_text(encoding="utf-8").splitlines())
-        status = "Active" if filename == active_file else "Archived"
+        status = "活动（Active）" if filename == active_file else "归档（Archived）"
         result_lines.append(f"| `{filename}` | ~{lines} | {status} |")
 
     return "\n".join(result_lines)
@@ -301,10 +301,10 @@ def create_new_journal_file(
     prev_num = num - 1
     new_file = dev_dir / f"{FILE_JOURNAL_PREFIX}{num}.md"
 
-    content = f"""# Journal - {developer} (Part {num})
+    content = f"""# 日志（Journal）- {developer}（第 {num} 部分）
 
-> Continuation from `{FILE_JOURNAL_PREFIX}{prev_num}.md` (archived at ~{max_lines} lines)
-> Started: {today}
+> 续接自 `{FILE_JOURNAL_PREFIX}{prev_num}.md`（约 {max_lines} 行时归档）
+> 开始日期（Started）: {today}
 
 ---
 
@@ -615,7 +615,7 @@ def _max_session_across_refs(repo_root: Path, refs: list[str], dev_rel: str) -> 
             "-h",
             "-E",
             "-e",
-            r"^## Session [0-9]+:",
+            r"^## (Session [0-9]+:|会话（Session） [0-9]+：)",
             "-e",
             r"Total Sessions",
         ]
@@ -629,7 +629,7 @@ def _max_session_across_refs(repo_root: Path, refs: list[str], dev_rel: str) -> 
 
     # `git grep` prefixes each hit with `<rev>:<path>:`, so the numbers are
     # matched anywhere in the line rather than anchored.
-    numbers = [int(m.group(1)) for m in re.finditer(r"## Session (\d+):", out)]
+    numbers = [int(m.group(1)) for m in re.finditer(r"## (?:Session|会话（Session）) (\d+)(?::|：)", out)]
     numbers += [
         int(m.group(1)) for m in re.finditer(r"Total Sessions[^\d]{0,8}(\d+)", out)
     ]
@@ -843,7 +843,7 @@ def classify_record(
     if session_num is None:
         return "", None, None, (
             f"{journal_file.name} carries this record's marker without a "
-            "'## Session N:' heading above it. The pending record is malformed; "
+            "session heading above it. The pending record is malformed; "
             "repair it by hand before retrying."
         )
 
@@ -884,9 +884,9 @@ def _render_bullet_section(header: str, items: list[str], bullet_prefix: str = "
 def _render_main_changes(changes: list[str], extra_content: str | None) -> str:
     """Render the Main Changes section from --change bullets or freeform content."""
     if changes:
-        return _render_bullet_section("Main Changes", changes)
+        return _render_bullet_section("主要变更（Main Changes）", changes)
     if extra_content:
-        return f"\n\n### Main Changes\n\n{extra_content}"
+        return f"\n\n### 主要变更（Main Changes）\n\n{extra_content}"
     return ""
 
 
@@ -906,39 +906,39 @@ def generate_session_content(
 ) -> str:
     """Generate session content."""
     if evidence:
-        commit_table = """| Hash | Message |
+        commit_table = """| 哈希（Hash） | 消息（Message） |
 |------|---------|"""
         for oid, subject in evidence:
             commit_table += f"\n| `{oid}` | {escape_markdown_cell(subject)} |"
     else:
-        commit_table = "(No commits - planning session)"
+        commit_table = "（无提交——规划会话）"
 
-    package_line = f"\n**Package**: {package}" if package else ""
-    branch_line = f"\n**Branch**: `{branch}`" if branch else ""
+    package_line = f"\n**包（Package）**: {package}" if package else ""
+    branch_line = f"\n**分支（Branch）**: `{branch}`" if branch else ""
 
     main_changes_section = _render_main_changes(changes or [], extra_content)
-    testing_section = _render_bullet_section("Testing", tests or [], bullet_prefix="- [OK] ")
-    next_steps_section = _render_bullet_section("Next Steps", next_steps or [])
+    testing_section = _render_bullet_section("测试（Testing）", tests or [], bullet_prefix="- [OK] ")
+    next_steps_section = _render_bullet_section("下一步（Next Steps）", next_steps or [])
 
     return f"""
 
-## Session {session_num}: {title}
+## 会话（Session） {session_num}：{title}
 {marker}
 
-**Date**: {today}
-**Task**: {title}{package_line}{branch_line}
+**日期（Date）**: {today}
+**任务（Task）**: {title}{package_line}{branch_line}
 
-### Summary
+### 摘要（Summary）
 
 {summary}{main_changes_section}
 
-### Git Commits
+### Git 提交（Git Commits）
 
 {commit_table}{testing_section}
 
-### Status
+### 状态（Status）
 
-[OK] **Completed**{next_steps_section}
+[OK] **已完成（Completed）**{next_steps_section}
 """
 
 
@@ -992,9 +992,9 @@ def update_index(
         if "@@@auto:current-status" in line:
             new_lines.append(line)
             in_current_status = True
-            new_lines.append(f"- **Active File**: `{active_file}`")
-            new_lines.append(f"- **Total Sessions**: {new_session}")
-            new_lines.append(f"- **Last Active**: {today}")
+            new_lines.append(f"- **活动文件（Active File）**: `{active_file}`")
+            new_lines.append(f"- **会话总数（Total Sessions）**: {new_session}")
+            new_lines.append(f"- **最近活动（Last Active）**: {today}")
             continue
 
         if "@@@/auto:current-status" in line:
@@ -1005,7 +1005,7 @@ def update_index(
         if "@@@auto:active-documents" in line:
             new_lines.append(line)
             in_active_documents = True
-            new_lines.append("| File | Lines | Status |")
+            new_lines.append("| 文件（File） | 行数（Lines） | 状态（Status） |")
             new_lines.append("|------|-------|--------|")
             new_lines.append(files_table)
             continue
@@ -1038,13 +1038,16 @@ def update_index(
                 r"^\|\s*#\s*\|\s*Date\s*\|\s*Title\s*\|\s*Commits\s*\|\s*Branch\s*\|\s*Base Branch\s*\|\s*$",
                 line,
             ):
-                new_lines.append("| # | Date | Title | Commits | Branch |")
+                new_lines.append("| # | 日期（Date） | 标题（Title） | 提交（Commits） | 分支（Branch） |")
                 continue
             if re.match(r"^\|\s*#\s*\|\s*Date\s*\|\s*Title\s*\|\s*Commits\s*\|\s*Branch\s*\|\s*$", line):
-                new_lines.append("| # | Date | Title | Commits | Branch |")
+                new_lines.append("| # | 日期（Date） | 标题（Title） | 提交（Commits） | 分支（Branch） |")
+                continue
+            if re.match(r"^\|\s*#\s*\|\s*日期（Date）\s*\|\s*标题（Title）\s*\|\s*提交（Commits）\s*\|\s*分支（Branch）\s*\|\s*$", line):
+                new_lines.append("| # | 日期（Date） | 标题（Title） | 提交（Commits） | 分支（Branch） |")
                 continue
             if re.match(r"^\|\s*#\s*\|\s*Date\s*\|\s*Title\s*\|\s*Commits\s*\|\s*$", line):
-                new_lines.append("| # | Date | Title | Commits | Branch |")
+                new_lines.append("| # | 日期（Date） | 标题（Title） | 提交（Commits） | 分支（Branch） |")
                 continue
             if re.match(r"^\|[-| ]+\|\s*$", line) and not header_written:
                 new_lines.append("|---|------|-------|---------|--------|")

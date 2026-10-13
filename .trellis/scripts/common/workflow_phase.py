@@ -36,7 +36,8 @@ _MARKER_RE = re.compile(r"^\[(/?)([A-Za-z][^\[\]]*)\]\s*$")
 _STEP_HEADING_RE = re.compile(r"^####\s+(\d+\.\d+)\b.*$")
 
 # Phase Index starts here; Phase 1/2/3 step bodies follow; ends at Breadcrumbs.
-_PHASE_INDEX_HEADING = "## Phase Index"
+_PHASE_INDEX_HEADINGS = {"## Phase Index", "## 阶段索引（Phase Index）"}
+_PHASE_ONE_HEADINGS = {"## Phase 1: Plan", "## 阶段一：规划（Phase 1: Plan）"}
 
 
 def _read_workflow() -> str:
@@ -75,10 +76,10 @@ def get_phase_index() -> str:
     end: int | None = None
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if start is None and stripped == _PHASE_INDEX_HEADING:
+        if start is None and stripped in _PHASE_INDEX_HEADINGS:
             start = i
             continue
-        if start is not None and stripped == "## Phase 1: Plan":
+        if start is not None and stripped in _PHASE_ONE_HEADINGS:
             end = i
             break
 

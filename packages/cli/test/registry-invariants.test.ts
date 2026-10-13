@@ -11,9 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { AI_TOOLS } from "../src/types/ai-tools.js";
-import {
-  PLATFORM_IDS,
-} from "../src/configurators/index.js";
+import { PLATFORM_IDS } from "../src/configurators/index.js";
 
 const COMMANDER_RESERVED_FLAGS = ["help", "version", "V", "h"];
 
@@ -85,7 +83,6 @@ describe("registry internal consistency", () => {
       expect(config.templateContext.cliFlag).toBe(config.cliFlag);
     }
   });
-
 });
 
 // =============================================================================
@@ -146,12 +143,7 @@ describe("UserPromptSubmit hook wiring", () => {
       const { dirname, join } = await import("node:path");
       const { fileURLToPath } = await import("node:url");
       const __filename = fileURLToPath(import.meta.url);
-      const templatesRoot = join(
-        dirname(__filename),
-        "..",
-        "src",
-        "templates",
-      );
+      const templatesRoot = join(dirname(__filename), "..", "src", "templates");
       const raw = fs.readFileSync(join(templatesRoot, path), "utf-8");
       const parsed = JSON.parse(raw) as {
         hooks?: Record<string, unknown>;
@@ -214,7 +206,10 @@ describe("UserPromptSubmit hook wiring", () => {
 // release, and rewriting them to match today's registry would be false.
 
 describe("docs-site matches the platform registry", () => {
-  async function docsPages(): Promise<{ root: string; files: string[] } | null> {
+  async function docsPages(): Promise<{
+    root: string;
+    files: string[];
+  } | null> {
     const fs = await import("node:fs");
     const { dirname, join } = await import("node:path");
     const { fileURLToPath } = await import("node:url");
@@ -226,7 +221,8 @@ describe("docs-site matches the platform registry", () => {
     const walk = (dir: string) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.isDirectory()) {
-          if (entry.name === "changelog" || entry.name === "node_modules") continue;
+          if (entry.name === "changelog" || entry.name === "node_modules")
+            continue;
           walk(join(dir, entry.name));
         } else if (entry.name.endsWith(".mdx")) {
           files.push(join(dir, entry.name));
@@ -265,7 +261,8 @@ describe("docs-site matches the platform registry", () => {
     // Only two-digit numbers are read as a claim about how many platforms are
     // supported. Prose legitimately says "on both platforms" or walks through
     // three in an example; a real support count has never been below ten.
-    const claim = /(\d{2,})\s*(?:configured\s+)?(?:platforms|个已配置平台|个平台)/g;
+    const claim =
+      /(\d{2,})\s*(?:configured\s+)?(?:platforms|个已配置平台|个平台)/g;
     for (const file of docs.files) {
       const content = fs.readFileSync(file, "utf-8");
       for (const [text, count] of content.matchAll(claim)) {
@@ -297,7 +294,14 @@ describe("every platform resolves to a marker label workflow.md uses", () => {
     const { fileURLToPath } = await import("node:url");
 
     const testDir = dirname(fileURLToPath(import.meta.url));
-    const scriptsDir = join(testDir, "..", "src", "templates", "trellis", "scripts");
+    const scriptsDir = join(
+      testDir,
+      "..",
+      "src",
+      "templates",
+      "trellis",
+      "scripts",
+    );
     const workflowPath = join(
       testDir,
       "..",
@@ -318,7 +322,7 @@ describe("every platform resolves to a marker label workflow.md uses", () => {
       "    rendered = filter_platform(content, resolve_effective_platform(flag, {}))",
       // Keep the assertion structural: count bullets surviving inside the
       // routing section rather than matching its prose, which is edited often.
-      "    section = rendered.split('### Active Task Routing', 1)",
+      "    section = rendered.split('### 活动任务路由（Active Task Routing）', 1)",
       "    body = section[1].split('###', 1)[0] if len(section) > 1 else ''",
       "    out[flag] = len([l for l in body.splitlines() if l.startswith('- ')])",
       "print(json.dumps(out))",

@@ -1,26 +1,26 @@
-# Directory Structure
+# 目录结构（Directory Structure）
 
-> How frontend code is organized in this project.
+> 本项目如何组织前端代码。
 
 ---
 
-## Overview
+## 概览（Overview）
 
 <!--
-Document your project's frontend directory structure here.
+在此记录项目的前端目录结构。
 
-Questions to answer:
-- Where do components live?
-- How are features/modules organized?
-- Where are shared utilities?
-- How are assets organized?
+需要回答的问题：
+- 组件位于何处？
+- 功能/模块如何组织？
+- 共享工具位于何处？
+- 资源如何组织？
 -->
 
-(To be filled by the team)
+（待团队填写）
 
 ---
 
-## Directory Layout
+## 目录布局（Directory Layout）
 
 ```
 <!-- Replace with your actual structure -->
@@ -31,24 +31,24 @@ src/
 
 ---
 
-## Module Organization
+## 模块组织（Module Organization）
 
-<!-- How should new features be organized? -->
+<!-- 新功能应如何组织？ -->
 
-(To be filled by the team)
-
----
-
-## Naming Conventions
-
-<!-- File and folder naming rules -->
-
-(To be filled by the team)
+（待团队填写）
 
 ---
 
-## Examples
+## 命名约定（Naming Conventions）
 
-<!-- Link to well-organized modules as examples -->
+<!-- 文件和目录的命名规则 -->
 
-(To be filled by the team)
+（待团队填写）
+
+---
+
+## 示例（Examples）
+
+<!-- 链接到组织良好的模块作为示例 -->
+
+（待团队填写）

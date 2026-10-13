@@ -306,27 +306,27 @@ def _parse_meta_pairs(pairs: list[str] | None) -> dict[str, str] | None:
 
 def _default_prd_content(title: str, description: str | None = None) -> str:
     """Return the default PRD skeleton created with every task."""
-    goal = (description or "").strip() or "TBD."
-    heading = title.strip() or "Untitled task"
+    goal = (description or "").strip() or "待填写。"
+    heading = title.strip() or "未命名任务"
     return f"""# {heading}
 
-## Goal
+## 目标（Goal）
 
 {goal}
 
-## Requirements
+## 需求（Requirements）
 
-- TBD
+- 待填写
 
-## Acceptance Criteria
+## 验收标准（Acceptance Criteria）
 
-- [ ] TBD
+- [ ] 待填写
 
-## Notes
+## 备注（Notes）
 
-- Keep `prd.md` focused on requirements, constraints, and acceptance criteria.
-- Lightweight tasks can remain PRD-only.
-- For complex tasks, add `design.md` for technical design and `implement.md` for execution planning before `task.py start`.
+- 让 `prd.md` 聚焦需求、约束和验收标准。
+- 轻量任务可以只保留 PRD。
+- 复杂任务在 `task.py start` 前增加 `design.md` 记录技术设计，增加 `implement.md` 记录执行计划。
 """
 
 

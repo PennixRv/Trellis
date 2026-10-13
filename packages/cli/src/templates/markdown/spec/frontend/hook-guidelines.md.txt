@@ -1,51 +1,51 @@
-# Hook Guidelines
+# Hook 指南（Hook Guidelines）
 
-> How hooks are used in this project.
+> 本项目如何使用 Hook。
 
 ---
 
-## Overview
+## 概览（Overview）
 
 <!--
-Document your project's hook conventions here.
+在此记录项目的 Hook 约定。
 
-Questions to answer:
-- What custom hooks do you have?
-- How do you handle data fetching?
-- What are the naming conventions?
-- How do you share stateful logic?
+需要回答的问题：
+- 有哪些自定义 Hook？
+- 如何处理数据获取？
+- 遵循哪些命名约定？
+- 如何共享有状态逻辑？
 -->
 
-(To be filled by the team)
+（待团队填写）
 
 ---
 
-## Custom Hook Patterns
+## 自定义 Hook 模式（Custom Hook Patterns）
 
-<!-- How to create and structure custom hooks -->
+<!-- 如何创建和组织自定义 Hook -->
 
-(To be filled by the team)
-
----
-
-## Data Fetching
-
-<!-- How data fetching is handled (React Query, SWR, etc.) -->
-
-(To be filled by the team)
+（待团队填写）
 
 ---
 
-## Naming Conventions
+## 数据获取（Data Fetching）
 
-<!-- Hook naming rules (use*, etc.) -->
+<!-- 如何处理数据获取（React Query、SWR 等） -->
 
-(To be filled by the team)
+（待团队填写）
 
 ---
 
-## Common Mistakes
+## 命名约定（Naming Conventions）
 
-<!-- Hook-related mistakes your team has made -->
+<!-- Hook 命名规则（use* 等） -->
 
-(To be filled by the team)
+（待团队填写）
+
+---
+
+## 常见错误（Common Mistakes）
+
+<!-- 团队曾经出现过的 Hook 相关错误 -->
+
+（待团队填写）
