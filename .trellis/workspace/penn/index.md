@@ -7,9 +7,9 @@
 ## Current Status
 
 <!-- @@@auto:current-status -->
-- **Active File**: `journal-1.md`
-- **Total Sessions**: 15
-- **Last Active**: 2026-10-10
+- **活动文件（Active File）**: `journal-1.md`
+- **会话总数（Total Sessions）**: 16
+- **最近活动（Last Active）**: 2026-10-13
 <!-- @@@/auto:current-status -->
 
 ---
@@ -17,9 +17,9 @@
 ## Active Documents
 
 <!-- @@@auto:active-documents -->
-| File | Lines | Status |
+| 文件（File） | 行数（Lines） | 状态（Status） |
 |------|-------|--------|
-| `journal-1.md` | ~437 | Active |
+| `journal-1.md` | ~470 | 活动（Active） |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -27,8 +27,9 @@
 ## Session History
 
 <!-- @@@auto:session-history -->
-| # | Date | Title | Commits | Branch |
+| # | 日期（Date） | 标题（Title） | 提交（Commits） | 分支（Branch） |
 |---|------|-------|---------|--------|
+| 16 | 2026-10-13 | Trellis 中文默认模板 beta.47 交付 | `632915aa`, `4cf4501b`, `be419882` | `codex/unify-trellis-chinese-templates` |
 | 15 | 2026-10-10 | AGENTS effective source and progressive planning | `92fcddc2`, `c97e3d11`, `66f9b45a`, `7fc835cd` | `pennix/v0.7-beta` |
 | 14 | 2026-10-08 | Durable historical Codex billing beta.40 delivery | `0f31c85f`, `a04054b0`, `231ea8bf` | `pennix/v0.7-beta` |
 | 13 | 2026-10-07 | 工作流审查修复交付收尾 | `3703c14c`, `cc99dcd5`, `5a66cb1d` | `pennix/v0.7-beta` |

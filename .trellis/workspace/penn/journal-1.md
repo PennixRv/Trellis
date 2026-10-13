@@ -435,3 +435,36 @@ Completed approved AGENTS override diagnostics, capability-aware project graph g
 ### Status
 
 [OK] **Completed**
+
+
+## 会话（Session） 16：Trellis 中文默认模板 beta.47 交付
+<!-- trellis-session: v=2 fp=8ab7732137efe56a -->
+
+**日期（Date）**: 2026-10-13
+**任务（Task）**: Trellis 中文默认模板 beta.47 交付
+**包（Package）**: cli
+**分支（Branch）**: `codex/unify-trellis-chinese-templates`
+
+### 摘要（Summary）
+
+完成中文默认用户模板、双格式解析及历史续写，发布安装 beta.47 并通过真实更新保护验收；任务已归档。
+
+### 主要变更（Main Changes）
+
+- 统一纳入源模板自然语言，保留机械锚点；同步消费者、工作流镜像与发布文档。
+
+### Git 提交（Git Commits）
+
+| 哈希（Hash） | 消息（Message） |
+|------|---------|
+| `632915aa` | feat: localize trellis user templates with bilingual parsing |
+| `4cf4501b` | 0.7.0-beta.47 |
+| `be419882` | docs: record Chinese template release and acceptance |
+
+### 测试（Testing）
+
+- [OK] CLI 2275/Core 432 通过，既有 3 项跳过；lint、typecheck、build 通过；发布包四平台 init/update 与旧资产冲突保护验收通过。
+
+### 状态（Status）
+
+[OK] **已完成（Completed）**
