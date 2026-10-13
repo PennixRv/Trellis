@@ -1,0 +1,53 @@
+{
+  "id": "unify-trellis-chinese-templates",
+  "name": "unify-trellis-chinese-templates",
+  "title": "统一 Trellis 用户文档模板为简体中文",
+  "description": "实现根协调任务 10-13-unify-trellis-template-writing 的 Trellis 源仓库部分：统一纳入范围的用户维护/共维护模板正文为简体中文，保留解析锚点和机器合同；适配工作流阶段解析及 journal 新旧格式续写；验证原生 init/update 保护。等待根任务方案批准后再启动。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-13",
+  "completedAt": null,
+  "branch": "codex/unify-trellis-chinese-templates",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "seal": {
+        "revision": 1,
+        "task_id": "unify-trellis-chinese-templates",
+        "task_name": "10-13-unify-trellis-chinese-templates",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "7c7ec68b525b99850397424ac568addab6b0bfc692325aba878da66b6dd36260",
+          "design.md": "5c5dfa8354923b5f183960e104db318189810e7250aa70e3ff30626c264fce2f",
+          "implement.md": "da55c6008aeeaa3f917de65fe7f7c019946fa7df768a65ae6c3df152da6568dc"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-13T04:07:10.050751+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "用户已批准根任务 revision 2 完整修订包，覆盖该 Trellis 组件子任务。",
+      "approved_at": "2026-10-13T04:08:16.635165+00:00"
+    }
+  }
+}
