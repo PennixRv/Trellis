@@ -307,7 +307,18 @@ trellis channel prune [opts]
   --yes                  : actually delete (default is dry-run)
   --dry-run              : show what would be removed (default behavior)
   → throws if --all/--empty/--idle/--ephemeral specified more than one
-  → stdout: list of candidates + "(dry-run) would remove N" or "Removed N"
+  → stdout: list of candidates + "(dry-run) would remove N" or a removed/skipped/released summary
+  → discovery and delete are serialized with the project worker admission lock
+  → unreadable/invalid event logs, invalid PIDs, live workers, and unverifiable process identities are fail-closed
+
+trellis backup list
+  → list `.trellis/.backup-*` snapshots and their completion state and size
+
+trellis backup prune [--keep <count>] [--yes]
+  --keep <count>         : retain at least the newest three completed backups (default 3)
+  --yes                  : delete the previewed completed backups
+  → default is a dry-run; incomplete/unknown snapshots or a concurrent backup operation block the whole prune
+  → new update snapshots are copied into an `.incomplete` staging directory and atomically renamed after a completion marker is written
 
 trellis channel run [name] [opts]
   (auto-generates name "run-<8hex>" if not provided, --ephemeral implied)

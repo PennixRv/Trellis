@@ -18,7 +18,7 @@ User-facing contract:
 
 - Input: a project directory containing `.trellis/`, the CLI binary on `PATH`.
 - Output: bundled templates on disk match the CLI version; `.trellis/.version` advanced; modified files preserved or backed up; renamed/deleted files migrated when `--migrate`; legacy deprecated files cleaned up via hash-verified `safe-file-delete`; a follow-up migration task created when the upgrade crosses a breaking release with a `migrationGuide`.
-- Side effects: snapshot backup at `.trellis/.backup-<timestamp>/`, `.trellis/.template-hashes.json` rewritten, optional `.trellis/tasks/<MM-DD>-migrate-to-<version>/` task tree.
+- Side effects: snapshot backup at `.trellis/.backup-<timestamp>/`, `.trellis/.template-hashes.json` rewritten, optional `.trellis/tasks/<MM-DD>-migrate-to-<version>/` task tree. New snapshots are copied under an incomplete staging name, receive `.backup-complete`, and are atomically renamed before the update reports them.
 
 Two big invariants:
 
@@ -57,6 +57,10 @@ interface UpdateOptions {
 ```
 
 Note that `force` / `skipAll` / `createNew` are mutually exclusive in spirit but the code does not assert mutual exclusivity. They are checked in priority order in `commands/update.ts:promptConflictResolution`. `force` also doubles as "non-interactive" — it skips the global `Proceed?` confirm in `commands/update.ts:update`.
+
+### Backup retention owner
+
+`trellis backup list` and `trellis backup prune` are the native owner entry points for update snapshots. Pruning is preview-only unless `--yes` is supplied, requires `--keep >= 3`, and removes only completed snapshots after re-reading the directory under the prune lock. A legacy snapshot without `.backup-complete`, a staging snapshot, or a concurrent marker blocks the whole deletion pass; the command never infers completion from age or directory name.
 
 ---
 

@@ -5,6 +5,7 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../constants/paths.js";
+import { BACKUP_COMPLETE_MARKER } from "./backup.js";
 import type { AITool } from "../types/ai-tools.js";
 import { VERSION, PACKAGE_NAME } from "../constants/version.js";
 import {
@@ -1466,6 +1467,7 @@ export function shouldExcludeFromBackup(relativePath: string): boolean {
  */
 function createFullBackup(cwd: string): string | null {
   const backupDir = createBackupDirPath(cwd);
+  const stagingDir = `${backupDir}.incomplete`;
   let hasFiles = false;
 
   for (const dir of BACKUP_DIRS) {
@@ -1481,10 +1483,10 @@ function createFullBackup(cwd: string): string | null {
 
       // Create backup
       if (!hasFiles) {
-        fs.mkdirSync(backupDir, { recursive: true });
+        fs.mkdirSync(stagingDir, { recursive: true });
         hasFiles = true;
       }
-      backupFile(cwd, backupDir, relativePath);
+      backupFile(cwd, stagingDir, relativePath);
     }
   }
 
@@ -1494,12 +1496,20 @@ function createFullBackup(cwd: string): string | null {
     if (shouldExcludeFromBackup(relativePath)) continue;
 
     if (!hasFiles) {
-      fs.mkdirSync(backupDir, { recursive: true });
+      fs.mkdirSync(stagingDir, { recursive: true });
       hasFiles = true;
     }
-    backupFile(cwd, backupDir, relativePath);
+    backupFile(cwd, stagingDir, relativePath);
   }
 
+  if (hasFiles) {
+    fs.writeFileSync(
+      path.join(stagingDir, BACKUP_COMPLETE_MARKER),
+      VERSION,
+      "utf8",
+    );
+    fs.renameSync(stagingDir, backupDir);
+  }
   return hasFiles ? backupDir : null;
 }
 

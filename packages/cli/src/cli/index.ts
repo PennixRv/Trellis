@@ -4,6 +4,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { init } from "../commands/init.js";
 import { update } from "../commands/update.js";
+import { listBackups, pruneBackups } from "../commands/backup.js";
 import { upgrade } from "../commands/upgrade.js";
 import { uninstall } from "../commands/uninstall.js";
 import { ablate, restore } from "../commands/ablate.js";
@@ -185,6 +186,43 @@ program
       if (process.env.DEBUG || process.env.TRELLIS_DEBUG) {
         console.error(error instanceof Error ? error.stack : error);
       }
+      process.exit(1);
+    }
+  });
+
+program
+  .command("backup <action>")
+  .description("List or prune completed Trellis update backups")
+  .option("--keep <count>", "minimum number of newest backups to retain", "3")
+  .option("--yes", "delete the previewed backups")
+  .action((action: string, options: Record<string, unknown>) => {
+    try {
+      if (action === "list") {
+        for (const backup of listBackups()) {
+          console.log(`${backup.name}\t${backup.state}\t${backup.bytes} bytes`);
+        }
+        return;
+      }
+      if (action !== "prune")
+        throw new Error("backup action must be list or prune");
+      const result = pruneBackups(undefined, {
+        keep: Number(options.keep),
+        confirm: options.yes as boolean,
+      });
+      if (result.blockedReason) {
+        throw new Error(`Backup pruning blocked: ${result.blockedReason}`);
+      }
+      for (const name of result.removedNames) {
+        console.log(`${options.yes ? "remove" : "would remove"} ${name}`);
+      }
+      if (!options.yes) {
+        console.log("(dry-run) use --yes after reviewing the list");
+      }
+    } catch (error) {
+      console.error(
+        chalk.red("Error:"),
+        error instanceof Error ? error.message : error,
+      );
       process.exit(1);
     }
   });

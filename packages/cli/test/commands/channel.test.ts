@@ -179,6 +179,28 @@ describe("channel storage and forum channels", () => {
     expect(fs.existsSync(eventPath)).toBe(false);
   });
 
+  it("fails closed when prune cannot establish a valid event log", async () => {
+    await createChannel("prune-missing-events", { by: "main" });
+    const eventPath = eventsPath(
+      "prune-missing-events",
+      projectKey(projectDir),
+    );
+    fs.rmSync(eventPath);
+
+    await channelPrune({ all: true, yes: true });
+    expect(fs.existsSync(path.dirname(eventPath))).toBe(true);
+
+    await createChannel("prune-invalid-events", { by: "main" });
+    const invalidPath = eventsPath(
+      "prune-invalid-events",
+      projectKey(projectDir),
+    );
+    fs.appendFileSync(invalidPath, "not-json\n");
+
+    await channelPrune({ all: true, yes: true });
+    expect(fs.existsSync(path.dirname(invalidPath))).toBe(true);
+  });
+
   it("records and filters the immutable main session owner", async () => {
     await createChannel("owned", { by: "main", ownerSession: "main-a" });
     await createChannel("other", { by: "main", ownerSession: "main-b" });
@@ -253,7 +275,9 @@ describe("channel storage and forum channels", () => {
         projectKey(projectDir),
       );
       expect(threadEvents[0]).toMatchObject({ ownerSessionId: "thread-owner" });
-      expect(sessionEvents[0]).toMatchObject({ ownerSessionId: "session-owner" });
+      expect(sessionEvents[0]).toMatchObject({
+        ownerSessionId: "session-owner",
+      });
     } finally {
       if (oldThread === undefined) delete process.env.CODEX_THREAD_ID;
       else process.env.CODEX_THREAD_ID = oldThread;
@@ -1128,12 +1152,7 @@ describe("channel stdout pump", () => {
     await finalized;
     stdout.destroy();
 
-    expect(order).toEqual([
-      "timeout",
-      "finalize",
-      "cleanup",
-      "exit",
-    ]);
+    expect(order).toEqual(["timeout", "finalize", "cleanup", "exit"]);
     expect(adapter.parseLine.mock.calls.map(([line]) => line)).toEqual([
       "captured-line",
       "captured-tail",
