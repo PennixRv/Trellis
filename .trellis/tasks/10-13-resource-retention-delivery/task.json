@@ -1,0 +1,49 @@
+{
+  "id": "resource-retention-delivery",
+  "name": "resource-retention-delivery",
+  "title": "落实工作流资源回收修订包",
+  "description": "执行根任务 10-13-workflow-resource-retention-optimization revision 2 已批准的 Trellis R1 R2 R5 R8 范围，补齐回执与事务保护并验收发布",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-13",
+  "completedAt": null,
+  "branch": "codex/unify-trellis-chinese-templates",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "direct",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "seal": {
+        "revision": 1,
+        "task_id": "resource-retention-delivery",
+        "task_name": "10-13-resource-retention-delivery",
+        "documents": [
+          "prd.md"
+        ],
+        "document_digests": {
+          "prd.md": "f0ebd25ea9ab9a4c4a88f495b8ed98363a2f56d883c4e098e6051c79e4599cc9"
+        },
+        "execution_class": "direct",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-13T12:46:57.110282+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "继承根任务 revision 2 已明确批准的相同修订包；不新增范围或用户选择",
+      "approved_at": "2026-10-13T12:47:08.198434+00:00"
+    }
+  }
+}

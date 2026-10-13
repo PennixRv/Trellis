@@ -60,7 +60,7 @@ Note that `force` / `skipAll` / `createNew` are mutually exclusive in spirit but
 
 ### Backup retention owner
 
-`trellis backup list` and `trellis backup prune` are the native owner entry points for update snapshots. Pruning is preview-only unless `--yes` is supplied, requires `--keep >= 3`, and removes only completed snapshots after re-reading the directory under the prune lock. A legacy snapshot without `.backup-complete`, a staging snapshot, or a concurrent marker blocks the whole deletion pass; the command never infers completion from age or directory name.
+`trellis backup list` and `trellis backup prune` are the native owner entry points for update snapshots. Pruning is preview-only unless `--yes` is supplied, requires `--keep >= 3`, and removes only completed snapshots after re-reading the directory under the shared update/prune lock. Update holds that lock from backup creation through its final writes. A legacy snapshot without `.backup-complete`, a staging snapshot, or a concurrent marker blocks the whole deletion pass; the command never infers completion from age or directory name. Preview separates candidates and estimated bytes from actual removals; execution reports successful names, failed names and bytes belonging only to successfully removed snapshots.
 
 ---
 

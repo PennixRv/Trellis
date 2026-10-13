@@ -1,0 +1,13 @@
+{
+  "version": "0.7.0-beta.49",
+  "description": "Protect update backups and report actual pruning results",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": [
+    "Share an exclusive lock between update writes and backup pruning",
+    "Separate preview candidates and estimated bytes from actual successful removals",
+    "Report partial deletion failures without counting them as reclaimed bytes"
+  ],
+  "migrations": [],
+  "notes": "No project migration or automatic backup deletion."
+}

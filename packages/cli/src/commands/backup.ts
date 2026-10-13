@@ -5,7 +5,7 @@ import { DIR_NAMES } from "../constants/paths.js";
 
 export const BACKUP_COMPLETE_MARKER = ".backup-complete";
 const BACKUP_PREFIX = ".backup-";
-const BACKUP_PRUNE_LOCK = ".backup-prune.lock";
+export const BACKUP_PRUNE_LOCK = ".backup-prune.lock";
 const DEFAULT_KEEP = 3;
 
 export interface BackupInfo {
@@ -19,7 +19,11 @@ export interface BackupInfo {
 export interface BackupPruneResult {
   backups: BackupInfo[];
   protectedNames: string[];
+  candidateNames: string[];
   removedNames: string[];
+  failedNames: string[];
+  estimatedBytes: number;
+  releasedBytes: number;
   blockedReason?: string;
 }
 
@@ -44,7 +48,7 @@ export function listBackups(cwd = process.cwd()): BackupInfo[] {
         const stat = fs.lstatSync(backupPath);
         const complete =
           stat.isDirectory() &&
-          fs.statSync(path.join(backupPath, BACKUP_COMPLETE_MARKER)).isFile();
+          fs.lstatSync(path.join(backupPath, BACKUP_COMPLETE_MARKER)).isFile();
         return {
           name: entry.name,
           path: backupPath,
@@ -83,6 +87,10 @@ export function pruneBackups(
       backups,
       protectedNames: backups.map((backup) => backup.name),
       removedNames: [],
+      candidateNames: [],
+      failedNames: [],
+      estimatedBytes: 0,
+      releasedBytes: 0,
       blockedReason: "backup maintenance is already in progress",
     };
   }
@@ -91,6 +99,10 @@ export function pruneBackups(
       backups,
       protectedNames: backups.map((backup) => backup.name),
       removedNames: [],
+      candidateNames: [],
+      failedNames: [],
+      estimatedBytes: 0,
+      releasedBytes: 0,
       blockedReason: "an unknown or incomplete backup is present",
     };
   }
@@ -101,7 +113,14 @@ export function pruneBackups(
     return {
       backups,
       protectedNames,
-      removedNames: candidates.map((backup) => backup.name),
+      candidateNames: candidates.map((backup) => backup.name),
+      removedNames: [],
+      failedNames: [],
+      estimatedBytes: candidates.reduce(
+        (total, backup) => total + backup.bytes,
+        0,
+      ),
+      releasedBytes: 0,
     };
   }
 
@@ -114,6 +133,10 @@ export function pruneBackups(
         backups: current,
         protectedNames: current.map((backup) => backup.name),
         removedNames: [],
+        candidateNames: [],
+        failedNames: [],
+        estimatedBytes: 0,
+        releasedBytes: 0,
         blockedReason: "backup state changed during confirmation",
       };
     }
@@ -121,15 +144,31 @@ export function pruneBackups(
       (backup) => backup.state === "complete",
     );
     const currentCandidates = currentComplete.slice(keep);
+    const removedNames: string[] = [];
+    const failedNames: string[] = [];
+    let releasedBytes = 0;
     for (const backup of currentCandidates) {
-      fs.rmSync(backup.path, { recursive: true, force: false });
+      try {
+        fs.rmSync(backup.path, { recursive: true, force: false });
+        removedNames.push(backup.name);
+        releasedBytes += backup.bytes;
+      } catch {
+        failedNames.push(backup.name);
+      }
     }
     return {
       backups: current,
       protectedNames: currentComplete
         .slice(0, keep)
         .map((backup) => backup.name),
-      removedNames: currentCandidates.map((backup) => backup.name),
+      candidateNames: currentCandidates.map((backup) => backup.name),
+      removedNames,
+      failedNames,
+      estimatedBytes: currentCandidates.reduce(
+        (total, backup) => total + backup.bytes,
+        0,
+      ),
+      releasedBytes,
     };
   } finally {
     fs.closeSync(fd);

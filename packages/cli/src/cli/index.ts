@@ -212,9 +212,16 @@ program
       if (result.blockedReason) {
         throw new Error(`Backup pruning blocked: ${result.blockedReason}`);
       }
-      for (const name of result.removedNames) {
+      for (const name of options.yes
+        ? result.removedNames
+        : result.candidateNames) {
         console.log(`${options.yes ? "remove" : "would remove"} ${name}`);
       }
+      console.log(
+        `Candidates: ${result.candidateNames.length}; removed: ${result.removedNames.length}; retained: ${result.protectedNames.length}; failed: ${result.failedNames.length}; ${options.yes ? "released" : "estimated"}: ${options.yes ? result.releasedBytes : result.estimatedBytes} bytes`,
+      );
+      for (const name of result.failedNames) console.error(`failed ${name}`);
+      if (result.failedNames.length > 0) process.exitCode = 1;
       if (!options.yes) {
         console.log("(dry-run) use --yes after reviewing the list");
       }

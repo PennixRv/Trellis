@@ -57,6 +57,7 @@ import {
   executeMigrations,
 } from "../../src/commands/update.js";
 import { VERSION } from "../../src/constants/version.js";
+import { BACKUP_PRUNE_LOCK, pruneBackups } from "../../src/commands/backup.js";
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../../src/constants/paths.js";
 import { agentsMdContent } from "../../src/templates/markdown/index.js";
 import { computeHash, loadHashes } from "../../src/utils/template-hash.js";
@@ -1065,7 +1066,11 @@ describe("update() integration", () => {
     const target = ".agents/skills/current.txt";
     writeProjectFile(source, "user knowledge");
     writeProjectFile(target, "current template");
-    const migration = { type: "rename-dir" as const, from: ".pi/skills", to: ".agents/skills" };
+    const migration = {
+      type: "rename-dir" as const,
+      from: ".pi/skills",
+      to: ".agents/skills",
+    };
     const templates = new Map([[target, "current template"]]);
     const classified = classifyMigrations([migration], tmpDir, {}, templates);
     expect(classified.auto).toHaveLength(0);
@@ -1110,6 +1115,31 @@ describe("update() integration", () => {
     const entries = fs.readdirSync(path.join(tmpDir, DIR_NAMES.WORKFLOW));
     const backupDirs = entries.filter((e) => e.startsWith(".backup-"));
     expect(backupDirs.length).toBeGreaterThanOrEqual(1);
+    expect(entries).not.toContain(BACKUP_PRUNE_LOCK);
+  });
+
+  it("keeps update writes exclusive with backup pruning", async () => {
+    await setupProject();
+    const target = path.join(tmpDir, MANAGED_FILE);
+    fs.writeFileSync(target, "# local old content\n");
+    const lockPath = path.join(tmpDir, DIR_NAMES.WORKFLOW, BACKUP_PRUNE_LOCK);
+    fs.writeFileSync(lockPath, "");
+    await expect(update({ force: true })).rejects.toMatchObject({
+      code: "EEXIST",
+    });
+    expect(fs.readFileSync(target, "utf8")).toBe("# local old content\n");
+    fs.rmSync(lockPath);
+    const write = fs.writeFileSync.bind(fs);
+    vi.spyOn(fs, "writeFileSync").mockImplementation((file, data, options) => {
+      if (String(file) === target) {
+        expect(pruneBackups(tmpDir, { confirm: true }).blockedReason).toMatch(
+          /in progress/,
+        );
+      }
+      return write(file, data, options);
+    });
+    await update({ force: true });
+    expect(fs.existsSync(lockPath)).toBe(false);
   });
 
   it("#10 downgrade protection prevents update when CLI is older", async () => {
@@ -1905,22 +1935,46 @@ describe("update() integration", () => {
   it("updates an older native workflow version without relaxing source integrity", async () => {
     await setupProject();
     const provenancePath = projectFile(PATHS.WORKFLOW_PROVENANCE_FILE);
-    const record = { schema_version: 1, workflow_id: "native", source_kind: "bundled", registry: "bundled:trellis", ref: "0.7.0-beta.34", path: "bundled:trellis/workflow.md", content_sha256: computeHash(workflowMdTemplate) };
+    const record = {
+      schema_version: 1,
+      workflow_id: "native",
+      source_kind: "bundled",
+      registry: "bundled:trellis",
+      ref: "0.7.0-beta.34",
+      path: "bundled:trellis/workflow.md",
+      content_sha256: computeHash(workflowMdTemplate),
+    };
     fs.writeFileSync(provenancePath, JSON.stringify(record));
     await update({ force: true });
-    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8"))).toMatchObject({ ...record, ref: VERSION });
+    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8"))).toMatchObject({
+      ...record,
+      ref: VERSION,
+    });
     const oldWorkflow = "# Pristine older native workflow\n";
     fs.writeFileSync(projectFile(PATHS.WORKFLOW_GUIDE_FILE), oldWorkflow);
     const hashes = readHashesV2(hashFilePath());
     hashes[PATHS.WORKFLOW_GUIDE_FILE] = computeHash(oldWorkflow);
     writeHashesV2(hashFilePath(), hashes);
-    fs.writeFileSync(provenancePath, JSON.stringify({ ...record, content_sha256: computeHash(oldWorkflow) }));
+    fs.writeFileSync(
+      provenancePath,
+      JSON.stringify({ ...record, content_sha256: computeHash(oldWorkflow) }),
+    );
     await update({ force: true });
-    expect(fs.readFileSync(projectFile(PATHS.WORKFLOW_GUIDE_FILE), "utf-8")).toBe(replacePythonCommandLiterals(workflowMdTemplate));
-    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8"))).toMatchObject({ ...record, ref: VERSION });
-    fs.writeFileSync(provenancePath, JSON.stringify({ ...record, content_sha256: "0".repeat(64) }));
+    expect(
+      fs.readFileSync(projectFile(PATHS.WORKFLOW_GUIDE_FILE), "utf-8"),
+    ).toBe(replacePythonCommandLiterals(workflowMdTemplate));
+    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8"))).toMatchObject({
+      ...record,
+      ref: VERSION,
+    });
+    fs.writeFileSync(
+      provenancePath,
+      JSON.stringify({ ...record, content_sha256: "0".repeat(64) }),
+    );
     await expect(update({ force: true })).rejects.toThrow("template integrity");
-    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8")).ref).toBe(record.ref);
+    expect(JSON.parse(fs.readFileSync(provenancePath, "utf-8")).ref).toBe(
+      record.ref,
+    );
   });
 
   it("#workflow-md-r4 updates workflow.md as one runtime template when hash-tracked", async () => {
