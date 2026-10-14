@@ -81,7 +81,6 @@ const CODEX_SUBNODE_CONTENT = [
 const MARKETPLACE_SOURCE =
   "gh:example/workflows#0123456789012345678901234567890123456789";
 const MARKETPLACE_OPTIONS = { marketplace: MARKETPLACE_SOURCE };
-const TDD_SHA256 = createHash("sha256").update(TDD_CONTENT).digest("hex");
 const CODEX_SUBNODE_SHA256 = createHash("sha256")
   .update(CODEX_SUBNODE_CONTENT)
   .digest("hex");

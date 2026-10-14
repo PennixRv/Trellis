@@ -1,0 +1,53 @@
+{
+  "id": "project-agents-writer-safety",
+  "name": "project-agents-writer-safety",
+  "title": "Project AGENTS writer safety verification",
+  "description": "Verify and repair native AGENTS writer contracts for the approved governance revision 1, preserving other blocks and project prose.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-14",
+  "completedAt": null,
+  "branch": "codex/project-agents-governance",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "seal": {
+        "revision": 1,
+        "task_id": "project-agents-writer-safety",
+        "task_name": "10-14-project-agents-writer-safety",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "d6d122f5052db8bc93046db1fbf4e460eda3d626887d1b2f1d1fc1fd2020e323",
+          "design.md": "aa245588b806f511541651f76e18b6b997433eca3fb6c69e3cb93fb7759c5f00",
+          "implement.md": "6ac185957b58c1aa5613ccd5414ff1e0ee0bec4cc85003ba0d8840b781bd55e7"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-14T07:40:17.471398+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "用户明确批准完整修订包实施并要求完整推进；本组件当前封口范围逐项落实该批准，无新增取舍",
+      "approved_at": "2026-10-14T07:40:17.575017+00:00"
+    }
+  }
+}

@@ -160,7 +160,8 @@ describe("init() integration", () => {
   });
 
   it("merges a pre-existing AGENTS.md into one managed block", async () => {
-    const userContent = "# Local Instructions\n\nKeep this section.\n";
+    const userContent =
+      "# Local Instructions\n\n<!-- CODEGRAPH_START -->\nCodeGraph navigation\n<!-- CODEGRAPH_END -->\n\nKeep this section.  \n\n";
     fs.writeFileSync(path.join(tmpDir, FILE_NAMES.AGENTS), userContent);
 
     await init({ yes: true });
@@ -170,7 +171,7 @@ describe("init() integration", () => {
       path.join(tmpDir, FILE_NAMES.AGENTS),
       "utf-8",
     );
-    expect(content).toBe(`${userContent.trimEnd()}\n\n${agentsMdContent}`);
+    expect(content).toBe(`${userContent}${agentsMdContent}`);
     expect(content.match(/<!-- TRELLIS:START -->/g)).toHaveLength(1);
     expect(content.match(/<!-- TRELLIS:END -->/g)).toHaveLength(1);
   });

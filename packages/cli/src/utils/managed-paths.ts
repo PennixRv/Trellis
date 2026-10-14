@@ -64,8 +64,12 @@ export function mergeManagedMarkdownBlock(
 
   if (!templateBlock) return templateContent;
   if (firstStart === -1 && firstEnd === -1) {
-    const trimmed = existingContent.replace(/\s+$/, "");
-    return `${trimmed}\n\n${templateBlock}\n`;
+    const separator = existingContent.endsWith("\n\n")
+      ? ""
+      : existingContent.endsWith("\n")
+        ? "\n"
+        : "\n\n";
+    return `${existingContent}${separator}${templateBlock}\n`;
   }
   if (
     firstStart === -1 ||

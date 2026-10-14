@@ -1,0 +1,12 @@
+{
+  "version": "0.7.0-beta.50",
+  "description": "Preserve project instruction bytes when appending the Trellis block",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": [
+    "Preserve trailing spaces and blank lines in existing project instructions during init",
+    "Verify that manual content and an existing CodeGraph block remain byte-for-byte intact"
+  ],
+  "migrations": [],
+  "notes": "No project workflow change or automatic migration."
+}
