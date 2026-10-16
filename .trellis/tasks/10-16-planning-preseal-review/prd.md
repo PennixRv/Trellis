@@ -9,12 +9,13 @@
 - 将最终方案展示与合并授权前移到 seal 之前，同步首次规划、继续与重规划入口。
 - 用户选择封口并批准推进后，原生 seal/approve/start 连续执行；保留摘要、版本、任务和真实答复约束。
 - 同步默认模板、Copilot 独立入口、bundled 参考及 Marketplace 四个有效工作流；无新状态、接口或依赖。
+- 恢复已创建但尚未公开发布的 beta.51：在既有发布工作流中增加受控手动触发和 `source_ref` checkout，继续使用原有版本校验、构建、测试、双包发布和 npm 回读；不在本机执行 npm publish，不删除或重打既有 tag／Release。
 
 ## 验收标准（Acceptance Criteria）
 
 - [ ] 模板、状态提示与 Marketplace 合同一致；补充、仅封口、失败和恢复场景明确。
 - [ ] 原生任务门禁、模板和相关 Marketplace 检查通过。
-- [ ] 必要双包发布、安装更新与根侧物化验收完成。
+- [ ] beta.51 双包已由 GitHub Actions 公开发布并通过精确 npm 回读；必要安装更新与根侧物化验收完成。
 
 ## 备注（Notes）
 

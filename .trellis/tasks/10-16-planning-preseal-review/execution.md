@@ -12,3 +12,10 @@
 - 发布阻塞：标签推送与 Release published（包括一次同一预发行记录的原生 draft→published 重发）后仍无对应 Actions 运行／check suite。工作流 active、仓库 Actions enabled、官方 Actions 状态 operational；公开事件显示发布事件到达，但未查明未创建运行的原因。`verify-npm --package all` 在 18 次等待后 exit 1，公开 core beta.51 404。未绕过 CI-only 发布合同。
 - 根项目 Marketplace 工作流已原生更新并通过来源核验、只读组合验收 8 项；Skill 集合固定 6f430d34 原生替换并核验 match。全局 CLI 仍 beta.50；本组件项目资产的 beta.51 原生刷新、最终安装验收与归档待公开发布完成，因此任务保持 in_progress。
 - 续接：先查询 tag 对应 Publish CI；出现真实运行后追踪结果并按原始错误处理，成功后原生 verify-npm。再由已更新 lifecycle 升级 trellis-cli，按三处项目既有来源原生更新受影响资产，补全安装／来源／组合核验并归档。已有同范围授权继续有效，不重新 seal 或询问同一批准。
+
+## 续接核验与待审方案（2026-10-16）
+
+- 当前本机 `@pennixrv/trellis` 为 `0.7.0-beta.50`；GitHub 远端 tag `v0.7.0-beta.51` 仍指向版本提交 `08e8aecff297698937f7cdc1a24597b9f91ac25b`，Release 已发布，但 `npm view @pennixrv/trellis@0.7.0-beta.51` 返回 404，`npm view @pennixrv/trellis@beta` 仍为 beta.50。
+- `gh run list` 未发现 beta.51 的 `Publish to npm` 运行；发布工作流当前只有 `release.published` 与 `v*` tag push 触发器，没有 `workflow_dispatch`。因此 beta.51 是已创建但未公开发布的目标，本机 beta.50 不是漏装结果，lifecycle 保留 drifted 是正确的 fail-closed 行为。
+- 待审的最小修订是：在现有 `.github/workflows/publish.yml` 增加受控 `workflow_dispatch` 与 `source_ref` 输入，并让 checkout 使用该输入；在现有任务分支上提交推送后，通过 GitHub Actions 对已存在的 `v0.7.0-beta.51` 运行原生发布流程。禁止本机 `npm publish`、删除或重打 tag、删除 Release。
+- 发布且公开 npm 精确核验通过后，才运行 lifecycle `upgrade --component trellis-cli --yes`、scoped `verify`、已登记项目的原生资产更新和根侧离线集成验收；任一发布或核验失败则保留 beta.50、beta.51 目标和原始回执，不改 catalog 伪造 match。

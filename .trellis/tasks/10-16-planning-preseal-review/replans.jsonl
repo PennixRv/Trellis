@@ -1,0 +1,1 @@
+{"timestamp": "2026-10-16T12:52:27.334265Z", "task": ".trellis/tasks/10-16-planning-preseal-review", "from_status": "in_progress", "reason": "beta.51 的 GitHub Release 和 tag 已存在，但 Publish to npm 未生成 Actions 运行；恢复发布需要新增受控 workflow_dispatch/source_ref 步骤，属于已批准方案之外的实质发布路径修订", "branch": "task/planning-preseal-review", "session": "codex_01a13fba-0228-7f50-ac50-bbf9b701b8c6"}

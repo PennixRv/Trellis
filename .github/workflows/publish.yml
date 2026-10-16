@@ -10,6 +10,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Git ref containing the exact version to publish"
+        required: true
+        default: "main"
 
 concurrency:
   group: publish-${{ github.ref_name || github.ref }}
@@ -26,6 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: "${{ inputs.source_ref || github.ref }}"
           fetch-depth: 0
           submodules: recursive
 
