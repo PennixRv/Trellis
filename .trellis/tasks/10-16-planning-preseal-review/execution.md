@@ -19,3 +19,12 @@
 - `gh run list` 未发现 beta.51 的 `Publish to npm` 运行；发布工作流当前只有 `release.published` 与 `v*` tag push 触发器，没有 `workflow_dispatch`。因此 beta.51 是已创建但未公开发布的目标，本机 beta.50 不是漏装结果，lifecycle 保留 drifted 是正确的 fail-closed 行为。
 - 待审的最小修订是：在现有 `.github/workflows/publish.yml` 增加受控 `workflow_dispatch` 与 `source_ref` 输入，并让 checkout 使用该输入；在现有任务分支上提交推送后，通过 GitHub Actions 对已存在的 `v0.7.0-beta.51` 运行原生发布流程。禁止本机 `npm publish`、删除或重打 tag、删除 Release。
 - 发布且公开 npm 精确核验通过后，才运行 lifecycle `upgrade --component trellis-cli --yes`、scoped `verify`、已登记项目的原生资产更新和根侧离线集成验收；任一发布或核验失败则保留 beta.50、beta.51 目标和原始回执，不改 catalog 伪造 match。
+
+## 发布恢复执行回执（2026-10-16）
+
+- 任务分支工作流修订提交 `74ebb965` 已推送到 `task/planning-preseal-review`；仅增加 `workflow_dispatch.source_ref` 和按输入 checkout，提交钩子运行 Core `432 passed / 1 skipped`、CLI 全量测试通过。
+- 为使 GitHub 默认分支识别手动入口，从 `origin/main` 建立仅含 `.github/workflows/publish.yml` 的提交 `c0a26299` 并推送到 `main`。远端内容已回读，`workflow_dispatch` 与 `source_ref` 均存在。
+- 两次 `gh workflow run publish.yml --repo PennixRv/Trellis`（一次指定任务分支、一次指定 `main`）以及一次直接 REST dispatch 均返回原始 `HTTP 422: Actions has been disabled for this repository`；没有创建新的 Actions run。
+- 同时回读 `repos/PennixRv/Trellis/actions/permissions` 为 `enabled=true, allowed_actions=all`，workflow 状态为 `active`，仓库为公开 fork、当前账号权限为 `ADMIN`。使用布尔参数再次通过原生 PUT 回写相同设置后，dispatch 仍返回同一 422。当前阻塞落在 GitHub fork／Actions 设置层，不能由本地代码、npm 或 lifecycle 绕过。
+- 补充执行原生 `gh workflow enable publish.yml --repo PennixRv/Trellis` 成功返回，但随后的 dispatch 仍报同一 422；尚不能仅凭回执确定 GitHub 设置不一致的具体原因。仅承载默认分支工作流提交的临时工作树已原生移除。
+- npm 仍为 `beta=0.7.0-beta.50`，精确查询 beta.51 仍 404；未执行本机 npm publish、lifecycle upgrade 或 catalog 回退。待仓库设置允许该 workflow 产生 run 后，从 dispatch 继续原计划。
