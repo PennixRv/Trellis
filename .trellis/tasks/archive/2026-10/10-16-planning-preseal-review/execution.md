@@ -51,3 +51,6 @@
 - 三处项目均已原生 `trellis update --create-new`：根项目 beta.50→beta.51，Trellis 与 pennix-skills beta.45→beta.51。原生备份保留，既有用户删除的 `.opencode/package.json` 未恢复，无冲突候选需要覆盖。各项目的 `update --dry-run` 均为 Already up to date，`workflow --verify` 均通过。
 - 生成摘要复核通过：根项目、Trellis、pennix-skills 的本次脚本／模板分别核对 2、37、16 项；工作流来源保持上述 Marketplace 固定提交或 native beta.51。Trellis lint／typecheck 通过，根侧离线组合验收 8 passed，其余状态均为 0。
 - Spec 复核：此次撤回只恢复既有发布合同；不保留临时手动入口专用说明，不新增发布接口、依赖或状态。默认分支发现机制和真实失败已保留在本执行记录，现行 release-process 的 CI-only、beta track、tag／Release 与双包校验合同继续适用。
+- 工作提交 `4c6ad11b` 已推送到任务分支，并以 fast-forward 收敛到远端 `pennix/v0.7-beta`；当前检出回到该 beta 分支。本地 main 仅快进到已推送的撤回提交 `ac29b004`，未将 beta 产品合入 stable。临时 main 工作树已原生移除。
+- 最终工作提交钩子全部通过：Core 432 passed / 1 skipped，CLI 2281 passed / 2 skipped；此前 lint／typecheck、release-preflight 3 项及 main／beta 工作流精确比较结果继续有效。未增加 npm 版本或再触发发布。
+- 验收结论：四项 PRD 验收均有证据。模板及 Marketplace 一致、最终答复分支和原生规划门禁已验证；beta.51 双包的成功 CI 与 npm 精确回读成立；CLI、三处项目资产与来源验收完成；main 临时入口已撤回，beta 分支已恢复既有路径并推送。可以按原生入口归档，不再保留旧发布阻塞为当前状态。
