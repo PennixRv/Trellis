@@ -8,3 +8,7 @@
 - 最终完整链路 lint、typecheck、test、build 全部通过：core 432 passed / 1 skipped；CLI 2281 passed / 2 skipped。两项已修正断言已包含在本轮全量结果中。
 - Marketplace 已推送 5b872f9；双语 beta.51 发布说明已推送 docs-site 044deaf。清单连续性、双包版本一致性、文档守卫、打包 CLI 的 core 精确依赖均通过。
 - npm pack dry-run 确认目标工作流、共享 brainstorm、continue、Copilot 独立模板和 task_planning 原生脚本均进入包。临时项目原生 init（Codex + Copilot）成功，生成资产摘要与登记值一致，最终复核规则已进入两平台 Skill；原生 update --dry-run 返回 Already up to date。临时项目与日志均在 /tmp，未纳入源码。
+- 原生 `pnpm release:beta` 全流程成功，版本提交 `08e8aecff297698937f7cdc1a24597b9f91ac25b` 与 tag `v0.7.0-beta.51` 已推送；双包版本均为 beta.51。源修复提交 f38d30af。GitHub 预发行记录已公开且对应原 tag，未修改既有标签。
+- 发布阻塞：标签推送与 Release published（包括一次同一预发行记录的原生 draft→published 重发）后仍无对应 Actions 运行／check suite。工作流 active、仓库 Actions enabled、官方 Actions 状态 operational；公开事件显示发布事件到达，但未查明未创建运行的原因。`verify-npm --package all` 在 18 次等待后 exit 1，公开 core beta.51 404。未绕过 CI-only 发布合同。
+- 根项目 Marketplace 工作流已原生更新并通过来源核验、只读组合验收 8 项；Skill 集合固定 6f430d34 原生替换并核验 match。全局 CLI 仍 beta.50；本组件项目资产的 beta.51 原生刷新、最终安装验收与归档待公开发布完成，因此任务保持 in_progress。
+- 续接：先查询 tag 对应 Publish CI；出现真实运行后追踪结果并按原始错误处理，成功后原生 verify-npm。再由已更新 lifecycle 升级 trellis-cli，按三处项目既有来源原生更新受影响资产，补全安装／来源／组合核验并归档。已有同范围授权继续有效，不重新 seal 或询问同一批准。
