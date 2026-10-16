@@ -21,6 +21,8 @@ The package pair is version-locked. Every published version must exist for both 
 
 Official npm publishing must happen through `.github/workflows/publish.yml`.
 
+For manual recovery, `workflow_dispatch.source_ref` selects the existing release tag for both checkout and the required tag/version check. The dispatch branch is only the workflow definition source; its `GITHUB_REF_NAME` must not substitute for the selected release tag. Pass the input through a quoted shell environment value, never interpolate it into command text.
+
 Do not run `npm publish` or `pnpm publish` locally for official Trellis packages. Local machines may run `pnpm pack`, `release-preflight`, tests, lint, typecheck, and dry-run checks, but not package publication.
 
 If a CI publish looks partial or inconsistent:
