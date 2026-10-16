@@ -468,3 +468,27 @@ Completed approved AGENTS override diagnostics, capability-aware project graph g
 ### 状态（Status）
 
 [OK] **已完成（Completed）**
+
+
+## 会话（Session） 17：完成 beta.51 发布恢复与 beta 分支收敛
+<!-- trellis-session: v=2 fp=333026636d99ca87 -->
+
+**日期（Date）**: 2026-10-16
+**任务（Task）**: 完成 beta.51 发布恢复与 beta 分支收敛
+**包（Package）**: cli
+**分支（Branch）**: `pennix/v0.7-beta`
+
+### 摘要（Summary）
+
+按用户批准撤回 main 临时手动入口并恢复 beta/tag 发布路径；既有 beta.51 CI 和 npm 双包核验成功，lifecycle 升级及三处项目原生资产更新完成。Core 432/CLI 2281 项通过，lint/typecheck、来源核验和根侧离线 8 项通过。任务分支已 fast-forward 到 pennix/v0.7-beta 并完成原生归档，未重打 tag、未本机发布。
+
+### Git 提交（Git Commits）
+
+| 哈希（Hash） | 消息（Message） |
+|------|---------|
+| `4c6ad11b` | fix(release): restore beta publishing and complete rollout |
+| `ac29b004` | revert(release): restore tag and release publishing |
+
+### 状态（Status）
+
+[OK] **已完成（Completed）**
