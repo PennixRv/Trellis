@@ -22,11 +22,13 @@
 
 除边界清晰的研究外，使用 `pennix-decision-grill` 筛选涉及用户实质取舍的选择；一个实质选择即可触发。它负责渐进提问方法，不负责任务生命周期。先处理依赖已满足且有证据支撑的选择，再处理影响和优先级；一次询问一至三个相互独立且连贯的决策，回答后重新评估。不要询问可直接查明的事实或已经确定的实现细节。在执行有界本地/网络证据工作或明确批准独立子节点前保存决策检查点。可执行前沿为空可能表示缺少证据，不表示方案已封口。
 
-对于 planned/change-bearing 工作，先收敛决策和必要任务资产，运行原生 `task.py plan seal <task>`，展示实质方案并停在实施前。只有之后用户明确批准**当前任务当前封口版本**，才可运行 `task.py plan approve <task> --revision <n> --basis "<简短且不含敏感信息的实际批准依据>"`，然后运行 `task.py start`。最初的交付请求、父任务批准和设计答复都不构成实施批准。`--allow-empty-context` 只覆盖上下文清单，不覆盖批准门禁。原生记录负责结构约束，对话真实性仍由 Agent 负责。
+对于 planned/change-bearing 工作，先收敛决策和必要任务资产，展示最终方案的目标、范围、修改目标与负责组件、关键决定、验收与验证、风险、发布/安装、回退及完成点，再按 `pennix-decision-grill` 的宿主交互合同征询“封口并批准推进”或“补充／修改方案”。明确合并授权后，才依次运行原生 `task.py plan seal <task>`、使用实际 revision 的 `task.py plan approve <task> --revision <n> --basis "<简短且不含敏感信息的实际批准依据>"`、`task.py start`。授权只覆盖同一任务刚展示的方案，不重复索取同一实施批准。最初的交付请求、父任务批准和普通设计答复都不构成实施批准。`--allow-empty-context` 只覆盖上下文清单，不覆盖批准门禁。原生记录负责结构约束，对话真实性仍由 Agent 负责。
 
-实质范围、owner、风险、公开行为或验收变化必须运行 `task.py replan`，重新封口、展示并取得新版本批准。对已封口的 planning 任务重新封口会产生新的实质版本。措辞、格式、进度和执行证据不会自动使封口失效。通用 create/set-meta 不能预填保留的 `meta.planning` 记录。
+补充意见保持 planning，更新方案后重新展示确认；用户明确只同意封口时仅 seal，不 approve/start。明确表达相同意图的自由文本有效，不要求固定口令；空回执、取消和推荐项不算批准。seal/approve/start 失败先核对原始回执及实际状态，不盲目重做已成功的 seal。已有充分且范围一致的授权在普通继续或恢复时复用。
 
-用户明确要求向 `in_progress` 任务增加内容时，只有该内容服务于同一任务、保持实际 owner 和目标不变、规模小、可逆且风险低，并且实质上不改变已封口的范围、owner、风险、公开行为、数据完整性、凭据、部署/发布路径或验收，才可在当前阶段继续。将请求、分类、owner、验收和验证写入未封口执行记录；该请求只授权这一项明确增加的内容。任何条件不满足或不清楚时，保留当前结论，记录 `decision-needed`，使用原生 `task.py replan`，走重新封口和后续批准路径。
+实质范围、owner、风险、公开行为、部署路径或验收变化必须重新规划；in_progress 任务使用原生 `task.py replan`，planning 任务直接更新材料。重新展示方案、取得明确确认后再 seal/approve/start；旧批准不覆盖新方案。对已封口的 planning 任务重新封口会产生新的实质版本。封口文档按字节摘要冻结，进度和非实质修正写入未封口执行记录。通用 create/set-meta 不能预填保留的 `meta.planning` 记录。
+
+用户明确要求向 `in_progress` 任务增加内容时，只有该内容服务于同一任务、保持实际 owner 和目标不变、规模小、可逆且风险低，并且实质上不改变已封口的范围、owner、风险、公开行为、数据完整性、凭据、部署/发布路径或验收，才可在当前阶段继续。将请求、分类、owner、验收和验证写入未封口执行记录；该请求只授权这一项明确增加的内容。任何条件不满足或不清楚时，保留当前结论，记录 `decision-needed`，使用原生 `task.py replan`，回到最终方案复核。
 
 使用原生 `task.py select <task>` 只选择上下文：它不改变阶段或分支，不触发 after_start Hook，也不授予实施权限。`create --no-start` 有意保留之前的指针。切换前保存旧检查点；存在活动 Channel 工作时，按 `trellis-channel` 的多目标流程暂停补充并排空已派发单元和预留，保留待处理单元及旧阶段。不要终止/重试或自动重启用户停止的任务。普通继续/压缩恢复保留检查点快速路径。
 
@@ -246,7 +248,7 @@ Phase 3: Finish  → verify, update spec, commit, and wrap up
 [workflow-state:planning]
 加载 `trellis-brainstorm`；保持 planning。
 如果 `task.json.meta.delivery_mode = "analysis_only"`，无论复杂度或跨 owner 范围如何，都完成有界证据工作；PRD 必须写明证据交付物和受保护目标不变边界。不要运行 Planning Seal 或等待实施批准。涉及受保护目标的建议必须另建 change-bearing 任务。
-对于 `analysis_only`，无论复杂度或跨 owner 范围如何，都完成有界证据工作；PRD 必须写明证据交付物和受保护目标不变边界。不要运行 Planning Seal 或等待实施批准。对于 change-bearing 工作，轻量任务可以使用 `prd.md`；复杂任务在实施审查前需要 `design.md`、`implement.md` 和 Planning Seal。研究建议和开放的产品选择可以记录，但不要将其封口为实施决策。持久化定义请求所需的答复，并继续同一规划循环。
+对于 change-bearing 工作，轻量任务可以使用 `prd.md`；复杂任务在最终复核前需要 `design.md` 和 `implement.md`。先展示方案，再征询“封口并批准推进”或“补充／修改方案”；明确合并授权后才原生 seal/approve/start，同一方案不重复确认。研究建议和开放的产品选择可以记录，但不要将其封口为实施决策。持久化定义请求所需的答复，并继续同一规划循环。
 多交付物范围：考虑父任务和可独立验证的子任务；依赖必须写入子任务资产，不能从树结构位置推断。
 子代理模式：在 start 前维护 `implement.jsonl` 和 `check.jsonl` 作为 spec/研究清单。
 planned/change-bearing start 需要原生 plan seal，以及对当前任务当前实质版本的匹配批准。选择上下文不构成批准。
@@ -259,7 +261,7 @@ planned/change-bearing start 需要原生 plan seal，以及对当前任务当�
 [workflow-state:planning-inline]
 加载 `trellis-brainstorm`；保持 planning。
 如果 `task.json.meta.delivery_mode = "analysis_only"`，无论复杂度或跨 owner 范围如何，都完成有界证据工作；PRD 必须写明证据交付物和受保护目标不变边界。不要运行 Planning Seal 或等待实施批准。涉及受保护目标的建议必须另建 change-bearing 任务。
-对于 `analysis_only`，无论复杂度或跨 owner 范围如何，都完成有界证据工作；PRD 必须写明证据交付物和受保护目标不变边界。不要运行 Planning Seal 或等待实施批准。对于 change-bearing 工作，轻量任务可以使用 `prd.md`；复杂任务在实施审查前需要 `design.md`、`implement.md` 和 Planning Seal。研究建议和开放的产品选择可以记录，但不要将其封口为实施决策。持久化定义请求所需的答复，并继续同一规划循环。
+对于 change-bearing 工作，轻量任务可以使用 `prd.md`；复杂任务在最终复核前需要 `design.md` 和 `implement.md`。先展示方案，再征询“封口并批准推进”或“补充／修改方案”；明确合并授权后才原生 seal/approve/start，同一方案不重复确认。研究建议和开放的产品选择可以记录，但不要将其封口为实施决策。持久化定义请求所需的答复，并继续同一规划循环。
 多交付物范围：考虑父任务和可独立验证的子任务；依赖必须写入子任务资产，不能从树结构位置推断。
 Inline 模式跳过 JSONL 整理；阶段二通过 `trellis-before-dev` 读取任务资产和 spec。
 planned/change-bearing 任务开始前需要原生 plan seal，以及对当前任务当前实质版本的匹配批准。选择上下文不构成批准。
@@ -278,6 +280,7 @@ planned/change-bearing 任务开始前需要原生 plan seal，以及对当前�
 子代理派发协议适用于所有平台和所有子代理，包括使用原生 Codex `SubagentStart` 注入上下文并以子代理侧读取为后备的模式、Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code/DeepSeek Harness、由 Hook 支持的 ZCode/Snow 以及 `trellis-research`：每个派发提示都必须先写 `Active task: <task path from task.py current>`，再写角色指令。Grok Build 使用 `spawn_subagent`，并将 `subagent_type` 设为 Trellis Agent 名称（例如 `trellis-implement`）。Kimi Code 派发内置 `coder` / `explore` 子代理，并提供对应的 `.kimi-code/skills/trellis-<role>/SKILL.md` 指令。DeepSeek Harness 要求子代理恰好加载一次对应的 `.dsh/skills/trellis-agent-<role>/SKILL.md`，再按能力选择同步路径。如果可选伴随插件提供 `trellis_wait`，使用默认可继续的后台模式派发 `subagent`，继续独立工作；依赖门即将满足时，对每个依赖子代理 ID 调用一次 `trellis_wait`，每次调用都要等到 DSH 排入该子代理的原生结算通知后才返回。没有 `trellis_wait` 时，从一开始就为每个子代理设置 `run_in_background: false`，避免依赖门越过它。不得用 shell sleep、轮询循环、`job_output`、重复 `list_agents` 或其他长命令模拟等待，也不得让后台子代理脱离事件驱动的等待路径。
 
 [workflow-state:in_progress]
+实质重规划后先完善并展示方案，征询封口并批准推进或补充意见，明确确认后才 seal/approve/start；已有充分授权不重复询问。
 满足上述 in_progress 条件、且由用户明确要求的有界增补，留在当前阶段，并记录到未封口执行记录。出现实质未决选择时，立即解释影响和建议，停止依赖该选择的动作并记录 `decision-needed`。运行原生 `task.py replan <task> "<reason>"` 回到规划，再使用阻塞式提问工具并重新封口/批准新的实质版本。不要延后该选择，也不要手动修改任务状态。
 `trellis-implement` / `trellis-research` 表示通过平台子代理机制派发的角色，不是主会话自行加载的 Skill（Claude Code 使用 Task/Agent 工具，不使用 Skill 工具）。`trellis-update-spec` 是 Skill。`trellis-check` 同时存在于两种入口；代码变更后验证时优先使用 Agent/角色入口。
 DeepSeek Harness 的角色指令以互不冲突的 `trellis-agent-implement` / `trellis-agent-check` / `trellis-agent-research` Skill 分发到 `.dsh/skills/`。主会话不得自行加载；要求子代理恰好加载一次对应角色 Skill。提供 `trellis_wait` 时，使用默认后台模式，继续独立工作，然后对每个依赖子代理 ID 调用一次 `trellis_wait`，消费原生结算通知后才进入依赖门。未提供时，从一开始就为每个子代理设置 `run_in_background: false`。不得轮询、sleep 或启动没有事件驱动等待路径的后台子代理。
@@ -291,6 +294,7 @@ DeepSeek Harness 的角色指令以互不冲突的 `trellis-agent-implement` / `
      [workflow-state:in_progress]；主会话直接编辑代码，不派发子代理。 -->
 
 [workflow-state:in_progress-inline]
+实质重规划后先完善并展示方案，征询封口并批准推进或补充意见，明确确认后才 seal/approve/start；已有充分授权不重复询问。
 流程：`trellis-before-dev` → 编辑 → `trellis-check` → 验证 → `trellis-update-spec` → 提交（阶段 3.4）→ `/trellis:finish-work`。
 满足上述 in_progress 条件、且由用户明确要求的有界增补，留在当前阶段，并记录到未封口执行记录。出现实质未决选择时，立即解释影响和建议，停止依赖该选择的动作并记录 `decision-needed`。运行原生 `task.py replan <task> "<reason>"` 回到规划，再使用阻塞式提问工具并重新封口/批准新的实质版本。不要延后该选择，也不要手动修改任务状态。
 Inline 模式不派发 implement/check 子代理。
@@ -403,7 +407,7 @@ brainstorm Skill 会引导你：
 - 让 `prd.md` 专注于需求和验收标准
 - 复杂任务在开始实施前生成 `design.md` 和 `implement.md`
 - 对阅读量大的工作拆成证据单元，并在继续前持久化每个单元的结论或恢复点
-- 在 change-bearing 实施审查或 `task.py start` 前，对任务资产运行 Planning Seal 收口检查，并锁定目标、分支、依赖、发布、验证、回滚、动态事实处理和实施决策；`analysis_only` 不使用此门禁
+- 在 change-bearing 最终方案复核前，对任务资产运行 Planning Seal 收口检查，核对目标、分支、依赖、发布、验证、回滚、动态事实处理和实施决策；检查不调用 seal，明确最终确认后才封口；`analysis_only` 不使用此门禁
 
 考虑拆分父子任务时：
 - 一个请求包含多个可独立验证的交付物时使用父任务。
@@ -505,7 +509,7 @@ python3 ./.trellis/scripts/task.py add-context "$TASK_DIR" check "<path>" "<reas
 
 此步骤仅适用于 change-bearing 任务。符合条件的 analysis-only 任务保持 `planning`，完成证据工作后不运行 `task.py start`，直接进入阶段 3.3。
 
-完成 Planning Seal 收口检查、资产审查以及上文适用的原生 plan seal/approve 门禁后，将任务状态切换为 `in_progress`：
+完成 Planning Seal 收口检查并展示最终方案，取得“封口并批准推进”的明确授权后，原生 plan seal，再以实际 revision 记录 approve；门禁通过后将任务状态切换为 `in_progress`，不重复索取同一实施批准：
 
 ```bash
 python3 ./.trellis/scripts/task.py start <task-dir>

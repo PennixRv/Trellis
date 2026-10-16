@@ -6,7 +6,7 @@ description: "Guide requirements discovery for a Trellis task after task-creatio
 
 ## Non-Negotiable Planning Contract
 
-A request to build, implement, fix, refactor, or "go ahead" is not approval to leave planning. Task-creation consent is also not implementation approval.
+An initial request to build, implement, fix, or refactor is not approval to leave planning. Task-creation consent is also not implementation approval. An explicit response approving the displayed final plan may authorize sealing and implementation together.
 
 For every non-trivial task, the user must respond at least once after the initial request before implementation begins. If no clarification is needed, that response must approve the final planning summary described below.
 
@@ -64,7 +64,7 @@ Use a concise title from the user's request. Both the title and `--description` 
 5. If the user requests independent subnode evidence, first freeze the dispatch plan in the task: question, evidence-unit mapping and grouping rationale, brief scope/stop conditions/destinations, concurrency and FIFO refill/acceptance method. Obtain the user's explicit approval of that frozen plan before any spawn/send. This approval covers only the listed evidence dispatch; material changes to units, scope, method, owner, risk, or acceptance require reapproval. Main-session evidence work may continue while dispatch approval is pending.
 6. When a needed answer returns, persist it, recheck evidence, and continue the same task.
 7. For `analysis_only`, record and verify the declared evidence and no-change boundary in planning; do not require a Planning Seal, implementation approval, or `task.py start` merely because the research is complex.
-8. For change-bearing work, resolve material decisions, create/update complex-task artifacts, run the requirement convergence and PRD passes, then close and present the Planning Seal. Stop before implementation. Only later explicit approval of this task's current sealed revision authorizes native plan approval and `task.py start`; material changes require `task.py replan` and approval of its newly sealed revision.
+8. For change-bearing work, resolve material decisions, complete artifacts, run the requirement convergence and PRD passes without sealing, and present the final plan including targets/owners, acceptance, risks, validation, release/install, rollback and completion boundary. Then use `pennix-decision-grill` under the host interaction contract to ask whether to seal and approve proceeding or supplement/revise. Explicit combined approval of this same plan authorizes native `plan seal`, `plan approve` using its actual revision and reply, then `task.py start`; do not repeat the same approval. Feedback keeps planning; seal-only permits no approve/start. Equivalent explicit free text qualifies; empty/cancelled replies and recommended options do not. Material changes require renewed final review, using `task.py replan` only when already in progress. Inspect failed command receipts before continuing, do not blindly reseal, and reuse existing sufficient authorization on resume.
 
 Do not invent a project-specific product/spec hierarchy. If the repository already has product, domain, or spec docs, use them. If it does not, proceed with the evidence that exists.
 
@@ -155,7 +155,7 @@ Before declaring change-bearing planning ready:
 - Repository-answerable questions have been answered; blocking implementation questions are resolved.
 - Complex change-bearing tasks have `design.md` and `implement.md`; sub-agent-dispatch implementation tasks have curated manifests.
 - The Planning Seal and final summary cover the implementation target, validation, and rollback.
-- The user subsequently approved this task's current sealed plan.
+- The final plan was presented before sealing and explicitly approved for this task; its matching native seal/approval gates must pass before start.
 
 For `analysis_only`, verify the declared evidence deliverable and protected-target no-change boundary, then proceed to complete the research in planning without an implementation summary approval.
 

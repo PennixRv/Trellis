@@ -44,7 +44,7 @@ The Trellis task system is stored entirely under `.trellis/tasks/` in the user p
 | `commit` / `pr_url` | Commit and PR information after completion. |
 | `meta` | Extension fields. |
 | `meta.execution_class` / `meta.delivery_mode` | Explicit task classification; planned/change-bearing start needs current material-plan approval. |
-| `meta.planning` | Reserved native material revision, seal, and later approval; use plan seal/approve, never generic metadata. |
+| `meta.planning` | Reserved native material revision, seal, and explicit approval of the displayed plan; use plan seal/approve, never generic metadata. |
 
 ## Parent / Child Task Trees
 
@@ -111,7 +111,7 @@ Rules:
 python3 ./.trellis/scripts/task.py create "<title>" --description "<one-line summary>" --slug <slug>
 python3 ./.trellis/scripts/task.py select <task>
 python3 ./.trellis/scripts/task.py plan seal <task>
-python3 ./.trellis/scripts/task.py plan approve <task> --revision <n> --basis "<actual later approval>"
+python3 ./.trellis/scripts/task.py plan approve <task> --revision <n> --basis "<actual approval of the displayed plan>"
 python3 ./.trellis/scripts/task.py start <task>
 python3 ./.trellis/scripts/task.py current --source
 python3 ./.trellis/scripts/task.py add-context <task> implement <file> <reason>

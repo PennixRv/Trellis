@@ -8223,19 +8223,21 @@ print(len(entries))
   it("[workflow-state-r2] template workflow.md [workflow-state:planning] mentions artifact gates + required jsonl curation", () => {
     const wf = templateWorkflowMd();
     const match = wf.match(
-      /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/,
+      /\[workflow-state:planning\]\s*\n([\s\S]*?)\[\/workflow-state:planning\]/,
     );
     expect(match).toBeTruthy();
     const body = match?.[1] ?? "";
     expect(body).toContain(
-      "对于 `analysis_only`，无论复杂度或跨 owner 范围如何，都完成有界证据工作",
+      "无论复杂度或跨 owner 范围如何，都完成有界证据工作",
     );
     expect(body).toContain(
       "对于 change-bearing 工作，轻量任务可以使用 `prd.md`",
     );
     expect(body).toContain(
-      "复杂任务在实施审查前需要 `design.md`、`implement.md` 和 Planning Seal",
+      "复杂任务在最终复核前需要 `design.md` 和 `implement.md`",
     );
+    expect(body).toContain("先展示方案，再征询“封口并批准推进”或“补充／修改方案”");
+    expect(body).toContain("明确合并授权后才原生 seal/approve/start");
     expect(body).toContain(
       "子代理模式：在 start 前维护 `implement.jsonl` 和 `check.jsonl` 作为 spec/研究清单",
     );

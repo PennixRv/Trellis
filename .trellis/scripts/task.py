@@ -1047,11 +1047,11 @@ def main() -> int:
     p_select = subparsers.add_parser("select", help="Select a task without changing its phase")
     p_select.add_argument("dir", help="Existing active task directory")
 
-    p_plan = subparsers.add_parser("plan", help="Seal or record later approval of a material plan")
+    p_plan = subparsers.add_parser("plan", help="Seal a reviewed material plan or record its explicit approval")
     plan_sub = p_plan.add_subparsers(dest="plan_command", required=True)
     p_seal = plan_sub.add_parser("seal", help="Seal the current material plan revision")
     p_seal.add_argument("dir", help="Planning task directory")
-    p_approve = plan_sub.add_parser("approve", help="Record actual later user approval")
+    p_approve = plan_sub.add_parser("approve", help="Record actual user approval of the displayed plan")
     p_approve.add_argument("dir", help="Planning task directory")
     p_approve.add_argument("--revision", type=int, required=True)
     p_approve.add_argument("--basis", required=True, help="Short non-sensitive basis for real approval")

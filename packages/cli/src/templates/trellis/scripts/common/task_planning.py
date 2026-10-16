@@ -134,4 +134,4 @@ def require_start_approval(data: dict[str, Any], task_dir: Path) -> None:
     if execution == "planned" and delivery == "change_bearing":
         record = _require_seal(data, task_dir)
         if type(record.get("approved_revision")) is not int or record.get("approved_revision") != record["revision"] or not record.get("approval_basis"):
-            raise PlanningError("current sealed plan has no matching later implementation approval; use task.py plan approve only after the user's approval")
+            raise PlanningError("current sealed plan has no matching implementation approval; use task.py plan approve only after the user explicitly approves the displayed plan")
