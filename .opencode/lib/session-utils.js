@@ -402,9 +402,9 @@ Trellis compact SessionStart context. Use it to orient the session; load details
     let rangeEnd = allLines.length
     for (let i = 0; i < allLines.length; i++) {
       const stripped = allLines[i].trim()
-      if (rangeStart === -1 && stripped === "## Phase Index") {
+      if (rangeStart === -1 && (stripped === "## 阶段索引（Phase Index）" || stripped === "## Phase Index")) {
         rangeStart = i
-      } else if (rangeStart !== -1 && stripped === "## Phase 1: Plan") {
+      } else if (rangeStart !== -1 && (stripped === "## 阶段一：规划（Phase 1: Plan）" || stripped === "## Phase 1: Plan")) {
         rangeEnd = i
         break
       }

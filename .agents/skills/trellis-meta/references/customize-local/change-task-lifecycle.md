@@ -25,7 +25,7 @@ Task lifecycle includes creation, start, context configuration, finish, archive,
 | Change task parsing/search | `.trellis/scripts/common/task_utils.py`. |
 | Change active task behavior | `.trellis/scripts/common/active_task.py`. |
 | Select context without starting | Native `task.py select`; preserve phase/branch and drain live Channel work first. |
-| Seal and record later approval of a material plan | Native `task.py plan seal/approve`; reserved `meta.planning`, owned by `common/task_planning.py`. |
+| Seal the displayed plan after final confirmation and record its implementation approval | Native `task.py plan seal/approve`; reserved `meta.planning`, owned by `common/task_planning.py`; an explicit combined approval needs no second confirmation. |
 
 ## lifecycle hooks
 

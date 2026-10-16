@@ -50,9 +50,9 @@ If the user wants only one platform to avoid sub-agents, first confirm whether t
 | `status` | Artifact state | Resume at |
 | --- | --- | --- |
 | `planning` | `prd.md` missing | Phase 1.1 (load `trellis-brainstorm`) |
-| `planning` | lightweight task with `prd.md` complete | ask for start review, then run `task.py start` |
+| `planning` | lightweight task with `prd.md` complete | present final plan, ask to seal and approve proceeding or supplement/revise, then native seal/approve/start; reuse sufficient authorization |
 | `planning` | complex task missing `design.md` or `implement.md` | complete missing planning artifacts |
-| `planning` | complex task has `prd.md`, `design.md`, and `implement.md` | ask for start review, then run `task.py start` |
+| `planning` | complex task has `prd.md`, `design.md`, and `implement.md` | present final plan, ask to seal and approve proceeding or supplement/revise, then native seal/approve/start; reuse sufficient authorization |
 | `in_progress` | no implementation in conversation history | Phase 2.1 (`trellis-implement`) |
 | `in_progress` | implementation done, no `trellis-check` run | Phase 2.2 (`trellis-check`) |
 | `in_progress` | check passed | Phase 3.3 (spec update) → 3.4 (commit) |

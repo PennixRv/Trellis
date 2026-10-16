@@ -13,6 +13,8 @@ When debug is complete, use this for deep analysis to break the "fix bug -> forg
 
 Analyze the bug you just fixed from these 5 dimensions:
 
+Start with a short causal loop before filling the five dimensions: expected behavior → observed failure → discriminating evidence → root cause → prevention check. If the failure is not reproduced, label the uncertainty and do not promote a plausible explanation to a confirmed cause.
+
 ### 1. Root Cause Category
 
 Which category does this bug belong to?
@@ -178,3 +180,5 @@ Record verified findings in the active task. Update a spec only when the finding
 Consumer projects do not sync specs into Trellis templates. When working on the Trellis source itself, update a corresponding template under `packages/cli/src/templates/markdown/` only if it exists and the change is intended for generated consumers. Keep root coordination contracts in their owner; do not copy them into component specs.
 
 Follow the task's existing commit and release process. This skill does not independently authorize source changes, commits, publication, or new tickets.
+
+When the analysis reveals a neighboring defect, compare its owner, target, risk, and acceptance with the current task. Record the finding and ask for inclusion when it changes material scope; only a same-owner, reversible, low-risk correction may continue under the existing in-progress addition rule. This keeps root-cause learning broad while keeping implementation scope explicit.

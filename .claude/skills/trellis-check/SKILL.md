@@ -126,3 +126,15 @@ on acceptance; new consequential scope choices follow the task's decision gate.
 - Design or judgment (naming a shared concept, moving a module boundary, changing a public interface, reassigning where behavior lives) → record the evidence and your recommendation, and stop. Do not rewrite it silently.
 
 If a fix would touch files outside the current task's scope, say so and stop instead of widening the change.
+
+## Step 7: Close the Review Loop
+
+For each material finding, preserve the chain from evidence to action:
+
+1. State the observed behavior, source or test evidence, and confidence.
+2. Identify the affected acceptance criterion, owner, target, and risk.
+3. Classify the finding as an in-scope correction, a separately owned issue, or a consequential scope change.
+4. Fix only in-scope mechanical corrections. Record separately owned or consequential findings and use the task's decision/replan gate before dependent work.
+5. Re-run the smallest check that exercises the finding, then re-read the affected acceptance criteria and final diff.
+
+Do not silently absorb newly discovered work because it is nearby. A user-requested addition can remain in the current task only when the existing same-owner, reversible, low-risk rule applies; otherwise ask through the normal decision route and update the sealed plan before implementation.

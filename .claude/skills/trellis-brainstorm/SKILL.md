@@ -7,11 +7,23 @@ description: "Guides collaborative requirements discovery before implementation.
 
 ## Non-Negotiable Planning Contract
 
-A request to build, implement, fix, refactor, or "go ahead" is not approval to leave planning. Task-creation consent is also not implementation approval.
+An initial request to build, implement, fix, or refactor is not approval to leave planning. Task-creation consent is also not implementation approval. An explicit response approving the displayed final plan may authorize sealing and implementation together.
 
 For every non-trivial task, the user must respond at least once after the initial request before implementation begins. If no clarification is needed, that response must approve the final planning summary described below.
 
 Keep the task in planning while a user-owned choice needed to define the requested work remains unresolved. For `analysis_only`, findings, recommendations, and open product options do not block evidence work or require a sealed decision chain. For other work, screen consequential user-owned choices with `pennix-decision-grill`, including a single choice; it owns progressive decision method, not task lifecycle. Do not implement or run `task.py start` until change decisions are sealed and approved.
+
+## Idea-to-Plan Route
+
+When the input is an idea, suspected gap, review finding, or loosely stated improvement, route it through the smallest complete chain:
+
+1. State the user outcome and the concrete problem or gap in one sentence.
+2. Separate repository-answerable facts from user-owned choices; inspect the repository, task history, and applicable specs before asking about facts.
+3. Record the current evidence and its recovery point in the natural task artifact: research matrix for research, PRD/design for planning, and the diff or Git history for code.
+4. Screen only the choices that change scope, owner, risk, public behavior, release, or acceptance through `$pennix-decision-grill`.
+5. Define observable acceptance, boundaries, rollback, and the next dependency-ready action; then use the normal seal and approval gate.
+
+An issue discovered while doing this work is not automatically part of the task. Compare its owner, target, risk, and acceptance with the sealed scope. Record every consequential finding and ask whether it should be included; a same-owner, reversible, low-risk correction may use the existing in-progress addition rule. Otherwise use `task.py replan` and reseal before dependent implementation.
 
 ## Analysis-Only Exception
 
@@ -78,7 +90,7 @@ Use a concise title from the user's request. Both the title and `--description` 
 5. If the user requests independent subnode evidence, first freeze the dispatch plan in the task: question, evidence-unit mapping and grouping rationale, brief scope/stop conditions/destinations, concurrency and FIFO refill/acceptance method. Obtain the user's explicit approval of that frozen plan before any spawn/send. This approval covers only the listed evidence dispatch; material changes to units, scope, method, owner, risk, or acceptance require reapproval. Main-session evidence work may continue while dispatch approval is pending.
 6. When a needed answer returns, persist it and the affected dependencies, recheck evidence, and continue the same task. Before substantial evidence work, save the current decision, known answers, missing facts, return point and stop condition. Use bounded local/web evidence or explicitly approved independent subnodes; they establish facts, not user decisions. An empty ready frontier can mean missing evidence, not planning closure. Do not create a second lifecycle for the same decision chain.
 7. For `analysis_only`, record and verify the declared evidence and no-change boundary in planning; do not require `design.md`, `implement.md`, a Planning Seal, implementation approval, or `task.py start` merely because the research is complex.
-8. For change-bearing work, resolve material decisions, create/update complex-task artifacts, run the requirement convergence and PRD passes, then close and present the Planning Seal. Stop before implementation. Only a later explicit approval for this task's current sealed revision authorizes native plan approval and `task.py start`. Initial requests, parent-task approvals, and design answers do not qualify. Material changes require `task.py replan` and approval of its newly sealed revision; progress and wording edits do not.
+8. For change-bearing work, resolve material decisions, create/update complex-task artifacts, and run the requirement convergence and PRD passes plus the Planning Seal closure pass without invoking seal. Present the final plan, then use the Final Plan Review below. Only explicit approval of this displayed plan authorizes native seal/approve/start. Initial requests, parent-task approvals, and ordinary design answers do not qualify. Material changes return to final review; use `task.py replan` only when already in progress. Keep progress and non-material corrections outside byte-frozen plan documents.
 
 When changing the active task only for planning, use native `task.py select`,
 not start. `create --no-start` intentionally preserves the old pointer. Follow
@@ -159,9 +171,17 @@ Before final review, verify all of the following:
 
 For `analysis_only`, keep the task PRD bounded to evidence and the protected-target no-change boundary; it may omit `design.md` and `implement.md` and does not need an implementation review or approval. Change-bearing tasks retain their applicable evidence, convergence, final review, and fresh implementation approval gates.
 
-The final planning summary must show Goal, In Scope, Out of Scope, Acceptance Criteria, Key Decisions, relevant Risks or Deferred Items, and artifact status.
+The final planning summary must show Goal, In Scope, Out of Scope, Acceptance Criteria, Key Decisions, relevant Risks or Deferred Items, artifact status, actual targets/owners, validation, release/install impact, rollback, and completion boundary.
 
 For change-bearing work, the Planning Seal closure pass reconciles task artifacts, targets, branches, dependencies, release, validation, rollback, dynamic facts, and material decisions before implementation; unresolved implementation ambiguity invalidates the seal. This closure pass is not an eligibility or completion gate for `analysis_only` evidence work.
+
+## Final Plan Review
+
+For planned change-bearing work, present the final plan before invoking `plan seal`, then use `pennix-decision-grill` under the host interaction contract to ask whether to **seal and approve proceeding** or **supplement/revise the plan**. Explicit equivalent free text qualifies; no fixed phrase or button is required. Completed design questions or an empty decision frontier do not replace this whole-plan review.
+
+Combined approval authorizes only this task's displayed plan: run native `plan seal`, use its returned revision for `plan approve` with the actual non-sensitive reply as basis, then `task.py start`. Do not ask for the same implementation approval again. Feedback keeps the task in planning until the revised plan is presented and explicitly confirmed. A seal-only request permits only sealing. An empty/cancelled response or a recommended option is not approval.
+
+If the plan changes materially after presentation, return to final review before sealing or implementing. If a command fails, inspect the receipt and current state; do not blindly reseal a successfully sealed plan. Resume an existing sufficient authorization without another confirmation. Direct small work and `analysis_only` retain their existing paths.
 
 ## Artifact Rules
 
@@ -216,6 +236,6 @@ Before declaring change-bearing planning ready:
 - Repository-answerable questions have been answered; blocking implementation questions are resolved.
 - Complex change-bearing tasks have `design.md` and `implement.md`; sub-agent-dispatch implementation tasks have curated manifests.
 - The Planning Seal and final summary cover the implementation target, validation, and rollback.
-- The user subsequently approved this task's current sealed plan.
+- The final plan was presented before sealing and explicitly approved for this task; its matching native seal/approval gates must pass before start.
 
 For `analysis_only`, verify the declared evidence deliverable and protected-target no-change boundary, then proceed to complete the research in planning without an implementation summary approval. Do not start change-bearing implementation merely because the user originally requested it.

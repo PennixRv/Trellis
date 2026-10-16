@@ -26,9 +26,9 @@
     "execution_class": "planned",
     "delivery_mode": "change_bearing",
     "planning": {
-      "revision": 2,
+      "revision": 3,
       "seal": {
-        "revision": 2,
+        "revision": 3,
         "task_id": "planning-preseal-review",
         "task_name": "10-16-planning-preseal-review",
         "documents": [
@@ -37,17 +37,17 @@
           "implement.md"
         ],
         "document_digests": {
-          "prd.md": "a4bc5ea184d49e839d3a6e86ee78f264a4b52acbeb6e402f2a320f4a11c2e9c9",
-          "design.md": "79cbcd414913a13be8cd14e57acd88af512656b6b4cc27a936902c613d2f7c11",
-          "implement.md": "aaf0ddb8b42bf1d8d1f41f59880b3d36145f2d9f3566677f1c7f4696880fa1ca"
+          "prd.md": "a82394697b48e5681d6376e387a9bb79d14e889c01a836ab197c5b4feb0b8f4b",
+          "design.md": "542b446490e03ceb342e3a64429bff3fc16c357c8254740c42090b6521e588e1",
+          "implement.md": "215fe644bfacf8c9cf953ad13b4b2845bc17697f34db403203044c883241e0dd"
         },
         "execution_class": "planned",
         "delivery_mode": "change_bearing",
-        "sealed_at": "2026-10-16T12:54:22.147264+00:00"
+        "sealed_at": "2026-10-16T13:24:08.592313+00:00"
       },
-      "approved_revision": 2,
-      "approval_basis": "用户明确批准 beta.51 发布恢复方案：修订 workflow_dispatch，原生 CI 发布、npm 精确核验、lifecycle 升级与后续验收；保留既有 tag 与 Release",
-      "approved_at": "2026-10-16T12:54:22.208558+00:00"
+      "approved_revision": 3,
+      "approval_basis": "用户在完整展示撤回 main 临时入口、恢复 beta/tag 路径、沿已核验 beta.51 制品完成安装与项目验收的修订方案后明确答复批准",
+      "approved_at": "2026-10-16T13:24:14.650264+00:00"
     }
   }
 }

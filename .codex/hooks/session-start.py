@@ -431,19 +431,19 @@ def _build_compact_current_state(
     return "\n".join(lines)
 
 
-def _extract_range(content: str, start_header: str, end_header: str) -> str:
+def _extract_range(content: str, start_header: tuple[str, ...], end_header: tuple[str, ...]) -> str:
     """Extract lines starting at `## start_header` up to (but excluding) `## end_header`."""
     lines = content.splitlines()
     start: "int | None" = None
     end: int = len(lines)
-    start_match = f"## {start_header}"
-    end_match = f"## {end_header}"
+    start_matches = {f"## {header}" for header in start_header}
+    end_matches = {f"## {header}" for header in end_header}
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if start is None and stripped == start_match:
+        if start is None and stripped in start_matches:
             start = i
             continue
-        if start is not None and stripped == end_match:
+        if start is not None and stripped in end_matches:
             end = i
             break
     if start is None:
@@ -495,7 +495,7 @@ def _build_workflow_toc(workflow_path: Path) -> str:
         "",
     ]
 
-    phases = _extract_range(content, "Phase Index", "Phase 1: Plan")
+    phases = _extract_range(content, ("阶段索引（Phase Index）", "Phase Index"), ("阶段一：规划（Phase 1: Plan）", "Phase 1: Plan"))
     if phases:
         out_lines.append(_strip_breadcrumb_tag_blocks(phases).rstrip())
 

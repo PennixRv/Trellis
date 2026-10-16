@@ -28,3 +28,26 @@
 - 同时回读 `repos/PennixRv/Trellis/actions/permissions` 为 `enabled=true, allowed_actions=all`，workflow 状态为 `active`，仓库为公开 fork、当前账号权限为 `ADMIN`。使用布尔参数再次通过原生 PUT 回写相同设置后，dispatch 仍返回同一 422。当前阻塞落在 GitHub fork／Actions 设置层，不能由本地代码、npm 或 lifecycle 绕过。
 - 补充执行原生 `gh workflow enable publish.yml --repo PennixRv/Trellis` 成功返回，但随后的 dispatch 仍报同一 422；尚不能仅凭回执确定 GitHub 设置不一致的具体原因。仅承载默认分支工作流提交的临时工作树已原生移除。
 - npm 仍为 `beta=0.7.0-beta.50`，精确查询 beta.51 仍 404；未执行本机 npm publish、lifecycle upgrade 或 catalog 回退。待仓库设置允许该 workflow 产生 run 后，从 dispatch 继续原计划。
+
+## 网页启用后的恢复与分支复核
+
+- 用户在 GitHub 网页启用 Actions 后，手动触发成功；此前被禁用的操作者及原因仍无充分证据，不将设置 API 的不一致回执当作原因。
+- 首轮运行 `38906074377` checkout 了既有 beta.51 tag，但标签检查仍读取 dispatch 分支 `main`，在版本门禁失败，未进入发布。已让标签检查与 checkout 共用 `source_ref`：以 shell 环境值传递并引用，不插入命令文本。正向 beta.51／refs/tags/beta.51 与反向 beta.50／main 四项核验通过；任务分支修复 `f84a8853`、默认分支修复 `56f023b6` 均已推送，本地完整测试仍为 Core 432 passed / 1 skipped、CLI 2281 passed / 2 skipped。
+- 第二轮运行 `38906379670` 的工作流执行 ref 是 `main`，checkout 源码是 tag `v0.7.0-beta.51`（`08e8aecff297698937f7cdc1a24597b9f91ac25b`）。截至分支复核时，typecheck、build、test、打包依赖检查及两个 npm publish 步骤成功，公开 registry 回读仍在等待；本机 exact npm 查询仍为 404。未执行 lifecycle upgrade 或项目资产写入。
+- `origin/main` 比原 `962d8dbd` 仅增加 `c0a26299`、`56f023b6`，差异仅为 `.github/workflows/publish.yml`；其 CLI 产品版本仍是 0.6.45。beta.51 tag 包含既有 `origin/pennix/v0.7-beta` 基线，不是将 stable 产品源码发成 beta。
+- GitHub 官方文档 `github/docs:data/reusables/actions/workflow-dispatch.md` 原文：`This trigger only receives events when the workflow file is on the default branch.` 默认分支登记和执行 ref 是不同概念；原批准计划仅说明从任务分支恢复，未明确展示向 stable main 推送入口及以 main 执行的影响。
+- 用户指出一直沿 beta 分支发布后，已暂停后续安装、项目资产写入和新发布触发，并通过原生 replan 返回 planning。`decision-needed`：是否保留 main 仅供 GitHub 发现的手动入口，还是撤回 main 入口并回到原有 beta/tag 触发流程。两条路径都不删除或重打 beta.51 tag，不重复发布已存在的 npm 版本，不将 beta 产品代码合入 main。
+- 候选 A：保留 main 上仅发布入口的两笔提交，实际维护与后续执行回到 beta／其任务分支，显式选择不可变发布 tag，移除默认选择 main 的误导；核验默认分支仅有预期工作流差异、beta 分支来源和双包精确制品。候选 B：以新 revert 提交撤回 main 上两笔入口变更，beta 线恢复原有 tag／Release 触发；本次公开制品若已核验则继续原安装验收，后续恢复不依赖手动 dispatch。
+- 用户通过宿主原生 grill 明确选择“撤回 main 入口”。采用候选 B：main 以新提交精确撤回上述两笔工作流改动；beta 任务分支同步移除本次临时手动入口及其专用说明，恢复既有 tag／Release 触发。保留已运行 CI 和已公开制品的真实历史，不删除重打 tag、不强推、不为改变运行标签而重复发布。修订方案审查并展示后，按原生 seal／approve／start 再实施。
+- 最终只读回执：运行 `38906379670` 为 completed/success，全部必需步骤（包括公开双包回读）通过；本机原生 `release-preflight.js verify-npm --package all` exit 0，两个 beta.51 包均在 beta dist-tag 可见。独立 npm 精确查询确认双包 `version=0.7.0-beta.51`、`beta=0.7.0-beta.51`、`latest=0.6.45`。现有制品核验已完成；撤回入口、CLI 升级和项目物化尚未执行。
+- 修订方案审查：PRD、design、implement 已按用户选择统一为撤回 main／恢复 beta/tag；不再要求保留手动入口。核验已覆盖发布源与版本 track，后续验收仍要求 main 精确恢复、beta 分支收敛、lifecycle scoped verify 和三处项目来源／组合门禁。当前文档 `git diff --check` 通过，等待展示后的最终封口推进答复。
+
+## Revision 3 实施
+
+- 用户在修订方案完整展示后明确答复“批准”；原生 seal revision 3、approve revision 3 和 start 全部成功。继续范围为 main 精确撤回、beta/tag 路径恢复、既有 beta.51 制品安装与原三处项目验收，未新增发布或重打 tag。
+- main 新撤回提交 `ac29b004` 已推送，工作流与原 `962d8dbd` 字节一致；仅撤回本次两笔临时入口改动，未改写远端历史。beta 任务分支同步撤回临时入口及专用说明，工作流与 `v0.7.0-beta.51` 的原发布工作流一致；YAML 解析、release-preflight 3 项和 diff 空白检查通过。
+- 项目更新精确范围为根项目、Trellis、pennix-skills。根项目保留 Marketplace `codex-subnode-channel@5b872f9986225159bc1942d4c789b5ca8025096b`；另两处保留 bundled native 并升级到 CLI beta.51 的模板。全部使用原生 update／workflow，不从源码复制，不改任务冻结文件或用户配置正文。
+- lifecycle 原生 `upgrade --component trellis-cli --yes` 成功，CLI 回读为 `0.7.0-beta.51`，用户级 npm 安装位置为 `/home/penn/.local/lib/node_modules`；随后 scoped verify 为 match、failures 为空。未改 catalog 目标或 stable 的 latest dist-tag。
+- 三处项目均已原生 `trellis update --create-new`：根项目 beta.50→beta.51，Trellis 与 pennix-skills beta.45→beta.51。原生备份保留，既有用户删除的 `.opencode/package.json` 未恢复，无冲突候选需要覆盖。各项目的 `update --dry-run` 均为 Already up to date，`workflow --verify` 均通过。
+- 生成摘要复核通过：根项目、Trellis、pennix-skills 的本次脚本／模板分别核对 2、37、16 项；工作流来源保持上述 Marketplace 固定提交或 native beta.51。Trellis lint／typecheck 通过，根侧离线组合验收 8 passed，其余状态均为 0。
+- Spec 复核：此次撤回只恢复既有发布合同；不保留临时手动入口专用说明，不新增发布接口、依赖或状态。默认分支发现机制和真实失败已保留在本执行记录，现行 release-process 的 CI-only、beta track、tag／Release 与双包校验合同继续适用。

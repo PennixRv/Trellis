@@ -4,4 +4,6 @@
 
 修改源模板及有效独立平台入口，原生 Python 只调整旧顺序文案并保持 dogfood 双树一致。Marketplace 在独立仓库的明确任务修改，先推送再更新 gitlink。默认模板与 native 工作流保持一致。冻结后的任务文件不写进度，验证与回执写 execution.md。
 
-beta.51 的发布恢复沿现有 CI-only owner 合同处理：在 `.github/workflows/publish.yml` 增加 `workflow_dispatch` 和必填 `source_ref` 输入，checkout 使用该输入选择已存在的 `v0.7.0-beta.51`；版本校验、构建、测试、发布和 npm 回读保持原有步骤。手动触发只补发当前已创建的 beta.51，不改变版本号、tag 或 Release，也不提供本机发布后门。
+beta.51 的恢复保留现有 CI-only owner 合同。用户在分支复核后明确选择撤回 main 的临时手动入口：main 使用新 revert 提交精确撤回 `c0a26299`、`56f023b6`，不改写远端历史；beta 任务分支移除本次新增的 `workflow_dispatch`、source_ref checkout 和专用标签环境适配，恢复原有 tag push／Release published 触发及原生版本校验。撤回相应专用说明，不留下无法从默认分支使用的手动恢复入口。
+
+已经执行的运行 `38906379670` 仍以既有 beta.51 tag `08e8aecff297698937f7cdc1a24597b9f91ac25b` 为实际构建源；如其公开双包核验通过，直接沿既有批准继续安装和项目验收，不为运行列表上的 main 标签重复发布、不删除或重打 tag／Release。若公开核验失败，保留原始回执，按既有 beta／tag CI 路径诊断，不本机发布。
