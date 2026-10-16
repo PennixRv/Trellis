@@ -51,7 +51,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Verify version alignment (core, cli, git tag)
-        run: node packages/cli/scripts/release-preflight.js check-versions --require-tag
+        run: GITHUB_REF_NAME="$RELEASE_SOURCE_REF" node packages/cli/scripts/release-preflight.js check-versions --require-tag
+        env:
+          RELEASE_SOURCE_REF: "${{ inputs.source_ref || github.ref }}"
 
       - name: Typecheck (core + cli)
         run: pnpm typecheck
