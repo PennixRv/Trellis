@@ -1095,6 +1095,13 @@ def cmd_rename(args: argparse.Namespace) -> int:
         )
         return 1
 
+    from .ownership_record import assert_task_rename_allowed
+    try:
+        assert_task_rename_allowed(repo_root, task_dir)
+    except (OSError, ValueError) as exc:
+        print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+        return 1
+
     old_name = task_dir.name
     date_prefix, _old_slug = _split_date_prefix(old_name)
 

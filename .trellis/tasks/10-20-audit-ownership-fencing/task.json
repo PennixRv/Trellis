@@ -1,0 +1,53 @@
+{
+  "id": "audit-ownership-fencing",
+  "name": "audit-ownership-fencing",
+  "title": "交接所有权围栏与改名边界修复",
+  "description": "关联根 audit-residual-convergence：修复 F-007 任务 JSON ID 与目录名错配，以及 F-011 交接记录存在时 rename 绕过；仅创建规划记录",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-20",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "seal": {
+        "revision": 1,
+        "task_id": "audit-ownership-fencing",
+        "task_name": "10-20-audit-ownership-fencing",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "076081bf88d55a7dc78e00b190a69f9cf011b2b8ec5c19ae4432c41f4b05a7e3",
+          "design.md": "c264206c749bd6d4d47645db9855421ca7493ac08c29c4de86a0215423f9fa99",
+          "implement.md": "62adf350267b72c900fda7e0c7d80df2a80cbcbe9406e205731b948685bc6519"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-20T13:56:00.988714+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "用户在完整方案及停止点展示后明确答复：批准推进并持续直到停止点收敛；覆盖根任务、已展示的源维护任务与三个组件的既定发布安装范围。",
+      "approved_at": "2026-10-20T13:56:01.046031+00:00"
+    }
+  }
+}

@@ -416,20 +416,35 @@ def status(root: Path | None, task_id: str, handoff_id: str, core_digest: str) -
     return _public(record)
 
 
+def _task_ownership_records(root: Path, task_path: Path) -> tuple[dict[str, str], list[Path]]:
+    """Discover records by validated JSON identity, never by directory name."""
+    runtime = root / ".trellis" / ".runtime"
+    ownership = runtime / "handoff-ownership"
+    if runtime.is_symlink() or ownership.is_symlink():
+        raise OwnershipError("ownership record directory is unsafe")
+    if not ownership.exists():
+        return {}, []
+    relative = task_path.relative_to(root).as_posix()
+    try:
+        task = _task_snapshot(root, relative)
+        records_dir = _record_path(root, task["id"], "record-probe").parent
+    except ContinuationError as exc:
+        raise OwnershipError(str(exc)) from exc
+    return task, sorted(records_dir.glob("*.json"))
+
+
+def assert_task_rename_allowed(root: Path, task_path: Path) -> None:
+    """A rename cannot preserve the immutable identity of a formal handoff."""
+    _task, records = _task_ownership_records(root, task_path)
+    if records:
+        raise OwnershipError("refusing rename: task has formal handoff ownership records")
+
+
 def assert_task_mutation_allowed(root: Path, task_path: Path) -> None:
     """Reject ordinary task pointer changes that would bypass ownership fencing."""
+    task, records = _task_ownership_records(root, task_path)
     actor = resolve_context_key()
-    try:
-        task_id = _safe_task_id(task_path.name)
-    except ContinuationError:
-        return
-    relative = task_path.relative_to(root).as_posix()
-    records_dir = root / ".trellis" / ".runtime" / "handoff-ownership" / task_id
-    if records_dir.is_symlink():
-        raise OwnershipError("ownership record directory is unsafe")
-    if not records_dir.is_dir():
-        return
-    for record_path in sorted(records_dir.glob("*.json")):
+    for record_path in records:
         if not actor:
             raise OwnershipError("no_direct_session_identity: task has handoff ownership fencing")
         if record_path.is_symlink():
@@ -437,7 +452,7 @@ def assert_task_mutation_allowed(root: Path, task_path: Path) -> None:
         record = _decode(record_path)
         if record["state"] not in STATES:
             continue
-        if record["task"]["path"] != relative:
+        if record["task"]["path"] != task["path"] or record["task"]["id"] != task["id"]:
             raise OwnershipError("ownership record task path does not match current task")
         if record.get("consumer_session_id") == actor:
             continue

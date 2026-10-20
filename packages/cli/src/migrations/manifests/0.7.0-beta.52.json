@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.52",
+  "description": "修复日期任务的交接围栏，并拒绝携带正式 ownership 记录的任务改名",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "交接围栏使用 task.json 中的规范任务 ID 查询记录，覆盖原生日期目录；任何正式 ownership 记录均阻止任务改名，避免留下失效的路径和身份引用。",
+  "migrations": [],
+  "notes": "无任务 schema、ownership 记录格式或历史迁移。没有正式 ownership 存储的普通任务保留原行为；已有交接记录的任务需保持原名。"
+}

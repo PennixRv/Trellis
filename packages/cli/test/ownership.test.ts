@@ -64,6 +64,120 @@ describe("handoff ownership", () => {
     ];
   }
 
+  function taskCommand(root: string, session: string | undefined, args: string[]) {
+    return spawnSync(python, [path.join(root, ".trellis/scripts/task.py"), ...args], {
+      cwd: root, encoding: "utf8",
+      env: session === undefined
+        ? { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot }
+        : { ...process.env, TRELLIS_CONTEXT_ID: session },
+    });
+  }
+
+  function datedFixture(): { root: string; relative: string } {
+    const root = fixture();
+    fs.rmSync(path.join(root, ".trellis/tasks/demo"), { recursive: true });
+    const created = taskCommand(root, "codex_source", ["create", "Demo", "--slug", "demo", "--description", "ownership regression", "--assignee", "fixture", "--no-start"]);
+    expect(created.status, created.stderr).toBe(0);
+    const name = fs.readdirSync(path.join(root, ".trellis/tasks")).find((entry) => /^\d{2}-\d{2}-demo$/.test(entry));
+    if (!name) throw new Error("native creation did not produce a dated directory");
+    const relative = `.trellis/tasks/${name}`;
+    expect(taskCommand(root, "codex_source", ["select", relative]).status).toBe(0);
+    return { root, relative };
+  }
+
+  function snapshot(root: string): Record<string, string> {
+    const files: Record<string, string> = {};
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === "__pycache__") continue;
+        const file = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(file);
+        else files[path.relative(root, file)] = entry.isSymbolicLink() ? fs.readlinkSync(file) : fs.readFileSync(file).toString("base64");
+      }
+    };
+    walk(path.join(root, ".trellis"));
+    return files;
+  }
+
+  it("fences native date-prefixed tasks and permits their consumer (F-007)", () => {
+    const { root, relative } = datedFixture();
+    expect(run(root, "codex_source", [...base("quiesce"), "--task", relative, "--source-session-id", "codex_source"]).status).toBe(0);
+    for (const args of [["select", relative], ["start", relative, "--allow-empty-context"], ["archive", relative]]) {
+      for (const actor of ["codex_other", undefined]) {
+        const before = snapshot(root);
+        const result = taskCommand(root, actor, args);
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toMatch(/fencing_conflict|no_direct_session_identity/);
+        expect(snapshot(root)).toEqual(before);
+      }
+    }
+    expect(run(root, "codex_source", base("seal", 0)).status).toBe(0);
+    expect(run(root, "codex_source", [...base("retire", 1), "--archive-observation", "not_required"]).status).toBe(0);
+    const claimed = run(root, "codex_target", [...base("claim", 3), "--task", relative]);
+    expect(claimed.status, claimed.stderr).toBe(0);
+    expect(run(root, "codex_target", base("consume", JSON.parse(claimed.stdout).generation as number)).status).toBe(0);
+    expect(taskCommand(root, "codex_target", ["select", relative]).status).toBe(0);
+  });
+
+  for (const dated of [false, true]) {
+    it.each(["quiescing", "sealed", "retiring", "ready", "claiming", "claimed", "consumed", "archived"])(`refuses rename with %s ownership, dated=${String(dated)} (F-011)`, (state) => {
+      const { root, relative } = dated ? datedFixture() : { root: fixture(), relative: ".trellis/tasks/demo" };
+      expect(run(root, "codex_source", [...base("quiesce"), "--task", relative, "--source-session-id", "codex_source"]).status).toBe(0);
+      // Persist interrupted and terminal states through the record owner so
+      // every fixture retains the real schema and integrity digest.
+      const seeded = spawnSync(python, ["-B", "-c", [
+        "import sys; from pathlib import Path",
+        "sys.path.insert(0, '.trellis/scripts')",
+        "from common.ownership_record import _load, _write",
+        "p, r = _load(Path.cwd(), 'demo', 'h1')",
+        `r.update(state=${JSON.stringify(state)}, consumer_session_id='codex_target', consumer_context_key='codex_target')`,
+        "_write(p, r)",
+      ].join("; ")], { cwd: root, encoding: "utf8" });
+      expect(seeded.status, seeded.stderr).toBe(0);
+      fs.writeFileSync(path.join(root, relative, "implement.jsonl"), JSON.stringify({file: `${relative}/prd.md`, reason: "reference"}) + "\n");
+      for (const actor of ["codex_other", "codex_target"]) {
+        const before = snapshot(root);
+        const result = taskCommand(root, actor, ["rename", relative, "renamed"]);
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toMatch(/handoff ownership.*rename|rename.*handoff ownership/);
+        expect(snapshot(root)).toEqual(before);
+      }
+    });
+
+    it(`preserves ordinary rename, dated=${String(dated)} (F-011)`, () => {
+      const { root, relative } = dated ? datedFixture() : { root: fixture(), relative: ".trellis/tasks/demo" };
+      const result = taskCommand(root, "codex_source", ["rename", relative, "renamed"]);
+      expect(result.status, result.stderr).toBe(0);
+      const target = relative.replace(/demo$/, "renamed");
+      expect(fs.existsSync(path.join(root, target, "task.json"))).toBe(true);
+      expect(JSON.parse(fs.readFileSync(path.join(root, target, "task.json"), "utf8")).id).toBe("renamed");
+      expect(JSON.parse(fs.readFileSync(path.join(root, ".trellis/.runtime/sessions/codex_source.json"), "utf8")).current_task).toBe(target);
+    });
+  }
+
+  it.each(["identity", "record", "directory"])("rejects unsafe %s before mutating a dated task (F-007)", (kind) => {
+    const { root, relative } = datedFixture();
+    expect(run(root, "codex_source", [...base("quiesce"), "--task", relative, "--source-session-id", "codex_source"]).status).toBe(0);
+    if (kind === "identity") {
+      const file = path.join(root, relative, "task.json");
+      const data = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
+      data.id = "../escape";
+      data.name = "../escape";
+      fs.writeFileSync(file, JSON.stringify(data));
+    } else if (kind === "record") {
+      fs.writeFileSync(path.join(root, ".trellis/.runtime/handoff-ownership/demo/h1.json"), "{}");
+    } else {
+      const records = path.join(root, ".trellis/.runtime/handoff-ownership");
+      const outside = path.join(root, "outside-records");
+      fs.renameSync(records, outside);
+      fs.symlinkSync(outside, records, "junction");
+    }
+    const before = snapshot(root);
+    const result = taskCommand(root, "codex_other", ["select", relative]);
+    expect(result.status).not.toBe(0);
+    expect(snapshot(root)).toEqual(before);
+  });
+
   it.each([0, 1, 3])("retires and claims with %i developer-owned candidates while preserving fencing", (candidateCount) => {
     const root = fixture();
     if (candidateCount > 0) {
