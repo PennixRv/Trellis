@@ -9,3 +9,5 @@ F-007/F-011 新增 22 项回归，旧源码 20 项失败、2 项普通改名通�
 额外 `lint:py` 报 4 个未修改 session-start Hook 的 common.io 导入错误、68 个警告。将原 HEAD 通过 git archive 解至隔离临时目录后运行相同检查，错误位置与数量完全相同；本次差异没有新增 Python 静态错误。该既有问题未纳入本任务。GitNexus runner 与索引缺失，图检查 not_run，未安装或重建。
 
 源码 Python 双树保持一致。正式发行、受管安装、三个项目物化、现场回执和根集成验收仍在根任务推进，未据源码通过声明整体完成。
+
+正式发行提交 2fff60e5、tag v0.7.0-beta.52，Publish to npm CI 39439528268 成功；CLI/core 正式包、精确依赖和目标脚本内容已核验。本机经 pennix update trellis-cli 安装 beta.52，根/Trellis/CCH 三项目均已使用原生 update --create-new 物化。各项目两个目标脚本与模板字节及原生 hash 相同；真实物化脚本的隔离日期任务围栏、拒绝 rename 和写前后快照检查通过。三个 workflow --verify 通过；根 Marketplace 固定来源和两处 Marketplace 工作树/gitlink 保持。当前仅提交本仓库原生 version/hash/provenance 记账和本记录，不提前关闭任务；根的 CCH 安装被新增 Lifecycle 候选校验缺陷阻断，正在进行增量规划。
