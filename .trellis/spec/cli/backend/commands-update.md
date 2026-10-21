@@ -153,13 +153,15 @@ This bucketing is the basis for both the printed plan and the write phase.
 
 ### `--dry-run`
 
-Runs the full pipeline up to and including the printed plan and breaking-change banner, then returns before the `Proceed?` confirm. No file writes, no backup, no version bump. Combines safely with `--migrate`: `commands/update.ts:update` allows the migration plan to be printed but stops before `executeMigrations` runs. See `update.integration.test.ts > #2 dry run makes no file changes even when changes exist` and `> #23 breaking-change gate allows --dry-run without --migrate`.
+Runs the full pipeline up to and including the printed plan and breaking-change banner, then returns before the `Proceed?` confirm. No file writes, no backup, no version bump. Combines safely with `--migrate`: `commands/update.ts:update` allows the migration plan to be printed but stops before `executeMigrations` runs. See `update.integration.test.ts > #2 dry run makes no file changes even when changes exist`, `> #12a dry-run on a version-only upgrade leaves .version unchanged`, and `> #23 breaking-change gate allows --dry-run without --migrate`.
 
 Manifest self-healing runs before that early return. Pass `persist: false` to
 `pruneOrphanManifestKeys` during preview and use its in-memory result for the
 plan; the original manifest bytes must remain unchanged even with orphan keys.
 Normal updates retain the helper's persistence behavior. The #2 regression
 includes an orphan `.codex/sessions/` entry to exercise this pre-return write.
+The no-file-change upgrade fast path must also avoid `updateVersionFile` during
+dry-run; #12a covers that version-stamp-only case.
 
 ### `--force` / `-f`
 
