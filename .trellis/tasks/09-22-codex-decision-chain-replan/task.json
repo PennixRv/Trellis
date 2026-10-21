@@ -24,6 +24,11 @@
   "notes": "",
   "meta": {
     "root_task": "09-22-pennix-skills-workflow-governance",
-    "planning_seal": "recorded"
+    "planning_seal": "recorded",
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1
+    }
   }
 }

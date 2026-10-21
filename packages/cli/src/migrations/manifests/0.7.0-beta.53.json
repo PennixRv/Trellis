@@ -1,0 +1,27 @@
+{
+  "version": "0.7.0-beta.53",
+  "description": "统一规划入口并安全清理旧规划 Skill",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "规划流程统一由 trellis-idea-to-closed-plan 提供；更新时仅删除内容哈希匹配的旧 trellis-brainstorm Skill 文件。",
+  "migrations": [
+    {"type":"safe-file-delete","from":".claude/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".cursor/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".opencode/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".agents/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".kilocode/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".kiro/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".agent/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".devin/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".qoder/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".codebuddy/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".github/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".factory/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".reasonix/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".zcode/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".trae/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".omp/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".grok/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]},
+    {"type":"safe-file-delete","from":".snow/skills/trellis-brainstorm/SKILL.md","description":"Remove the superseded generated planning skill.","allowed_hashes":["d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e"]}
+  ]
+}

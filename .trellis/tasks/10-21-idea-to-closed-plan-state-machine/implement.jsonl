@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/cli/backend/workflow-state-contract.md", "reason": "Lifecycle status and event writer contract"}
+{"file": ".trellis/spec/cli/backend/filesystem-safety.md", "reason": "Task migration, generated asset ownership and safe submodule removal"}
+{"file": ".trellis/spec/cli/backend/migrations.md", "reason": "Generated template migration and compatibility"}
+{"file": ".trellis/spec/cli/backend/commands-workflow.md", "reason": "Workflow template routing and hash ownership"}
+{"file": ".trellis/spec/cli/unit-test/integration-patterns.md", "reason": "Real CLI integration test patterns"}

@@ -132,7 +132,11 @@ describe.skipIf(!hasPython())("task.py meta (task.json.meta access)", () => {
 
     const dir = findTaskDir(tmp, "meta-task");
     const data = readTaskJson(tmp, dir);
-    expect(data.meta).toEqual({ linear: "ENG-123", epic: "auth" });
+    expect(data.meta).toMatchObject({
+      linear: "ENG-123",
+      epic: "auth",
+      planning: { revision: 1, stage: "intake" },
+    });
   });
 
   it("create --meta with a malformed value errors and names the bad value", () => {
@@ -230,10 +234,16 @@ describe.skipIf(!hasPython())("task.py meta (task.json.meta access)", () => {
 
     const r1 = runTask(tmp, "set-meta", taskDir, "priority-note", "urgent");
     expect(r1.status).toBe(0);
-    expect(readTaskJson(tmp, dir).meta).toEqual({ "priority-note": "urgent" });
+    expect(readTaskJson(tmp, dir).meta).toMatchObject({
+      "priority-note": "urgent",
+      planning: { revision: 1, stage: "intake" },
+    });
 
     const r2 = runTask(tmp, "set-meta", taskDir, "priority-note", "later");
     expect(r2.status).toBe(0);
-    expect(readTaskJson(tmp, dir).meta).toEqual({ "priority-note": "later" });
+    expect(readTaskJson(tmp, dir).meta).toMatchObject({
+      "priority-note": "later",
+      planning: { revision: 1, stage: "intake" },
+    });
   });
 });

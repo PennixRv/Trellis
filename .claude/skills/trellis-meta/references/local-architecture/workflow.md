@@ -70,7 +70,7 @@ After editing, make the AI reread `.trellis/workflow.md`; do not assume the flow
 
 `workflow.md` is the semantic center of the local workflow, but each platform can also have its own entry files:
 
-- skills, such as `trellis-brainstorm` and `trellis-check`.
+- skills, such as `trellis-idea-to-closed-plan` and `trellis-check`.
 - commands/prompts/workflows, such as continue and finish-work.
 - hooks, such as session-start or workflow-state injection.
 

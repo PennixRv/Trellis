@@ -9,7 +9,7 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
-      - 'marketplace'
+      - '.gitmodules'
       - '**/*.py'
       - '.github/workflows/ci.yml'
   pull_request:
@@ -20,7 +20,7 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
-      - 'marketplace'
+      - '.gitmodules'
       - '**/*.py'
       - '.github/workflows/ci.yml'
 
@@ -31,7 +31,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Checkout docs source
+        run: git submodule update --init docs-site
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

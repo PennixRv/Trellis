@@ -23,6 +23,11 @@
   "relatedFiles": [],
   "notes": "",
   "meta": {
-    "architecture_source": "codex-workflow-optimization/.trellis/tasks/09-07-trellis-reusable-concurrent-workflow-architecture"
+    "architecture_source": "codex-workflow-optimization/.trellis/tasks/09-07-trellis-reusable-concurrent-workflow-architecture",
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1
+    }
   }
 }

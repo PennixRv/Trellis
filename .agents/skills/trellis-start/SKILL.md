@@ -48,8 +48,7 @@ Index files list the specific guideline docs to read when you actually start cod
 From Step 1 you know the current task and status. Check the task directory:
 
 - **Active task with `task.json.meta.delivery_mode = "analysis_only"`** → keep `planning`, complete the PRD's bounded evidence work, then verify the no-change boundary, commit task artifacts, and archive directly. Do not run `task.py start`; any protected-target change needs a separate change-bearing task.
-- **Active task status `planning` + no `prd.md`** → Phase 1.1. Load the `trellis-brainstorm` skill.
-- **Active task status `planning` + `prd.md` exists** → stay in Phase 1. Lightweight tasks can be PRD-only; complex tasks need `design.md` + `implement.md`. Load the relevant Phase 1 step detail before `task.py start`.
+- **Active task status `planning`** → read `meta.planning.stage` through `task.py current --json`, then load `trellis-idea-to-closed-plan` and resume that exact stage. Do not infer planning state from whether `prd.md` exists.
 - **Existing task selected by explicit intent but not bound** → use native `task.py select` for context only. Drain already dispatched Channel units before a real task switch. Planned/change-bearing work presents the final plan and asks whether to seal and approve proceeding or supplement/revise before native seal/approve/start; reuse an existing sufficient authorization. Selecting or recovering context does not approve implementation.
 - **Active task status `in_progress`** → Phase 2 step 2.1. Load the step detail:
   ```bash
@@ -63,7 +62,7 @@ From Step 1 you know the current task and status. Check the task directory:
 
 | User intent | Skill |
 |---|---|
-| New feature / unclear requirements | `trellis-brainstorm` |
+| New task, unresolved planning, or major change to an active task | `trellis-idea-to-closed-plan` |
 | About to write code | `trellis-before-dev` |
 | Done coding / quality check | `trellis-check` |
 | Stuck / fixed same bug multiple times | `trellis-break-loop` |

@@ -1,0 +1,1037 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-21T05:18:56.201322+00:00",
+  "scope": "21 Trellis beta active tasks existing before creation of the Trellis owner task",
+  "repositories": {
+    "root": {
+      "path": ".",
+      "branch": "main",
+      "head": "11da1d105a3299deb976b8dab66f526881922809",
+      "upstream": null,
+      "upstream_head": null,
+      "status_porcelain": "?? .trellis/tasks/10-21-idea-to-closed-plan-state-machine/",
+      "worktrees": [
+        "worktree /home/penn/devel/codex-workflow-optimization",
+        "HEAD 11da1d105a3299deb976b8dab66f526881922809",
+        "branch refs/heads/main"
+      ],
+      "refs": [
+        "11da1d105a3299deb976b8dab66f526881922809 refs/heads/main",
+        "d7e37116ab0133783a2ba283f5493c67e92cb791 refs/heads/task/cch-status-bar-defect-convergence",
+        "3f0bfe84b9dbea6742f0b396657108a955f8a48a refs/heads/task/cch-subnode-observability",
+        "f4ca91c31d1ff51a6c02b8565469dd3958a98202 refs/heads/task/openviking-handoff-convergence"
+      ]
+    },
+    "trellis": {
+      "path": "Trellis",
+      "branch": "pennix/v0.7-beta",
+      "head": "3d00c482d8d3744fd8e3147396ed1f7e3dc82b17",
+      "upstream": "origin/pennix/v0.7-beta",
+      "upstream_head": "3d00c482d8d3744fd8e3147396ed1f7e3dc82b17",
+      "status_porcelain": "",
+      "worktrees": [
+        "worktree /home/penn/devel/codex-workflow-optimization/.git/modules/Trellis",
+        "HEAD 3d00c482d8d3744fd8e3147396ed1f7e3dc82b17",
+        "branch refs/heads/pennix/v0.7-beta"
+      ],
+      "refs": [
+        "1abf0eb3d508690c4f3b9e31e12654f44364fb3b refs/heads/codex/trellis-fork-skills-migration",
+        "e13afa226deb6df03434c50298c5dfc1b197e953 refs/heads/codex/trellis-runtime-audit-20260902",
+        "fafcdd32cc2386f7a4a8ba448fe0a32fade3361d refs/heads/fix/subnode-terminal-wait",
+        "60de8057c6b2d795c5e25dfdb778fe585a1e8bab refs/heads/fix/unbound-identity-recovery",
+        "ac29b00402e4e29c74d6e78622d5e85aeb36b1d9 refs/heads/main",
+        "3d00c482d8d3744fd8e3147396ed1f7e3dc82b17 refs/heads/pennix/v0.7-beta",
+        "8f3da34a13586ca36fdfa3f6e7f37f335fee4343 refs/heads/task/cch-channel-observability",
+        "69c670d2bbaca283bd5169807fab11acc9b17b17 refs/heads/task/matt-method-integration",
+        "4c6ad11bbc9205f4f7bb8af0a4181a66b6151843 refs/heads/task/planning-preseal-review",
+        "ac29b00402e4e29c74d6e78622d5e85aeb36b1d9 refs/remotes/origin/HEAD",
+        "75685135793e78f8a01549cdc5cb31be14db6192 refs/remotes/origin/agent/post-069-regression-fixes",
+        "ff0e263fcd66f7dadd2c53c52a92ed3ee43183be refs/remotes/origin/chore/python-static-checks",
+        "0c2017e4d75d652d7404d70b350c1a5f659fcd5b refs/remotes/origin/chore/readme-slogan-update",
+        "6a86cca67ef8ca96640a0607a559c952736059aa refs/remotes/origin/chore/refresh-wx-group4-qr",
+        "32878ed533f5c7ef797b0326f2b87059a6ab732a refs/remotes/origin/chore/refresh-wx-group6-qr",
+        "87b3410bffbe595d21159d712ee02714cdea28e3 refs/remotes/origin/chore/refresh-wx-group6-qr-image",
+        "b0b17fd256a65d20d06a388a64c8ee2ba62fda5a refs/remotes/origin/chore/refresh-wx-group7-qr",
+        "9f26cbf89cf7b673affdd2a81183fd98b5a82887 refs/remotes/origin/chore/refresh-wx10-qr",
+        "4fd33969a8c0e6c408ba3f83ad4a44cf7a728f48 refs/remotes/origin/chore/refresh-wx8-qr",
+        "42669e499ff290e2527372c3d1cede309aafaf21 refs/remotes/origin/chore/refresh-wx9-qr",
+        "c5de65b39179fff67a29ca81f8cedb8b17a9730e refs/remotes/origin/chore/update-community-qrcodes",
+        "c0f5c4dd6ed0c99e1ee64716b23ef2ec81ac948c refs/remotes/origin/chore/wechat-qr-group8",
+        "96fc72389a40ca8245b7ac2356682bb0474cae33 refs/remotes/origin/codex/adapt-antigravity",
+        "586767a075a7356e322a7c9bbef4aa144649c8d1 refs/remotes/origin/codex/backport-main-fixes-v07",
+        "6a8c88c27aaa015b36b3484364942269505d132a refs/remotes/origin/codex/codex-hook-auto-inject",
+        "9056ff39e3f6c2061ae04c3c4959d1554270c9f2 refs/remotes/origin/codex/codex-spec-injection",
+        "b6e94ac1850ea06a629b97a41e60458ea5ea3cb3 refs/remotes/origin/codex/kiro-code-support",
+        "4862c9230a599154e57e9b69d01a224573f567be refs/remotes/origin/codex/project-agents-governance",
+        "56227ff95839595fc7cf4f908b3fa6a0105b3c89 refs/remotes/origin/codex/sync-v0610-beta",
+        "1abf0eb3d508690c4f3b9e31e12654f44364fb3b refs/remotes/origin/codex/trellis-fork-skills-migration",
+        "a0bcb311843f1ccc79f19149f94c19b15a7c148d refs/remotes/origin/codex/unify-trellis-chinese-templates",
+        "52bc1fa4e916636632ae3a679706864144c80040 refs/remotes/origin/codex/update-root-readmes",
+        "5f92482dc32f4e032106390a1da13cb973418873 refs/remotes/origin/docs/marketplace-and-changelog",
+        "5abb587d0122ba89388c88425e39ec534ecb85e8 refs/remotes/origin/docs/mem-recall-pi-settings",
+        "446d937721e98a63e005f69c53abffa7ec546f01 refs/remotes/origin/docs/optimize-chinese-readme-traffic",
+        "aa5732494b49fc4a9da34df9ee743c0c729ad12a refs/remotes/origin/docs/readme-cn-slogan-qr-refresh",
+        "534349bf2a26af01844a23d21b56de5cb1cc588e refs/remotes/origin/docs/readme-refresh-en-zh",
+        "846d08fcd1a1f3b62c482dcac8756aaa2fdc5762 refs/remotes/origin/docs/readme-slogan-revert-4-28",
+        "ccf95fcf877441b10ebb6d3990ea4fb2f94286db refs/remotes/origin/docs/spec-refresh",
+        "5f2e0b540728a874a74e6c4aaccfe9bacf33e524 refs/remotes/origin/feat/codex",
+        "1b1071bbc9fb18964d7edfa6738da3c19121f26e refs/remotes/origin/feat/codex-support",
+        "d3330a1e97aa5c80dd7fec250623428d62138c69 refs/remotes/origin/feat/gemini",
+        "73e57153ddca410cb20a7ee795301cd11ba3d2a7 refs/remotes/origin/feat/init-download-ux",
+        "affacba7fff533111d7418f5254066e17f24071c refs/remotes/origin/feat/monorepo-git",
+        "ccedf8c183714b2bce68bed67a8557d044fa2ef1 refs/remotes/origin/feat/monorepo-submodule",
+        "8ad7b3673984da344448bb2b0f84fbc31b24c6fa refs/remotes/origin/feat/opencode",
+        "1a3571fda0e5ce4a3cecff16ebaa4e63b6d9aad9 refs/remotes/origin/feat/per-task-workflow-selection",
+        "d6bba9a0dc9984227c66d71010d66c1ac774ae45 refs/remotes/origin/feat/pi-dynamic-spec",
+        "db3325dbcbc1a4e36db4a30ab6b4c9a005b64c8d refs/remotes/origin/feat/pi-mem-project-settings",
+        "ae132301d783926e6ab2219bb1e27fda696527e2 refs/remotes/origin/feat/record-session-auto-commit",
+        "1d86ea21f861e0aea84dadf42d6505e1ad45f078 refs/remotes/origin/feat/remote-spec",
+        "36e179c8296203203e838b27459030f4e392d3dd refs/remotes/origin/feat/spec-on-demand-injection",
+        "9c2bd66ae32d6578743bf0e22797db333b60d84e refs/remotes/origin/feat/task-commands",
+        "ca84b9652e62305cf9174d4b5a417afaa43521a3 refs/remotes/origin/feat/task-lifecycle-hooks",
+        "54894e2dc12c1e4b5d98575fad312256723595b6 refs/remotes/origin/feat/task-subtask",
+        "1247a9f57ecdac100a88fdd71d92afadd092265f refs/remotes/origin/feat/update-skip-spec",
+        "fb9067b70d533d15e0156f1ad7c5f043571a71e5 refs/remotes/origin/feat/v0.4.0-beta",
+        "ba74fcc60415878ae0daa103303493876b410148 refs/remotes/origin/feat/v0.4.0-readme",
+        "8afc24ecc66581b7fb5f350f602e517fb0c08956 refs/remotes/origin/feat/v0.5",
+        "407cd4a8a5ce4e91fdc8c5599c98304d38418370 refs/remotes/origin/feat/v0.5.0-beta",
+        "ff2a5734eedcfb1e168f619ba10895b53fbd21f8 refs/remotes/origin/feat/v0.5.0-rc",
+        "f9ab7001f703b084025e8adccefb5efc9e3a89e6 refs/remotes/origin/feat/v0.6.0-beta",
+        "834fcaea2e899f02e6f046ccad7c50dc40289519 refs/remotes/origin/feat/v0.6.0-rc",
+        "82e0013732de4557a7d110a427223275d0fbacca refs/remotes/origin/feat/v0.7-beta",
+        "5f4cd6f1c530dc98a2c568183f29c98a1efbe96c refs/remotes/origin/feat/v037",
+        "307501e08da8ed142686db65ab7c4f784780d110 refs/remotes/origin/feat/workflow-config-default",
+        "a6d67dee5962b7bcc29cb492be9a6fa3c7b94130 refs/remotes/origin/feature/min-231-sessionstart-reinject",
+        "48d3718d46dedaac68dd82e91a0e3cdefbf65aa2 refs/remotes/origin/feature/readme-docs-optimization",
+        "024983ecb3435236f7fff316f9e4c0bf040b6494 refs/remotes/origin/feature/record-session-task-awareness",
+        "a052b77b0db45fb8c01305e0640f49445ca32fcb refs/remotes/origin/feature/support-trae-qoder",
+        "228f4be129cee8249cadddbb2e3f7c4300851dd1 refs/remotes/origin/fix/470-pi-max-thinking",
+        "904cdfdedde84e1910d4a1b4df261ecec6b0656a refs/remotes/origin/fix/479-codex-turn-failures",
+        "ccd456d46aeb7a7801840159214921914889bb33 refs/remotes/origin/fix/488-idle-timeout-after-done",
+        "22bc66340e76d9c725cd193868aa3c4d08b1e4fe refs/remotes/origin/fix/512-pi-session-isolation",
+        "8ebad8b9ca934d02771af41b6768e6f2fc5823de refs/remotes/origin/fix/channel-name-path-traversal",
+        "eb1f52fcaa048e12d899345f3fb2bac37e3a04a8 refs/remotes/origin/fix/clear-claudecode-env-for-nested-agents",
+        "52298ca80bef36d1917e0f27cb0af1aa559f687d refs/remotes/origin/fix/issue-500-platform-detection",
+        "c515cedcc503b0fb9e5642bd4949b9913a9af65e refs/remotes/origin/fix/issue-87-88",
+        "5b7edf32069e01289245ef01805a0d60a5f79cbc refs/remotes/origin/fix/issue-quickfix-batch",
+        "17614d306484f41c71ef9782122f17739f13c431 refs/remotes/origin/fix/post-review-hardening",
+        "bd1485161335d15304d70d12a90d6ff4e8de8da2 refs/remotes/origin/fix/record-session-prompt",
+        "7197e4382abfc53187d9ef402826a14c624684d3 refs/remotes/origin/fix/skip-user-customizable-files-on-update",
+        "51ce56daa0ea2d508534d0c71062602b43034168 refs/remotes/origin/fix/spec-templates-and-iflow",
+        "6ec05370c033d6bf85d9cb05afbc0ce13d64c6b5 refs/remotes/origin/fix/start-process",
+        "60de8057c6b2d795c5e25dfdb778fe585a1e8bab refs/remotes/origin/fix/unbound-identity-recovery",
+        "eb2748119b5af6c2abc4b8602bac8205cb1a63a3 refs/remotes/origin/fix/update-wechat-qr",
+        "4df2c2ce389e3108597fd51f5b3a8e2a2356e6c1 refs/remotes/origin/fix/windows-stdin-utf8",
+        "517f84cf0b48bd80442107f55853eb14edf69404 refs/remotes/origin/fix/yaml-quote-strip",
+        "43b3e23fc72a6e0941f6c63f1ab9317ce924a247 refs/remotes/origin/hotfix/init-setting",
+        "ac29b00402e4e29c74d6e78622d5e85aeb36b1d9 refs/remotes/origin/main",
+        "3d00c482d8d3744fd8e3147396ed1f7e3dc82b17 refs/remotes/origin/pennix/v0.7-beta",
+        "2e206c57888eee00e8804fc50e0f512895474d09 refs/remotes/origin/refactor/bash2py",
+        "79834b378ace3c8b409531f0793ca0a437798f1e refs/remotes/origin/refactor/command-path",
+        "23ff2dd10c258b06236998ca64b59053c906cc9a refs/remotes/origin/refactor/shell-to-cli",
+        "7aec25433aeaf0e7bac2063d1d86f331c7a6f4a5 refs/remotes/origin/release/0.6.12",
+        "15b2d64bf9a489203383ae76e0784304bbb4b239 refs/remotes/origin/release/0.6.7-manifest",
+        "e67d3f6afcd76797a8d2f06b4eb7bea0b66ce782 refs/remotes/origin/release/v0.6.10-prep",
+        "4f9b067f6f9f3229410212e2cbe512414c7571ec refs/remotes/origin/revert/467-beta-workflow-from-main",
+        "68551f3a92384c0205e0e71efaccd6ba312dc825 refs/remotes/origin/sync/v0.7-beta-0.6.13",
+        "ddc126497ceea1161706dddb461a7b9d52fd4cf1 refs/remotes/origin/sync/v0.7-beta-main-0.6.11",
+        "5cb7bf0fa115ffdf9df2249da847745e6aec36ce refs/remotes/origin/taosu0216-patch-1",
+        "8f3da34a13586ca36fdfa3f6e7f37f335fee4343 refs/remotes/origin/task/cch-channel-observability",
+        "69c670d2bbaca283bd5169807fab11acc9b17b17 refs/remotes/origin/task/matt-method-integration",
+        "4c6ad11bbc9205f4f7bb8af0a4181a66b6151843 refs/remotes/origin/task/planning-preseal-review",
+        "9845b4cb85587fe6f672242eb21e470c976cbe75 refs/remotes/origin/update-wechat-qr-group4",
+        "e77ae89f648a78d5859fa2e8ac314655898421a5 refs/remotes/upstream/HEAD",
+        "75685135793e78f8a01549cdc5cb31be14db6192 refs/remotes/upstream/agent/post-069-regression-fixes",
+        "ff0e263fcd66f7dadd2c53c52a92ed3ee43183be refs/remotes/upstream/chore/python-static-checks",
+        "0c2017e4d75d652d7404d70b350c1a5f659fcd5b refs/remotes/upstream/chore/readme-slogan-update",
+        "6a86cca67ef8ca96640a0607a559c952736059aa refs/remotes/upstream/chore/refresh-wx-group4-qr",
+        "32878ed533f5c7ef797b0326f2b87059a6ab732a refs/remotes/upstream/chore/refresh-wx-group6-qr",
+        "87b3410bffbe595d21159d712ee02714cdea28e3 refs/remotes/upstream/chore/refresh-wx-group6-qr-image",
+        "b0b17fd256a65d20d06a388a64c8ee2ba62fda5a refs/remotes/upstream/chore/refresh-wx-group7-qr",
+        "9f26cbf89cf7b673affdd2a81183fd98b5a82887 refs/remotes/upstream/chore/refresh-wx10-qr",
+        "4fd33969a8c0e6c408ba3f83ad4a44cf7a728f48 refs/remotes/upstream/chore/refresh-wx8-qr",
+        "42669e499ff290e2527372c3d1cede309aafaf21 refs/remotes/upstream/chore/refresh-wx9-qr",
+        "c5de65b39179fff67a29ca81f8cedb8b17a9730e refs/remotes/upstream/chore/update-community-qrcodes",
+        "c0f5c4dd6ed0c99e1ee64716b23ef2ec81ac948c refs/remotes/upstream/chore/wechat-qr-group8",
+        "96fc72389a40ca8245b7ac2356682bb0474cae33 refs/remotes/upstream/codex/adapt-antigravity",
+        "586767a075a7356e322a7c9bbef4aa144649c8d1 refs/remotes/upstream/codex/backport-main-fixes-v07",
+        "6a8c88c27aaa015b36b3484364942269505d132a refs/remotes/upstream/codex/codex-hook-auto-inject",
+        "9056ff39e3f6c2061ae04c3c4959d1554270c9f2 refs/remotes/upstream/codex/codex-spec-injection",
+        "b6e94ac1850ea06a629b97a41e60458ea5ea3cb3 refs/remotes/upstream/codex/kiro-code-support",
+        "56227ff95839595fc7cf4f908b3fa6a0105b3c89 refs/remotes/upstream/codex/sync-v0610-beta",
+        "52bc1fa4e916636632ae3a679706864144c80040 refs/remotes/upstream/codex/update-root-readmes",
+        "5f92482dc32f4e032106390a1da13cb973418873 refs/remotes/upstream/docs/marketplace-and-changelog",
+        "5abb587d0122ba89388c88425e39ec534ecb85e8 refs/remotes/upstream/docs/mem-recall-pi-settings",
+        "446d937721e98a63e005f69c53abffa7ec546f01 refs/remotes/upstream/docs/optimize-chinese-readme-traffic",
+        "aa5732494b49fc4a9da34df9ee743c0c729ad12a refs/remotes/upstream/docs/readme-cn-slogan-qr-refresh",
+        "534349bf2a26af01844a23d21b56de5cb1cc588e refs/remotes/upstream/docs/readme-refresh-en-zh",
+        "846d08fcd1a1f3b62c482dcac8756aaa2fdc5762 refs/remotes/upstream/docs/readme-slogan-revert-4-28",
+        "ccf95fcf877441b10ebb6d3990ea4fb2f94286db refs/remotes/upstream/docs/spec-refresh",
+        "5f2e0b540728a874a74e6c4aaccfe9bacf33e524 refs/remotes/upstream/feat/codex",
+        "1b1071bbc9fb18964d7edfa6738da3c19121f26e refs/remotes/upstream/feat/codex-support",
+        "d3330a1e97aa5c80dd7fec250623428d62138c69 refs/remotes/upstream/feat/gemini",
+        "73e57153ddca410cb20a7ee795301cd11ba3d2a7 refs/remotes/upstream/feat/init-download-ux",
+        "affacba7fff533111d7418f5254066e17f24071c refs/remotes/upstream/feat/monorepo-git",
+        "ccedf8c183714b2bce68bed67a8557d044fa2ef1 refs/remotes/upstream/feat/monorepo-submodule",
+        "8ad7b3673984da344448bb2b0f84fbc31b24c6fa refs/remotes/upstream/feat/opencode",
+        "1a3571fda0e5ce4a3cecff16ebaa4e63b6d9aad9 refs/remotes/upstream/feat/per-task-workflow-selection",
+        "d6bba9a0dc9984227c66d71010d66c1ac774ae45 refs/remotes/upstream/feat/pi-dynamic-spec",
+        "db3325dbcbc1a4e36db4a30ab6b4c9a005b64c8d refs/remotes/upstream/feat/pi-mem-project-settings",
+        "ae132301d783926e6ab2219bb1e27fda696527e2 refs/remotes/upstream/feat/record-session-auto-commit",
+        "1d86ea21f861e0aea84dadf42d6505e1ad45f078 refs/remotes/upstream/feat/remote-spec",
+        "36e179c8296203203e838b27459030f4e392d3dd refs/remotes/upstream/feat/spec-on-demand-injection",
+        "9c2bd66ae32d6578743bf0e22797db333b60d84e refs/remotes/upstream/feat/task-commands",
+        "ca84b9652e62305cf9174d4b5a417afaa43521a3 refs/remotes/upstream/feat/task-lifecycle-hooks",
+        "54894e2dc12c1e4b5d98575fad312256723595b6 refs/remotes/upstream/feat/task-subtask",
+        "1247a9f57ecdac100a88fdd71d92afadd092265f refs/remotes/upstream/feat/update-skip-spec",
+        "fb9067b70d533d15e0156f1ad7c5f043571a71e5 refs/remotes/upstream/feat/v0.4.0-beta",
+        "ba74fcc60415878ae0daa103303493876b410148 refs/remotes/upstream/feat/v0.4.0-readme",
+        "8afc24ecc66581b7fb5f350f602e517fb0c08956 refs/remotes/upstream/feat/v0.5",
+        "407cd4a8a5ce4e91fdc8c5599c98304d38418370 refs/remotes/upstream/feat/v0.5.0-beta",
+        "ff2a5734eedcfb1e168f619ba10895b53fbd21f8 refs/remotes/upstream/feat/v0.5.0-rc",
+        "f9ab7001f703b084025e8adccefb5efc9e3a89e6 refs/remotes/upstream/feat/v0.6.0-beta",
+        "834fcaea2e899f02e6f046ccad7c50dc40289519 refs/remotes/upstream/feat/v0.6.0-rc",
+        "53ae2047716c7043583b1cf6e645462559b70960 refs/remotes/upstream/feat/v0.7-beta",
+        "5f4cd6f1c530dc98a2c568183f29c98a1efbe96c refs/remotes/upstream/feat/v037",
+        "307501e08da8ed142686db65ab7c4f784780d110 refs/remotes/upstream/feat/workflow-config-default",
+        "a6d67dee5962b7bcc29cb492be9a6fa3c7b94130 refs/remotes/upstream/feature/min-231-sessionstart-reinject",
+        "48d3718d46dedaac68dd82e91a0e3cdefbf65aa2 refs/remotes/upstream/feature/readme-docs-optimization",
+        "024983ecb3435236f7fff316f9e4c0bf040b6494 refs/remotes/upstream/feature/record-session-task-awareness",
+        "a052b77b0db45fb8c01305e0640f49445ca32fcb refs/remotes/upstream/feature/support-trae-qoder",
+        "228f4be129cee8249cadddbb2e3f7c4300851dd1 refs/remotes/upstream/fix/470-pi-max-thinking",
+        "904cdfdedde84e1910d4a1b4df261ecec6b0656a refs/remotes/upstream/fix/479-codex-turn-failures",
+        "ccd456d46aeb7a7801840159214921914889bb33 refs/remotes/upstream/fix/488-idle-timeout-after-done",
+        "22bc66340e76d9c725cd193868aa3c4d08b1e4fe refs/remotes/upstream/fix/512-pi-session-isolation",
+        "8ebad8b9ca934d02771af41b6768e6f2fc5823de refs/remotes/upstream/fix/channel-name-path-traversal",
+        "eb1f52fcaa048e12d899345f3fb2bac37e3a04a8 refs/remotes/upstream/fix/clear-claudecode-env-for-nested-agents",
+        "52298ca80bef36d1917e0f27cb0af1aa559f687d refs/remotes/upstream/fix/issue-500-platform-detection",
+        "c515cedcc503b0fb9e5642bd4949b9913a9af65e refs/remotes/upstream/fix/issue-87-88",
+        "5b7edf32069e01289245ef01805a0d60a5f79cbc refs/remotes/upstream/fix/issue-quickfix-batch",
+        "17614d306484f41c71ef9782122f17739f13c431 refs/remotes/upstream/fix/post-review-hardening",
+        "bd1485161335d15304d70d12a90d6ff4e8de8da2 refs/remotes/upstream/fix/record-session-prompt",
+        "7197e4382abfc53187d9ef402826a14c624684d3 refs/remotes/upstream/fix/skip-user-customizable-files-on-update",
+        "51ce56daa0ea2d508534d0c71062602b43034168 refs/remotes/upstream/fix/spec-templates-and-iflow",
+        "6ec05370c033d6bf85d9cb05afbc0ce13d64c6b5 refs/remotes/upstream/fix/start-process",
+        "eb2748119b5af6c2abc4b8602bac8205cb1a63a3 refs/remotes/upstream/fix/update-wechat-qr",
+        "4df2c2ce389e3108597fd51f5b3a8e2a2356e6c1 refs/remotes/upstream/fix/windows-stdin-utf8",
+        "517f84cf0b48bd80442107f55853eb14edf69404 refs/remotes/upstream/fix/yaml-quote-strip",
+        "43b3e23fc72a6e0941f6c63f1ab9317ce924a247 refs/remotes/upstream/hotfix/init-setting",
+        "e77ae89f648a78d5859fa2e8ac314655898421a5 refs/remotes/upstream/main",
+        "2e206c57888eee00e8804fc50e0f512895474d09 refs/remotes/upstream/refactor/bash2py",
+        "79834b378ace3c8b409531f0793ca0a437798f1e refs/remotes/upstream/refactor/command-path",
+        "23ff2dd10c258b06236998ca64b59053c906cc9a refs/remotes/upstream/refactor/shell-to-cli",
+        "7aec25433aeaf0e7bac2063d1d86f331c7a6f4a5 refs/remotes/upstream/release/0.6.12",
+        "15b2d64bf9a489203383ae76e0784304bbb4b239 refs/remotes/upstream/release/0.6.7-manifest",
+        "e67d3f6afcd76797a8d2f06b4eb7bea0b66ce782 refs/remotes/upstream/release/v0.6.10-prep",
+        "4f9b067f6f9f3229410212e2cbe512414c7571ec refs/remotes/upstream/revert/467-beta-workflow-from-main",
+        "68551f3a92384c0205e0e71efaccd6ba312dc825 refs/remotes/upstream/sync/v0.7-beta-0.6.13",
+        "ddc126497ceea1161706dddb461a7b9d52fd4cf1 refs/remotes/upstream/sync/v0.7-beta-main-0.6.11",
+        "5cb7bf0fa115ffdf9df2249da847745e6aec36ce refs/remotes/upstream/taosu0216-patch-1",
+        "9845b4cb85587fe6f672242eb21e470c976cbe75 refs/remotes/upstream/update-wechat-qr-group4",
+        "f06c222d57f5b714a1078826fb4a6b89b18f2be6 refs/tags/v0.2.10",
+        "cfe9987aaa11c750e65038d0fa3ff90fdf5b68d4 refs/tags/v0.2.11",
+        "47f7cb6d68c556d69cfc8c2a38f82495656c96f6 refs/tags/v0.2.12",
+        "81191969757abe505d66e23c2e9aeb01a4e5256c refs/tags/v0.2.13",
+        "a047bac1ebdacb31dbcc4ed7a39c8d589ecfdbf8 refs/tags/v0.2.14",
+        "e8ffc268c080a7f697d483187d53369b07f1c139 refs/tags/v0.2.15",
+        "d566de7bdd97183a7bec12d6ecf0572504d5bebb refs/tags/v0.2.9",
+        "22dda139a96ae77a9d11226d8576af0fc54ac21c refs/tags/v0.3.0",
+        "4d63d4e84c21c3a9cb7dde8f1f7000fe227c6881 refs/tags/v0.3.0-beta.0",
+        "9d1d305c503f7765c8289b3ad5d688478b432e3b refs/tags/v0.3.0-beta.1",
+        "9e2321c96638e64353d12085fc6e06d1510f9081 refs/tags/v0.3.0-beta.11",
+        "12618a3b2c3d98bbcb06dcdc303fdf831fa74d25 refs/tags/v0.3.0-beta.12",
+        "1ed42645e33d9040779cc337976002384d3b1cd1 refs/tags/v0.3.0-beta.13",
+        "b71be11b97c8f3dbe28cce6358202cbf8f3b0075 refs/tags/v0.3.0-beta.14",
+        "d11bb1913f71e38ea266597f6fbf9d9ef9360b12 refs/tags/v0.3.0-beta.15",
+        "f24e1c1f9984bf3999ceee6e49fdd80edf56d502 refs/tags/v0.3.0-beta.16",
+        "e81a2a81dfa9e2d267e7cb0e25951fdbffd9a44f refs/tags/v0.3.0-beta.2",
+        "f64bfc0cb2388a5955c001bd47697eec203bae68 refs/tags/v0.3.0-beta.3",
+        "721d57a49026139f82eed803a4c34a9cf1dcbb16 refs/tags/v0.3.0-beta.4",
+        "4145b74a1a09db3e8cb5aacc87b9b9876c8383f6 refs/tags/v0.3.0-beta.5",
+        "4d871a7653d559a275f58350a3e892743448866e refs/tags/v0.3.0-beta.6",
+        "39bb548acd3bc8dd7aa309f0e9f27d45eefbf5f2 refs/tags/v0.3.0-beta.7",
+        "2ca4dd25dad332d3996c675be9c1fe8f4bd204ef refs/tags/v0.3.0-beta.8",
+        "ceea98a3db301607175cf0d523d24a2ffa7e25e4 refs/tags/v0.3.0-beta.9",
+        "501cbb095ef0253feeca4c2b765194730c3e2b90 refs/tags/v0.3.0-rc.0",
+        "397b2afdb0e650685741445cc6c22383187b5b61 refs/tags/v0.3.0-rc.1",
+        "cd8d39849cfb180ca6cf11eb8ad23b3c6c457f17 refs/tags/v0.3.0-rc.2",
+        "5cb93abd41dea328279190dc54adc6c0e65a8080 refs/tags/v0.3.0-rc.3",
+        "ad9e206d6b9f513d6dc45956aee022803af33638 refs/tags/v0.3.0-rc.4",
+        "c3a566c951e5846955eca01aeb8a4cc5dec41c14 refs/tags/v0.3.0-rc.5",
+        "3ca4b72a66780f305c5e1e5c668ccf1cbee3b2ba refs/tags/v0.3.0-rc.6",
+        "91eb08b240f846fed0e4ccb10865af701c5d8398 refs/tags/v0.3.1",
+        "a8d7e371c621f05b74af3491846c249bb312bec1 refs/tags/v0.3.10",
+        "83c9cd78c98069c4fa87e448998a39f4a4eadc66 refs/tags/v0.3.2",
+        "4bf058fa50fbc87e5cf517cd5f04be6e152f3e28 refs/tags/v0.3.3",
+        "960b20583b12125163319de88285f5fac46ee56a refs/tags/v0.3.4",
+        "bc5c2b7a116b8d4d2f500a037a39add34c34d742 refs/tags/v0.3.5",
+        "ea85a63a8e24d7ab05ec839da6d2e61074c86070 refs/tags/v0.3.6",
+        "3b1c03985678616abd6b5fefbb1a2980d65b2219 refs/tags/v0.3.7",
+        "74c64b65aea63381f653982de87980d17eaf1a1c refs/tags/v0.3.8",
+        "d28613fdb45d4f7f8c11aece846bd889edc70e33 refs/tags/v0.3.9",
+        "7170a9648f18c4d8cd222d707a6f6b8a8167864e refs/tags/v0.4.0",
+        "15da0b0f48ffdb41ca01298860b1357c63436aef refs/tags/v0.4.0-beta.1",
+        "737f7508f073ebd5d8a2a76f4bbd3c4aacc8793e refs/tags/v0.4.0-beta.10",
+        "e6a72dbe7f66885a6a6cbf5f82eb67b17c267763 refs/tags/v0.4.0-beta.2",
+        "8670adbc8c854f534eb615c7c2fc22231d2833d3 refs/tags/v0.4.0-beta.3",
+        "fbd31a2c3279594f6fc63a27a95d9bd496c9be27 refs/tags/v0.4.0-beta.4",
+        "df588063ea11247dc0901b2b27b2dba4d679b83c refs/tags/v0.4.0-beta.5",
+        "61f0aaf0045b014fc5eeaf67c88a38a9c992577d refs/tags/v0.4.0-beta.6",
+        "77bb2deeb9c102333cc59430a7a51e57f546f071 refs/tags/v0.4.0-beta.7",
+        "1852b997bb155c3d1c0a101fb0bc53f6ca83b6c9 refs/tags/v0.4.0-beta.8",
+        "6fb39c83f5787dc24f5c8e7aa1a7ac3e0041e1a6 refs/tags/v0.4.0-beta.9",
+        "ca7bd3321f852618900d7e7a52b50123cdc38692 refs/tags/v0.4.0-rc.0",
+        "60ce7126523840fcb7f477c670596bed4fc95f02 refs/tags/v0.4.0-rc.1",
+        "75b3d6238d01ea75e8ac0c96b14bd86984b0a4ef refs/tags/v0.5.0",
+        "1717776750ede978fad6f4fdf8caba8d88909623 refs/tags/v0.5.0-beta.1",
+        "cd0c9f6ae8802c6803093f2df5b7b043467f34d4 refs/tags/v0.5.0-beta.10",
+        "82827b8244ff20a420db64e859d27a5059650926 refs/tags/v0.5.0-beta.11",
+        "dc79a0137c2ee9d50131dda066eaad9fcf51b271 refs/tags/v0.5.0-beta.12",
+        "7387f3e918bffae1426176037330865e46f74c19 refs/tags/v0.5.0-beta.13",
+        "943a6087ae60479aa5e23477d3281e4669c3581c refs/tags/v0.5.0-beta.14",
+        "854fb455e9261f4f84f18351183f550e0fae7016 refs/tags/v0.5.0-beta.15",
+        "c9e703bed63310db6805405c58e906b403415f9f refs/tags/v0.5.0-beta.16",
+        "7f520a5abe3c0c9304d3ee9868fb166f914a6e5d refs/tags/v0.5.0-beta.17",
+        "836dee819ef5bbfe136ec5e975721ff6828ef464 refs/tags/v0.5.0-beta.18",
+        "859a151f0c1cde115cc3269cac4b06f892063e3a refs/tags/v0.5.0-beta.19",
+        "7afd0c2b299888e2898f946389b036044ad61513 refs/tags/v0.5.0-beta.2",
+        "375fec7308000d8c9880d6b9b5ff58c708821d73 refs/tags/v0.5.0-beta.3",
+        "515dca196ec0d8e02486e283504e5c429325792b refs/tags/v0.5.0-beta.4",
+        "66a1ae29da14c40c7c5adb422cae108e7c3995c0 refs/tags/v0.5.0-beta.5",
+        "e49975d9074dd8eee4e2c6fdf6133aa8b3482f98 refs/tags/v0.5.0-beta.6",
+        "ed52d467a6241fbc21f1925574434a481e8e1f4a refs/tags/v0.5.0-beta.7",
+        "2ca1b53fc39ca4b7d609ba5d355e38cc4a52093e refs/tags/v0.5.0-beta.8",
+        "ceafa5feffb36c2d695ef349ce658ece88e331e0 refs/tags/v0.5.0-beta.9",
+        "91a81775d8048f471c74a585c7b6cccc53cec2cf refs/tags/v0.5.0-rc.0",
+        "76d6acd2bac72e848a330ed49537ff90f9f311d7 refs/tags/v0.5.0-rc.1",
+        "8b4199bcd1dd7fc45b55c478a368d589b3211435 refs/tags/v0.5.0-rc.2",
+        "d2860489b91bf0a0cdfcd9dfe268584dfe2458f7 refs/tags/v0.5.0-rc.3",
+        "9393a655a4790796a6aa18a73890c96a33da4675 refs/tags/v0.5.0-rc.4",
+        "0f50275031251068836c2e24150108fb6ef4d380 refs/tags/v0.5.0-rc.5",
+        "936dc3fd3bc18adf38c9e97ca720fd6322e8950f refs/tags/v0.5.0-rc.6",
+        "ff2a5734eedcfb1e168f619ba10895b53fbd21f8 refs/tags/v0.5.0-rc.7",
+        "dd73642a5525f653fd13544468dc4223d9a5cd19 refs/tags/v0.5.1",
+        "8d1ede79356a432b52efc86ab7cade519bd120e7 refs/tags/v0.5.10",
+        "b592901f6312780471d2580be63268c28019a13d refs/tags/v0.5.11",
+        "3d0949f5b28711226423edb8472b6f7ab2f13d87 refs/tags/v0.5.12",
+        "f31cf1945cb9ae93c5d9ae4a75f2d9ef696c59b2 refs/tags/v0.5.13",
+        "e000208ef6961ccbd9227fc59864dcfc4921ee9b refs/tags/v0.5.14",
+        "6b44d10c1b76d193835d3e2be62f849c66bd220e refs/tags/v0.5.15",
+        "a6e77bdae0c32b00c6d8df6d53e592cbb8917bb9 refs/tags/v0.5.16",
+        "593a374b29c08c6734de951f98023f387ebeb7e6 refs/tags/v0.5.17",
+        "3675b6a9e0fc4858598f5bc4a0352d1566663e47 refs/tags/v0.5.18",
+        "7a469cbbb0a53570bba6891351b033197d1521c9 refs/tags/v0.5.19",
+        "5ad1e21ed71bf4333fb7bd7805de60d761a2e494 refs/tags/v0.5.2",
+        "381cf432231529e2bdbc1c4d4afc72da2d269f36 refs/tags/v0.5.3",
+        "8afc24ecc66581b7fb5f350f602e517fb0c08956 refs/tags/v0.5.4",
+        "b8f576fafc311c18c94b122f2cf665f184d8ce50 refs/tags/v0.5.5",
+        "66d1acf21eb5022ec60df095c5e489cec61867e5 refs/tags/v0.5.6",
+        "1ac65c26198de8e741b7c54d2d760bd603a21eff refs/tags/v0.5.7",
+        "12542ec52e7c77221f222f7f4c5ce23001be3968 refs/tags/v0.5.8",
+        "e60539fcf6594ce282f45556df6a24da1215a2a8 refs/tags/v0.5.9",
+        "f2cc0745a72c98f4fd1adb726efcb5f35ad131e9 refs/tags/v0.6.0",
+        "9f65015e814dca2d86b0f6ef5bbb5582e631e35c refs/tags/v0.6.0-beta.0",
+        "49a40cd608dff523f6e4d7653a78c27a7c62a587 refs/tags/v0.6.0-beta.1",
+        "6871d1592cd64d702cbb5c19d38df0cecac63629 refs/tags/v0.6.0-beta.10",
+        "7b43eb2ee144f76d047537fe8b70a7b18c21f961 refs/tags/v0.6.0-beta.11",
+        "467ea3e167c2585d2bc2a3f5e3505acce941d53c refs/tags/v0.6.0-beta.12",
+        "c9f4d1259f60a1c3e6abb12be85df6bfb9f23211 refs/tags/v0.6.0-beta.13",
+        "3b79fb468f066d839031e691be0551db8d13574b refs/tags/v0.6.0-beta.14",
+        "85a27abde0b9c6599f9a8305059beecef80ddab6 refs/tags/v0.6.0-beta.15",
+        "b5e3ed456b29f2c1eaa5647e78a0de86bb9a7571 refs/tags/v0.6.0-beta.16",
+        "cd929ef6de16f7aac68f13fa998ff527bba90b4f refs/tags/v0.6.0-beta.17",
+        "77aeefb2724d82fcaf24fb1097c88890885d44bf refs/tags/v0.6.0-beta.18",
+        "e665b5cc25cbce1a2ffe54f159488e07fee98235 refs/tags/v0.6.0-beta.19",
+        "1612799a983aa2a983f7fefa72d75719b7dbe21b refs/tags/v0.6.0-beta.2",
+        "42896123f40bb210090840df153d6eb57caf4627 refs/tags/v0.6.0-beta.20",
+        "30beb8e3ed379b7ef9270e14d4b406fc330044d2 refs/tags/v0.6.0-beta.21",
+        "714eab1b38d9e386b0e2179692494ef7481c29d9 refs/tags/v0.6.0-beta.22",
+        "9d63f90fb5beb2df39180c07cb260bca1db29da4 refs/tags/v0.6.0-beta.23",
+        "0b5a9dc73a394d3bb67a168e82beb80073a43e89 refs/tags/v0.6.0-beta.3",
+        "b9afec48f7678f3036789c9d47df9f30a00e5615 refs/tags/v0.6.0-beta.4",
+        "751638f2fda88661b70713e0485c045baf512ec9 refs/tags/v0.6.0-beta.5",
+        "f6372bdce8adc4381215f4a358553922e699052b refs/tags/v0.6.0-beta.6",
+        "329276e1e200a886ed33fe929805fdf87b99135f refs/tags/v0.6.0-beta.7",
+        "ef7478f562430d920a2228775ff428438eb3ceb3 refs/tags/v0.6.0-beta.8",
+        "a2dd5f482985e5b75eb01c1e8c64ae8159bb5db8 refs/tags/v0.6.0-beta.9",
+        "6869bc6fabea6b7ff4e05905d25741d2d7a2d2e9 refs/tags/v0.6.0-rc.0",
+        "c8ed3e212837c46f072b8415f0cb298866d2b719 refs/tags/v0.6.1",
+        "c94d6fc289b7a6fdd9480bdfae4d4639c9ac2d4c refs/tags/v0.6.10",
+        "a82d4d4c75abf85c6200c4528f750798d531a70f refs/tags/v0.6.11",
+        "516b34e3591001b28fda5e2d4df3f717e82f5785 refs/tags/v0.6.12",
+        "7a821367b48693bbe96409d73bf0fd658dca6c84 refs/tags/v0.6.13",
+        "18c028c2b6303fd468685c6fe1c99d79df62cadf refs/tags/v0.6.14",
+        "d8fff53ce4964ed1a3e52fea6b418b27eba093e4 refs/tags/v0.6.15",
+        "88f4834449da9b4f607ec05e322408a0aa66f2ce refs/tags/v0.6.16",
+        "be0a05c0884473a0d825acdb114da647c0096994 refs/tags/v0.6.17",
+        "f7cdc3821246b5a2f6957964f89a2244059b9779 refs/tags/v0.6.18",
+        "01e0eae4f527940aec4e6c87669ab8e892b62b94 refs/tags/v0.6.19",
+        "d8a947a714114e13a2819f687491c641125082b9 refs/tags/v0.6.2",
+        "518f44d45edc0c0fdcd1a2e9128b38f94d219ad1 refs/tags/v0.6.20",
+        "3e6074b6241789064bccaa6ba523ea0eba73725f refs/tags/v0.6.21",
+        "2a9e9f64bbb7f539fcce1f1bc5dfe4ecaabae5f0 refs/tags/v0.6.22",
+        "5d0caa44ade149fd0aef41dd5abc3fd1f1349194 refs/tags/v0.6.23",
+        "01d743b054c2f6f1174a43a2369f402403b0fe96 refs/tags/v0.6.24",
+        "24ee1ee717656ced304574562d08b3ea767161c3 refs/tags/v0.6.25",
+        "0469bfbf6ba6d1cdb9d14f37315ca9ca38789218 refs/tags/v0.6.26",
+        "cf776d85cd1718832102c1f3dddbd80f5b103766 refs/tags/v0.6.27",
+        "a35a3059695921127c5239a6830243b7e9f9d8b6 refs/tags/v0.6.28",
+        "e9cf07585b665f6f7b23c15c9745aeb90326db45 refs/tags/v0.6.29",
+        "1d50e8d1f1509eca0fbdb50b16ac72384c32ad35 refs/tags/v0.6.3",
+        "cca82be1241e67c0b3bb9a11c5a4e129034e343c refs/tags/v0.6.30",
+        "5d0da7fca92b0df8d7bfb13d0a5a0eeca722dd14 refs/tags/v0.6.31",
+        "7e33df044f3570bd80eb75820b3fd7a0a9cee236 refs/tags/v0.6.32",
+        "a376bef7a93f1706d47cb743be50bb381e5b76bf refs/tags/v0.6.33",
+        "c5dc64fc5e27330a6e546e1edf38fe59d1bcbe5a refs/tags/v0.6.34",
+        "b582978a1f984736b94d76a377e126d6e99c9e42 refs/tags/v0.6.35",
+        "eea4c67e5f3a28be80557f8b6b98f2047f4d605c refs/tags/v0.6.36",
+        "25345cca31154c44e5558b709149f71e4585c13b refs/tags/v0.6.37",
+        "f5d951a8c9c6809238a07e48a330c845b0c03ce4 refs/tags/v0.6.38",
+        "7012cd8afc2b2d4fad5dc6986abc1a40e30b3829 refs/tags/v0.6.39",
+        "28d30c0ab343f64a75e12632413d452093dc1b20 refs/tags/v0.6.4",
+        "1002fb2c8d2ac8b541ba2e1618a959a2b07cc64a refs/tags/v0.6.40",
+        "42194c3cb7fe7276b0bb17d8543517426669be36 refs/tags/v0.6.41",
+        "21e7dedfed9d047de56773e69494f58eb5bef154 refs/tags/v0.6.42",
+        "e1b18ddd6314ba11514f89fd9b04106df6678c14 refs/tags/v0.6.43",
+        "4c80cc8f77b180e1483be5796cf3e4ed594e15a9 refs/tags/v0.6.44",
+        "962d8dbdc58e3ce058139dd952756f52d7adac85 refs/tags/v0.6.45",
+        "01ec8d6503b2338194e9bd2e9dbbcf22054c1bba refs/tags/v0.6.5",
+        "41b6a460d298861991b082c7a7fbfa1f9f42fc6f refs/tags/v0.6.6",
+        "e7c5ead4d0dfd717d11a40b6bc0c80d8af94c49a refs/tags/v0.6.7",
+        "dc68f5a92a68489b681c511f4a784e413d724e85 refs/tags/v0.6.8",
+        "12e279a8af00456b1d0d4e3d0f7f59e7b702202e refs/tags/v0.6.9",
+        "ef91afee611e6c2f7a2555516815af0dc59d8bfd refs/tags/v0.7.0-beta.0",
+        "1019808318a5573c5fc73c3e90bd19abefa7b6e4 refs/tags/v0.7.0-beta.1",
+        "717bd21b4fdd08e59218231db9afbceba75ff5dd refs/tags/v0.7.0-beta.10",
+        "3a9ee37d4b69c845906e395e3215f8c02015134f refs/tags/v0.7.0-beta.11",
+        "d7935fb6ea6c74d9e47d1a6375aae5294c307aeb refs/tags/v0.7.0-beta.12",
+        "018fe049d1d10ca5188fb7140c7dc07a02f57634 refs/tags/v0.7.0-beta.13",
+        "6da164226706a077707138086a88fb3bbb28d4ec refs/tags/v0.7.0-beta.14",
+        "03f6f6147717659c0e36b4ff3ec3c8f754aedfec refs/tags/v0.7.0-beta.15",
+        "a131444b87f9212b356e8adbc8c2acee2f40e0a6 refs/tags/v0.7.0-beta.16",
+        "6a5c9c38a9f828e06cea7167cca39e79e3af52e4 refs/tags/v0.7.0-beta.17",
+        "9432e234117a30300301076ee40bad85b9c76e46 refs/tags/v0.7.0-beta.18",
+        "d2f0b5a12ae7da1378c18fe574999525a4f06cfc refs/tags/v0.7.0-beta.19",
+        "68551f3a92384c0205e0e71efaccd6ba312dc825 refs/tags/v0.7.0-beta.2",
+        "57988d0c6c4becd9691fdf6966d0305fa225c738 refs/tags/v0.7.0-beta.20",
+        "12860f8c81c3b7d1490be80bd6816fcdeae28cb1 refs/tags/v0.7.0-beta.21",
+        "5126222ff4d5e7d1d542b307f2e9f35ef23c3e9e refs/tags/v0.7.0-beta.22",
+        "a39818be93f9347120ce7b1d3f9645a27ebeb322 refs/tags/v0.7.0-beta.23",
+        "427a52cae99749544306c848b9cefa2eb7bff3fc refs/tags/v0.7.0-beta.24",
+        "c0f90ba76f949f2ce340b1311abaf24d4bc0b3d8 refs/tags/v0.7.0-beta.25",
+        "32fb739c6693b4fd19eea95084be75e704f5f0ce refs/tags/v0.7.0-beta.26",
+        "fe2f60aed1890e77d7d800a921d0744ef7bc9fdd refs/tags/v0.7.0-beta.27",
+        "58998a534b206370c8f3a28ce9bc2dfb766f68df refs/tags/v0.7.0-beta.28",
+        "025f1da7c77c4e9426bf3dc5eca4824d3e79104b refs/tags/v0.7.0-beta.29",
+        "53ae2047716c7043583b1cf6e645462559b70960 refs/tags/v0.7.0-beta.3",
+        "aa2b84d85bba3d21cb070ae48c923291be164ade refs/tags/v0.7.0-beta.30",
+        "eff7db756b0f4c8f3d91ef7152320b765631f366 refs/tags/v0.7.0-beta.31",
+        "8e334547d7c37cc717f777208f0b00620744ab98 refs/tags/v0.7.0-beta.32",
+        "ad0fe7f74377862679ff616613a77b3fa2980560 refs/tags/v0.7.0-beta.33",
+        "0ebe9570c15989207536f67b1b33bf721c445aff refs/tags/v0.7.0-beta.34",
+        "b3b20e32d2d357178514f14a333f72cd538099ce refs/tags/v0.7.0-beta.35",
+        "3cf75bd6cecd8137c1eb9d7a2c2289f0b4d2dae3 refs/tags/v0.7.0-beta.36",
+        "283513db33b259ae39459b42a36efb53a3b3ec10 refs/tags/v0.7.0-beta.37",
+        "c84717f6e4fdad910cfe581f3da524a190e1b6cf refs/tags/v0.7.0-beta.38",
+        "cc99dcd5dbf947e5c4bac9ac677bbf41c8fc0d7c refs/tags/v0.7.0-beta.39",
+        "aff0990ca02a7fcac83e1a65340a917b5eeca934 refs/tags/v0.7.0-beta.4.pennix.1",
+        "a04054b07237c9640509043b4c5e0c55837a251f refs/tags/v0.7.0-beta.40",
+        "b3445bbe022b31443b6295f04ca20551f42e924c refs/tags/v0.7.0-beta.41",
+        "a3079c31c69b4313167b864b397427df2164438c refs/tags/v0.7.0-beta.42",
+        "c97e3d11ab51006acfaeac52d57f2f746f36f164 refs/tags/v0.7.0-beta.43",
+        "9286e41ce3c3c10d296783a4c13910a5e3df4a6b refs/tags/v0.7.0-beta.44",
+        "5fc1f97e1a5407074eefcd1ea68676594c1b7a95 refs/tags/v0.7.0-beta.45",
+        "ced81464d6d861ac8a07e4ad766c0409ff25fd84 refs/tags/v0.7.0-beta.46",
+        "4cf4501b7853f48a4b3d8819db93eaba3effbb3e refs/tags/v0.7.0-beta.47",
+        "e08589f0ea66d0813c6166fec1f9e61c24c07ab6 refs/tags/v0.7.0-beta.48",
+        "0484938b38eaf45e9f82dff7d492214fc3567bc7 refs/tags/v0.7.0-beta.49",
+        "8ed5649f82d15abcdaf8a088b6d592a2815c57fd refs/tags/v0.7.0-beta.5",
+        "e8e06047ce46babb3a4716531f444fd45fe7a3d3 refs/tags/v0.7.0-beta.50",
+        "08e8aecff297698937f7cdc1a24597b9f91ac25b refs/tags/v0.7.0-beta.51",
+        "2fff60e59bf49293f378f870bdd014945ea9c6f6 refs/tags/v0.7.0-beta.52",
+        "3c37e41a798910b3d4ef3980ad23d74875386b0f refs/tags/v0.7.0-beta.6",
+        "aef750e12ac92b97837a206ad709d25a4357172c refs/tags/v0.7.0-beta.7",
+        "84c56be35708ed1049356b71a5afdf8389025091 refs/tags/v0.7.0-beta.8",
+        "d258508c920f26d6f01e57c2a3065b8f688c2c19 refs/tags/v0.7.0-beta.9"
+      ]
+    },
+    "marketplace": {
+      "path": "pennix-marketplace",
+      "branch": "main",
+      "head": "5b872f9986225159bc1942d4c789b5ca8025096b",
+      "upstream": "origin/main",
+      "upstream_head": "5b872f9986225159bc1942d4c789b5ca8025096b",
+      "status_porcelain": "",
+      "worktrees": [
+        "worktree /home/penn/devel/codex-workflow-optimization/.git/modules/pennix-marketplace",
+        "HEAD 5b872f9986225159bc1942d4c789b5ca8025096b",
+        "branch refs/heads/main"
+      ],
+      "refs": [
+        "5b872f9986225159bc1942d4c789b5ca8025096b refs/heads/main",
+        "5b872f9986225159bc1942d4c789b5ca8025096b refs/remotes/origin/HEAD",
+        "5c0a469c2b07f12dc433753adef602c7dcca994a refs/remotes/origin/docs/mem-recall-pi-settings",
+        "1e0af97b9148ba8104f28577349af41c0b41868c refs/remotes/origin/fix/unbound-identity-recovery",
+        "5b872f9986225159bc1942d4c789b5ca8025096b refs/remotes/origin/main",
+        "9d4ff009868811a29cc01ec2644857b8b59774b0 refs/remotes/origin/pennix/v0.7-beta",
+        "21c7fc2c59e7544405bfbb2e2f307e5bee6e6ce5 refs/remotes/origin/sync/native-workflow-seed-gate",
+        "847808deee30deb04f753c4c25a175d94491d632 refs/remotes/origin/task/research-approval-gate",
+        "e34b0f7c83fbb00584df19f14a9a41db920e1ccf refs/tags/v0.6.22",
+        "d8a21fadef09eb107225593413f85b9df4c9d170 refs/tags/v0.6.23",
+        "69bd00c556bab65a98147554104007747a954bac refs/tags/v0.6.24",
+        "2ad389e1a57d6daf1759f8331aaa17608446133d refs/tags/v0.6.25",
+        "ef401ddadd4c6e9235af0355c7af6e4e3bf4dabd refs/tags/v0.6.28",
+        "b7f88a745a04602c1e64dba3e1fd3c197c0871c0 refs/tags/v0.6.30",
+        "9cd97152591f1920eb00a352a86d409252180466 refs/tags/v0.6.33",
+        "768b22d6ad81cab420c8114292110d328b88631e refs/tags/v0.6.34",
+        "d3295482a7c26f4aed33f3d73f8ef6be1e75eb43 refs/tags/v0.6.35",
+        "f14c09e73a606db301796909f8e0c15c97346a8e refs/tags/v0.6.36"
+      ]
+    },
+    "nested_marketplace": {
+      "path": "Trellis/marketplace",
+      "branch": "main",
+      "head": "5b872f9986225159bc1942d4c789b5ca8025096b",
+      "upstream": "origin/main",
+      "upstream_head": "5b872f9986225159bc1942d4c789b5ca8025096b",
+      "status_porcelain": "",
+      "worktrees": [
+        "worktree /home/penn/devel/codex-workflow-optimization/.git/modules/Trellis/modules/marketplace",
+        "HEAD 5b872f9986225159bc1942d4c789b5ca8025096b",
+        "branch refs/heads/main"
+      ],
+      "refs": [
+        "1e0af97b9148ba8104f28577349af41c0b41868c refs/heads/fix/unbound-identity-recovery",
+        "5b872f9986225159bc1942d4c789b5ca8025096b refs/heads/main",
+        "9d4ff009868811a29cc01ec2644857b8b59774b0 refs/heads/pennix/v0.7-beta",
+        "5b872f9986225159bc1942d4c789b5ca8025096b refs/remotes/origin/HEAD",
+        "5c0a469c2b07f12dc433753adef602c7dcca994a refs/remotes/origin/docs/mem-recall-pi-settings",
+        "1e0af97b9148ba8104f28577349af41c0b41868c refs/remotes/origin/fix/unbound-identity-recovery",
+        "5b872f9986225159bc1942d4c789b5ca8025096b refs/remotes/origin/main",
+        "9d4ff009868811a29cc01ec2644857b8b59774b0 refs/remotes/origin/pennix/v0.7-beta",
+        "21c7fc2c59e7544405bfbb2e2f307e5bee6e6ce5 refs/remotes/origin/sync/native-workflow-seed-gate",
+        "847808deee30deb04f753c4c25a175d94491d632 refs/remotes/origin/task/research-approval-gate",
+        "a478b28de4e57fb2245e95307413413dda0fef1b refs/remotes/upstream/HEAD",
+        "5c0a469c2b07f12dc433753adef602c7dcca994a refs/remotes/upstream/docs/mem-recall-pi-settings",
+        "a478b28de4e57fb2245e95307413413dda0fef1b refs/remotes/upstream/main",
+        "21c7fc2c59e7544405bfbb2e2f307e5bee6e6ce5 refs/remotes/upstream/sync/native-workflow-seed-gate",
+        "e34b0f7c83fbb00584df19f14a9a41db920e1ccf refs/tags/v0.6.22",
+        "d8a21fadef09eb107225593413f85b9df4c9d170 refs/tags/v0.6.23",
+        "69bd00c556bab65a98147554104007747a954bac refs/tags/v0.6.24",
+        "2ad389e1a57d6daf1759f8331aaa17608446133d refs/tags/v0.6.25",
+        "ef401ddadd4c6e9235af0355c7af6e4e3bf4dabd refs/tags/v0.6.28",
+        "b7f88a745a04602c1e64dba3e1fd3c197c0871c0 refs/tags/v0.6.30",
+        "9cd97152591f1920eb00a352a86d409252180466 refs/tags/v0.6.33",
+        "768b22d6ad81cab420c8114292110d328b88631e refs/tags/v0.6.34",
+        "d3295482a7c26f4aed33f3d73f8ef6be1e75eb43 refs/tags/v0.6.35",
+        "f14c09e73a606db301796909f8e0c15c97346a8e refs/tags/v0.6.36"
+      ]
+    }
+  },
+  "marketplace_object_integrity": {
+    "root_reachable_object_count": 695,
+    "nested_reachable_object_count": 695,
+    "nested_objects_missing_from_root": [],
+    "object_id_sets_equal": true
+  },
+  "legacy_tasks": [
+    {
+      "path": "Trellis/.trellis/tasks/06-17-architecture-diagram",
+      "id": "architecture-diagram",
+      "title": "Trellis System Architecture Diagram",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "f96d3e57ada90009d05bf2adb15a4ed936f6721a533fd4ec9de0de0d7e8a5efd",
+          "bytes": 710
+        },
+        "prd.md": {
+          "sha256": "13aa4ce7f203f61d1481f7ade6e8155ffeabd6000eb6c60cb9be78baa86ca950",
+          "bytes": 6073
+        },
+        "design.md": {
+          "sha256": "21f6ceb83fd644f5b06f39cd87d7faaa4cba0360909313c9ee79f82ded26ec02",
+          "bytes": 8045
+        },
+        "implement.md": {
+          "sha256": "860deb29c19666fc4e204bc0fb5406e59efd617d1e58c99449905fd2aaa6686a",
+          "bytes": 5085
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/06-17-benchmark-showcase",
+      "id": "benchmark-showcase",
+      "title": "Benchmark & Showcase Trellis Capabilities",
+      "status": "planning",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "16de6d902534e5d96c3a15d4379fb6638bde0c0c64c32a35bc72fddb752aa4dd",
+          "bytes": 699
+        },
+        "prd.md": {
+          "sha256": "6e78dc535525d8637e02ecfd8ab73b51039daf3182d5c57fb714fddc9b8f9613",
+          "bytes": 5998
+        },
+        "design.md": {
+          "sha256": "dcebe935902ddacb4cf07b5f0f71e636df22bed888f1eed31b99b17752f6df80",
+          "bytes": 5168
+        },
+        "implement.md": {
+          "sha256": "493e5dcae4bc14856832021e7a2fa20365e0d9e072988ab8513c1834df6f39a2",
+          "bytes": 5722
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/07-23-codex-inline-default-agent-model",
+      "id": "codex-inline-default-agent-model",
+      "title": "Codex: revert dispatch default to inline + sub-agent model config",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "d0f8baa130c7440e2f232db5691e9324928a3a304f30b46210002d7482fe8f85",
+          "bytes": 969
+        },
+        "prd.md": {
+          "sha256": "6c3b6fca07d5df73d6e1013648b7c85c1ebfbf81fd6ff6f903a302bb3b9f172a",
+          "bytes": 3483
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/07-23-per-task-workflow",
+      "id": "per-task-workflow",
+      "title": "Per-task dynamic workflow selection",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "3610747b4456065cd234f4811039a4ef2172f147d06b82a81932cefc831a1c7b",
+          "bytes": 697
+        },
+        "prd.md": {
+          "sha256": "104f0f658e7b124fd8ba119bf2a0a37730b25bb6a6d1b854d88dd41d611d930e",
+          "bytes": 5633
+        },
+        "design.md": {
+          "sha256": "c46c418c96bde5100479df4129b833668c564640c9acc2dbfdcccf8a8d9d8063",
+          "bytes": 7389
+        },
+        "implement.md": {
+          "sha256": "db1dc9d49aab1dc7115028734402b284b9cd947d1940f9ca4eaf0a95cbde76f7",
+          "bytes": 4170
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/07-23-spec-on-demand-injection",
+      "id": "spec-on-demand-injection",
+      "title": "Path-scoped on-demand spec injection",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "5c623fcdd7bfaa083d8b6e24c962bd71c03a2a7719b78386f7687443dc4f5ab2",
+          "bytes": 756
+        },
+        "prd.md": {
+          "sha256": "98c8a89ba61003d21ca75aa942216b46ba29fa3196824a0f0afb6a915618edc7",
+          "bytes": 14188
+        },
+        "design.md": {
+          "sha256": "b9a654a71027b450a105c6f03d7b0ee90fc2e514d9a8a88c0970b387a5281ab8",
+          "bytes": 28160
+        },
+        "implement.md": {
+          "sha256": "e4b4fd82c1e1cf922a24dbf9f651b626760e32c0a0b4ecd84b9d1996eee9b777",
+          "bytes": 15254
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/07-24-workflow-config-default",
+      "id": "workflow-config-default",
+      "title": "Layered workflow default (config + personal override)",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "3bbb72bf138cabddb217a24caddcdf08fac30ade71c661f77aa302012ff76c3e",
+          "bytes": 735
+        },
+        "prd.md": {
+          "sha256": "ef657c1ca6e9c256e94878842bb3d291fdec9d9da85e66ac8f3d6c1c04b99574",
+          "bytes": 6924
+        },
+        "design.md": {
+          "sha256": "622194588f162ff6fef36c85a5b35c54a24afb736cd011d31afcd7211fcd7775",
+          "bytes": 4675
+        },
+        "implement.md": {
+          "sha256": "e4be60da55988db3a3d2b37cb9f1ce9c6c1f3f5832cb9a3a5478b539393d657c",
+          "bytes": 1979
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/08-05-opencode-shell-env",
+      "id": "opencode-shell-env",
+      "title": "OpenCode: bridge session identity via shell.env plugin",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "519b06483643ec2887360e43e4ff8c8b955bf2d004509af91f0bb977053198fd",
+          "bytes": 596
+        },
+        "prd.md": {
+          "sha256": "cc0506f3bc3372759fe928ffc5c47a7460ca527108bd62078c3374ce6d6e2769",
+          "bytes": 5265
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/08-05-purge-fake-env-names",
+      "id": "purge-fake-env-names",
+      "title": "Purge invented session env var names",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "19bfedbced36aa30cef0adffd9a310e5dace1ea13c017ea646070223fb5dfb84",
+          "bytes": 582
+        },
+        "prd.md": {
+          "sha256": "e4f1421b61c324d609d30310c99c8b5d0bfecbeb776c793f0736fe6b77c2ce0b",
+          "bytes": 6827
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/08-05-session-identity-hardening",
+      "id": "session-identity-hardening",
+      "title": "Session identity: structural hardening",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "90495bf325f9aa6d95f54d943dbd41f320dc54e9386db208854b91d0cb890732",
+          "bytes": 596
+        },
+        "prd.md": {
+          "sha256": "960d9c02c7c50d5a169ee32b64df2fcac03d471a676ff891e99323489199e7d8",
+          "bytes": 8847
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/08-05-session-identity-propagation",
+      "id": "session-identity-propagation",
+      "title": "Investigate session identity propagation gaps (CodeBuddy, OMP #517)",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "c03f7a45740a216e87e00760dc1182bd2b46d403139015aedb0d0fb5a691d4ef",
+          "bytes": 738
+        },
+        "prd.md": {
+          "sha256": "efdcc8143b47617bf0890280413a7b5ae4e21fb373a3e84404e3fc51395ee2a0",
+          "bytes": 4143
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/08-05-shell-ticket-bridge",
+      "id": "shell-ticket-bridge",
+      "title": "Generalize the shell-ticket session bridge",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "ac11f92eb9e8022701f53a55c1617c9c4f860190137c13e2938f555f56b3d02a",
+          "bytes": 586
+        },
+        "prd.md": {
+          "sha256": "588be1a693144d5f6dbf1289b6c6ac4d572d6c8a0466eca3d58ada7fd850d0a0",
+          "bytes": 6332
+        },
+        "design.md": {
+          "sha256": "4b894114be5422ad51bfdd96515599f59c32bbf2e05c1db62f496236c773a53f",
+          "bytes": 5291
+        },
+        "implement.md": {
+          "sha256": "5cc7b250298b93e0ed0c8451a402b196918f86bc849c73c1c333aa6f4a35f0e5",
+          "bytes": 3122
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/08-06-converge-platform-templates",
+      "id": "converge-platform-templates",
+      "title": "Derive platform template collection from a single description",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "5fd3a49df99bfc1641d197761b5da36cf58b3c475641c37afe34872da2dc6681",
+          "bytes": 589
+        },
+        "prd.md": {
+          "sha256": "96a69d6852555c4d00eb44760f1f012ba2cbfc08d083be47bdf0f18e35ad0e23",
+          "bytes": 4409
+        },
+        "design.md": {
+          "sha256": "e1098fd8e9cc2b91aa95c39bf8f2de08973667bf55405978776549941f3b7460",
+          "bytes": 4456
+        },
+        "implement.md": {
+          "sha256": "6b7dcf791b571cdad84a09fd53c9008eae2c9181f24bc0a81d2088ebb8f6c9ba",
+          "bytes": 2839
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/08-06-mem-full-recall",
+      "id": "mem-full-recall",
+      "title": "Recover full conversations across compaction; add Grok adapter",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "2731091ed56d08347bbec4ab782cb8f3da2a9fac5cf0736228b237a7f34478de",
+          "bytes": 566
+        },
+        "prd.md": {
+          "sha256": "35caf32c3080ab885c75cf8db8c45ca5ffddb24d9c8a6f01bc4c5d2592631000",
+          "bytes": 6830
+        },
+        "design.md": {
+          "sha256": "a1e7665963619fbd87c3e467aab5d53b04486b97520c9b33e72d97d912f10056",
+          "bytes": 4515
+        },
+        "implement.md": {
+          "sha256": "54b871cdc87c0afef06b88c2bb76f1f4a8ffd14545a799ad1a6f4f22c9c78255",
+          "bytes": 2512
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/08-06-purge-stale-references",
+      "id": "purge-stale-references",
+      "title": "Purge references to deleted symbols before release",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "983fbf4073e94c40c7c9f596cf32a6aa9406e694a1edc93a9528c89f5e3038f8",
+          "bytes": 568
+        },
+        "prd.md": {
+          "sha256": "333f7c76ad2daf14e5b773d3d18d5475f0d9514a5eef292ebaf0677481ae139f",
+          "bytes": 4468
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/09-07-subnode-workflow-managed-assets",
+      "id": "subnode-workflow-managed-assets",
+      "title": "Implement managed subnode workflow assets",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "a16e3507fd0b4bfe36e226962de798adb3248134977c9a41185ff5accf2a6ef9",
+          "bytes": 922
+        },
+        "prd.md": {
+          "sha256": "ee803fb36fc8ad64d6af5f09471a1aba46d3547ea6d47b5a019492fde867081a",
+          "bytes": 4559
+        },
+        "design.md": {
+          "sha256": "4e8b3c75e118e1645f374e28d7ba49f081ae23891780ecee53e0d3dfc4efc417",
+          "bytes": 4740
+        },
+        "implement.md": {
+          "sha256": "0c889453e9203615593c8ac42caee97a3d1654f04d8226941401dddd5ad04f36",
+          "bytes": 2118
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/09-09-codex-session-fallback-isolation",
+      "id": "codex-session-fallback-isolation",
+      "title": "Isolate Codex main-session active-task resolution",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "510d4817da58546bc19385dcd3c1324cfbd13d757035d0d593007677309001be",
+          "bytes": 736
+        },
+        "prd.md": {
+          "sha256": "ebb0196fd830ee7cff9a385c1cd61e6d985f3a4013de6523a97e8f7c9d728fe3",
+          "bytes": 2379
+        },
+        "design.md": {
+          "sha256": "0fc5a06313c8167fa3b465cb2523e19c0e6e4fcd9e1c90146d63fe292230ddbf",
+          "bytes": 817
+        },
+        "implement.md": {
+          "sha256": "5f41c7083391bef61f25e4b0c7fd95ede4213d9da40dd284591da15fe1f6ac90",
+          "bytes": 515
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/09-19-unbound-active-task-projection",
+      "id": "unbound-active-task-projection",
+      "title": "修复未绑定活动任务的工作流投影",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "d1a9546ee17554002e766fed5daba0bc149f7dc54c828528285d95f557ddff6a",
+          "bytes": 689
+        },
+        "prd.md": {
+          "sha256": "25ff118d13736a6d6da45c08bc6b8cd05d400693e93282f32a1eeeae4eb6af5d",
+          "bytes": 2556
+        },
+        "design.md": {
+          "sha256": "45b120f7bf918629db4e85ec4c253f365acf72d64dda718afa5074148a7916f6",
+          "bytes": 1732
+        },
+        "implement.md": {
+          "sha256": "d2916f6b0df798f1089c9277e99120a85db7e954f11465e9d3b85b98fe7f2255",
+          "bytes": 635
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/09-22-codex-decision-chain-replan",
+      "id": "codex-decision-chain-replan",
+      "title": "Codex planning and evidence governance",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "01704bdbeb0296eb1744eb47d19750474c1371ec5355fa98d81c08ee99af2a5d",
+          "bytes": 817
+        },
+        "prd.md": {
+          "sha256": "5c0304b4bbe75832726864e7d2e93514b2c00dd5153105555889378f694c997c",
+          "bytes": 4975
+        },
+        "design.md": {
+          "sha256": "fddd969f4ac5ad4002387f968701abc871fc4cc9616f4fdaebb96c5b5aee2005",
+          "bytes": 3340
+        },
+        "implement.md": {
+          "sha256": "643990ef76117dcffd589cff9bf8c590fa702ebb96e739ac492fdc83aeeb147c",
+          "bytes": 2184
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/09-22-decision-gates-replan-lifecycle",
+      "id": "decision-gates-replan-lifecycle",
+      "title": "Decision gates and replanning lifecycle",
+      "status": "in_progress",
+      "execution_class": null,
+      "delivery_mode": null,
+      "files": {
+        "task.json": {
+          "sha256": "c04b71040d7b3217e3ca2d3ece5456f0357de4a6bb003af01b1fa42035372512",
+          "bytes": 713
+        },
+        "prd.md": {
+          "sha256": "74f1c72ff796fdbbcc012ffe6c80f52bc69bcaa44bd4e0cd5e4b68dec8c55403",
+          "bytes": 2416
+        },
+        "design.md": {
+          "sha256": "1df2a19a041b997bf7d4ba743ac1dec0fd6997dd2cd987320ba57a3d9c133d7f",
+          "bytes": 1174
+        },
+        "implement.md": {
+          "sha256": "8f9bb4bc912081f9d4c122783afbab250487a65a7e3bb7d4682ce9b94265a8f6",
+          "bytes": 574
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/09-30-agentmemory-trellis-cutover",
+      "id": "agentmemory-trellis-cutover",
+      "title": "Trellis AgentMemory subnode hard-off 与消费者迁移",
+      "status": "in_progress",
+      "execution_class": "complex",
+      "delivery_mode": "change_bearing",
+      "files": {
+        "task.json": {
+          "sha256": "26130a76f8e23bad65ee1544104825d54de7678d6dd69f48354a7c6c40b83561",
+          "bytes": 1203
+        },
+        "prd.md": {
+          "sha256": "db3304330c08fb394c03d4ad3c4afaac45b9e758ebd93fafe7439d03c9d41e84",
+          "bytes": 2110
+        },
+        "design.md": {
+          "sha256": "01903daf1be8a7c8cecff933fba28d964759ce9c91aa537edfc248f9e90f6dae",
+          "bytes": 2263
+        },
+        "implement.md": {
+          "sha256": "d6e4779d5bdf55aa7a12aa76967c6021f41d24d446cf8beb84167cf64460f6b3",
+          "bytes": 2050
+        }
+      }
+    },
+    {
+      "path": "Trellis/.trellis/tasks/10-03-cognee-subnode-isolation",
+      "id": "cognee-subnode-isolation",
+      "title": "Cognee subnode memory isolation",
+      "status": "in_progress",
+      "execution_class": "complex",
+      "delivery_mode": "change_bearing",
+      "files": {
+        "task.json": {
+          "sha256": "debefdf9a843949df67073374856ab2704b1e29b0a2b4efc3c5869dd66d7c7e3",
+          "bytes": 1046
+        },
+        "prd.md": {
+          "sha256": "c4216496cba81467f835d909730f03c369eecd82d64729ab4dec11bc4b5b85ec",
+          "bytes": 1000
+        },
+        "design.md": {
+          "sha256": "ff5ec14d3e7a799667fd68c1e1e4408e39845fc141bd638aac6317b4a7e10f29",
+          "bytes": 642
+        },
+        "implement.md": {
+          "sha256": "5126631819263c05130f533706331a85a81238a1cdb49770b4ac42bf51f59edc",
+          "bytes": 1718
+        }
+      }
+    }
+  ]
+}

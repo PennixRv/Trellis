@@ -1,0 +1,373 @@
+{
+  "schema_version": 1,
+  "baseline": "01-pre-migration-baseline.json",
+  "scope": "冻结的 21 项 Trellis beta 活动任务；不含本任务 owner",
+  "tasks": [
+    {
+      "path": ".trellis/tasks/06-17-architecture-diagram",
+      "source_digests": {
+        "task.json": "f96d3e57ada90009d05bf2adb15a4ed936f6721a533fd4ec9de0de0d7e8a5efd",
+        "prd.md": "13aa4ce7f203f61d1481f7ade6e8155ffeabd6000eb6c60cb9be78baa86ca950",
+        "design.md": "21f6ceb83fd644f5b06f39cd87d7faaa4cba0360909313c9ee79f82ded26ec02",
+        "implement.md": "860deb29c19666fc4e204bc0fb5406e59efd617d1e58c99449905fd2aaa6686a"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "架构导航图、词汇表和生成流程需要多步骤设计；保留既有执行状态。"
+    },
+    {
+      "path": ".trellis/tasks/06-17-benchmark-showcase",
+      "source_digests": {
+        "task.json": "16de6d902534e5d96c3a15d4379fb6638bde0c0c64c32a35bc72fddb752aa4dd",
+        "prd.md": "6e78dc535525d8637e02ecfd8ab73b51039daf3182d5c57fb714fddc9b8f9613",
+        "design.md": "dcebe935902ddacb4cf07b5f0f71e636df22bed888f1eed31b99b17752f6df80",
+        "implement.md": "493e5dcae4bc14856832021e7a2fa20365e0d9e072988ab8513c1834df6f39a2"
+      },
+      "source_status": "planning",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": "intake"
+      },
+      "disposition": "planning_intake",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "PRD、设计及实施材料要求构建内部 benchmark harness；预算、模型和隔离方案尚需决策，从 intake 接入。"
+    },
+    {
+      "path": ".trellis/tasks/07-23-codex-inline-default-agent-model",
+      "source_digests": {
+        "task.json": "d0f8baa130c7440e2f232db5691e9324928a3a304f30b46210002d7482fe8f85",
+        "prd.md": "6c3b6fca07d5df73d6e1013648b7c85c1ebfbf81fd6ff6f903a302bb3b9f172a"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "配置默认值、模型键持久化和更新行为共同变化；按 planned 保留既有执行，不推定 direct 资格。"
+    },
+    {
+      "path": ".trellis/tasks/07-23-per-task-workflow",
+      "source_digests": {
+        "task.json": "3610747b4456065cd234f4811039a4ef2172f147d06b82a81932cefc831a1c7b",
+        "prd.md": "104f0f658e7b124fd8ba119bf2a0a37730b25bb6a6d1b854d88dd41d611d930e",
+        "design.md": "c46c418c96bde5100479df4129b833668c564640c9acc2dbfdcccf8a8d9d8063",
+        "implement.md": "db1dc9d49aab1dc7115028734402b284b9cd947d1940f9ca4eaf0a95cbde76f7"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "工作流选择跨 task、运行时消费者和 CLI；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/07-23-spec-on-demand-injection",
+      "source_digests": {
+        "task.json": "5c623fcdd7bfaa083d8b6e24c962bd71c03a2a7719b78386f7687443dc4f5ab2",
+        "prd.md": "98c8a89ba61003d21ca75aa942216b46ba29fa3196824a0f0afb6a915618edc7",
+        "design.md": "b9a654a71027b450a105c6f03d7b0ee90fc2e514d9a8a88c0970b387a5281ab8",
+        "implement.md": "e4b4fd82c1e1cf922a24dbf9f651b626760e32c0a0b4ecd84b9d1996eee9b777"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "按路径注入涉及多平台、Hook 和历史版本合同；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/07-24-workflow-config-default",
+      "source_digests": {
+        "task.json": "3bbb72bf138cabddb217a24caddcdf08fac30ade71c661f77aa302012ff76c3e",
+        "prd.md": "ef657c1ca6e9c256e94878842bb3d291fdec9d9da85e66ac8f3d6c1c04b99574",
+        "design.md": "622194588f162ff6fef36c85a5b35c54a24afb736cd011d31afcd7211fcd7775",
+        "implement.md": "e4be60da55988db3a3d2b37cb9f1ce9c6c1f3f5832cb9a3a5478b539393d657c"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "团队、个人和 task 默认值有分层优先级；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/08-05-opencode-shell-env",
+      "source_digests": {
+        "task.json": "519b06483643ec2887360e43e4ff8c8b955bf2d004509af91f0bb977053198fd",
+        "prd.md": "cc0506f3bc3372759fe928ffc5c47a7460ca527108bd62078c3374ce6d6e2769"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "PRD 已记录 ABANDONED 结果；本次只迁移 metadata，保留其原有 in_progress，不借迁移宣称完成或重启。"
+    },
+    {
+      "path": ".trellis/tasks/08-05-purge-fake-env-names",
+      "source_digests": {
+        "task.json": "19bfedbced36aa30cef0adffd9a310e5dace1ea13c017ea646070223fb5dfb84",
+        "prd.md": "e4f1421b61c324d609d30310c99c8b5d0bfecbeb776c793f0736fe6b77c2ce0b"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "多个平台环境变量和兼容性分组需统一校验；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/08-05-session-identity-hardening",
+      "source_digests": {
+        "task.json": "90495bf325f9aa6d95f54d943dbd41f320dc54e9386db208854b91d0cb890732",
+        "prd.md": "960d9c02c7c50d5a169ee32b64df2fcac03d471a676ff891e99323489199e7d8"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "多项身份硬化与双份源码漂移防护需要组合验证；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/08-05-session-identity-propagation",
+      "source_digests": {
+        "task.json": "c03f7a45740a216e87e00760dc1182bd2b46d403139015aedb0d0fb5a691d4ef",
+        "prd.md": "efdcc8143b47617bf0890280413a7b5ae4e21fb373a3e84404e3fc51395ee2a0"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "analysis_only",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "PRD 明确只交付各平台身份传播矩阵与建议，不实施修复；分类为 analysis_only，同时保留历史 in_progress 且不伪造来源阶段。"
+    },
+    {
+      "path": ".trellis/tasks/08-05-shell-ticket-bridge",
+      "source_digests": {
+        "task.json": "ac11f92eb9e8022701f53a55c1617c9c4f860190137c13e2938f555f56b3d02a",
+        "prd.md": "588be1a693144d5f6dbf1289b6c6ac4d572d6c8a0466eca3d58ada7fd850d0a0",
+        "design.md": "4b894114be5422ad51bfdd96515599f59c32bbf2e05c1db62f496236c773a53f",
+        "implement.md": "5cc7b250298b93e0ed0c8451a402b196918f86bc849c73c1c333aa6f4a35f0e5"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "七个平台共享 shell ticket bridge，涉及运行时身份与回退；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/08-06-converge-platform-templates",
+      "source_digests": {
+        "task.json": "5fd3a49df99bfc1641d197761b5da36cf58b3c475641c37afe34872da2dc6681",
+        "prd.md": "96a69d6852555c4d00eb44760f1f012ba2cbfc08d083be47bdf0f18e35ad0e23",
+        "design.md": "e1098fd8e9cc2b91aa95c39bf8f2de08973667bf55405978776549941f3b7460",
+        "implement.md": "6b7dcf791b571cdad84a09fd53c9008eae2c9181f24bc0a81d2088ebb8f6c9ba"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "跨平台模板收集的单一来源迁移；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/08-06-mem-full-recall",
+      "source_digests": {
+        "task.json": "2731091ed56d08347bbec4ab782cb8f3da2a9fac5cf0736228b237a7f34478de",
+        "prd.md": "35caf32c3080ab885c75cf8db8c45ca5ffddb24d9c8a6f01bc4c5d2592631000",
+        "design.md": "a1e7665963619fbd87c3e467aab5d53b04486b97520c9b33e72d97d912f10056",
+        "implement.md": "54b871cdc87c0afef06b88c2bb76f1f4a8ffd14545a799ad1a6f4f22c9c78255"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "压缩历史恢复、多代理用户消息与 Grok adapter 三项关联修改；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/08-06-purge-stale-references",
+      "source_digests": {
+        "task.json": "983fbf4073e94c40c7c9f596cf32a6aa9406e694a1edc93a9528c89f5e3038f8",
+        "prd.md": "333f7c76ad2daf14e5b773d3d18d5475f0d9514a5eef292ebaf0677481ae139f"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "多个已发布 Skill、Hook 与仓内引用的同步治理；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/09-07-subnode-workflow-managed-assets",
+      "source_digests": {
+        "task.json": "a16e3507fd0b4bfe36e226962de798adb3248134977c9a41185ff5accf2a6ef9",
+        "prd.md": "ee803fb36fc8ad64d6af5f09471a1aba46d3547ea6d47b5a019492fde867081a",
+        "design.md": "4e8b3c75e118e1645f374e28d7ba49f081ae23891780ecee53e0d3dfc4efc417",
+        "implement.md": "0c889453e9203615593c8ac42caee97a3d1654f04d8226941401dddd5ad04f36"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "受管理 subnode 资产、脚本及 Channel 屏障跨组件落地；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/09-09-codex-session-fallback-isolation",
+      "source_digests": {
+        "task.json": "510d4817da58546bc19385dcd3c1324cfbd13d757035d0d593007677309001be",
+        "prd.md": "ebb0196fd830ee7cff9a385c1cd61e6d985f3a4013de6523a97e8f7c9d728fe3",
+        "design.md": "0fc5a06313c8167fa3b465cb2523e19c0e6e4fcd9e1c90146d63fe292230ddbf",
+        "implement.md": "5f41c7083391bef61f25e4b0c7fd95ede4213d9da40dd284591da15fe1f6ac90"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "主会话身份隔离与独立 checkout 回归；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/09-19-unbound-active-task-projection",
+      "source_digests": {
+        "task.json": "d1a9546ee17554002e766fed5daba0bc149f7dc54c828528285d95f557ddff6a",
+        "prd.md": "25ff118d13736a6d6da45c08bc6b8cd05d400693e93282f32a1eeeae4eb6af5d",
+        "design.md": "45b120f7bf918629db4e85ec4c253f365acf72d64dda718afa5074148a7916f6",
+        "implement.md": "d2916f6b0df798f1089c9277e99120a85db7e954f11465e9d3b85b98fe7f2255"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "任务投影涉及 Python、Hook 与 OpenCode 对齐；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/09-22-codex-decision-chain-replan",
+      "source_digests": {
+        "task.json": "01704bdbeb0296eb1744eb47d19750474c1371ec5355fa98d81c08ee99af2a5d",
+        "prd.md": "5c0304b4bbe75832726864e7d2e93514b2c00dd5153105555889378f694c997c",
+        "design.md": "fddd969f4ac5ad4002387f968701abc871fc4cc9616f4fdaebb96c5b5aee2005",
+        "implement.md": "643990ef76117dcffd589cff9bf8c590fa702ebb96e739ac492fdc83aeeb147c"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "决策、封口、replan 和证据治理跨层合同；旧 planning_seal 文本仅保留为历史注释，不转成新批准。"
+    },
+    {
+      "path": ".trellis/tasks/09-22-decision-gates-replan-lifecycle",
+      "source_digests": {
+        "task.json": "c04b71040d7b3217e3ca2d3ece5456f0357de4a6bb003af01b1fa42035372512",
+        "prd.md": "74f1c72ff796fdbbcc012ffe6c80f52bc69bcaa44bd4e0cd5e4b68dec8c55403",
+        "design.md": "1df2a19a041b997bf7d4ba743ac1dec0fd6997dd2cd987320ba57a3d9c133d7f",
+        "implement.md": "8f9bb4bc912081f9d4c122783afbab250487a65a7e3bb7d4682ce9b94265a8f6"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "决策入口与原生 replan 生命周期联动；按 planned 保留既有执行。"
+    },
+    {
+      "path": ".trellis/tasks/09-30-agentmemory-trellis-cutover",
+      "source_digests": {
+        "task.json": "26130a76f8e23bad65ee1544104825d54de7678d6dd69f48354a7c6c40b83561",
+        "prd.md": "db3304330c08fb394c03d4ad3c4afaac45b9e758ebd93fafe7439d03c9d41e84",
+        "design.md": "01903daf1be8a7c8cecff933fba28d964759ce9c91aa537edfc248f9e90f6dae",
+        "implement.md": "d6e4779d5bdf55aa7a12aa76967c6021f41d24d446cf8beb84167cf64460f6b3"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "complex 旧分类迁为 planned；原审批注释原样保留，不将其当成当前 revision 的 seal/approval。"
+    },
+    {
+      "path": ".trellis/tasks/10-03-cognee-subnode-isolation",
+      "source_digests": {
+        "task.json": "debefdf9a843949df67073374856ab2704b1e29b0a2b4efc3c5869dd66d7c7e3",
+        "prd.md": "c4216496cba81467f835d909730f03c369eecd82d64729ab4dec11bc4b5b85ec",
+        "design.md": "ff5ec14d3e7a799667fd68c1e1e4408e39845fc141bd638aac6317b4a7e10f29",
+        "implement.md": "5126631819263c05130f533706331a85a81238a1cdb49770b4ac42bf51f59edc"
+      },
+      "source_status": "in_progress",
+      "target": {
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "stage": null
+      },
+      "disposition": "legacy_in_progress",
+      "approval_review": "没有符合新合同的 revision/digest seal 或 approval；保留旧字段，不生成新批准。",
+      "reason": "complex 旧分类迁为 planned；子会话隔离与模板跨层变更，保留旧执行和审批事实。"
+    }
+  ]
+}

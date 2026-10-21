@@ -165,7 +165,7 @@ describe("resolvePlaceholders", () => {
     });
 
     it("leaves other placeholders untouched when no context", () => {
-      const input = "See {{CMD_REF:brainstorm}} and {{EXECUTOR_AI}}";
+      const input = "See {{CMD_REF:idea-to-closed-plan}} and {{EXECUTOR_AI}}";
       expect(resolvePlaceholders(input)).toBe(input);
     });
   });
@@ -177,10 +177,10 @@ describe("resolvePlaceholders", () => {
   describe("{{CMD_REF:name}}", () => {
     it("resolves with /trellis: prefix (Claude)", () => {
       const result = resolvePlaceholders(
-        "See {{CMD_REF:brainstorm}} for details",
+        "See {{CMD_REF:idea-to-closed-plan}} for details",
         claudeCtx,
       );
-      expect(result).toBe("See /trellis:brainstorm for details");
+      expect(result).toBe("See /trellis:idea-to-closed-plan for details");
     });
 
     it("resolves with $ prefix (Codex)", () => {
@@ -201,9 +201,9 @@ describe("resolvePlaceholders", () => {
 
     it("handles multiple CMD_REF in one template", () => {
       const input =
-        "{{CMD_REF:start}} then {{CMD_REF:brainstorm}} then {{CMD_REF:check}}";
+        "{{CMD_REF:start}} then {{CMD_REF:idea-to-closed-plan}} then {{CMD_REF:check}}";
       expect(resolvePlaceholders(input, claudeCtx)).toBe(
-        "/trellis:start then /trellis:brainstorm then /trellis:check",
+        "/trellis:start then /trellis:idea-to-closed-plan then /trellis:check",
       );
     });
 
@@ -439,11 +439,11 @@ describe("resolvePlaceholders", () => {
 describe("resolvePlaceholdersNeutral", () => {
   it("renders {{CMD_REF:name}} as `name` (Trellis command) — platform-neutral", () => {
     expect(
-      resolvePlaceholdersNeutral("See {{CMD_REF:brainstorm}}", claudeCtx),
-    ).toBe("See `brainstorm` (Trellis command)");
+      resolvePlaceholdersNeutral("See {{CMD_REF:idea-to-closed-plan}}", claudeCtx),
+    ).toBe("See `idea-to-closed-plan` (Trellis command)");
     expect(
-      resolvePlaceholdersNeutral("See {{CMD_REF:brainstorm}}", codexCtx),
-    ).toBe("See `brainstorm` (Trellis command)");
+      resolvePlaceholdersNeutral("See {{CMD_REF:idea-to-closed-plan}}", codexCtx),
+    ).toBe("See `idea-to-closed-plan` (Trellis command)");
   });
 
   it("produces byte-identical CMD_REF output across platforms", () => {
@@ -503,7 +503,7 @@ describe("resolvePlaceholdersNeutral", () => {
   });
 
   it("returns content unchanged when no context is provided (legacy parity)", () => {
-    const input = "See {{CMD_REF:brainstorm}}";
+    const input = "See {{CMD_REF:idea-to-closed-plan}}";
     expect(resolvePlaceholdersNeutral(input)).toBe(input);
   });
 
@@ -535,7 +535,7 @@ describe("resolveSkillsNeutral / resolveAllAsSkillsNeutral", () => {
     const neutral = resolveSkillsNeutral(AI_TOOLS.codex.templateContext);
     const cmdRefNames = [
       "start",
-      "brainstorm",
+      "idea-to-closed-plan",
       "check",
       "break-loop",
       "update-spec",

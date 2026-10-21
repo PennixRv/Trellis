@@ -49,7 +49,7 @@ If the user wants only one platform to avoid sub-agents, first confirm whether t
 
 | `status` | Artifact state | Resume at |
 | --- | --- | --- |
-| `planning` | `prd.md` missing | Phase 1.1 (load `trellis-brainstorm`) |
+| `planning` | any planning artifact state | Read `meta.planning.stage`; load `trellis-idea-to-closed-plan` and resume that stage |
 | `planning` | lightweight task with `prd.md` complete | present final plan, ask to seal and approve proceeding or supplement/revise, then native seal/approve/start; reuse sufficient authorization |
 | `planning` | complex task missing `design.md` or `implement.md` | complete missing planning artifacts |
 | `planning` | complex task has `prd.md`, `design.md`, and `implement.md` | present final plan, ask to seal and approve proceeding or supplement/revise, then native seal/approve/start; reuse sufficient authorization |

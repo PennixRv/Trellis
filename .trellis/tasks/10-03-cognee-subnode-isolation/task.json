@@ -24,9 +24,12 @@
   "notes": "",
   "meta": {
     "delivery_mode": "change_bearing",
-    "execution_class": "complex",
+    "execution_class": "planned",
     "work_domain": "workflow_governance",
     "decision_frontier": "multiple",
-    "approval_mode": "implementation_authorized"
+    "approval_mode": "implementation_authorized",
+    "planning": {
+      "revision": 1
+    }
   }
 }

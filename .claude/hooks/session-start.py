@@ -450,6 +450,11 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
 
     task_title = task_data.get("title", task_ref)
     task_status = task_data.get("status", "unknown")
+    from common.task_planning import PlanningError, planning_record
+    try:
+        stage = planning_record(task_data).get("stage") or "unknown (legacy task)"
+    except PlanningError as exc:
+        return f"Status: TASK_ERROR\nTask: {task_ref}\nNext-Action: Repair the existing planning record: {exc}"
     artifact_names = ("prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl")
     present = [name for name in artifact_names if (task_dir / name).is_file()]
     if (task_dir / "research").is_dir():
@@ -463,9 +468,6 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             "Next-Action: Run `/trellis:finish-work`. If the working tree is dirty, return to Phase 3.4 first."
         )
 
-    has_prd = (task_dir / "prd.md").is_file()
-    has_design = (task_dir / "design.md").is_file()
-    has_implement_plan = (task_dir / "implement.md").is_file()
     implement_jsonl = task_dir / "implement.jsonl"
     check_jsonl = task_dir / "check.jsonl"
     jsonl_ready = (
@@ -473,39 +475,23 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
         and (not check_jsonl.is_file() or _has_curated_jsonl_entry(check_jsonl))
     )
 
-    if task_status == "planning" and not has_prd:
-        return (
-            f"Status: PLANNING\nTask: {task_title}\n"
-            f"Present: {present_line}\n"
-            "Next-Action: Load `trellis-brainstorm` and write `prd.md`. Stay in planning."
-        )
-
     if task_status == "planning":
-        missing_complex = [
-            name for name, exists in (
-                ("design.md", has_design),
-                ("implement.md", has_implement_plan),
-            )
-            if not exists
+        next_bits = [
+            "Load `trellis-idea-to-closed-plan` and resume the recorded planning stage; "
+            "artifact presence does not establish readiness"
         ]
-        next_bits: list[str] = []
-        if missing_complex:
-            next_bits.append(
-                "Lightweight task can request start review with PRD-only; "
-                f"complex task must add {', '.join(missing_complex)} before start"
-            )
-        else:
-            next_bits.append("Planning artifacts are present; ask for review before `task.py start`")
         if not jsonl_ready:
             next_bits.append("curate `implement.jsonl` and `check.jsonl` before sub-agent mode start")
         return (
             f"Status: PLANNING\nTask: {task_title}\n"
+            f"Stage: {stage}\n"
             f"Present: {present_line}\n"
             f"Next-Action: {'; '.join(next_bits)}. Do not enter implementation until the user confirms start."
         )
 
     return (
         f"Status: {str(task_status).upper()}\nTask: {task_title}\n"
+        f"Stage: {stage}\n"
         f"Present: {present_line}\n"
         "Next-Action: Follow the matching per-turn workflow-state. "
         "Implementation/check context order is jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if present`."

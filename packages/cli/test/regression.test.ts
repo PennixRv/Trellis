@@ -75,6 +75,30 @@ afterEach(() => {
   clearManifestCache();
 });
 
+function prepareDirectTaskFixture(cwd: string, task: string): void {
+  const py = process.platform === "win32" ? "python" : "python3";
+  const taskPath = path.join(cwd, ".trellis", "tasks", task, "task.json");
+  const data = JSON.parse(fs.readFileSync(taskPath, "utf-8"));
+  data.assignee = "test-dev";
+  fs.writeFileSync(taskPath, JSON.stringify(data, null, 2));
+  fs.writeFileSync(
+    path.join(cwd, ".trellis", "tasks", task, "prd.md"),
+    "# Direct fixture\n\n## Scope\nOne fixture change owned by test-dev.\n\n## Verification\nRun the regression assertion.\n\n## Rollback\nDelete the temporary fixture.\n",
+  );
+  for (const args of [
+    ["set-meta", task, "execution_class", "direct"],
+    ["set-meta", task, "delivery_mode", "change_bearing"],
+    ["plan", "advance", task, "--to", "evidence"],
+    ["plan", "advance", task, "--to", "direct_ready"],
+  ]) {
+    const result = spawnSync(py, [".trellis/scripts/task.py", ...args], {
+      cwd,
+      encoding: "utf-8",
+    });
+    expect(result.status, result.stderr).toBe(0);
+  }
+}
+
 // =============================================================================
 // 1. Windows / Encoding Regressions
 // =============================================================================
@@ -962,7 +986,7 @@ describe("regression: task lifecycle overwrite and collision safety", () => {
     ).toBe(0);
     const dirName = `${datePrefix}-kid`;
 
-    const r = runTask("archive", dirName, "--no-commit");
+    const r = runTask("archive", dirName, "--no-commit", "--reason", "Abandon fixture");
     expect(r.status, r.stderr).toBe(0);
     expect(fs.existsSync(taskDir(dirName))).toBe(false);
     expect(
@@ -1417,7 +1441,7 @@ describe("regression: JSON read/write failure reporting", () => {
 
       fs.chmodSync(taskDir(childName), 0o555);
       try {
-        const r = runTask(["archive", parentName, "--no-commit"]);
+        const r = runTask(["archive", parentName, "--no-commit", "--reason", "Abandon fixture"]);
         expect(r.status).not.toBe(0);
         expect(r.stderr).toContain("Failed to write");
         expect(r.stderr).toContain(childName);
@@ -1476,7 +1500,7 @@ describe("regression: JSON read/write failure reporting", () => {
       fs.chmodSync(taskDir(failingChild), 0o555);
       fs.chmodSync(taskJsonPath(failingChild), 0o444);
       try {
-        const r = runTask(["archive", parentName, "--no-commit"]);
+        const r = runTask(["archive", parentName, "--no-commit", "--reason", "Abandon fixture"]);
         expect(r.status).not.toBe(0);
         expect(r.stderr).toContain("Failed to write");
         expect(r.stderr).toContain(failingChild);
@@ -1702,6 +1726,7 @@ describe("regression: JSON read/write failure reporting", () => {
           runTask(["set-meta", name, "delivery_mode", "change_bearing"], env)
             .status,
         ).toBe(0);
+        prepareDirectTaskFixture(tmpDir, name);
       }
       expect(runTask(["start", `${datePrefix}-one`], env).status).toBe(0);
 
@@ -3061,6 +3086,7 @@ describe("regression: current-task path normalization", () => {
     const taskJson = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8"));
     taskJson.status = "planning";
     fs.writeFileSync(taskJsonPath, JSON.stringify(taskJson, null, 2), "utf-8");
+    prepareDirectTaskFixture(tmpDir, "issue-106");
 
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const output = execSync(
@@ -3358,6 +3384,7 @@ describe("regression: current-task path normalization", () => {
       status: string;
     };
     expect(beforeStart.status).toBe("planning");
+    prepareDirectTaskFixture(tmpDir, taskDir as string);
 
     // Now run start with the same session — must not error.
     let startStatus = 0;
@@ -3492,7 +3519,7 @@ describe("regression: current-task path normalization", () => {
     fs.writeFileSync(path.join(activeTaskDir, "prd.md"), "# PRD\n", "utf-8");
 
     execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} archive ${JSON.stringify(taskDirName)} --no-commit`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} archive ${JSON.stringify(taskDirName)} --no-commit --reason "Abandon fixture"`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -6311,6 +6338,33 @@ print(json.dumps({
     }
   });
 
+  it.each<[string, string, string | undefined]>([
+    ["shared", ".claude/hooks/session-start.py", claudeSessionStart],
+    ["codex", ".codex/hooks/session-start.py", codexSessionStart],
+    ["copilot", ".github/copilot/hooks/session-start.py", copilotSessionStart],
+  ])("SessionStart %s resumes the native stage despite complete artifacts", (_platform, hookPath, source) => {
+    setupTaskRepo();
+    writeProjectFile(hookPath, expectTemplateContent(source, "session-start"));
+    writeProjectFile(".trellis/tasks/issue-106/design.md", "# Design\n");
+    writeProjectFile(".trellis/tasks/issue-106/implement.md", "# Implementation\n");
+    writeSessionContext("codex_stage-probe", ".trellis/tasks/issue-106");
+    for (const stage of ["evidence", "user_review", "plan_closed"]) {
+      const taskPath = path.join(tmpDir, ".trellis/tasks/issue-106/task.json");
+      const task = JSON.parse(fs.readFileSync(taskPath, "utf-8"));
+      task.status = "planning";
+      task.meta = { execution_class: "planned", delivery_mode: "change_bearing", planning: { revision: 1, stage } };
+      fs.writeFileSync(taskPath, JSON.stringify(task));
+      const before = fs.readFileSync(taskPath, "utf-8");
+      const payload = JSON.parse(runPython(hookPath, JSON.stringify({ cwd: tmpDir }), { TRELLIS_CONTEXT_ID: "codex_stage-probe" }));
+      const context = payload.hookSpecificOutput.additionalContext;
+      expect(context).toContain(`Stage: ${stage}`);
+      expect(context).toContain("trellis-idea-to-closed-plan");
+      expect(context).not.toContain("Lightweight task can");
+      expect(context).not.toContain("Planning artifacts are present; ask for review");
+      expect(fs.readFileSync(taskPath, "utf-8")).toBe(before);
+    }
+  });
+
   it("[#240] Codex SessionStart output uses compact context without generic sub-agent notice", () => {
     setupTaskRepo();
     writeProjectFile(
@@ -7207,11 +7261,11 @@ print(json.dumps({
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     // Post-R5: breadcrumb body is read exclusively from workflow.md tag
     // blocks. Provide a minimal no_task tag so the test can assert the
-    // routing to trellis-brainstorm content surfaces.
+    // routing to the canonical closed-plan skill.
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
       "[workflow-state:no_task]\n" +
-        "No active task. Load `trellis-brainstorm` skill to start.\n" +
+        "No active task. Load `trellis-idea-to-closed-plan` skill to start.\n" +
         "[/workflow-state:no_task]\n",
     );
     writeLegacyCurrentTask(".trellis/tasks/issue-106");
@@ -7226,7 +7280,7 @@ print(json.dumps({
       "Status: no_task",
     );
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
-      "trellis-brainstorm",
+      "trellis-idea-to-closed-plan",
     );
   });
 
@@ -8231,10 +8285,10 @@ print(len(entries))
       "无论复杂度或跨 owner 范围如何，都完成有界证据工作",
     );
     expect(body).toContain(
-      "对于 change-bearing 工作，轻量任务可以使用 `prd.md`",
+      "对于 planned/change-bearing 工作，依唯一规划入口形成完整方案及详细有序步骤和唯一停止点",
     );
     expect(body).toContain(
-      "复杂任务在最终复核前需要 `design.md` 和 `implement.md`",
+      "direct 按 direct_ready 合同处理",
     );
     expect(body).toContain("先展示方案，再征询“封口并批准推进”或“补充／修改方案”");
     expect(body).toContain("明确合并授权后才原生 seal/approve/start");
@@ -8243,7 +8297,7 @@ print(len(entries))
     );
   });
 
-  it("[#292] workflow and brainstorm templates treat seed-only jsonl as not planning-ready", () => {
+  it("[#292] workflow and planning skill treat seed-only jsonl as not planning-ready", () => {
     const wf = templateWorkflowMd();
     expect(wf).not.toContain("seed-only manifests are tolerated by consumers");
     expect(wf).not.toContain(
@@ -8265,53 +8319,30 @@ print(len(entries))
       "src",
       "templates",
     );
-    const brainstormFiles = [
-      "common/skills/brainstorm.md",
-      "copilot/prompts/brainstorm.prompt.md",
-    ];
-
-    for (const relativePath of brainstormFiles) {
-      const content = fs.readFileSync(
-        path.join(templateRoot, relativePath),
-        "utf-8",
-      );
-      expect(content, relativePath).toContain(
-        "`implement.jsonl` and `check.jsonl` must each contain at least one real spec/research entry before `task.py start`",
-      );
-    }
+    const planningSkill = fs.readFileSync(
+      path.join(templateRoot, "common/skills/idea-to-closed-plan.md"),
+      "utf-8",
+    );
+    expect(planningSkill).toContain(
+      "`implement.jsonl` and `check.jsonl` must each contain at least one real spec or research entry",
+    );
+    expect(planningSkill).toContain("seed-only `_example` rows");
   });
 
-  it("[#320] brainstorm templates require lossless PRD convergence before start", () => {
+  it("[#320] planning skill requires lossless PRD convergence before start", () => {
     const templateRoot = path.join(
       path.dirname(fileURLToPath(import.meta.url)),
       "..",
       "src",
       "templates",
     );
-    const brainstormFiles = [
-      "common/skills/brainstorm.md",
-      "copilot/prompts/brainstorm.prompt.md",
-    ];
-
-    for (const relativePath of brainstormFiles) {
-      const content = fs.readFileSync(
-        path.join(templateRoot, relativePath),
-        "utf-8",
-      );
-      expect(content, relativePath).toContain(
-        "run the requirement convergence and PRD passes",
-      );
-      expect(content, relativePath).toContain("## PRD Convergence Pass");
-      expect(content, relativePath).toContain(
-        "Fold temporary brainstorm sections such as `What I already know`, `Assumptions`, and resolved `Open Questions`",
-      );
-      expect(content, relativePath).toContain(
-        "Preserve every file:line anchor, decision, constraint, requirement ID, and acceptance-criteria mapping.",
-      );
-      expect(content, relativePath).toContain(
-        "After the pass, read `prd.md` top to bottom and verify that no fact is repeated across sections",
-      );
-    }
+    const planningSkill = fs.readFileSync(
+      path.join(templateRoot, "common/skills/idea-to-closed-plan.md"),
+      "utf-8",
+    );
+    expect(planningSkill).toContain("Before final review, rewrite `prd.md`");
+    expect(planningSkill).toContain("Keep it lossless");
+    expect(planningSkill).toContain("read the PRD top to bottom");
   });
 
   it("[workflow-state-r3-no_task] template workflow.md [workflow-state:no_task] block is present and well-formed", () => {
@@ -9438,6 +9469,7 @@ print(len(entries))
       branch: null,
       base_branch: "main",
     });
+    prepareDirectTaskFixture(tmpDir, "issue-106");
 
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const result = spawnSync(
@@ -9491,6 +9523,7 @@ print(len(entries))
       branch: null,
       base_branch: "main",
     });
+    prepareDirectTaskFixture(tmpDir, "issue-106");
 
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const result = spawnSync(
@@ -12923,7 +12956,7 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
 
   it("[task-rename] refuses to rename an archived task", () => {
     const target = create("target");
-    expect(runTask("archive", target, "--no-commit").status).toBe(0);
+    expect(runTask("archive", target, "--no-commit", "--reason", "Abandon fixture").status).toBe(0);
 
     const r = runTask(
       "rename",
@@ -13083,6 +13116,7 @@ describe("regression: a linked worktree inherits developer identity", () => {
       ["inherited", "main-dev"],
     ]);
 
+    prepareDirectTaskFixture(worktreeDir, `${datePrefix}-inherited`);
     const started = runTask(worktreeDir, ["start", `${datePrefix}-inherited`]);
     expect(started.status, started.stderr).toBe(0);
 

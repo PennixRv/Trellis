@@ -22,5 +22,11 @@
   "parent": "08-05-session-identity-propagation",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1
+    }
+  }
 }

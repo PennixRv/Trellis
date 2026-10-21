@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cli/backend/workflow-state-contract.md", "reason": "Verify lifecycle state writers and persisted event contracts"}
+{"file": ".trellis/spec/cli/backend/release-process.md", "reason": "Verify cross-branch submodule coordination and clean checkout"}
+{"file": ".trellis/spec/cli/backend/commands-workflow.md", "reason": "Verify workflow source, hashes and caller compatibility"}
+{"file": ".trellis/spec/cli/unit-test/integration-patterns.md", "reason": "Verify command-level integration tests"}

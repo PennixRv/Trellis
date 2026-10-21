@@ -40,8 +40,7 @@ Index files list the specific guideline docs to read when you actually start cod
 ## Step 4: Decide next action
 From Step 1 you know the current task and status. Check the task directory:
 
-- **Active task status `planning` + no `prd.md`** → Phase 1.1. Load the `trellis-brainstorm` skill.
-- **Active task status `planning` + `prd.md` exists** → stay in Phase 1. Lightweight tasks can be PRD-only; complex tasks need `design.md` + `implement.md`. Load the relevant Phase 1 step detail before `task.py start`.
+- **Active task status `planning`** → read `meta.planning.stage` through `task.py current --json`, then load `trellis-idea-to-closed-plan` and resume that exact stage. Do not infer planning state from whether `prd.md` exists.
 - **Active task status `in_progress`** → Phase 2 step 2.1. Load the step detail:
   ```bash
   {{PYTHON_CMD}} ./.trellis/scripts/get_context.py --mode phase --step 2.1 --platform {{CLI_FLAG}}
@@ -54,7 +53,7 @@ From Step 1 you know the current task and status. Check the task directory:
 
 | User intent | Skill |
 |---|---|
-| New feature / unclear requirements | `trellis-brainstorm` |
+| New task, planning, or major change to an active task | `trellis-idea-to-closed-plan` |
 | About to write code | `trellis-before-dev` |
 | Done coding / quality check | `trellis-check` |
 | Stuck / fixed same bug multiple times | `trellis-break-loop` |

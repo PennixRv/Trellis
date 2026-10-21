@@ -25,9 +25,12 @@
   "meta": {
     "root_coordinator_task": "09-30-agentmemory-hard-cutover",
     "delivery_mode": "change_bearing",
-    "execution_class": "complex",
+    "execution_class": "planned",
     "approval_mode": "awaiting_implementation_start",
     "planning_seal": "closed",
-    "planning_contract": "2026-10-01-agentmemory-native-plugin-mcp"
+    "planning_contract": "2026-10-01-agentmemory-native-plugin-mcp",
+    "planning": {
+      "revision": 1
+    }
   }
 }

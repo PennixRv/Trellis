@@ -56,7 +56,7 @@ Run only when the phase or routing rule is missing; otherwise reuse it.
 `get_context.py` shows the active task's `status` field. Route by `status` + artifact presence. This command replaces the user needing to remember the Trellis flow; it does not itself approve implementation.
 
 - `status=planning` + `task.json.meta.delivery_mode = "analysis_only"` → verify the PRD's bounded evidence deliverable and protected-target no-change boundary, then complete the evidence and archive directly regardless of complexity or cross-owner scope. Do not run `task.py start`; a protected-target change requires a separate change-bearing task.
-- `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
+- `status=planning` + no `prd.md` → load `trellis-idea-to-closed-plan` and resume at the recorded stage
 - `status=planning` + a recorded `decision-needed` or unsealed decision chain → return to `pennix-decision-grill` only for a change-bearing decision or a user-owned choice that materially defines the requested research scope or method; research recommendations and open product choices alone do not trigger the gate.
 - `status=in_progress` + a material unresolved decision → record the reason and run `task.py replan <task> "<reason>"`; do not ask a native question during implementation.
 - `status=planning` + `prd.md` only → decide whether the task is lightweight or complex. Lightweight can move to **1.4** review; complex returns to **1.1** to add `design.md` + `implement.md`.

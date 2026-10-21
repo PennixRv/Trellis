@@ -681,7 +681,7 @@ Trellis is a workflow layer over Claude Code / Cursor / etc. that keeps AI
 agents consistent with project-specific conventions instead of writing generic
 code every session.
 
-- **Three phases**: Plan (brainstorm → \`prd.md\`) → Execute (code + check) →
+- **Three phases**: Plan (intake → evidence → decisions → closed plan) → Execute (code + check) →
   Finish (capture + wrap). Full reference: \`.trellis/workflow.md\`.
 - **Task lifecycle**: planning → in_progress → done → archive, under
   \`.trellis/tasks/\`.
@@ -699,7 +699,7 @@ code every session.
 - **\`<workflow-state>\` tag** is auto-injected with every user message,
   carrying the current task + phase hint.
 - **\`/trellis:continue\`** loads the Phase Index, reads \`prd.md\` + recent
-  activity, and routes to the right skill (\`trellis-brainstorm\` for planning,
+  activity, and routes to the right skill (\`trellis-idea-to-closed-plan\` for planning,
   \`trellis-implement\` for coding, \`trellis-check\` for verification).
 - **\`trellis-implement\` sub-agent** is spawned when code needs to be written.
   The platform hook reads \`{TASK_DIR}/implement.jsonl\` and auto-injects those

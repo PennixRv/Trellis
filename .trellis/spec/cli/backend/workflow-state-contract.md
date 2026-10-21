@@ -398,16 +398,49 @@ before a live-task switch; select does not mirror supervisor state. The Hook
 uses the selected task's existing status. Codex inline bans native implement/
 check subagents, while explicit Channel evidence follows the selected workflow.
 
+### Planning stage and lifecycle status
+
+`task.json.status` and `task.json.meta.planning.stage` are separate axes. `status` is `planning`, `in_progress`, or terminal `completed`; `stage` records the current planning stage and remains `plan_closed` after a planned task starts. New tasks begin at `planning/intake`. A missing stage on a legacy task is tolerated: planning tasks read as `intake`, while an in-progress task has an unknown (`null`) source stage until explicitly replanned.
+
+The legal planning edges are:
+
+| Current stage | Allowed next stage | Gate |
+| --- | --- | --- |
+| `intake` | `evidence` | Classification and task ownership established |
+| `evidence` | `decision_convergence`, `solution_formation`, `direct_ready` | Decisions are required only for planned change-bearing work with open material choices; direct work must pass its bounded direct contract |
+| `decision_convergence` | `evidence`, `solution_formation` | Evidence may be refreshed; all material choices must be resolved before solution formation |
+| `solution_formation` | `evidence`, `decision_convergence`, `solution_review` | Complete ordered implementation plan and unique stop point are present before review |
+| `solution_review` | `evidence`, `decision_convergence`, `solution_formation`, `user_review` | The complete plan passes structural validation and no material decision is open |
+| `user_review` | `evidence`, `decision_convergence`, `solution_formation` | A material revision invalidates the prior review and starts a new revision |
+| `plan_closed` | none via `plan advance` | Reopen only through guarded `task.py replan` |
+| `direct_ready` | none via `plan advance` | Start validates the accepted direct-change contract |
+
+Planned change-bearing work closes in this order: reach `user_review`, display the full material plan and its digest, `plan seal --expected-digest <digest>`, record explicit approval for that same revision with `plan approve`, then reach `plan_closed`. `task.py start` rechecks the current seal and approval before changing status to `in_progress`. Sealing alone does not approve implementation. `execution.md` is an unsealed execution evidence file and is excluded from the material plan digest; edits to `prd.md`, `design.md`, or `implement.md` invalidate a prior seal.
+
+An established task-based direct change follows `intake -> evidence -> direct_ready -> start`. `direct_ready` requires one named owner and a bounded change, observable verification, and rollback contract. Taskless direct work remains outside this graph. Analysis-only work follows `intake -> evidence -> archive`, requires recorded evidence and an explicit completion reason, and cannot start implementation. An unfinished planning task can be archived only through the explicit administrative-abandonment path with a reason; this records the disposition and moves it to terminal `completed` status.
+
+`task.py replan <task> <reason> --to <stage>` accepts any `in_progress` task, including legacy and direct tasks, and a `planning` task only at `plan_closed`. It rejects all other source states, including `completed` tasks and archived paths. The caller (the planning model) selects the earliest affected stage; the CLI validates only source/target legality. Replan increments the material revision, clears the old seal and approval, returns status to `planning`, and appends a receipt with `from_status`, nullable `from_stage`, and `to_stage`. This preserves the source lifecycle state for execution work and the source planning state for approved-but-not-started work. A follow-up to a terminal task is new work and must create a new task.
+
+### Post-closure change triage
+
+The planning entry first decides whether a new request belongs to the active task. An independent deliverable gets a new task without changing an unrelated task or its ledger. If bounded evidence cannot establish that relationship, the active task remains unchanged and the model asks the user to clarify. Completed and archived tasks remain terminal.
+
+For work belonging to the current task, the model compares the request or discovery with the approved baseline: the sealed plan for planned work, or the accepted single-change/owner/verification/rollback contract for direct work. The model alone classifies impact. A change is minor only if every applicable commitment remains intact and the delta fits an approved step or direct contract. This includes goal, scope, acceptance, resolved user choices, owner and repository/branch/component, design and public/data/security/privacy/release contracts, dependency order, verification, risk/rollback, and the unique stop point. Minor changes keep both status and stage, leave sealed documents unchanged, and append an `execution.md` entry recording baseline revision/classification, trigger and evidence, rationale, affected step or direct contract, actual delta, and verification.
+
+Any changed commitment, failed material assumption, reopened substantive user choice, expired direct eligibility, or unresolved uncertainty after bounded evidence is major. A small request that changes approved scope or acceptance is major. Stop work dependent on the change, record the evidence, and call native replan to the earliest affected stage: `intake` for goal/scope/classification/owner/direct eligibility; `evidence` when facts need re-establishing; `decision_convergence` for an open material user choice; `solution_formation` for a changed solution, step, verification, risk, or stop point; `solution_review` when only internal review must repeat; or `user_review` when the intact solution only needs renewed user review. Replan clears the prior seal and approval; implementation resumes only after the revised complete plan passes review and receives explicit user approval. The CLI does not implement this semantic classification.
+
+The planning Skill owns this impact assessment and stage selection. Workflow templates and callers route to that single entry; they do not maintain duplicate minor/major rules. The native CLI owns persisted state, transition guards, and receipts.
+
 The table below enumerates every code path that writes `task.json.status` —
 i.e., every path that can change which breadcrumb fires next turn. **Adding
 a new writer requires updating this spec.**
 
 | # | Writer | File:Line | Value | Trigger |
 |---|--------|-----------|-------|---------|
-| 1 | `cmd_create` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:206` | `"planning"` | `task.py create "<title>"` (also visibly auto-sets the session active-task pointer when session identity is available; `--no-start` skips pointer movement for backlog batching — see R7 in 04-30-workflow-state-commit-gap PRD) |
+| 1 | `cmd_create` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:206` | `"planning"` + `meta.planning.stage="intake"` | `task.py create "<title>"` (also visibly auto-sets the session active-task pointer when session identity is available; `--no-start` skips pointer movement for backlog batching — see R7 in 04-30-workflow-state-commit-gap PRD) |
 | 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py` | `"in_progress"` (prior `"planning"`, explicit classification, applicable current plan seal/approval) | `task.py start <dir>` |
-| 3 | `cmd_replan` | `packages/cli/src/templates/trellis/scripts/task.py` | `"planning"` (prior `"in_progress"`; auditable reason and material plan invalidation) | `task.py replan <dir> "reason"` |
-| 4 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:337` | `"completed"` (unconditional flip + archive `mv`) | `task.py archive <dir>` |
+| 3 | `cmd_replan` | `packages/cli/src/templates/trellis/scripts/task.py` | `"planning"` (prior `"in_progress"` or `planning/plan_closed`; auditable reason, explicit target stage, and material plan invalidation) | `task.py replan <dir> "reason" --to <stage>` |
+| 4 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:337` | `"completed"` (after normal completion, analysis completion, or reasoned administrative abandonment) | `task.py archive <dir> [--reason <text>]` |
 | 5 | `emptyTaskJson` factory | `packages/cli/src/utils/task-json.ts:54` | `"planning"` (default) | TS callers (init, update) |
 | 6 | `getBootstrapTaskJson` | `packages/cli/src/commands/init.ts:535` | `"in_progress"` (override) | `trellis init` (creator path) |
 | 7 | `getJoinerTaskJson` | `packages/cli/src/commands/init.ts:587` | `"in_progress"` (override) | `trellis init` (joiner path) |

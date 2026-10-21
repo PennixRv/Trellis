@@ -467,7 +467,7 @@ describe("init() integration", () => {
     ).toBe(true);
     expect(
       fs.existsSync(
-        path.join(tmpDir, ".qoder", "skills", "trellis-brainstorm", "SKILL.md"),
+        path.join(tmpDir, ".qoder", "skills", "trellis-idea-to-closed-plan", "SKILL.md"),
       ),
     ).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, ".claude"))).toBe(false);

@@ -88,7 +88,7 @@ function getTaskStatus(ctx, platformInput = null) {
     (!existsSync(checkJsonl) || hasCuratedJsonlEntry(checkJsonl))
 
   if (taskStatus === "planning" && !hasPrd) {
-    return `Status: PLANNING\nTask: ${taskTitle}\nPresent: ${presentLine}\nNext-Action: Load trellis-brainstorm and write prd.md. Stay in planning.`
+    return `Status: PLANNING\nTask: ${taskTitle}\nPresent: ${presentLine}\nNext-Action: Load trellis-idea-to-closed-plan and resume the recorded planning stage.`
   }
 
   if (taskStatus === "planning") {

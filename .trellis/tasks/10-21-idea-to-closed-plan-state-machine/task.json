@@ -1,0 +1,56 @@
+{
+  "id": "idea-to-closed-plan-state-machine",
+  "name": "idea-to-closed-plan-state-machine",
+  "title": "Implement closed-plan workflow state machine",
+  "description": "Implement Trellis-owned plan stages, complete-plan validation, approval guards, routing migration, and existing-task migration on pennix/v0.7-beta.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-21",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 2,
+      "stage": "plan_closed",
+      "review_digest": "sha256:7088a12fa0d7079f12754458a152519170c49e6b6f003ca69752abab4be99917",
+      "seal": {
+        "revision": 2,
+        "task_id": "idea-to-closed-plan-state-machine",
+        "task_name": "10-21-idea-to-closed-plan-state-machine",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "99067e68c610b7380bef1c07a06e16c85238d971b9833fd8ae71f064cf22a98a",
+          "design.md": "e767808dcac16ff6d999bcae11434489d04f7a409856c624f32f5cd570c918a5",
+          "implement.md": "be624b8ae8bee8a8699c905dcf1fb056204e512d4999c0e8b010070de9cad852"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "plan_digest": "sha256:7088a12fa0d7079f12754458a152519170c49e6b6f003ca69752abab4be99917",
+        "sealed_at": "2026-10-21T06:31:42.690916+00:00"
+      },
+      "approved_revision": 2,
+      "approval_basis": "User explicitly approved the reviewed current plan revision in this session on 2026-10-21.",
+      "approved_at": "2026-10-21T06:31:42.742363+00:00"
+    }
+  }
+}

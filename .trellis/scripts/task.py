@@ -12,7 +12,7 @@ Usage:
     python3 task.py plan seal <dir>             # Seal the current material plan
     python3 task.py plan approve <dir> --revision N --basis "approval"
     python3 task.py start <dir>                 # Start an approved task, record current branch
-    python3 task.py replan <dir> "<reason>"     # Return an in-progress task to planning
+    python3 task.py replan <dir> --to <stage> "<reason>"  # Reopen the earliest affected planning stage
     python3 task.py current [--source] [--json] # Show active task
     python3 task.py ownership <operation> ...   # Manage formal handoff task ownership
     python3 task.py finish                      # Clear active task
@@ -37,6 +37,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from common.log import Colors, colored
 from common.paths import (
@@ -64,8 +65,10 @@ from common.io import (
 )
 from common.task_utils import is_within_tasks_dir, resolve_task_dir, run_task_hooks
 from common.task_planning import (
-    PlanningError, approve_plan, invalidate_plan, require_start_approval, seal_plan,
+    PlanningError, REPLAN_STAGES, STAGES, advance_stage, approve_plan, invalidate_plan, plan_digest,
+    planning_record, require_start_approval, seal_plan,
 )
+from common.task_migration import MigrationError, migrate as migrate_tasks, rollback as rollback_task_migration
 from common.tasks import iter_active_tasks, children_progress
 from common.workflow_selection import WORKFLOW_ID_RE, workflow_md_for_task
 
@@ -234,12 +237,38 @@ def cmd_select(args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     repo_root = get_repo_root()
+    if args.plan_command == "migrate":
+        try:
+            if args.rollback:
+                receipt_path = args.rollback if args.rollback.is_absolute() else repo_root / args.rollback
+                result = rollback_task_migration(repo_root, receipt_path)
+            else:
+                if not args.manifest:
+                    raise MigrationError("plan migrate requires --manifest unless --rollback is used")
+                manifest_path = args.manifest if args.manifest.is_absolute() else repo_root / args.manifest
+                result = migrate_tasks(repo_root, manifest_path, apply=args.apply, receipt_value=args.receipt)
+        except (MigrationError, OwnershipError, OSError, ValueError) as exc:
+            print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
+            return 1
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
+    stage: str | None = None
     try:
         target, data = _active_task_target(args.dir, repo_root)
+        if args.plan_command == "digest":
+            print(json.dumps({
+                "task_id": data.get("id") or target.name,
+                "revision": planning_record(data)["revision"],
+                "digest": plan_digest(data, target),
+            }, ensure_ascii=False, sort_keys=True))
+            return 0
         if data.get("status") != "planning":
-            raise PlanningError("plan seal/approve requires planning; use replan for a material change")
-        if args.plan_command == "seal":
-            revision = seal_plan(data, target)
+            raise PlanningError("planning transitions require status=planning; use replan for an in-progress task")
+        if args.plan_command == "advance":
+            stage = advance_stage(data, target, args.to)
+            revision = planning_record(data)["revision"]
+        elif args.plan_command == "seal":
+            revision = seal_plan(data, target, args.expected_digest)
         else:
             approve_plan(data, target, args.revision, args.basis)
             revision = args.revision
@@ -248,7 +277,10 @@ def cmd_plan(args: argparse.Namespace) -> int:
     except (PlanningError, OwnershipError, OSError, ValueError) as exc:
         print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
         return 1
-    print(colored(f"✓ Plan {args.plan_command}: revision {revision}", Colors.GREEN))
+    if args.plan_command == "advance":
+        print(colored(f"✓ Planning stage: {stage} (revision {revision})", Colors.GREEN))
+    else:
+        print(colored(f"✓ Plan {args.plan_command}: revision {revision}", Colors.GREEN))
     return 0
 
 
@@ -376,51 +408,37 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 
 def cmd_replan(args: argparse.Namespace) -> int:
-    """Return an in-progress task to planning without losing its binding."""
+    """Return a task to its earliest affected planning stage."""
     repo_root = get_repo_root()
-    full_path = resolve_task_dir(args.dir, repo_root)
-    if full_path is None or not full_path.is_dir():
-        print(colored(f"Error: Task not found: {args.dir}", Colors.RED), file=sys.stderr)
-        return 1
-
     try:
-        assert_task_mutation_allowed(repo_root, full_path)
-    except (OwnershipError, OSError) as exc:
+        full_path, data = _active_task_target(args.dir, repo_root)
+    except (PlanningError, OwnershipError, OSError, ValueError) as exc:
         print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
-        return 2
+        return 1
 
     reason = " ".join(args.reason).strip()
     if not reason:
         print(colored("Error: replan reason must not be empty", Colors.RED), file=sys.stderr)
         return 1
 
-    task_json_path = full_path / FILE_TASK_JSON
-    data, read_reason = read_json_checked(task_json_path)
-    if data is None:
-        problem, hint = describe_json_read_failure(task_json_path, read_reason)
-        print(colored(f"Error: {problem}", Colors.RED), file=sys.stderr)
-        print(hint, file=sys.stderr)
-        return 1
-    if data.get("status") != "in_progress":
-        print(
-            colored(
-                f"Error: replan requires status=in_progress (found {data.get('status')!r})",
-                Colors.RED,
-            ),
-            file=sys.stderr,
-        )
-        return 1
-
     try:
-        invalidate_plan(data)
+        from_status = data["status"]
+        from_stage = planning_record(data).get("stage")
+        if from_status == "planning" and from_stage != "plan_closed":
+            raise PlanningError("replan requires planning/plan_closed or any in_progress task")
+        invalidate_plan(data, args.to)
     except PlanningError as exc:
         print(colored(f"Error: {exc}", Colors.RED), file=sys.stderr)
         return 1
 
+    task_json_path = full_path / FILE_TASK_JSON
     event = {
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "task": full_path.relative_to(repo_root).as_posix(),
-        "from_status": "in_progress",
+        "from_status": from_status,
+        "from_stage": from_stage,
+        "to_stage": args.to,
+        "revision": planning_record(data)["revision"],
         "reason": reason,
         "branch": data.get("branch"),
     }
@@ -443,7 +461,7 @@ def cmd_replan(args: argparse.Namespace) -> int:
         print(colored("Error: replan event recorded but task status was not changed", Colors.RED), file=sys.stderr)
         return 1
 
-    print(colored(f"✓ Task returned to planning: {full_path.relative_to(repo_root)}", Colors.GREEN))
+    print(colored(f"✓ Task returned to planning/{args.to}: {full_path.relative_to(repo_root)}", Colors.GREEN))
     print("Reason:", reason)
     run_task_hooks("after_replan", task_json_path, repo_root)
     return 0
@@ -487,6 +505,15 @@ def cmd_finish(args: argparse.Namespace) -> int:
     return 0
 
 
+def _planning_stage(data: dict[str, Any]) -> str | None:
+    meta = data.get("meta")
+    planning = meta.get("planning") if isinstance(meta, dict) else None
+    stage = planning.get("stage") if isinstance(planning, dict) else None
+    if isinstance(stage, str) and stage:
+        return stage
+    return "intake" if data.get("status") == "planning" else None
+
+
 def cmd_current(args: argparse.Namespace) -> int:
     """Show active task."""
     repo_root = get_repo_root()
@@ -513,6 +540,7 @@ def cmd_current(args: argparse.Namespace) -> int:
                 "id": data.get("id") or data.get("name"),
                 "title": data.get("title"),
                 "status": data.get("status"),
+                "planning_stage": _planning_stage(data),
                 "parent": data.get("parent"),
                 "children": data.get("children", []),
                 "branch": data.get("branch"),
@@ -757,6 +785,7 @@ def cmd_list(args: argparse.Namespace) -> int:
                 "id": t.raw.get("id") or dir_name,
                 "title": t.title,
                 "status": t.status,
+                "planning_stage": _planning_stage(t.raw),
                 "display_status": _display_status(t, all_statuses),
                 "priority": t.priority,
                 "assignee": t.assignee or None,
@@ -800,6 +829,9 @@ def cmd_list(args: argparse.Namespace) -> int:
         # Children progress
         progress = children_progress(t.children, all_statuses)
         status_label = _display_status(t, all_statuses)
+        stage = _planning_stage(t.raw)
+        if stage:
+            status_label += f" · {stage}"
 
         # Package tag
         pkg_tag = f" @{t.package}" if t.package else ""
@@ -883,6 +915,8 @@ Usage:
   python3 task.py select <dir>                       Select context without starting
   python3 task.py plan seal <dir>                    Seal the current material plan
   python3 task.py plan approve <dir> --revision N --basis "approval"
+  python3 task.py plan migrate --manifest <file> [--apply --receipt <.trellis/file>]
+  python3 task.py plan migrate --rollback <.trellis/receipt.json>
   python3 task.py create <title> --description <desc> --package <pkg>   Create task for a specific package
   python3 task.py create <title> --description <desc> --parent <dir>    Create task as child of parent
   python3 task.py create <title> --description <desc> --no-start        Create without making it active in this session
@@ -891,7 +925,7 @@ Usage:
   python3 task.py validate <dir>                     Validate jsonl files
   python3 task.py list-context <dir>                 List jsonl entries
   python3 task.py start <dir>                        Set active task; records the checked-out branch when unset
-  python3 task.py replan <dir> "<reason>"            Return an in-progress task to planning
+  python3 task.py replan <dir> --to <stage> "<reason>" Return task to its earliest affected planning stage
   python3 task.py current [--source]                 Show active task
   python3 task.py finish                             Clear active task
   python3 task.py workflow <id>                      Select workflow variant for active task
@@ -1047,14 +1081,26 @@ def main() -> int:
     p_select = subparsers.add_parser("select", help="Select a task without changing its phase")
     p_select.add_argument("dir", help="Existing active task directory")
 
-    p_plan = subparsers.add_parser("plan", help="Seal a reviewed material plan or record its explicit approval")
+    p_plan = subparsers.add_parser("plan", help="Advance planning, inspect a plan digest, seal, migrate, or record approval")
     plan_sub = p_plan.add_subparsers(dest="plan_command", required=True)
+    p_advance = plan_sub.add_parser("advance", help="Advance to an allowed planning stage")
+    p_advance.add_argument("dir", help="Planning task directory")
+    p_advance.add_argument("--to", choices=sorted(STAGES - {"plan_closed"}), required=True, help="Target planning stage")
+    p_digest = plan_sub.add_parser("digest", help="Show the digest of the complete current plan")
+    p_digest.add_argument("dir", help="Planning task directory")
     p_seal = plan_sub.add_parser("seal", help="Seal the current material plan revision")
     p_seal.add_argument("dir", help="Planning task directory")
+    p_seal.add_argument("--expected-digest", required=True, help="Digest shown with the complete plan to the user")
     p_approve = plan_sub.add_parser("approve", help="Record actual user approval of the displayed plan")
     p_approve.add_argument("dir", help="Planning task directory")
     p_approve.add_argument("--revision", type=int, required=True)
     p_approve.add_argument("--basis", required=True, help="Short non-sensitive basis for real approval")
+    p_migrate = plan_sub.add_parser("migrate", help="Preview or apply a digest-guarded legacy task migration")
+    migration_mode = p_migrate.add_mutually_exclusive_group()
+    migration_mode.add_argument("--apply", action="store_true", help="Apply after validating every frozen source digest")
+    migration_mode.add_argument("--rollback", type=Path, help="Conditionally restore a prior migration receipt")
+    p_migrate.add_argument("--manifest", type=Path, help="Frozen JSON migration manifest (required except for rollback)")
+    p_migrate.add_argument("--receipt", help="New rollback receipt path under .trellis/; required with --apply")
 
     # start
     p_start = subparsers.add_parser("start", help="Set active task")
@@ -1066,9 +1112,10 @@ def main() -> int:
     )
 
     # replan
-    p_replan = subparsers.add_parser("replan", help="Return an in-progress task to planning")
+    p_replan = subparsers.add_parser("replan", help="Return an in-progress task to a selected planning stage")
     p_replan.add_argument("dir", help="Task directory")
     p_replan.add_argument("reason", nargs="+", help="Material reason for returning to planning")
+    p_replan.add_argument("--to", choices=sorted(REPLAN_STAGES), required=True, help="Earliest affected planning stage")
 
     # current
     p_current = subparsers.add_parser("current", help="Show active task")
@@ -1176,6 +1223,7 @@ def main() -> int:
     p_archive = subparsers.add_parser("archive", help="Archive task")
     p_archive.add_argument("name", help="Task directory or name")
     p_archive.add_argument("--no-commit", action="store_true", help="Skip auto git commit after archive")
+    p_archive.add_argument("--reason", help="Required when archiving a planning task")
     p_archive.add_argument(
         "--skip-branch-validation",
         action="store_true",

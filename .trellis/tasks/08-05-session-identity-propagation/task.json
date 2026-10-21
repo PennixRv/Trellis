@@ -27,5 +27,11 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "analysis_only",
+    "planning": {
+      "revision": 1
+    }
+  }
 }

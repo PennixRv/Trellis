@@ -260,6 +260,11 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
 
     task_title = task_data.get("title", task_ref)
     task_status = task_data.get("status", "unknown")
+    from common.task_planning import PlanningError, planning_record
+    try:
+        stage = planning_record(task_data).get("stage") or "unknown (legacy task)"
+    except PlanningError as exc:
+        return f"Status: TASK_ERROR\nTask: {task_ref}\nNext: Repair the existing planning record: {exc}"
 
     if task_status == "completed":
         return (
@@ -268,9 +273,6 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
             "or start a new task."
         )
 
-    has_prd = (task_dir / "prd.md").is_file()
-    has_design = (task_dir / "design.md").is_file()
-    has_implement = (task_dir / "implement.md").is_file()
     present = [
         name
         for name in ("prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl")
@@ -278,27 +280,16 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
     ]
     present_line = ", ".join(present) if present else "none"
 
-    if not has_prd:
-        return (
-            f"Status: PLANNING\nTask: {task_title}\nPresent: {present_line}\n"
-            "Next: Load trellis-brainstorm and write prd.md. Stay in planning."
-        )
-
     if task_status == "planning":
-        if has_design and has_implement:
-            next_action = "Review planning artifacts with the user before `task.py start`."
-        else:
-            next_action = (
-                "Lightweight task can ask for start review with PRD-only; "
-                "complex task must add design.md and implement.md before `task.py start`."
-            )
         return (
-            f"Status: PLANNING\nTask: {task_title}\nPresent: {present_line}\n"
-            f"Next: {next_action}"
+            f"Status: PLANNING\nTask: {task_title}\nStage: {stage}\nPresent: {present_line}\n"
+            "Next: Load trellis-idea-to-closed-plan and resume the recorded planning stage; "
+            "artifact presence does not establish readiness."
         )
 
     return (
         f"Status: {task_status.upper()}\nTask: {task_title}\nPresent: {present_line}\n"
+        f"Stage: {stage}\n"
         "Next: Follow the matching per-turn workflow-state. Context order is jsonl entries, "
         "prd.md, design.md if present, implement.md if present."
     )

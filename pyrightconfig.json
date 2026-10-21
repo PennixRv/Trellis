@@ -7,6 +7,7 @@
   "exclude": ["**/node_modules", "**/__pycache__", "dist"],
   "typeCheckingMode": "standard",
   "pythonVersion": "3.9",
+  "extraPaths": [".trellis/scripts"],
   "reportMissingImports": true,
   "reportMissingTypeStubs": false,
   "reportUnusedVariable": true,

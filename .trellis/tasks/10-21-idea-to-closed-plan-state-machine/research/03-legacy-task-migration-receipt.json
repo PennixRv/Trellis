@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "manifest_digest": "c553409a137a2334e07b6b6ffc7c1805459c5bfec74bf4b8abc7f583c28b17d7",
+  "created_at": "2026-10-21T08:02:38.709650+00:00",
+  "tasks": [
+    {
+      "path": ".trellis/tasks/06-17-architecture-diagram",
+      "before_task_json": "{\n  \"id\": \"architecture-diagram\",\n  \"name\": \"architecture-diagram\",\n  \"title\": \"Trellis System Architecture Diagram\",\n  \"description\": \"High-level + drill-down architecture diagrams for Trellis (CLI/templates/configurators/hooks/skills/scripts/migrations) to onboard contributors and new teammates.\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": null,\n  \"priority\": \"P1\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-06-17\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "00da7525595b7343cda3bb32129806cf0caf14dcd17b6735b0fac3ad2c24d07a"
+    },
+    {
+      "path": ".trellis/tasks/06-17-benchmark-showcase",
+      "before_task_json": "{\n  \"id\": \"benchmark-showcase\",\n  \"name\": \"benchmark-showcase\",\n  \"title\": \"Benchmark & Showcase Trellis Capabilities\",\n  \"description\": \"Catalog Trellis differentiators, design reproducible benchmarks (token/turn/quality) vs vanilla Claude Code & Codex, and produce showcase data + assets.\",\n  \"status\": \"planning\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": null,\n  \"priority\": \"P1\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-06-17\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "74f0eec0f33ee4e48c8f996536e3efa4ec3db16e3b9981ea7fd0351ae8abec83"
+    },
+    {
+      "path": ".trellis/tasks/07-23-codex-inline-default-agent-model",
+      "before_task_json": "{\n  \"id\": \"codex-inline-default-agent-model\",\n  \"name\": \"codex-inline-default-agent-model\",\n  \"title\": \"Codex: revert dispatch default to inline + sub-agent model config\",\n  \"description\": \"Fix #459: revert codex dispatch_mode default from auto to inline (0.6.8 regression: sub-agents silently inherit the expensive main-session model); add codex.agents.model / model_reasoning_effort config rendered into the three trellis-*.toml so opt-in sub-agent users can route sub-agents to a cheaper model (also covers the model-config item of #442). Ship as 0.6.9.\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-07-23\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "a90e4f032092a4a1778e39a741cf06d39cd18d69411e96808cb6928bd86e9da7"
+    },
+    {
+      "path": ".trellis/tasks/07-23-per-task-workflow",
+      "before_task_json": "{\n  \"id\": \"per-task-workflow\",\n  \"name\": \"per-task-workflow\",\n  \"title\": \"Per-task dynamic workflow selection\",\n  \"description\": \"Allow each task to select a workflow variant; runtime injection paths resolve the active task's workflow instead of the single global .trellis/workflow.md\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P1\",\n  \"creator\": \"tommy\",\n  \"assignee\": \"tommy\",\n  \"createdAt\": \"2026-07-23\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "d382d024b7ea810f4681b64e143add1dd7a31d97dadc3a9b0766fac03fee1421"
+    },
+    {
+      "path": ".trellis/tasks/07-23-spec-on-demand-injection",
+      "before_task_json": "{\n  \"id\": \"spec-on-demand-injection\",\n  \"name\": \"spec-on-demand-injection\",\n  \"title\": \"Path-scoped on-demand spec injection\",\n  \"description\": \"Inject the specs that govern a file right when the agent edits it: frontmatter path globs on spec .md files + PostToolUse hook with budget and session dedup, plus a pull-mode get_context --mode spec\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P1\",\n  \"creator\": \"tommy\",\n  \"assignee\": \"tommy\",\n  \"createdAt\": \"2026-07-23\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "f55123e9e76534cf594a0942048f013b1b0f8635dccac3b3e296c02c74d2bf80"
+    },
+    {
+      "path": ".trellis/tasks/07-24-workflow-config-default",
+      "before_task_json": "{\n  \"id\": \"workflow-config-default\",\n  \"name\": \"workflow-config-default\",\n  \"title\": \"Layered workflow default (config + personal override)\",\n  \"description\": \"Add team-shared config.yaml default_workflow + personal .developer override to the per-task resolution chain, per colleague transcript\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P1\",\n  \"creator\": \"tommy\",\n  \"assignee\": \"tommy\",\n  \"createdAt\": \"2026-07-24\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"feat/per-task-workflow-selection\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "88158410a4f8c0a370a4249b7164a10928662257913a014097012d65d115a492"
+    },
+    {
+      "path": ".trellis/tasks/08-05-opencode-shell-env",
+      "before_task_json": "{\n  \"id\": \"opencode-shell-env\",\n  \"name\": \"opencode-shell-env\",\n  \"title\": \"OpenCode: bridge session identity via shell.env plugin\",\n  \"description\": \"\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-08-05\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": \"08-05-session-identity-propagation\",\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "7ef76bbfb5b8ac9e3d7c56ee5d276e3bfa9017dd54d89220119dbd13665d4459"
+    },
+    {
+      "path": ".trellis/tasks/08-05-purge-fake-env-names",
+      "before_task_json": "{\n  \"id\": \"purge-fake-env-names\",\n  \"name\": \"purge-fake-env-names\",\n  \"title\": \"Purge invented session env var names\",\n  \"description\": \"\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-08-05\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": \"08-05-session-identity-propagation\",\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "0ed6192683b71a4f97f810dda00b6ad3754be5e69b2c24900fe3f675e7850b6e"
+    },
+    {
+      "path": ".trellis/tasks/08-05-session-identity-hardening",
+      "before_task_json": "{\n  \"id\": \"session-identity-hardening\",\n  \"name\": \"session-identity-hardening\",\n  \"title\": \"Session identity: structural hardening\",\n  \"description\": \"\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-08-05\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": \"08-05-session-identity-propagation\",\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "74a056f2b1d88f54403dc0c3d21c8eb527b31456775aff90834412ab1ee9025b"
+    },
+    {
+      "path": ".trellis/tasks/08-05-session-identity-propagation",
+      "before_task_json": "{\n  \"id\": \"session-identity-propagation\",\n  \"name\": \"session-identity-propagation\",\n  \"title\": \"Investigate session identity propagation gaps (CodeBuddy, OMP #517)\",\n  \"description\": \"\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-08-05\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [\n    \"08-05-opencode-shell-env\",\n    \"08-05-session-identity-hardening\",\n    \"08-05-purge-fake-env-names\",\n    \"08-05-shell-ticket-bridge\"\n  ],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "0daae2561f049d8a899d6057f4549e98a74c364beeaf2fa42ccece22a2b6629b"
+    },
+    {
+      "path": ".trellis/tasks/08-05-shell-ticket-bridge",
+      "before_task_json": "{\n  \"id\": \"shell-ticket-bridge\",\n  \"name\": \"shell-ticket-bridge\",\n  \"title\": \"Generalize the shell-ticket session bridge\",\n  \"description\": \"\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-08-05\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": \"08-05-session-identity-propagation\",\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "fb80423513b3d007a15dbbd451925ee7d524b7bd242b6ff67ffa5a52e1f375e1"
+    },
+    {
+      "path": ".trellis/tasks/08-06-converge-platform-templates",
+      "before_task_json": "{\n  \"id\": \"converge-platform-templates\",\n  \"name\": \"converge-platform-templates\",\n  \"title\": \"Derive platform template collection from a single description\",\n  \"description\": \"\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-08-06\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "ebb81b3fcdf52555a1fb4762311d9624aff6cfafcf2a54de5a67d40f2b0cd871"
+    },
+    {
+      "path": ".trellis/tasks/08-06-mem-full-recall",
+      "before_task_json": "{\n  \"id\": \"mem-full-recall\",\n  \"name\": \"mem-full-recall\",\n  \"title\": \"Recover full conversations across compaction; add Grok adapter\",\n  \"description\": \"\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-08-06\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "8ace78cc070fe061f617a6fc63dd84f5b7e391f8b4a044eb065fc0378e8447f1"
+    },
+    {
+      "path": ".trellis/tasks/08-06-purge-stale-references",
+      "before_task_json": "{\n  \"id\": \"purge-stale-references\",\n  \"name\": \"purge-stale-references\",\n  \"title\": \"Purge references to deleted symbols before release\",\n  \"description\": \"\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"taosu\",\n  \"assignee\": \"taosu\",\n  \"createdAt\": \"2026-08-06\",\n  \"completedAt\": null,\n  \"branch\": null,\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "161453fa58a0ecb882c79a9f36395712c25a3e0936bbb08cc264ae01a412132a"
+    },
+    {
+      "path": ".trellis/tasks/09-07-subnode-workflow-managed-assets",
+      "before_task_json": "{\n  \"id\": \"subnode-workflow-managed-assets\",\n  \"name\": \"subnode-workflow-managed-assets\",\n  \"title\": \"Implement managed subnode workflow assets\",\n  \"description\": \"Implement and release the Trellis managed subnode role, artifact helper, coordinator note helper, and generalized Channel guidance defined by the approved cross-project architecture.\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"penn\",\n  \"assignee\": \"penn\",\n  \"createdAt\": \"2026-09-07\",\n  \"completedAt\": null,\n  \"branch\": \"codex/trellis-runtime-audit-20260902\",\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {\n    \"architecture_source\": \"codex-workflow-optimization/.trellis/tasks/09-07-trellis-reusable-concurrent-workflow-architecture\"\n  }\n}",
+      "after_digest": "216e147ed37133ff496b465bba37a0c658952a1d517e3d3adce04ad66595c49b"
+    },
+    {
+      "path": ".trellis/tasks/09-09-codex-session-fallback-isolation",
+      "before_task_json": "{\n  \"id\": \"codex-session-fallback-isolation\",\n  \"name\": \"codex-session-fallback-isolation\",\n  \"title\": \"Isolate Codex main-session active-task resolution\",\n  \"description\": \"Fix missing-session single-session fallback isolation; downstream acceptance tracked by castbox/guru-trellis#378.\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P2\",\n  \"creator\": \"wumengye\",\n  \"assignee\": \"wumengye\",\n  \"createdAt\": \"2026-09-09\",\n  \"completedAt\": null,\n  \"branch\": \"codex/fix-codex-session-fallback\",\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "178402a235b7d307f4fc995da201023ea8d9467c5814bba5dd4e132d350b7044"
+    },
+    {
+      "path": ".trellis/tasks/09-19-unbound-active-task-projection",
+      "before_task_json": "{\n  \"id\": \"unbound-active-task-projection\",\n  \"name\": \"unbound-active-task-projection\",\n  \"title\": \"修复未绑定活动任务的工作流投影\",\n  \"description\": \"区分无当前会话 pointer 与无活动任务，避免唯一活动任务被 workflow hook 误导为 no_task\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P1\",\n  \"creator\": \"penn\",\n  \"assignee\": \"penn\",\n  \"createdAt\": \"2026-09-19\",\n  \"completedAt\": null,\n  \"branch\": \"main\",\n  \"base_branch\": \"main\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "67e7f9e3c41313270318fa94e08bbd8bded072de9ebee9ecd87be65dbda66391"
+    },
+    {
+      "path": ".trellis/tasks/09-22-codex-decision-chain-replan",
+      "before_task_json": "{\n  \"id\": \"codex-decision-chain-replan\",\n  \"name\": \"codex-decision-chain-replan\",\n  \"title\": \"Codex planning and evidence governance\",\n  \"description\": \"Implement the approved Pennix decision-chain, Planning Seal, evidence-unit, and subnode-v2 governance directly on pennix/v0.7-beta.\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P1\",\n  \"creator\": \"penn\",\n  \"assignee\": \"penn\",\n  \"createdAt\": \"2026-09-22\",\n  \"completedAt\": null,\n  \"branch\": \"pennix/v0.7-beta\",\n  \"base_branch\": \"pennix/v0.7-beta\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {\n    \"root_task\": \"09-22-pennix-skills-workflow-governance\",\n    \"planning_seal\": \"recorded\"\n  }\n}\n",
+      "after_digest": "ee464dfed1831ede697077f3a3cfdbfc21b18f06dc0895543f2b43f5b41d86c4"
+    },
+    {
+      "path": ".trellis/tasks/09-22-decision-gates-replan-lifecycle",
+      "before_task_json": "{\n  \"id\": \"decision-gates-replan-lifecycle\",\n  \"name\": \"decision-gates-replan-lifecycle\",\n  \"title\": \"Decision gates and replanning lifecycle\",\n  \"description\": \"Implement the approved Pennix decision-gate bridge and controlled replan lifecycle on the Pennix v0.7 beta branch.\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P1\",\n  \"creator\": \"penn\",\n  \"assignee\": \"penn\",\n  \"createdAt\": \"2026-09-22\",\n  \"completedAt\": null,\n  \"branch\": \"pennix/v0.7-beta\",\n  \"base_branch\": \"pennix/v0.7-beta\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {}\n}",
+      "after_digest": "f76c84adb44e536bdaeaa600e10bd8154f460bcc55d0a8300bc8d96c5f6bb4f3"
+    },
+    {
+      "path": ".trellis/tasks/09-30-agentmemory-trellis-cutover",
+      "before_task_json": "{\n  \"id\": \"agentmemory-trellis-cutover\",\n  \"name\": \"agentmemory-trellis-cutover\",\n  \"title\": \"Trellis AgentMemory subnode hard-off 与消费者迁移\",\n  \"description\": \"Trellis pennix/v0.7-beta承载Codex subnode合并后AgentMemory env剥离/SDK child marker、whole-plugin及native MCP双入口关闭，Hindsight模板精确native migration与workflow权威合同；统一验收后原生beta发布和消费者更新。当前planning到开工边界，不改源码发包。\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P1\",\n  \"creator\": \"penn\",\n  \"assignee\": \"penn\",\n  \"createdAt\": \"2026-09-30\",\n  \"completedAt\": null,\n  \"branch\": \"pennix/v0.7-beta\",\n  \"base_branch\": \"pennix/v0.7-beta\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {\n    \"root_coordinator_task\": \"09-30-agentmemory-hard-cutover\",\n    \"delivery_mode\": \"change_bearing\",\n    \"execution_class\": \"complex\",\n    \"approval_mode\": \"awaiting_implementation_start\",\n    \"planning_seal\": \"closed\",\n    \"planning_contract\": \"2026-10-01-agentmemory-native-plugin-mcp\"\n  }\n}",
+      "after_digest": "e173eda5e59559c7666f5983140b4e93d37f616a01856305a693ca930ff1f8f3"
+    },
+    {
+      "path": ".trellis/tasks/10-03-cognee-subnode-isolation",
+      "before_task_json": "{\n  \"id\": \"cognee-subnode-isolation\",\n  \"name\": \"cognee-subnode-isolation\",\n  \"title\": \"Cognee subnode memory isolation\",\n  \"description\": \"Replace legacy memory isolation with Cognee at the real supervisor and Codex adapter boundaries, preserve main capture, prove env/config overrides and publish the paired beta release. Authorized root contract: ../.trellis/tasks/10-03-cognee-memory-base-replacement.\",\n  \"status\": \"in_progress\",\n  \"dev_type\": null,\n  \"scope\": null,\n  \"package\": \"cli\",\n  \"priority\": \"P1\",\n  \"creator\": \"penn\",\n  \"assignee\": \"penn\",\n  \"createdAt\": \"2026-10-03\",\n  \"completedAt\": null,\n  \"branch\": \"pennix/v0.7-beta\",\n  \"base_branch\": \"pennix/v0.7-beta\",\n  \"worktree_path\": null,\n  \"commit\": null,\n  \"pr_url\": null,\n  \"subtasks\": [],\n  \"children\": [],\n  \"parent\": null,\n  \"relatedFiles\": [],\n  \"notes\": \"\",\n  \"meta\": {\n    \"delivery_mode\": \"change_bearing\",\n    \"execution_class\": \"complex\",\n    \"work_domain\": \"workflow_governance\",\n    \"decision_frontier\": \"multiple\",\n    \"approval_mode\": \"implementation_authorized\"\n  }\n}",
+      "after_digest": "30c6f6f5417ed689005fd57e05ef76992afa99c5945dc40147e096a48c5f5f0b"
+    }
+  ]
+}

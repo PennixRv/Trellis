@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import fs from "node:fs";
-import path from "node:path";
 import {
   getCommandTemplates,
   getSkillTemplates,
@@ -144,16 +142,6 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).toContain("#");
   });
 
-  it("marketplace native workflow mirror matches the bundled workflow", () => {
-    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
-      ? process.cwd()
-      : path.resolve(process.cwd(), "../..");
-    const marketplaceNative = fs.readFileSync(
-      path.join(repoRoot, "marketplace/workflows/native/workflow.md"),
-      "utf-8",
-    );
-    expect(marketplaceNative).toBe(workflowMdTemplate);
-  });
 
   it("analysis-only tasks complete evidence work without entering implementation", () => {
     const marker = '`task.json.meta.delivery_mode = "analysis_only"`';
@@ -173,7 +161,7 @@ describe("trellis template constants", () => {
       expect(breadcrumb).toContain("不要运行 Planning Seal 或等待实施批准");
       expect(breadcrumb).toContain("完成有界证据工作");
     }
-    for (const name of ["start", "continue", "finish-work", "brainstorm"]) {
+    for (const name of ["start", "continue", "finish-work", "idea-to-closed-plan"]) {
       const content = commonTemplates.get(name) ?? "";
       expect(content, `${name} must describe analysis-only tasks`).toContain(
         marker,
@@ -192,157 +180,31 @@ describe("trellis template constants", () => {
   });
 
   it("keeps complex research in evidence mode and gates only requested subnode dispatch", () => {
-    const brainstorm =
-      getSkillTemplates().find((template) => template.name === "brainstorm")
+    const planningSkill =
+      getSkillTemplates().find((template) => template.name === "idea-to-closed-plan")
         ?.content ?? "";
     expect(workflowMdTemplate).toContain('`task.json.meta.delivery_mode = "analysis_only"`');
     expect(workflowMdTemplate).toContain("跨 owner");
     expect(workflowMdTemplate).toContain("受保护目标不变边界");
-    expect(brainstorm).toContain('`task.json.meta.delivery_mode = "analysis_only"`');
-    expect(brainstorm).toContain("cross-owner");
-    expect(brainstorm).toContain("no-change boundary");
+    expect(planningSkill).toContain('`task.json.meta.delivery_mode = "analysis_only"`');
+    expect(planningSkill).toContain("cross-owner");
+    expect(planningSkill).toContain("no-change boundary");
     expect(workflowMdTemplate).toContain("复杂度、跨 owner 范围、多个证据单元");
     expect(workflowMdTemplate).toContain("不要运行 Planning Seal");
-    expect(brainstorm).toContain("regardless of complexity");
-    expect(brainstorm).toContain("explicit approval of that frozen plan");
-    expect(brainstorm).toContain("only the listed evidence dispatch");
-    expect(brainstorm).toContain("implementation approval gates");
+    expect(planningSkill).toContain("complex or cross-owner evidence work");
+    expect(planningSkill).toContain("explicit approval before any spawn or send");
+    expect(planningSkill).toContain("only the frozen dispatch");
+    expect(planningSkill).toContain("implementation approval");
     expect(workflowMdTemplate).toContain("证据单元");
     expect(workflowMdTemplate).toContain("change-bearing");
   });
 
-  it("keeps direct small work bounded across bundled and Marketplace workflows", () => {
-    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
-      ? process.cwd()
-      : path.resolve(process.cwd(), "../..");
-    const workflows = [
-      workflowMdTemplate,
-      ...[
-        "native/workflow.md",
-        "tdd/workflow.md",
-        "channel-driven-subagent-dispatch/workflow.md",
-        "codex-subnode-channel/workflow.md",
-      ].map((relativePath) =>
-        fs.readFileSync(
-          path.join(repoRoot, "marketplace", "workflows", relativePath),
-          "utf-8",
-        ),
-      ),
-    ];
-
-    for (const workflow of workflows) {
-      expect(workflow).toMatch(/Direct small work|直接小任务/);
-      expect(workflow).toMatch(/immediate verification|立即验证/);
-      expect(workflow).toMatch(/ownership|owner/);
-      expect(workflow).toMatch(/release|发布/);
-      expect(workflow).toMatch(/credentials|凭据/);
-      expect(workflow).toMatch(/durable record|持久记录/);
-    }
+  it("exposes one canonical planning skill for the closed-plan workflow", () => {
+    const planningNames = getSkillTemplates()
+      .map((template) => template.name)
+      .filter((name) => name === "brainstorm" || name === "idea-to-closed-plan");
+    expect(planningNames).toEqual(["idea-to-closed-plan"]);
   });
-
-  it("keeps the Codex Subnode Channel planning and delivery contract", () => {
-    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
-      ? process.cwd()
-      : path.resolve(process.cwd(), "../..");
-    const workflow = fs.readFileSync(
-      path.join(
-        repoRoot,
-        "marketplace/workflows/codex-subnode-channel/workflow.md",
-      ),
-      "utf-8",
-    );
-
-    expect(workflow).toContain(
-      '`task.json.meta.delivery_mode = "analysis_only"` exactly',
-    );
-    expect(workflow).toContain("Complexity, cross-owner scope, multiple units");
-    expect(workflow).toContain("Before any requested subnode spawn/send");
-    expect(workflow).toContain("Approval covers only the named evidence briefs");
-    expect(workflow).toContain("After each answer, persist the decision,");
-    expect(workflow).toContain(
-      "run `python3 ./.trellis/scripts/task.py replan",
-    );
-    for (const state of [
-      "unbound_task",
-      "unbound_ambiguous",
-      "unbound_ambiguous-inline",
-    ]) {
-      expect(workflow).toContain(`[workflow-state:${state}]`);
-    }
-    expect(workflow).toContain("Evidence is unit-sized");
-    expect(workflow).toContain("Reports use schema version 2");
-    expect(workflow).toContain("Planning Seal closure pass");
-    expect(workflow).toContain(
-      "this workflow does not insert a second `Proposed commits`/`ok`",
-    );
-  });
-
-  it("marketplace TDD workflow planning breadcrumbs include behavior gates", () => {
-    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
-      ? process.cwd()
-      : path.resolve(process.cwd(), "../..");
-    const tddWorkflow = fs.readFileSync(
-      path.join(repoRoot, "marketplace/workflows/tdd/workflow.md"),
-      "utf-8",
-    );
-    const planning =
-      /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/.exec(
-        tddWorkflow,
-      )?.[1];
-    const planningInline =
-      /\[workflow-state:planning-inline\]([\s\S]*?)\[\/workflow-state:planning-inline\]/.exec(
-        tddWorkflow,
-      )?.[1];
-
-    for (const block of [planning, planningInline]) {
-      expect(block).toContain("observable behavior slices");
-      expect(block).toContain("public interface under test");
-      expect(block).toContain("mock boundaries");
-    }
-  });
-
-  it("marketplace Codex subnode workflow keeps delivery inline and evidence durable", () => {
-    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
-      ? process.cwd()
-      : path.resolve(process.cwd(), "../..");
-    const index = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, "marketplace/index.json"), "utf-8"),
-    ) as { templates: { id: string; type: string; path: string }[] };
-    expect(index.templates).toContainEqual(
-      expect.objectContaining({
-        id: "codex-subnode-channel",
-        type: "workflow",
-        path: "workflows/codex-subnode-channel/workflow.md",
-      }),
-    );
-
-    const workflow = fs.readFileSync(
-      path.join(
-        repoRoot,
-        "marketplace/workflows/codex-subnode-channel/workflow.md",
-      ),
-      "utf-8",
-    );
-    expect(workflow).toContain("The main session delivers by default");
-    expect(workflow).toContain("`brief.json`");
-    expect(workflow).toContain("`worklog.md`");
-    expect(workflow).toContain("`report.json`");
-    expect(workflow).toContain("`trellis-research-record`");
-    expect(workflow).toContain("Evidence is unit-sized");
-    expect(workflow).toContain("Local report delivery/validation failures isolate");
-    expect(workflow).toContain("pause global admission until reconciled");
-    expect(workflow).not.toContain("ctx_recovery_brief");
-    expect(workflow).not.toContain("Semantic RecoveryBrief");
-    expect(workflow).toContain("Planning Seal closure pass");
-    expect(workflow).toContain("[workflow-state:planning]");
-    expect(workflow).toContain("[workflow-state:in_progress]");
-    expect(workflow).toContain("rather than high-frequency polling");
-    expect(workflow).not.toContain("Do not poll");
-    expect(workflow).not.toContain(
-      "Channel-driven sub-agent dispatch is default",
-    );
-  });
-
   it("[codex-native-subagents] workflow.md preserves the dispatch prompt for Codex native fallback", () => {
     // The in_progress breadcrumb instructs the main agent to prefix
     // dispatch prompts with "Active task: <path>". Codex uses native

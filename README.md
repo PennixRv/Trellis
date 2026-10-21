@@ -79,7 +79,7 @@ The workflow is simple:
 
 Trellis runs a 4-phase loop with auto-invoked skills and sub-agents:
 
-1. **Plan** — `trellis-brainstorm` walks through requirements one question at a time and writes `prd.md`. Research-heavy items go to a `trellis-research` sub-agent. The result is curated specs + research files referenced from `implement.jsonl` / `check.jsonl`.
+1. **Plan** — `trellis-idea-to-closed-plan` routes requests through the native planning stages, closes consequential decisions, and forms a complete design with ordered implementation steps and one observable stop point. The complete plan is reviewed and explicitly approved before implementation. Sub-agent workflows also curate spec and research context in `implement.jsonl` / `check.jsonl`.
 2. **Implement** — a `trellis-implement` sub-agent writes code from the PRD with the curated context auto-injected, no git commit.
 3. **Verify** — a `trellis-check` sub-agent reviews the diff against specs and runs lint, type-check, and tests, self-fixing where it can.
 4. **Finish** — a final check runs, then `trellis-update-spec` promotes new learnings back into `.trellis/spec/` so the next session starts smarter.

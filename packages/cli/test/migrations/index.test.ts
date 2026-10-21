@@ -79,6 +79,44 @@ describe("getAllMigrations", () => {
   });
 });
 
+describe("0.7.0-beta.53 retired planning skill migration", () => {
+  it("removes only the unchanged generated trellis-brainstorm skill paths", () => {
+    const oldSkillHash =
+      "d73f919226ee9ee1c4deec9e2b1b3d088ca197b56a051d405ec34133e69f437e";
+    const expectedPaths = [
+      ".claude/skills/trellis-brainstorm/SKILL.md",
+      ".cursor/skills/trellis-brainstorm/SKILL.md",
+      ".opencode/skills/trellis-brainstorm/SKILL.md",
+      ".agents/skills/trellis-brainstorm/SKILL.md",
+      ".kilocode/skills/trellis-brainstorm/SKILL.md",
+      ".kiro/skills/trellis-brainstorm/SKILL.md",
+      ".agent/skills/trellis-brainstorm/SKILL.md",
+      ".devin/skills/trellis-brainstorm/SKILL.md",
+      ".qoder/skills/trellis-brainstorm/SKILL.md",
+      ".codebuddy/skills/trellis-brainstorm/SKILL.md",
+      ".github/skills/trellis-brainstorm/SKILL.md",
+      ".factory/skills/trellis-brainstorm/SKILL.md",
+      ".reasonix/skills/trellis-brainstorm/SKILL.md",
+      ".zcode/skills/trellis-brainstorm/SKILL.md",
+      ".trae/skills/trellis-brainstorm/SKILL.md",
+      ".omp/skills/trellis-brainstorm/SKILL.md",
+      ".grok/skills/trellis-brainstorm/SKILL.md",
+      ".snow/skills/trellis-brainstorm/SKILL.md",
+    ];
+
+    expect(
+      getMigrationsForVersion("0.7.0-beta.52", "0.7.0-beta.53")
+        .filter((migration) => migration.type === "safe-file-delete")
+        .map(({ from, allowed_hashes }) => ({ from, allowed_hashes })),
+    ).toEqual(
+      expectedPaths.map((from) => ({
+        from,
+        allowed_hashes: [oldSkillHash],
+      })),
+    );
+  });
+});
+
 // =============================================================================
 // getMigrationsForVersion — version range filtering
 // =============================================================================
