@@ -1,0 +1,8 @@
+{
+  "version": "0.7.0-beta.54",
+  "description": "修复无文件差异预览时更新项目版本标记",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "trellis update --dry-run 在仅需更新项目版本标记的升级路径中不再写入 .trellis/.version。",
+  "migrations": []
+}

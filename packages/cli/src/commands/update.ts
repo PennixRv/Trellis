@@ -2631,7 +2631,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       console.log(chalk.green("✓ Already up to date!"));
     } else {
       // Version changed but no file changes needed — still update the version stamp
-      updateVersionFile(cwd);
+      if (!options.dryRun) updateVersionFile(cwd);
       if (isUpgrade) {
         console.log(
           chalk.green(

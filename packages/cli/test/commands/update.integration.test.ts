@@ -1199,6 +1199,19 @@ describe("update() integration", () => {
     expect(fs.readFileSync(versionPath, "utf-8")).toBe(VERSION);
   });
 
+  it("#12a dry-run on a version-only upgrade leaves .version unchanged", async () => {
+    await setupProject();
+
+    const versionPath = versionFilePath();
+    fs.writeFileSync(versionPath, "0.3.0-rc.6");
+    const hashesBefore = fs.readFileSync(hashFilePath());
+
+    await update({ dryRun: true });
+
+    expect(fs.readFileSync(versionPath, "utf-8")).toBe("0.3.0-rc.6");
+    expect(fs.readFileSync(hashFilePath())).toEqual(hashesBefore);
+  });
+
   it("#12b versioned upgrade scenario applies auto-updates, additive config sections, and modified-file skips", async () => {
     await setupProject();
 
