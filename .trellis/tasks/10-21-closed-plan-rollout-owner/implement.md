@@ -1,0 +1,18 @@
+# Owner execution plan
+
+This is an exact local decomposition of the approved root rollout, not a new proposal. Root retains cross-owner dependencies and final host acceptance.
+
+<!-- trellis-implementation-plan:v1 -->
+```json
+{
+  "schema_version": 1,
+  "steps": [
+    {"id":"fix-preview","target":{"repository":"Trellis","branch":"pennix/v0.7-beta","component_or_path":"packages/cli/src/commands/update.ts and packages/cli/test/commands/update.integration.test.ts"},"depends_on":[],"action":"Pass the existing persist option at update's prune call; add the real orphan-key dry-run regression and record the contract in the current update spec.","deliverables":"Minimum source fix, regression and spec update.","verification":"Focused integration test, lint, typecheck, full tests, build and native release preflight.","risks":"Changing ordinary manifest repair or missing preview side effects.","rollback":"Revert only this unaccepted owner change; preserve unrelated work."},
+    {"id":"nest-marketplace","target":{"repository":"Trellis","branch":"pennix/v0.7-beta","component_or_path":".gitmodules and marketplace gitlink"},"depends_on":["fix-preview"],"action":"After root verifies Marketplace main is published, use native Git submodule commands to restore the sole nested checkout at its approved SHA; keep docs-site and CI/package boundaries.","deliverables":"Verified nested Marketplace gitlink and source record.","verification":"URL, branch, gitlink, checkout and remote match; recursive clone works; package excludes marketplace.","risks":"Duplicate checkout or unpublished source.","rollback":"Stop root removal until nested checkout passes; use native Git operations for rollback."},
+    {"id":"release-beta","target":{"repository":"Trellis","branch":"pennix/v0.7-beta","component_or_path":"native pnpm release:beta and matching npm CLI/core artifacts"},"depends_on":["nest-marketplace"],"action":"Commit reviewed source and owner records; confirm next available beta and use native release workflow without manual version/tag rewriting.","deliverables":"Published matching beta and pushed source/tag.","verification":"Release preflight, Actions completion, npm dist-tag, versions, exact core dependency and artifact integrity.","risks":"Occupied version or failed CI.","rollback":"Stop installation on mismatch; do not overwrite tags or published packages."},
+    {"id":"materialize-and-close","target":{"repository":"Trellis","branch":"pennix/v0.7-beta","component_or_path":"managed project assets and owner task"},"depends_on":["release-beta"],"action":"After root installs the verified CLI via Lifecycle and reviews all six previews, use native update for this project, verify assets and workflow, commit, finish/archive natively and push final owner records.","deliverables":"Updated assets, native archive and final pushed owner HEAD for root integration.","verification":"Project version, diff, workflow verify, custom content, unrelated active task, remote SHA and clean worktree.","risks":"Modified assets or archive changing the final owner HEAD.","rollback":"Keep task open on incomplete acceptance; use native update backup contract and record the final SHA after archive."}
+  ],
+  "stop_point":{"condition":"All owner checks pass, matching beta is published, this project's materialized assets and workflow are verified, native owner archive is pushed and root has final SHA.","observable_evidence":"Test/release/registry receipts, nested gitlink, native workflow verification, final archive path and origin/pennix/v0.7-beta SHA.","remaining_work":"Root retains cross-layer and real-host acceptance; unrelated subnode task remains open."}
+}
+```
+<!-- /trellis-implementation-plan:v1 -->

@@ -2393,6 +2393,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       cwd,
       [...configuredPlatforms],
       hashes,
+      { persist: !options.dryRun },
     );
     if (prune.pruned.length > 0) {
       console.log(

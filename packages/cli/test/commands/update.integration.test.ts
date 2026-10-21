@@ -662,11 +662,14 @@ describe("update() integration", () => {
       readHashesV2(hashFile),
       MANAGED_FILE,
     ) as Record<string, string>;
+    hashes[".codex/sessions/user-session.jsonl"] = computeHash("user session");
     writeHashesV2(hashFile, hashes);
     fs.unlinkSync(target);
+    const manifestBefore = fs.readFileSync(hashFile);
 
     await update({ dryRun: true });
 
+    expect(fs.readFileSync(hashFile)).toEqual(manifestBefore);
     // File should still be missing (dry run didn't recreate it)
     expect(fs.existsSync(target)).toBe(false);
     // No backup directory created

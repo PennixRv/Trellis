@@ -1,0 +1,56 @@
+{
+  "id": "closed-plan-rollout-owner",
+  "name": "closed-plan-rollout-owner",
+  "title": "落地闭合方案工作流：更新预览修复、Marketplace 与项目资产",
+  "description": "执行根 rollout 已批准的 Trellis owner 步骤：修复 dry-run 写入、恢复唯一嵌套 Marketplace，发布 beta 并更新本项目资产；保留无关 subnode 任务。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-21",
+  "completedAt": null,
+  "branch": "pennix/v0.7-beta",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "stage": "plan_closed",
+      "review_digest": "sha256:103b09972ea089f29e7a3d48571ac1cfc43de1d83c41854654f6de390c1dfdf9",
+      "seal": {
+        "revision": 1,
+        "task_id": "closed-plan-rollout-owner",
+        "task_name": "10-21-closed-plan-rollout-owner",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "1c86f2e8246d4011304855d82b8a390353dd3f2099cc28a412fba0503bfe8c8c",
+          "design.md": "4571a2cd0fefaab6ae4cec7b829dee237aaa4a6672e7f314695fcf29d4bcedfa",
+          "implement.md": "910de4d8d6524b088533712cac833fd48cac65fff9fa187f090170cb45c36dd1"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "plan_digest": "sha256:103b09972ea089f29e7a3d48571ac1cfc43de1d83c41854654f6de390c1dfdf9",
+        "sealed_at": "2026-10-21T13:41:17.026408+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "User explicitly approved these detailed root rollout owner steps and instructed deterministic completion without another approval; this record adds no scope or decision",
+      "approved_at": "2026-10-21T13:41:17.086477+00:00"
+    }
+  }
+}
