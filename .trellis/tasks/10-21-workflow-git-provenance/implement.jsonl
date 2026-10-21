@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/cli/backend/commands-workflow.md", "reason": "Preserve registry origin in durable workflow provenance and retain Git source identity through round-trip resolution."}

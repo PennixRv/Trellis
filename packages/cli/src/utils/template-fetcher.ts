@@ -319,7 +319,7 @@ export function parseRegistrySource(source: string): RegistrySource {
     );
   }
 
-  const repo = `${segments[0]}/${segments[1]}`;
+  const repo = `${segments[0]}/${segments[1].replace(/\.git$/, "")}`;
   const subdir = segments.slice(2).join("/");
 
   // Build raw base URL

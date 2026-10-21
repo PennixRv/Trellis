@@ -57,7 +57,7 @@ export interface ResolvedWorkflowTemplate {
   content: string;
   /** Where the content came from (for error messages). */
   source: "bundled" | "marketplace";
-  /** Canonical registry identity used for durable project provenance. */
+  /** Replayable registry identity and transport for durable project provenance. */
   registry: string;
   /** Immutable registry ref, or the bundled CLI version for native. */
   ref: string;
@@ -79,7 +79,7 @@ export interface WorkflowTemplateListing {
 
 export interface WorkflowResolveOptions {
   /**
-   * Marketplace source (giget-style or HTTPS URL). Required for resolving
+   * Marketplace source (provider prefix, HTTPS or SSH). Required for resolving
    * non-native workflows and must include an immutable commit ref.
    */
   source?: string;
@@ -100,6 +100,14 @@ function requireImmutableMarketplaceSource(
     );
   }
   const registry = parseSourceOrThrow(source);
+  if (registry.sourceKind === "https") {
+    const url = new URL(source);
+    if (url.username || url.password) {
+      throw new WorkflowResolveError(
+        "Workflow marketplace sources cannot include URL credentials; use local Git credentials instead.",
+      );
+    }
+  }
   if (!isImmutableWorkflowRef(registry.ref)) {
     throw new WorkflowResolveError(
       `Marketplace workflow source must use an immutable 40/64-hex commit ref; received "${registry.ref}".`,
@@ -298,7 +306,9 @@ export async function resolveWorkflowTemplate(
     path: entry.path,
     content,
     source: "marketplace",
-    registry: registry.gigetSource,
+    registry: registry.preferGit
+      ? (options.source ?? registry.gigetSource)
+      : registry.gigetSource,
     ref: registry.ref,
     contentSha256,
   };

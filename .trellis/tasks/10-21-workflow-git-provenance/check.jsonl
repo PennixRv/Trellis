@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/cli/unit-test/conventions.md", "reason": "Test Git source parsing and provenance round trips with transport, host, port, and ref boundaries."}

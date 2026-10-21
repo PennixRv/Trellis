@@ -28,7 +28,7 @@ This spec applies when editing:
 - `packages/cli/src/utils/workflow-resolver.ts`
 - `packages/cli/src/commands/init.ts` workflow-selection code
 - `packages/cli/src/configurators/workflow.ts`
-- `marketplace/workflows/**`
+- workflow sources in an independently checked out Marketplace repository
 - workflow-related tests
 
 ### 2. Signatures
@@ -128,6 +128,11 @@ Ownership contract:
   remove `.trellis/workflow.md` from `.trellis/.template-hashes.json` with
   `removeHash`, and persist the immutable source in
   `.trellis/workflow-provenance.json`.
+- Git-backed workflow provenance preserves the validated source transport,
+  host, port, subdirectory and immutable ref, so `workflow --verify` resolves
+  through the same backend. Do not persist HTTPS URL credentials; use native
+  Git credentials. A repository's optional `.git` suffix is not part of its
+  provider repository name, including when an immutable `#ref` follows it.
 - Switching is still an explicit project action; generic `trellis update` does
   not switch workflows. When provenance exists, it resolves and verifies the
   same selected source for whole-file comparison, so it cannot fall back to the
@@ -194,8 +199,9 @@ Native source-of-truth contract:
 
 - `packages/cli/src/templates/trellis/workflow.md` is the source of truth for
   native workflow.
-- If `marketplace/workflows/native/workflow.md` exists, tests must enforce byte
-  identity with the bundled native template.
+- The root coordinator checks byte identity between its independent Marketplace
+  native workflow source and the bundled native template. Trellis unit tests and
+  commit/CI hooks must not initialize or read an inner Marketplace checkout.
 
 ### 4. Validation & Error Matrix
 
@@ -265,11 +271,10 @@ Integration tests:
 - `trellis update` after switching to non-native does not restore native.
 - `trellis update` with a valid non-native provenance record does not produce a
   native `workflow.md.new`.
-- Marketplace native mirror matches bundled native workflow when the mirror file
-  exists.
-- Real `marketplace/workflows/tdd/workflow.md` planning breadcrumbs include the
-  TDD gates: observable behavior slices, public interface under test, and mock
-  boundaries.
+- Git-backed materialization and `--verify` preserve public SSH, self-hosted
+  SSH/HTTPS, ports, subdirectories and immutable commits without HTTP fallback.
+- Native mirror and real Marketplace TDD planning contracts are checked by the
+  root coordinator against its independent source checkout.
 - `--save tdd` writes the library file; `.trellis/workflow.md` and
   `.template-hashes.json` are byte-unchanged.
 - `--save` on an existing library file fails without `--force` and overwrites
