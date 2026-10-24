@@ -185,8 +185,8 @@ export function createShutdown(args: CreateShutdownArgs): ShutdownController {
     // The flag is claimed SYNCHRONOUSLY before the await so two
     // concurrent `finalizeOnExit` calls (or `applyParseResult` racing
     // with `child.on("exit")`) can't both pass the guard and emit
-    // duplicate synthetic events. `by` is the worker name (not
-    // `supervisor:<name>`) so `wait --from <worker> --kind done` wakes
+    // duplicate synthetic events. `by` is the teammate name (not
+    // `supervisor:<name>`) so `wait --from <teammate> --kind done` wakes
     // for the synthesised event same as for an adapter-emitted one.
     if (!terminalEmitted && shutdownReason === null) {
       terminalEmitted = true;
@@ -201,7 +201,7 @@ export function createShutdown(args: CreateShutdownArgs): ShutdownController {
         await appendEvent(channelName, {
           kind: "error",
           by: workerName,
-          message: `worker exited without terminal event (code=${code ?? "null"}, signal=${signal ?? "null"})`,
+          message: `teammate exited without terminal event (code=${code ?? "null"}, signal=${signal ?? "null"})`,
           synthesized: true,
           exit_code: code,
           exit_signal: signal,

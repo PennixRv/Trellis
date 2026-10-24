@@ -1,6 +1,6 @@
 # Command Reference
 
-Authoritative current command reference for `trellis channel` subcommands,
+Authoritative current command reference for `trellis teamwork` subcommands,
 validated against the source in `packages/cli/src/commands/channel/`
 (`index.ts` Commander wiring and each subcommand handler).
 
@@ -10,10 +10,10 @@ is the default and resolves against the current cwd's project bucket.
 ## Top-level
 
 ```
-trellis channel <subcommand>
+trellis teamwork <subcommand>
 ```
 
-> Multi-agent collaboration runtime — spawn / coordinate / interrupt worker
+> Multi-agent collaboration runtime — spawn / coordinate / interrupt teammate
 > agents through a shared event log.
 
 ---
@@ -23,7 +23,7 @@ trellis channel <subcommand>
 ### `create <name>`
 
 ```bash
-trellis channel create <name>
+trellis teamwork create <name>
   [--scope project|global]                # default: project
   [--type chat|forum]                     # default: chat
   [--task <path>]                         # associated Trellis task dir
@@ -41,16 +41,17 @@ trellis channel create <name>
 ```
 
 Behavior:
+
 - Appends a `create` event; immutable `type` (cannot mutate forum↔chat after).
-- `--ephemeral` channels are hidden from `channel list` by default and are
-  the sweep target for `channel prune --ephemeral`.
+- `--ephemeral` channels are hidden from `teamwork list` by default and are
+  the sweep target for `teamwork prune --ephemeral`.
 - `--linked-context-*` are folded into `--context-*`; emit a deprecation
   notice when used.
 
 ### `list`
 
 ```bash
-trellis channel list
+trellis teamwork list
   [--scope project|global]
   [--json]
   [--project <slug>]                      # substring match on task field
@@ -59,8 +60,9 @@ trellis channel list
 ```
 
 Behavior:
+
 - Default scope: current cwd's project. `--all-projects` scans every bucket.
-- Pretty mode prints `NAME WORKERS EVENTS LAST KIND TYPE TASK`, sorted by
+- Pretty mode prints `NAME TEAMMATES EVENTS LAST KIND TYPE TASK`, sorted by
   recency, with a footer noting hidden ephemeral count.
 - `--json` switches to a JSON array.
 
@@ -71,7 +73,7 @@ Behavior:
 ### `send <name> [text]`
 
 ```bash
-trellis channel send <name> [text]
+trellis teamwork send <name> [text]
   --as <agent>                            # REQUIRED — author
   [--scope project|global]
   [--to <agents,csv>]                     # default: broadcast
@@ -80,13 +82,14 @@ trellis channel send <name> [text]
 ```
 
 Behavior:
+
 - Body precedence: positional `[text]` → `--stdin` → `--text-file`.
 - `--to` with one entry stores a string; multiple stores an array; omitted
   means broadcast.
 - `--delivery-mode` selects targeted-delivery validation:
   - `appendOnly` (default-ish — just record),
   - `requireKnownWorker` (the named target must have a `spawned` event),
-  - `requireRunningWorker` (the worker must currently be live).
+  - `requireRunningWorker` (the teammate must currently be live).
 - Prints the appended event as one JSON line on stdout.
 
 > **Note:** `send` has **no** `--tag` and **no** `--kind` flag. See
@@ -95,7 +98,7 @@ Behavior:
 ### `messages <name>`
 
 ```bash
-trellis channel messages <name>
+trellis teamwork messages <name>
   [--scope project|global]
   [--raw]                                 # one JSON event per line
   [--follow]                              # stream new events
@@ -110,6 +113,7 @@ trellis channel messages <name>
 ```
 
 Behavior:
+
 - Auto-detects forum channels: with no filters it renders the thread board
   instead of the event stream. `--thread` / `--action` are forum-only and
   error against chat channels.
@@ -119,7 +123,7 @@ Behavior:
 ### `wait <name>`
 
 ```bash
-trellis channel wait <name>
+trellis teamwork wait <name>
   --as <agent>                            # REQUIRED — self for filter ctx
   [--scope project|global]
   [--timeout <Ns|Nm|Nh|Nms>]              # parsed by parseDuration
@@ -133,6 +137,7 @@ trellis channel wait <name>
 ```
 
 Behavior:
+
 - Streams matching events as JSON, one per line.
 - Default `--to` filter is the caller's own agent (broadcast events still
   match — broadcast + explicit-to-me).
@@ -162,26 +167,26 @@ Concrete model in the current source:
 - `--kind` lives on `wait` (CSV, OR semantics) and `messages` (single
   value). `send` and `run` cannot emit a custom kind — every `send` writes
   a `message` event.
-- Mid-turn worker abort is **not** a tag. It is the dedicated
-  `channel interrupt` command, which appends an `interrupt_requested` /
-  `interrupted` pair and provider-level interrupts the worker.
+- Mid-turn teammate abort is **not** a tag. It is the dedicated
+  `teamwork interrupt` command, which appends an `interrupt_requested` /
+  `interrupted` pair and provider-level interrupts the teammate.
 
-Practical rule for dispatchers waiting on workers:
+Practical rule for dispatchers waiting on teammates:
 
-- Use `--kind done,turn_finished` for "worker finished a turn" — these are
+- Use `--kind done,turn_finished` for "teammate finished a turn" — these are
   system events that the supervisor fires automatically. Do not depend on
-  the worker LLM remembering to emit any custom signal.
-- Use `trellis channel interrupt` (the command) only when you actually want
+  the teammate LLM remembering to emit any custom signal.
+- Use `trellis teamwork interrupt` (the command) only when you actually want
   mid-turn abort behavior.
 - Do **not** invent user-side tags as completion signals. There is no
-  `--tag` filter; a worker writing a custom string into its final message
+  `--tag` filter; a teammate writing a custom string into its final message
   is just text inside a `message` event and cannot be matched by `wait`.
 
 Long bodies always go through stdin or a file:
 
 ```bash
-trellis channel send T --as A --stdin < /tmp/message.md
-trellis channel send T --as A --text-file /tmp/message.md
+trellis teamwork send T --as A --stdin < /tmp/message.md
+trellis teamwork send T --as A --text-file /tmp/message.md
 ```
 
 ---
@@ -191,14 +196,15 @@ trellis channel send T --as A --text-file /tmp/message.md
 ### `interrupt <name> [text]`
 
 ```bash
-trellis channel interrupt <name> [text]
+trellis teamwork interrupt <name> [text]
   --as <agent>                            # REQUIRED — caller
-  --to <agent>                            # REQUIRED — target worker
+  --to <agent>                            # REQUIRED — target teammate
   [--scope project|global]
   [--stdin | --text-file <path>]
 ```
 
 Behavior:
+
 - Appends an `interrupt` event with `reason: "user"` and a replacement
   instruction body; supervisor performs provider-level interrupt where
   supported (Claude `/interrupt`, Codex turn cancel).
@@ -206,16 +212,16 @@ Behavior:
 
 ---
 
-## Workers
+## Teammates
 
 ### `spawn <name>`
 
 ```bash
-trellis channel spawn <name>
+trellis teamwork spawn <name>
   [--scope project|global]
   [--agent <agent-name>]                  # loads .trellis/agents/<name>.md
   [--provider claude|codex]               # overrides agent file
-  [--as <worker-name>]                    # default: agent name
+  [--as <teammate-name>]                    # default: agent name
   [--cwd <path>]
   [--model <id>]
   [--resume <id>]                         # session/thread id resume
@@ -225,34 +231,35 @@ trellis channel spawn <name>
   [--file <path>] ...                     # glob, repeatable; inject content
   [--jsonl <path>] ...                    # Trellis manifest, repeatable
   [--by <agent>]                          # spawn-event author
-                                          # default: TRELLIS_CHANNEL_AS env or 'main'
+                                          # default: TRELLIS_TEAMWORK_AS env or 'main'
   [--inbox-policy explicitOnly|broadcastAndExplicit]
                                           # default explicitOnly
   [--idle-timeout <Ns|Nm|Nh>]             # OOM-guard idle TTL
                                           # default 5m, 0 disables
-  [--max-live-workers <n>]                # spawn-time live-worker budget
+  [--max-live-teammates <n>]                # spawn-time live-teammate budget
                                           # default 6, 0 disables
 ```
 
 Behavior:
+
 - Provider is validated against the adapter registry
   (`packages/cli/src/commands/channel/adapters/`); current: `claude`,
   `codex`.
-- Worker stays inbox-idle until the first `send --to <worker>`.
+- Teammate stays inbox-idle until the first `send --to <teammate>`.
 - Records a `spawned` event with `pid`, `provider`, `agent`, `files`,
   `manifests`.
 - OOM-guard precedence: CLI flag → env var
-  (`TRELLIS_CHANNEL_WORKER_IDLE_TIMEOUT`,
-  `TRELLIS_CHANNEL_MAX_LIVE_WORKERS`) →
-  `.trellis/config.yaml#channel.worker_guard` → built-in defaults.
+  (`TRELLIS_TEAMWORK_IDLE_TIMEOUT`,
+  `TRELLIS_TEAMWORK_MAX_LIVE_TEAMMATES`) →
+  `.trellis/config.yaml#teamwork.teammate_guard` → built-in defaults.
 
 ### `run [name]`
 
 ```bash
-trellis channel run [name?]
+trellis teamwork run [name?]
   [--agent <name>]
   [--provider claude|codex]
-  [--as <worker-name>]
+  [--as <teammate-name>]
   [--cwd <path>]
   [--model <id>]
   [--file <path>] ...                     # repeatable, glob
@@ -262,8 +269,9 @@ trellis channel run [name?]
 ```
 
 Behavior:
+
 - One-shot. Auto-generates `run-<hex>` if `name` omitted.
-- Creates an ephemeral channel (`createMode=run`), spawns a single worker,
+- Creates an ephemeral channel (`createMode=run`), spawns a single teammate,
   sends the prompt, waits for `done`, prints the final assistant text to
   stdout, then removes the channel on success. On failure the channel is
   kept for inspection and exit code is 1.
@@ -274,33 +282,35 @@ Behavior:
 ### `kill <name>`
 
 ```bash
-trellis channel kill <name>
-  --as <agent>                            # REQUIRED — worker agent name
+trellis teamwork kill <name>
+  --as <agent>                            # REQUIRED — teammate agent name
   [--scope project|global]
   [--force]                               # SIGKILL immediately
 ```
 
 Behavior:
+
 - Default path: SIGTERM → 8 s grace → SIGKILL escalation; the CLI writes a
   `killed` event when SIGKILL was needed so the log stays truthful.
-- Cleans `pid`, `worker-pid`, `config`, `spawnlock` sidecar files; keeps
+- Cleans `pid`, `teammate-pid`, `config`, `spawnlock` sidecar files; keeps
   `log`, `session-id`, `thread-id` for forensics / resume.
 
 ### `rm <name>`
 
 ```bash
-trellis channel rm <name>
+trellis teamwork rm <name>
   [--scope project|global]
 ```
 
 Behavior:
-- Kills any live workers, then deletes the entire channel directory.
+
+- Kills any live teammates, then deletes the entire channel directory.
 - Prints `Removed channel '<name>'`.
 
 ### `prune`
 
 ```bash
-trellis channel prune
+trellis teamwork prune
   [--scope project|global]                # omitted: scan every project
   [--all | --empty | --idle <Ns|Nm|Nh|Nd> | --ephemeral]   # mutually exclusive
   [--yes]                                 # actually delete (default: dry-run)
@@ -309,11 +319,12 @@ trellis channel prune
 ```
 
 Behavior:
+
 - Filter flags are mutually exclusive — error otherwise.
 - Default is dry-run; `--yes` flips to real delete.
 - Without `--scope`, scans **every** project bucket (intentional, repo-wide
   cleanup); with `--scope project|global`, limited to that bucket.
-- Live-worker channels are always skipped regardless of filter.
+- Live-teammate channels are always skipped regardless of filter.
 - Output: per-candidate line `name  last-ts  (reason)` plus a final summary.
 
 ---
@@ -323,7 +334,7 @@ Behavior:
 ### `post <name> <action>`
 
 ```bash
-trellis channel post <name> <action>
+trellis teamwork post <name> <action>
   --as <agent>                            # REQUIRED
   [--scope project|global]
   [--thread <key>]                        # required except action=opened
@@ -341,6 +352,7 @@ trellis channel post <name> <action>
 ```
 
 Behavior:
+
 - `<action>` is free-form on the CLI surface; conventional values include
   `opened`, `comment`, `status`, `labels`, `assignees`, `summary`,
   `processed`.
@@ -351,29 +363,31 @@ Behavior:
 ### `forum <name>`
 
 ```bash
-trellis channel forum <name>
+trellis teamwork forum <name>
   [--scope project|global]
   [--status <status>]
   [--raw]
 ```
 
 Behavior:
+
 - Lists threads (reduced state). `--status` filters by current thread
   status. `--raw` prints one JSON per thread.
 
 ### `thread <name> <thread>` / `thread rename`
 
 ```bash
-trellis channel thread <name> <thread-key>
+trellis teamwork thread <name> <thread-key>
   [--scope project|global]
   [--raw]
 
-trellis channel thread rename <name> <old-thread> <new-thread>
+trellis teamwork thread rename <name> <old-thread> <new-thread>
   --as <agent>                            # REQUIRED
   [--scope project|global]
 ```
 
 Behavior:
+
 - `thread <name> <key>` shows one thread's timeline:
   header `<thread> [<status>] <title>`, then description / labels /
   assignees / summary / timeline lines. `--raw` switches to raw events.
@@ -386,7 +400,7 @@ Behavior:
 ### `context add` / `context delete` / `context list`
 
 ```bash
-trellis channel context add <name>
+trellis teamwork context add <name>
   [--as <agent>]                          # default: main
   [--scope project|global]
   [--thread <key>]                        # thread-level instead of channel-level
@@ -394,20 +408,21 @@ trellis channel context add <name>
   [--raw <text>]      ...                 # repeatable
                                           # at least one of --file or --raw
 
-trellis channel context delete <name>
+trellis teamwork context delete <name>
   [--as <agent>]                          # default: main
   [--scope project|global]
   [--thread <key>]
   [--file <abs-path>] ...
   [--raw <text>]      ...
 
-trellis channel context list <name>
+trellis teamwork context list <name>
   [--scope project|global]
   [--thread <key>]
   [--raw]                                 # one JSON entry per line
 ```
 
 Behavior:
+
 - `add` / `delete` append a `context` event and print the event JSON.
 - `list` projects current context entries; pretty output is
   `file <path>` / `raw <truncated text>` lines, `(no context)` when empty.
@@ -415,17 +430,18 @@ Behavior:
 ### `title set <name>` / `title clear <name>`
 
 ```bash
-trellis channel title set <name>
+trellis teamwork title set <name>
   --title <text>                          # REQUIRED
   [--as <agent>]                          # default: main
   [--scope project|global]
 
-trellis channel title clear <name>
+trellis teamwork title clear <name>
   [--as <agent>]                          # default: main
   [--scope project|global]
 ```
 
 Behavior:
+
 - Appends a `title` event projecting a stable display title onto the
   channel. Output: event JSON.
 
@@ -433,10 +449,10 @@ Behavior:
 
 ## Hidden / Internal
 
-| Command | Purpose |
-|---|---|
-| `channel __supervisor <channel> <worker> <config>` | Forked entry point invoked by `spawn`. Do not invoke directly. |
-| `channel __parse-trace <adapter> <file>` | Dev helper — replays a recorded stream-json / wire trace through the matching adapter and prints the resulting channel events. Adapter is validated against the provider registry. |
+| Command                                              | Purpose                                                                                                                                                                            |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `channel __supervisor <channel> <teammate> <config>` | Forked entry point invoked by `spawn`. Do not invoke directly.                                                                                                                     |
+| `channel __parse-trace <adapter> <file>`             | Dev helper — replays a recorded stream-json / wire trace through the matching adapter and prints the resulting channel events. Adapter is validated against the provider registry. |
 
 ---
 
@@ -477,4 +493,3 @@ Forum channels are event-sourced; use the CLI reducers
   pipe); diagnostic notes go to stderr.
 - **Errors** go through `chalk.red("Error:")` to stderr and `exit 1`.
 - **`wait` timeout** specifically exits **124**.
-

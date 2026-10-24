@@ -68,9 +68,9 @@ export interface SupervisorView {
 export interface WorkerAdapter<Ctx = AdapterCtx> {
   /** Display + binary name. */
   readonly provider: Provider;
-  /** Build the CLI args used to spawn the worker process. */
+  /** Build the CLI args used to start the teammate process. */
   buildArgs(view: SupervisorView): string[];
-  /** Fresh per-worker context (e.g. JSON-RPC pending map). */
+  /** Fresh per-teammate context (e.g. JSON-RPC pending map). */
   createCtx(): Ctx;
   /**
    * Optional one-time setup AFTER the worker is spawned and stdout is piped,
@@ -145,7 +145,7 @@ const codexAdapter: WorkerAdapter<CodexCtx> = {
       ctx,
       "initialize",
       {
-        clientInfo: { name: "trellis-channel", version: "0.1" },
+        clientInfo: { name: "trellis-teamwork", version: "0.1" },
         capabilities: {},
       },
       "initialize",

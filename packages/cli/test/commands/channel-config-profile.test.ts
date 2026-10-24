@@ -33,7 +33,7 @@ function project() {
   );
   fs.writeFileSync(
     path.join(root, ".trellis", "config.yaml"),
-    "channel:\n  teammate:\n    max_concurrency: 3\n  teammate_guard:\n    max_live_teammates: 4\n    non_batch_reserved: 1\n",
+    "teamwork:\n  teammate:\n    max_concurrency: 3\n  teammate_guard:\n    max_live_teammates: 4\n    non_batch_reserved: 1\n",
   );
   return root;
 }
@@ -70,15 +70,27 @@ describe("Channel teammate config and profiles", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
+  it("does not read the retired channel teammate configuration", () => {
+    const root = project();
+    fs.writeFileSync(
+      path.join(root, ".trellis", "config.yaml"),
+      "channel:\n  teammate:\n    max_concurrency: 3\n  teammate_guard:\n    max_live_teammates: 4\n    non_batch_reserved: 1\n",
+    );
+    expect(resolveTeammateRuntimeConfig(root, {}).teammate.maxConcurrency).toBe(
+      1,
+    );
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
   it("rejects non-finite profile option numbers", () => {
     const root = project();
     fs.writeFileSync(
       path.join(root, ".trellis", "agents", "teammate-profiles.json"),
       '{"profiles":{"review":{"options":{"temperature":1e400}}}}',
     );
-    expect(() => resolveTeammateProfile({ cwd: root, profile: "review" })).toThrow(
-      /must be finite/,
-    );
+    expect(() =>
+      resolveTeammateProfile({ cwd: root, profile: "review" }),
+    ).toThrow(/must be finite/);
     fs.rmSync(root, { recursive: true, force: true });
   });
 });

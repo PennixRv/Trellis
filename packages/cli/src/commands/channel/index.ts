@@ -39,31 +39,31 @@ function parseNonNegativeInteger(value: string): number {
   return Number(value);
 }
 
-export function registerChannelCommand(program: Command): void {
+export function registerTeamworkCommand(program: Command): void {
   const channel = program
-    .command("channel")
+    .command("teamwork")
     .description(
-      "Trellis Channel runtime — coordinate agents through a shared event log",
+      "Trellis Teamwork runtime — coordinate teammates through a shared event log",
     );
 
   channel
     .command("create <name>")
-    .description("Create a new channel (collaboration session)")
-    .option("--scope <scope>", "channel scope: project | global")
-    .option("--type <type>", "channel type: chat | forum", "chat")
+    .description("Create a Teamwork session")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
+    .option("--type <type>", "session type: chat | forum", "chat")
     .option("--task <path>", "associated Trellis task directory")
     .option("--project <slug>", "project slug")
     .option("--labels <csv>", "comma-separated labels")
-    .option("--description <text>", "stable channel description")
+    .option("--description <text>", "stable Teamwork session description")
     .option(
       "--context-file <absolute-path>",
-      "absolute file path attached as channel context (repeatable)",
+      "absolute file path attached as Teamwork session context (repeatable)",
       (val: string, prev: string[] | undefined) => [...(prev ?? []), val],
       [] as string[],
     )
     .option(
       "--context-raw <text>",
-      "raw channel context text (repeatable)",
+      "raw Teamwork session context text (repeatable)",
       (val: string, prev: string[] | undefined) => [...(prev ?? []), val],
       [] as string[],
     )
@@ -81,10 +81,13 @@ export function registerChannelCommand(program: Command): void {
     )
     .option("--cwd <path>", "working directory recorded in the create event")
     .option("--by <agent>", "agent name recorded as the creator", "main")
-    .option("--force", "overwrite existing channel with the same name")
+    .option(
+      "--force",
+      "overwrite an existing Teamwork session with the same name",
+    )
     .option(
       "--ephemeral",
-      "mark as ephemeral — hidden from `channel list` by default and cleanable via `channel prune --ephemeral`",
+      "mark as ephemeral — hidden from `teamwork list` by default and cleanable via `teamwork prune --ephemeral`",
     )
     .action(
       async (
@@ -120,9 +123,9 @@ export function registerChannelCommand(program: Command): void {
 
   channel
     .command("send <name>")
-    .description("Send a message into the channel")
+    .description("Send a message in a Teamwork session")
     .requiredOption("--as <agent>", "agent name sending")
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option(
       "--to <agents>",
       "comma-separated target agents (default: broadcast)",
@@ -175,7 +178,7 @@ export function registerChannelCommand(program: Command): void {
     .command("wait <name>")
     .description("Block until an event matching the filter arrives, or timeout")
     .requiredOption("--as <agent>", "agent name waiting")
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--timeout <duration>", "max wait (e.g. 30s, 2m, 1h)")
     .option("--from <agents>", "only wake on events from these agents (CSV)")
     .option(
@@ -230,10 +233,10 @@ export function registerChannelCommand(program: Command): void {
 
   channel
     .command("interrupt <name>")
-    .description("Interrupt a worker turn and send a replacement instruction")
+    .description("Interrupt a teammate turn and send a replacement instruction")
     .requiredOption("--as <agent>", "agent name requesting the interrupt")
-    .requiredOption("--to <agent>", "target worker name")
-    .option("--scope <scope>", "channel scope: project | global")
+    .requiredOption("--to <agent>", "target teammate name")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--stdin", "read interrupt message body from stdin")
     .option("--text-file <path>", "read interrupt message body from file")
     .argument(
@@ -275,31 +278,31 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("spawn <name>")
     .description(
-      "Register a worker (claude/codex) into the channel — the worker stays idle until the first `channel send --to <worker>` arrives",
+      "Register a teammate process (claude/codex) in a Teamwork session — it stays idle until the first `teamwork send --to <teammate>` arrives",
     )
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option(
       "--agent <agent-name>",
       "load .trellis/agents/<name>.md (sets default --provider / --model / system prompt)",
     )
     .option(
       "--provider <provider>",
-      "worker provider: claude | codex (overrides agent)",
+      "teammate provider: claude | codex (overrides agent)",
     )
     .option(
       "--as <name>",
-      "worker name in the channel (default: <agent-name> if --agent is set)",
+      "teammate name in the Teamwork session (default: <agent-name> if --agent is set)",
     )
-    .option("--cwd <path>", "worker working directory (default: process cwd)")
+    .option("--cwd <path>", "teammate working directory (default: process cwd)")
     .option("--model <id>", "model override")
     .option("--resume <id>", "resume an existing session/thread id")
     .option(
       "--sandbox <mode>",
-      "codex-only: worker sandbox mode: read-only | workspace-write | danger-full-access (default workspace-write)",
+      "codex-only: teammate sandbox mode: read-only | workspace-write | danger-full-access (default workspace-write)",
     )
     .option(
       "--timeout <duration>",
-      "auto-kill worker after this duration (e.g. 30m, 1h, 7200s)",
+      "auto-kill teammate process after this duration (e.g. 30m, 1h, 7200s)",
     )
     .option(
       "--warn-before <duration>",
@@ -307,7 +310,7 @@ export function registerChannelCommand(program: Command): void {
     )
     .option(
       "--file <path>",
-      "include a file's content as context in the worker's system prompt (glob supported, repeatable)",
+      "include a file's content as context in the teammate's system prompt (glob supported, repeatable)",
       (val: string, prev: string[] | undefined) => [...(prev ?? []), val],
       [] as string[],
     )
@@ -319,19 +322,19 @@ export function registerChannelCommand(program: Command): void {
     )
     .option(
       "--by <agent>",
-      "identity recorded as the spawn author (defaults to TRELLIS_CHANNEL_AS env or 'main')",
+      "identity recorded as the spawn author (defaults to TRELLIS_TEAMWORK_AS env or 'main')",
     )
     .option(
       "--inbox-policy <policy>",
-      "worker inbox delivery policy: explicitOnly | broadcastAndExplicit (default explicitOnly)",
+      "teammate inbox delivery policy: explicitOnly | broadcastAndExplicit (default explicitOnly)",
     )
     .option(
       "--idle-timeout <duration>",
-      "OOM-guard idle-cleanup TTL for this worker (default 5m; 0 disables)",
+      "OOM-guard idle-cleanup TTL for this teammate (default 5m; 0 disables)",
     )
     .option(
-      "--max-live-workers <n>",
-      "spawn-time live-worker budget for this project/scope (default 6; 0 disables)",
+      "--max-live-teammates <n>",
+      "spawn-time live-teammate budget for this project/scope (default 6; 0 disables)",
       parseNonNegativeInteger,
     )
     .action(async (name: string, raw: Record<string, unknown>) => {
@@ -351,7 +354,7 @@ export function registerChannelCommand(program: Command): void {
         scope?: string;
         inboxPolicy?: string;
         idleTimeout?: string;
-        maxLiveWorkers?: number;
+        maxLiveTeammates?: number;
       };
       if (opts.provider !== undefined && !isProvider(opts.provider)) {
         console.error(
@@ -378,7 +381,7 @@ export function registerChannelCommand(program: Command): void {
           scope: opts.scope,
           inboxPolicy: parseInboxPolicy(opts.inboxPolicy),
           idleTimeoutMs: parseDuration(opts.idleTimeout),
-          maxLiveWorkers: opts.maxLiveWorkers,
+          maxLiveWorkers: opts.maxLiveTeammates,
         });
       } catch (err) {
         console.error(
@@ -392,7 +395,7 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("batch <plan>")
     .description(
-      "Submit one frozen Channel teammate plan; requires an installed host adapter",
+      "Submit one frozen Teamwork plan; requires an installed host adapter",
     )
     .action(async (_planPath: string) => {
       try {
@@ -411,7 +414,7 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("run [name]")
     .description(
-      "One-shot: create ephemeral channel, spawn worker, send prompt, wait done, print final answer, cleanup",
+      "One-shot: create an ephemeral Teamwork session, start a teammate, send the prompt, wait for completion, print the answer, and clean up",
     )
     .option(
       "--agent <agent-name>",
@@ -419,10 +422,10 @@ export function registerChannelCommand(program: Command): void {
     )
     .option(
       "--provider <provider>",
-      "worker provider: claude | codex (overrides agent)",
+      "teammate provider: claude | codex (overrides agent)",
     )
-    .option("--as <name>", "worker name (default: agent name if --agent set)")
-    .option("--cwd <path>", "worker working directory")
+    .option("--as <name>", "teammate name (default: agent name if --agent set)")
+    .option("--cwd <path>", "teammate working directory")
     .option("--model <id>", "model override")
     .option(
       "--file <path>",
@@ -490,8 +493,10 @@ export function registerChannelCommand(program: Command): void {
 
   channel
     .command("rm <name>")
-    .description("Kill workers and delete a channel directory entirely")
-    .option("--scope <scope>", "channel scope: project | global")
+    .description(
+      "Stop teammate processes and delete a Teamwork session entirely",
+    )
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .action(async (name: string, raw: Record<string, unknown>) => {
       try {
         await channelRm(name, raw as { scope?: string });
@@ -507,24 +512,30 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("prune")
     .description(
-      "Bulk-remove channels by criteria (defaults to dry-run preview)",
+      "Bulk-remove Teamwork sessions by criteria (defaults to dry-run preview)",
     )
-    .option("--scope <scope>", "channel scope: project | global")
-    .option("--all", "remove all channels (except live ones and --keep)")
-    .option("--empty", "remove channels with no activity (only create event)")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
+    .option(
+      "--all",
+      "remove all Teamwork sessions (except live ones and --keep)",
+    )
+    .option(
+      "--empty",
+      "remove Teamwork sessions with no activity (only create event)",
+    )
     .option(
       "--idle <duration>",
-      "remove channels whose last event is older than this (e.g. 1h, 7d)",
+      "remove sessions whose last event is older than this (e.g. 1h, 7d)",
     )
     .option(
       "--ephemeral",
-      "remove only channels marked `--ephemeral` at create time",
+      "remove only sessions marked `--ephemeral` at create time",
     )
     .option("--yes", "actually delete (default is dry-run)")
     .option("--dry-run", "show what would be removed without deleting", true)
     .option(
       "--keep <names>",
-      "comma-separated channel names to keep regardless",
+      "comma-separated Teamwork session names to keep regardless",
     )
     .action(async (raw: Record<string, unknown>) => {
       const opts = raw as {
@@ -560,17 +571,17 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("list")
     .description(
-      "List channels in ~/.trellis/channels/ with worker / activity summary",
+      "List Teamwork sessions in ~/.trellis/channels/ with teammate and activity summary",
     )
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--json", "emit JSON instead of a formatted table")
     .option(
       "--project <slug>",
-      "filter channels whose `task` field contains this substring",
+      "filter sessions whose `task` field contains this substring",
     )
     .option(
       "--all",
-      "include ephemeral channels (default: hide channels marked ephemeral)",
+      "include ephemeral sessions (default: hide sessions marked ephemeral)",
     )
     .option(
       "--all-projects",
@@ -597,8 +608,8 @@ export function registerChannelCommand(program: Command): void {
 
   channel
     .command("messages <name>")
-    .description("View messages and events in the channel")
-    .option("--scope <scope>", "channel scope: project | global")
+    .description("View messages and events in a Teamwork session")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--raw", "print raw JSON (one event per line)")
     .option("--follow", "stream new events as they arrive (Ctrl-C to stop)")
     .option("--last <N>", "show only the last N matching events", (v) =>
@@ -656,10 +667,10 @@ export function registerChannelCommand(program: Command): void {
   channel
     .command("kill <name>")
     .description(
-      "Stop a worker in the channel (SIGTERM, or SIGKILL with --force)",
+      "Stop a teammate process in the Teamwork session (SIGTERM, or SIGKILL with --force)",
     )
-    .requiredOption("--as <agent>", "worker agent name")
-    .option("--scope <scope>", "channel scope: project | global")
+    .requiredOption("--as <agent>", "teammate agent name")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--force", "skip graceful shutdown, send SIGKILL immediately")
     .action(async (name: string, raw: Record<string, unknown>) => {
       const opts = raw as { as: string; force?: boolean; scope?: string };
@@ -676,9 +687,9 @@ export function registerChannelCommand(program: Command): void {
 
   channel
     .command("post <name> <action>")
-    .description("Append a structured thread event to a forum channel")
+    .description("Append a structured thread event to a Teamwork forum")
     .requiredOption("--as <agent>", "agent name posting")
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--thread <key>", "thread key (required except opened)")
     .option("--title <text>", "thread title")
     .option("--text <text>", "event body")
@@ -732,8 +743,8 @@ export function registerChannelCommand(program: Command): void {
 
   channel
     .command("forum <name>")
-    .description("List threads in a forum channel")
-    .option("--scope <scope>", "channel scope: project | global")
+    .description("List threads in a Teamwork forum")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--status <status>", "filter by thread status")
     .option("--raw", "print raw reduced thread JSON")
     .action(async (name: string, raw: Record<string, unknown>) => {
@@ -756,9 +767,9 @@ export function registerChannelCommand(program: Command): void {
     .description("Show or mutate one thread timeline");
 
   thread
-    .argument("<name>", "channel name")
+    .argument("<name>", "Teamwork session name")
     .argument("<thread>", "thread key")
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--raw", "print raw thread events")
     .action(
       async (name: string, threadKey: string, raw: Record<string, unknown>) => {
@@ -780,9 +791,9 @@ export function registerChannelCommand(program: Command): void {
 
   thread
     .command("rename <name> <oldThread> <newThread>")
-    .description("Rename a thread inside a forum channel")
+    .description("Rename a thread inside a Teamwork forum")
     .requiredOption("--as <agent>", "agent name")
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .action(
       async (
         name: string,
@@ -805,15 +816,17 @@ export function registerChannelCommand(program: Command): void {
 
   const context = channel
     .command("context")
-    .description("Manage channel-level or thread-level context entries");
+    .description(
+      "Manage Teamwork session-level or thread-level context entries",
+    );
 
   const addContextOptions = (cmd: Command): Command =>
     cmd
       .option("--as <agent>", "agent name", "main")
-      .option("--scope <scope>", "channel scope: project | global")
+      .option("--scope <scope>", "Teamwork session scope: project | global")
       .option(
         "--thread <key>",
-        "mutate thread-level context instead of channel-level",
+        "mutate thread-level context instead of Teamwork session-level",
       )
       .option(
         "--file <absolute-path>",
@@ -865,10 +878,10 @@ export function registerChannelCommand(program: Command): void {
   context
     .command("list <name>")
     .description("List projected current context entries")
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .option(
       "--thread <key>",
-      "show thread-level context instead of channel-level",
+      "show thread-level context instead of Teamwork session-level",
     )
     .option("--raw", "print one context entry JSON per line")
     .action(async (name: string, raw: Record<string, unknown>) => {
@@ -888,13 +901,13 @@ export function registerChannelCommand(program: Command): void {
 
   const title = channel
     .command("title")
-    .description("Set or clear the channel display title");
+    .description("Set or clear the Teamwork session title");
 
   title
     .command("set <name>")
-    .description("Set the channel display title")
+    .description("Set the Teamwork session title")
     .option("--as <agent>", "agent name", "main")
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .requiredOption("--title <text>", "display title")
     .action(async (name: string, raw: Record<string, unknown>) => {
       const opts = raw as { as: string; scope?: string; title: string };
@@ -911,9 +924,9 @@ export function registerChannelCommand(program: Command): void {
 
   title
     .command("clear <name>")
-    .description("Clear the channel display title")
+    .description("Clear the Teamwork session title")
     .option("--as <agent>", "agent name", "main")
-    .option("--scope <scope>", "channel scope: project | global")
+    .option("--scope <scope>", "Teamwork session scope: project | global")
     .action(async (name: string, raw: Record<string, unknown>) => {
       try {
         await channelTitleClear(
@@ -929,23 +942,25 @@ export function registerChannelCommand(program: Command): void {
       }
     });
 
-  // Hidden: supervisor entry point invoked by `channel spawn` via fork.
+  // Hidden: supervisor entry point invoked by `teamwork spawn` via fork.
   channel
-    .command("__supervisor <channel> <worker> <config>")
+    .command("__supervisor <teamwork-session> <teammate> <config>")
     .description(
       "[internal] supervisor process entry point — do not invoke directly",
     )
-    .action(async (channelName: string, worker: string, configPath: string) => {
-      try {
-        await runSupervisor(channelName, worker, configPath);
-      } catch (err) {
-        console.error(
-          chalk.red("Supervisor error:"),
-          err instanceof Error ? err.message : err,
-        );
-        process.exit(1);
-      }
-    });
+    .action(
+      async (channelName: string, teammateName: string, configPath: string) => {
+        try {
+          await runSupervisor(channelName, teammateName, configPath);
+        } catch (err) {
+          console.error(
+            chalk.red("Supervisor error:"),
+            err instanceof Error ? err.message : err,
+          );
+          process.exit(1);
+        }
+      },
+    );
 
   // Dev-only: feed a recorded stream-json / wire trace through the matching
   // adapter and print the resulting channel events. Used during adapter

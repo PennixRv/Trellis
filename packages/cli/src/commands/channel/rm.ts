@@ -1,8 +1,8 @@
 /**
- * `trellis channel rm <name>` — kill any live workers, then remove the
+ * `trellis teamwork rm <name>` — stop any live teammates, then remove the
  * channel directory under `~/.trellis/channels/`.
  *
- * `trellis channel prune [--all | --idle <duration> | --empty]` — bulk
+ * `trellis teamwork prune [--all | --idle <duration> | --empty]` — bulk
  * cleanup matching criteria.
  */
 
@@ -39,12 +39,12 @@ export async function channelRm(
     }).project;
   const dir = channelDir(name, project);
   if (!fs.existsSync(dir)) {
-    throw new Error(`Channel '${name}' not found at ${dir}`);
+    throw new Error(`Teamwork session '${name}' not found at ${dir}`);
   }
   await killLiveWorkers(dir);
   fs.rmSync(dir, { recursive: true, force: true });
   if (!opts.force) {
-    console.log(`Removed channel '${name}'`);
+    console.log(`Removed Teamwork session '${name}'`);
   }
 }
 
@@ -80,7 +80,7 @@ export async function channelPrune(opts: PruneOptions): Promise<void> {
   const scope = parseChannelScope(opts.scope);
   const root = channelRoot();
   if (!fs.existsSync(root)) {
-    console.log("(no channels)");
+    console.log("(no Teamwork sessions)");
     return;
   }
 
@@ -177,7 +177,9 @@ export async function channelPrune(opts: PruneOptions): Promise<void> {
   }
 
   if (opts.dryRun) {
-    console.log(`\n(dry-run) would remove ${candidates.length} channel(s)`);
+    console.log(
+      `\n(dry-run) would remove ${candidates.length} Teamwork session(s)`,
+    );
     return;
   }
   if (!opts.yes) {
@@ -197,7 +199,7 @@ export async function channelPrune(opts: PruneOptions): Promise<void> {
       );
     }
   }
-  console.log(`\nRemoved ${candidates.length} channel(s)`);
+  console.log(`\nRemoved ${candidates.length} Teamwork session(s)`);
 }
 
 function hasLiveWorker(dir: string): boolean {

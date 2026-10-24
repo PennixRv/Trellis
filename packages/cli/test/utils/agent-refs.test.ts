@@ -10,13 +10,13 @@ import {
 
 describe("collectReferencedAgents", () => {
   it("extracts names from `--agent <name>` flags", () => {
-    const body = "Run `trellis channel spawn --agent implement` then check.";
-    expect(collectReferencedAgents(body)).toEqual(["implement"]);
+    const body = "Run `trellis teamwork spawn --agent teammate` then report.";
+    expect(collectReferencedAgents(body)).toEqual(["teammate"]);
   });
 
   it("extracts names from `--agent=<name>` form", () => {
-    const body = "use --agent=check for reviews";
-    expect(collectReferencedAgents(body)).toEqual(["check"]);
+    const body = "use --agent=teammate for reviews";
+    expect(collectReferencedAgents(body)).toEqual(["teammate"]);
   });
 
   it("extracts names from `.trellis/agents/<name>.md` literal paths", () => {
@@ -26,12 +26,12 @@ describe("collectReferencedAgents", () => {
 
   it("deduplicates and sorts results across both surface forms", () => {
     const body = `
-      trellis channel spawn --agent implement
-      trellis channel spawn --agent check
-      see .trellis/agents/implement.md for details
-      another reference: --agent check
+      trellis teamwork spawn --agent teammate
+      trellis teamwork spawn --agent teammate
+      see .trellis/agents/teammate.md for details
+      another reference: --agent teammate
     `;
-    expect(collectReferencedAgents(body)).toEqual(["check", "implement"]);
+    expect(collectReferencedAgents(body)).toEqual(["teammate"]);
   });
 
   it("returns empty array when no references are present", () => {
@@ -61,23 +61,23 @@ describe("collectMissingAgents", () => {
 
   it("returns referenced names that are not on disk", () => {
     fs.writeFileSync(
-      path.join(cwd, ".trellis", "agents", "implement.md"),
-      "---\nname: implement\n---\n",
+      path.join(cwd, ".trellis", "agents", "alpha.md"),
+      "---\nname: alpha\n---\n",
     );
-    const body = "--agent implement --agent check";
-    expect(collectMissingAgents(cwd, body)).toEqual(["check"]);
+    const body = "--agent alpha --agent beta";
+    expect(collectMissingAgents(cwd, body)).toEqual(["beta"]);
   });
 
   it("returns [] when every referenced agent exists", () => {
     fs.writeFileSync(
-      path.join(cwd, ".trellis", "agents", "implement.md"),
-      "---\nname: implement\n---\n",
+      path.join(cwd, ".trellis", "agents", "alpha.md"),
+      "---\nname: alpha\n---\n",
     );
     fs.writeFileSync(
-      path.join(cwd, ".trellis", "agents", "check.md"),
-      "---\nname: check\n---\n",
+      path.join(cwd, ".trellis", "agents", "beta.md"),
+      "---\nname: beta\n---\n",
     );
-    const body = "--agent implement --agent check";
+    const body = "--agent alpha --agent beta";
     expect(collectMissingAgents(cwd, body)).toEqual([]);
   });
 

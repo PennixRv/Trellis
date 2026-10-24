@@ -13,7 +13,7 @@ import { resolveTrustedRoots } from "./context-trust.js";
 import {
   enforceSpawnBudget,
   formatBudgetOverflowError,
-  resolveWorkerGuardConfig,
+  resolveTeammateGuardConfig,
 } from "./guard.js";
 import { withLock } from "./store/lock.js";
 import {
@@ -35,27 +35,27 @@ export interface SpawnOptions {
   resume?: string;
   /** Codex-only: overrides the `thread/start` sandbox mode (default `workspace-write`). */
   sandbox?: CodexSandboxMode;
-  /** Auto-kill the worker after this many milliseconds (anti-zombie). */
+  /** Auto-kill the teammate process after this many milliseconds (anti-zombie). */
   timeoutMs?: number;
   /** Emit supervisor_warning this many milliseconds before timeout. */
   warnBeforeMs?: number;
-  /** Files (or globs) to include in the worker's system prompt. */
+  /** Files (or globs) to include in the teammate's system prompt. */
   files?: string[];
   /** Trellis jsonl manifests to expand into the system prompt. */
   jsonls?: string[];
   scope?: string;
   /** Identity recorded as the `spawned` event author. Defaults to
-   *  the calling worker (`TRELLIS_CHANNEL_AS` env) or "main". */
+   *  the calling teammate (`TRELLIS_TEAMWORK_AS` env) or "main". */
   by?: string;
-  /** Worker inbox delivery policy (default `explicitOnly`). */
+  /** Teammate inbox delivery policy (default `explicitOnly`). */
   inboxPolicy?: InboxPolicy;
   /**
-   * OOM-guard idle-cleanup TTL for this worker, in ms. `0` disables
+   * OOM-guard idle-cleanup TTL for this teammate, in ms. `0` disables
    * idle cleanup. Overrides env / config / built-in default.
    */
   idleTimeoutMs?: number;
   /**
-   * OOM-guard live-worker budget for this spawn. `0` disables the
+   * OOM-guard live-teammate budget for this spawn. `0` disables the
    * spawn-time budget check. Overrides env / config / built-in default.
    */
   maxLiveWorkers?: number;
@@ -114,12 +114,12 @@ function resolveSpawn(channelName: string, opts: SpawnOptions): ResolvedSpawn {
 }
 
 /**
- * Compose the worker's system prompt: Trellis channel protocol prefix
+ * Compose the teammate's system prompt: Trellis Teamwork protocol prefix
  * (placeholder) + agent body (if any).
  *
  * NOTE: protocol prefix lives in the system prompt — NOT in any user
- * message. The worker stays inbox-idle after spawn; the first message
- * the worker sees is whatever the channel `send`s next.
+ * message. The teammate stays inbox-idle after spawn; the first message
+ * it sees is whatever the `teamwork send` command sends next.
  */
 function buildSystemPrompt(
   channelName: string,
@@ -128,9 +128,9 @@ function buildSystemPrompt(
   context: string,
 ): string {
   const protocol = [
-    "[TRELLIS CHANNEL PROTOCOL — placeholder]",
-    `You are agent "${safeIdentifier(workerName)}" participating in the channel "${safeIdentifier(channelName)}".`,
-    "Other agents (humans and AIs) may also be in this channel.",
+    "[TRELLIS TEAMWORK PROTOCOL — placeholder]",
+    `You are teammate "${safeIdentifier(workerName)}" participating in the channel "${safeIdentifier(channelName)}".`,
+    "Other teammates (humans and AIs) may also be in this channel.",
     "Messages addressed to you arrive as ordinary user turns.",
     "End each substantive reply clearly so the channel can route a `done` event.",
     "",
@@ -149,7 +149,7 @@ function buildSystemPrompt(
   return parts.join("\n\n---\n\n");
 }
 
-/** Restrict channel / worker names that flow into the protocol header so
+/** Restrict channel / teammate names that flow into the protocol header so
  *  they can't carry newlines or fake protocol directives. The CLI layer
  *  already validates names but defense in depth keeps prompt injection
  *  from this surface impossible. */
@@ -173,11 +173,11 @@ export async function channelSpawn(
 
   const resolved = resolveSpawn(channelName, opts);
 
-  // OOM guard: enforce live-worker budget for this project/scope before
-  // forking a supervisor. Expired idle workers are cleaned first; if the
+  // OOM guard: enforce the live-teammate budget for this project/scope before
+  // forking a supervisor. Expired idle teammates are cleaned first; if the
   // budget is still exhausted we reject rather than guess which non-
-  // expired worker to kill.
-  const guardPolicy = resolveWorkerGuardConfig({
+  // expired teammate to kill.
+  const guardPolicy = resolveTeammateGuardConfig({
     ...(opts.idleTimeoutMs !== undefined
       ? { flagIdleTimeoutMs: opts.idleTimeoutMs }
       : {}),
@@ -185,8 +185,8 @@ export async function channelSpawn(
       ? { flagMaxLiveWorkers: opts.maxLiveWorkers }
       : {}),
   });
-  // Serialize the budget check across the whole project bucket. A per-worker
-  // lock is not enough: two different worker names could otherwise both see
+  // Serialize the budget check across the whole project bucket. A per-teammate
+  // lock is not enough: two different teammate names could otherwise both see
   // a free slot and fork supervisors at the same time.
   return withLock(
     path.join(projectDir(ref.project), ".worker-guard.lock"),
@@ -197,7 +197,7 @@ export async function channelSpawn(
       });
       if (guard.cleaned.length > 0) {
         process.stderr.write(
-          `[channel guard] cleaned ${guard.cleaned.length} idle worker(s) past TTL ${guardPolicy.idleTimeoutMs}ms: ${guard.cleaned
+          `[teamwork guard] cleaned ${guard.cleaned.length} idle teammate(s) past TTL ${guardPolicy.idleTimeoutMs}ms: ${guard.cleaned
             .map((w) => `${w.channel}/${w.workerId}`)
             .join(", ")}\n`,
         );
@@ -212,7 +212,7 @@ export async function channelSpawn(
         );
       }
 
-      // Acquire the worker-level lock so a concurrent spawn / kill can't race
+      // Acquire the teammate-level lock so a concurrent spawn / kill can't race
       // with us. The lock is released as soon as we've handed off to a detached
       // supervisor (pid file in place).
       return withLock(
@@ -238,22 +238,22 @@ async function spawnLocked(
   project: string,
   idleTimeoutMs: number,
 ): Promise<{ pid: number; log: string; worker: string }> {
-  // Re-check worker name not already busy (now safe under the lock).
+  // Re-check teammate name not already busy (now safe under the lock).
   const pidPath = workerFile(channelName, resolved.as, "pid", project);
   if (fs.existsSync(pidPath)) {
     const existing = Number(fs.readFileSync(pidPath, "utf-8").trim());
     if (existing && processAlive(existing)) {
       throw new Error(
-        `Worker '${resolved.as}' is already running in channel '${channelName}' (pid ${existing})`,
+        `Teammate '${resolved.as}' is already running in channel '${channelName}' (pid ${existing})`,
       );
     }
   }
 
   const spawnedBy =
     opts.by ??
-    (typeof process.env.TRELLIS_CHANNEL_AS === "string" &&
-    process.env.TRELLIS_CHANNEL_AS.length > 0
-      ? process.env.TRELLIS_CHANNEL_AS
+    (typeof process.env.TRELLIS_TEAMWORK_AS === "string" &&
+    process.env.TRELLIS_TEAMWORK_AS.length > 0
+      ? process.env.TRELLIS_TEAMWORK_AS
       : "main");
 
   const configPath = writeSupervisorConfig(
@@ -347,7 +347,7 @@ async function spawnLocked(
       }
       reject(
         new Error(
-          `Failed to launch supervisor for worker '${resolved.as}': ${err.message}`,
+          `Failed to launch supervisor for teammate '${resolved.as}': ${err.message}`,
         ),
       );
     });

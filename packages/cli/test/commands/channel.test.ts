@@ -29,7 +29,10 @@ import {
   channelTitleSet,
 } from "../../src/commands/channel/title.js";
 import { channelThreadPost } from "../../src/commands/channel/threads.js";
-import { readChannelEvents } from "../../src/commands/channel/store/events.js";
+import {
+  appendEvent,
+  readChannelEvents,
+} from "../../src/commands/channel/store/events.js";
 import { matchesEventFilter } from "../../src/commands/channel/store/filter.js";
 import {
   channelRoot,
@@ -83,6 +86,31 @@ describe("channel storage and forum channels", () => {
     expect(
       fs.existsSync(eventsPath("root-check", projectKey(projectDir))),
     ).toBe(true);
+  });
+
+  it("renders teammate lifecycle labels in Teamwork messages", async () => {
+    await createChannel("teammate-labels", { by: "main" });
+    await appendEvent("teammate-labels", {
+      kind: "spawned",
+      by: "main",
+      as: "reviewer-a",
+      provider: "codex",
+    });
+    await appendEvent("teammate-labels", {
+      kind: "supervisor_warning",
+      by: "supervisor:reviewer-a",
+      worker: "reviewer-a",
+      reason: "timeout_approaching",
+    });
+
+    await channelMessages("teammate-labels", {});
+
+    const output = vi
+      .mocked(console.log)
+      .mock.calls.map(([line]) => String(line))
+      .join("\n");
+    expect(output).toContain("teammate=reviewer-a");
+    expect(output).not.toContain("worker=");
   });
 
   it("reduces structured thread events into board state", async () => {
@@ -246,10 +274,7 @@ describe("channel storage and forum channels", () => {
       textFile: bodyFile,
     });
 
-    const events = await readChannelEvents(
-      "file-post",
-      projectKey(projectDir),
-    );
+    const events = await readChannelEvents("file-post", projectKey(projectDir));
     expect(events.at(-1)).toMatchObject({
       kind: "thread",
       action: "comment",
@@ -341,10 +366,7 @@ describe("channel storage and forum channels", () => {
     });
     await channelTitleClear("defaults", {});
 
-    const events = await readChannelEvents(
-      "defaults",
-      projectKey(projectDir),
-    );
+    const events = await readChannelEvents("defaults", projectKey(projectDir));
     expect(events.slice(-4).map((event) => event.by)).toEqual([
       "main",
       "main",
@@ -354,9 +376,7 @@ describe("channel storage and forum channels", () => {
 
     vi.mocked(console.log).mockClear();
     await channelContextList("defaults", {});
-    expect(vi.mocked(console.log).mock.calls[0]?.[0]).toBe(
-      "raw  channel note",
-    );
+    expect(vi.mocked(console.log).mock.calls[0]?.[0]).toBe("raw  channel note");
   });
 
   it("records turn_finished when a worker emits a terminal event", async () => {
@@ -543,7 +563,10 @@ describe("channel storage and forum channels", () => {
     abort.abort();
     await watcher;
 
-    const events = await readChannelEvents("queued-turns", projectKey(projectDir));
+    const events = await readChannelEvents(
+      "queued-turns",
+      projectKey(projectDir),
+    );
     expect(events.slice(-3)).toMatchObject([
       { kind: "done", by: "worker" },
       { kind: "turn_finished", inputSeq: 2, turnId: "msg:2" },

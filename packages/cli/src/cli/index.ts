@@ -13,7 +13,8 @@ import {
   runWorkflowCommand,
   WorkflowCommandError,
 } from "../commands/workflow.js";
-import { registerChannelCommand } from "../commands/channel/index.js";
+import { registerTeamworkCommand } from "../commands/channel/index.js";
+import { registerTaskProgressCommand } from "../commands/task-progress.js";
 import { DIR_NAMES } from "../constants/paths.js";
 import { PACKAGE_NAME, VERSION } from "../constants/version.js";
 import { compareVersions } from "../utils/compare-versions.js";
@@ -123,7 +124,7 @@ program
   )
   .option(
     "--workflow <id>",
-    "Workflow template id for .trellis/workflow.md (default: native; e.g., tdd, channel-driven-subagent-dispatch)",
+    "Workflow template id for .trellis/workflow.md (default: native; e.g., tdd or a marketplace template)",
   )
   .option(
     "--workflow-source <source>",
@@ -313,11 +314,11 @@ program
 const workflowCommand = program
   .command("workflow")
   .description(
-    "List or switch the project's .trellis/workflow.md template (native, tdd, channel-driven-subagent-dispatch, or marketplace)",
+    "List or switch the project's .trellis/workflow.md template (native, tdd, or a marketplace template)",
   )
   .option(
     "-t, --template <id>",
-    "Workflow template id (e.g., native, tdd, channel-driven-subagent-dispatch)",
+    "Workflow template id (e.g., native, tdd, or a marketplace template)",
   )
   .option(
     "-m, --marketplace <source>",
@@ -429,6 +430,7 @@ program
     }
   });
 
-registerChannelCommand(program);
+registerTeamworkCommand(program);
+registerTaskProgressCommand(program);
 
 program.parse();

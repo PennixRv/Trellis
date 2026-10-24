@@ -1,14 +1,14 @@
 /**
- * Supervisor process: owns a single worker (claude or codex) and bridges
- * worker ↔ channel events.jsonl.
+ * Supervisor process: owns one teammate process (Claude Code or Codex) and
+ * bridges teammate messages with the Channel event log.
  *
- * Run as: `trellis channel __supervisor <channel> <worker> <config-path>`
+ * Run as: `trellis teamwork __supervisor <channel> <teammate> <config-path>`
  *
  * Three concurrent loops:
- *   1. stdout reader  — parse worker stdout → adapter → append events
- *   2. inbox watcher  — read events.jsonl for `to=<worker>` say events,
- *                       translate via adapter.encodeUserMessage → worker stdin
- *   3. signal handler — SIGTERM → close worker stdin → 3s → SIGTERM → 3s → SIGKILL
+ *   1. stdout reader  — parse teammate output → adapter → append events
+ *   2. inbox watcher  — read events.jsonl for `to=<teammate>` messages,
+ *                       translate via adapter.encodeUserMessage → process stdin
+ *   3. signal handler — SIGTERM → close process stdin → 3s → SIGTERM → 3s → SIGKILL
  *                       → write `killed` event → exit
  */
 
@@ -40,13 +40,13 @@ import { scheduleSupervisorTimeoutWarning } from "./supervisor/warning.js";
 export interface SupervisorConfig {
   provider: Provider;
   cwd: string;
-  /** Combined worker system prompt: channel protocol prefix + agent body.
+  /** Combined teammate system prompt: Teamwork protocol prefix + agent body.
    *  Injected via Claude `--append-system-prompt(-file)` or Codex
    *  `developerInstructions`. The supervisor also persists it to
-   *  `<worker>.system-prompt.md` and exposes the path as
+   *  `<teammate>.system-prompt.md` and exposes the path as
    *  `view.systemPromptFile` so adapters can avoid OS argv-length limits.
-   *  No "initial user prompt" — the worker stays idle until the first
-   *  inbox `send --to <worker>` arrives. */
+   *  No "initial user prompt" — the teammate stays idle until its first
+   *  inbox message arrives. */
   systemPrompt: string;
   /** Extra env vars (TRELLIS_HOOKS=0 etc. are added automatically). */
   env?: Record<string, string>;
@@ -56,19 +56,19 @@ export interface SupervisorConfig {
   resume?: string;
   /** Codex-only: overrides the `thread/start` sandbox mode (default `workspace-write`). */
   sandbox?: CodexSandboxMode;
-  /** Auto-kill worker after this many ms (anti-zombie). */
+  /** Auto-kill the teammate process after this many ms (anti-zombie). */
   timeoutMs?: number;
   /** Emit supervisor_warning this many ms before timeout. `<=0` disables it. */
   warnBeforeMs?: number;
   /**
-   * OOM-guard idle-cleanup TTL in ms. When a running worker stays idle
+   * Teammate-guard idle-cleanup TTL in ms. When a running teammate stays idle
    * for this long (no active turn), the supervisor self-terminates with
    * `killed{reason:"idle-timeout"}`. `<=0` or undefined disables.
    */
   idleTimeoutMs?: number;
   /** Caller identity recorded on the `spawned` event (default "main"). */
   spawnedBy?: string;
-  /** Agent definition name loaded for this worker, if any (recorded on `spawned`). */
+  /** Agent definition loaded for this teammate, if any (recorded on `spawned`). */
   agent?: string;
   /** Relative paths injected via --file / --jsonl (recorded on `spawned`). */
   contextFiles?: string[];
@@ -76,7 +76,7 @@ export interface SupervisorConfig {
    *  (recorded on `spawned` for observability — "I passed --jsonl X but
    *  X contained no real entries"). */
   contextManifests?: string[];
-  /** Worker inbox delivery policy (recorded on `spawned`; default
+  /** Teammate inbox delivery policy (recorded on `spawned`; default
    *  `explicitOnly`). */
   inboxPolicy?: InboxPolicy;
 }
@@ -91,7 +91,7 @@ interface ResolvedProviderPath {
 }
 
 /**
- * Drain worker stdout before synthesising terminal state and removing the
+ * Drain teammate output before synthesising terminal state and removing the
  * supervisor's runtime files.
  */
 export async function finalizeSupervisorExit(args: {
@@ -126,7 +126,7 @@ export async function finalizeSupervisorExit(args: {
  * Resolve the real launch target for npm `.cmd` shims on Windows.
  *
  * @param provider CLI basename for the provider, such as `codex` or `claude`.
- * @param cwd Worker launch directory, used to check local `node_modules/.bin` first.
+ * @param cwd Teammate launch directory, used to check local `node_modules/.bin` first.
  * @returns Command and prefix arguments that can be passed directly to `spawn()`.
  */
 export function resolveProviderPath(
@@ -173,7 +173,7 @@ export function resolveProviderPath(
 }
 
 /**
- * Entry point invoked by `trellis channel __supervisor <channel> <worker> <config>`.
+ * Entry point invoked by `trellis teamwork __supervisor <channel> <teammate> <config>`.
  */
 export async function runSupervisor(
   channelName: string,
@@ -182,7 +182,7 @@ export async function runSupervisor(
 ): Promise<void> {
   const config = readConfig(configPath);
 
-  // Self-pid file lets `trellis channel kill` find us.
+  // Self-pid file lets `trellis teamwork kill` find us.
   const project = process.env.TRELLIS_CHANNEL_PROJECT;
   fs.writeFileSync(
     workerFile(channelName, workerName, "pid", project),
@@ -192,9 +192,9 @@ export async function runSupervisor(
   // ── adapter selection ──
   const adapter = getAdapter(config.provider);
   const adapterCtx = adapter.createCtx();
-  // Persist an oversized system prompt to the worker dir and hand adapters a
+  // Persist an oversized system prompt to the teammate dir and hand adapters a
   // file path. Inlining a large prompt (agent body + injected --file/--jsonl
-  // context) on the worker command line breaks spawn(): Windows CreateProcess
+  // context) on the teammate command line breaks spawn(): Windows CreateProcess
   // caps the command line at 32,767 chars and fails with a silent-to-the-user
   // ENAMETOOLONG. Prompts within the inline budget stay on the argv flag so
   // Claude Code installs older than v2.0.34 (no --append-system-prompt-file)
@@ -225,7 +225,7 @@ export async function runSupervisor(
     ...config.env,
     TRELLIS_HOOKS: "0",
     TRELLIS_CHANNEL: channelName,
-    TRELLIS_CHANNEL_AS: workerName,
+    TRELLIS_TEAMWORK_AS: workerName,
   };
 
   const logPath = workerFile(channelName, workerName, "log", project);
@@ -276,7 +276,7 @@ export async function runSupervisor(
 
   // Attach before any await. Node drains unread child stdio after `exit`, so
   // attaching only after the durable `spawned` append can silently discard a
-  // fast worker's final output. Line processing stays gated until `spawned`
+  // fast teammate's final output. Line processing stays gated until `spawned`
   // is durable, preserving event-log order.
   const stdoutDrained = startStdoutPump({
     channelName,
@@ -317,7 +317,7 @@ export async function runSupervisor(
     // owns process.exit; subsequent fires must be no-ops or we'd queue
     // duplicate error events.
     if (spawnFailed) return;
-    log.write(`[supervisor] worker error: ${err.message}\n`);
+    log.write(`[supervisor] teammate error: ${err.message}\n`);
     if (!child.pid) {
       // Pre-spawn failure (ENOENT / EACCES): emit ONE `error` event,
       // skip the misleading `spawned{pid:undefined}`, clean up, and exit
@@ -333,7 +333,7 @@ export async function runSupervisor(
             {
               kind: "error",
               by: `supervisor:${workerName}`,
-              message: `worker spawn failed: ${err.message}`,
+              message: `teammate process start failed: ${err.message}`,
               provider: config.provider,
             },
             project,
@@ -346,7 +346,7 @@ export async function runSupervisor(
       })();
       return;
     }
-    // Post-spawn error (worker already running). Claude M2 fix: await
+    // Post-spawn error (teammate process already running). Claude M2 fix: await
     // the `error` append BEFORE requesting shutdown so `killed` can't
     // land first in events.jsonl.
     //
@@ -362,7 +362,7 @@ export async function runSupervisor(
           {
             kind: "error",
             by: `supervisor:${workerName}`,
-            message: `worker process error: ${err.message}`,
+            message: `teammate process error: ${err.message}`,
             provider: config.provider,
           },
           project,
@@ -473,7 +473,7 @@ export async function runSupervisor(
   if (config.timeoutMs && config.timeoutMs > 0) {
     setTimeout(() => {
       log.write(
-        `[supervisor] timeout ${config.timeoutMs}ms reached, killing worker\n`,
+        `[supervisor] timeout ${config.timeoutMs}ms reached, stopping teammate\n`,
       );
       // shutdown.request emits a single `killed{reason:"timeout"}` event;
       // no need to emit a separate one here.
@@ -481,7 +481,7 @@ export async function runSupervisor(
     }, config.timeoutMs).unref();
 
     // Fire-and-forget pre-timeout observability warning. One-shot, guarded
-    // by shutdown/terminal/exit state so it stays quiet once the worker is
+    // by shutdown/terminal/exit state so it stays quiet once the teammate is
     // already on its way out.
     scheduleSupervisorTimeoutWarning({
       channelName,
@@ -550,7 +550,7 @@ async function cleanup(channelName: string, workerName: string): Promise<void> {
   // because `withLock` released it; we delete it defensively in case the
   // CLI crashed mid-spawn and left a stale one.
   // Keep `log` (forensic), `session-id` / `thread-id` (future resume).
-  // `inbox-cursor` is kept so a respawn (same worker name without
+  // `inbox-cursor` is kept so a respawn (same teammate name without
   // killing the channel) doesn't replay messages.
   // `system-prompt.md` may carry a large injected context; a respawn rewrites
   // it from config when needed, so it is removed unconditionally (also when

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadAgent } from "../../src/commands/channel/agent-loader.js";
 import { assembleContext } from "../../src/commands/channel/context-loader.js";
 import {
-  parseChannelTrustSection,
+  parseTeamworkTrustSection,
   resolveTrustedRoots,
 } from "../../src/commands/channel/context-trust.js";
 
@@ -17,17 +17,17 @@ function realTmp(): string {
   return fs.realpathSync(os.tmpdir());
 }
 
-describe("parseChannelTrustSection", () => {
-  it("returns empty when channel section absent", () => {
-    expect(parseChannelTrustSection("packages:\n  cli:\n    path: x\n")).toEqual(
-      { trustedDirs: [] },
-    );
+describe("parseTeamworkTrustSection", () => {
+  it("returns empty when Teamwork section absent", () => {
+    expect(
+      parseTeamworkTrustSection("packages:\n  cli:\n    path: x\n"),
+    ).toEqual({ trustedDirs: [] });
   });
 
   it("parses a trusted_context_dirs list", () => {
     const content = [
-      "channel:",
-      "  worker_guard:",
+      "teamwork:",
+      "  teammate_guard:",
       "    idle_timeout: 5m",
       "  trusted_context_dirs:",
       "    - /work/user/trellis_workspace",
@@ -35,7 +35,7 @@ describe("parseChannelTrustSection", () => {
       "",
       "next_section: 1",
     ].join("\n");
-    const result = parseChannelTrustSection(content);
+    const result = parseTeamworkTrustSection(content);
     expect(result.trustedDirs).toEqual([
       "/work/user/trellis_workspace",
       "/another/dir",
@@ -44,35 +44,37 @@ describe("parseChannelTrustSection", () => {
 
   it("parses auto_trust_trellis_symlinks true/false", () => {
     expect(
-      parseChannelTrustSection("channel:\n  auto_trust_trellis_symlinks: false\n")
-        .autoTrustSymlinks,
+      parseTeamworkTrustSection(
+        "teamwork:\n  auto_trust_trellis_symlinks: false\n",
+      ).autoTrustSymlinks,
     ).toBe(false);
     expect(
-      parseChannelTrustSection("channel:\n  auto_trust_trellis_symlinks: true\n")
-        .autoTrustSymlinks,
+      parseTeamworkTrustSection(
+        "teamwork:\n  auto_trust_trellis_symlinks: true\n",
+      ).autoTrustSymlinks,
     ).toBe(true);
   });
 
   it("ignores commented-out entries", () => {
     const content = [
-      "channel:",
+      "teamwork:",
       "  # trusted_context_dirs:",
       "  #   - /work/user/trellis_workspace",
       "  # auto_trust_trellis_symlinks: false",
     ].join("\n");
-    const result = parseChannelTrustSection(content);
+    const result = parseTeamworkTrustSection(content);
     expect(result.trustedDirs).toEqual([]);
     expect(result.autoTrustSymlinks).toBeUndefined();
   });
 
   it("stops the list at the next key within the section", () => {
     const content = [
-      "channel:",
+      "teamwork:",
       "  trusted_context_dirs:",
       "    - /a",
       "  auto_trust_trellis_symlinks: false",
     ].join("\n");
-    const result = parseChannelTrustSection(content);
+    const result = parseTeamworkTrustSection(content);
     expect(result.trustedDirs).toEqual(["/a"]);
     expect(result.autoTrustSymlinks).toBe(false);
   });
@@ -101,7 +103,7 @@ describe("resolveTrustedRoots", () => {
     fs.mkdirSync(extDir, { recursive: true });
     fs.writeFileSync(
       path.join(cwd, ".trellis", "config.yaml"),
-      `channel:\n  trusted_context_dirs:\n    - ${extDir}\n`,
+      `teamwork:\n  trusted_context_dirs:\n    - ${extDir}\n`,
     );
     const roots = resolveTrustedRoots(cwd);
     expect(roots).toEqual([fs.realpathSync(extDir)]);
@@ -111,7 +113,7 @@ describe("resolveTrustedRoots", () => {
     const missing = path.join(tmpDir, "does-not-exist");
     fs.writeFileSync(
       path.join(cwd, ".trellis", "config.yaml"),
-      `channel:\n  trusted_context_dirs:\n    - ${missing}\n`,
+      `teamwork:\n  trusted_context_dirs:\n    - ${missing}\n`,
     );
     const originalWrite = process.stderr.write.bind(process.stderr);
     const warnings: string[] = [];
@@ -161,7 +163,7 @@ describe("resolveTrustedRoots", () => {
       fs.symlinkSync(extTasks, path.join(cwd, ".trellis", "tasks"), "dir");
       fs.writeFileSync(
         path.join(cwd, ".trellis", "config.yaml"),
-        "channel:\n  auto_trust_trellis_symlinks: false\n",
+        "teamwork:\n  auto_trust_trellis_symlinks: false\n",
       );
       expect(resolveTrustedRoots(cwd)).toEqual([]);
     },
@@ -236,7 +238,7 @@ describe("assembleContext with trusted roots (#414 repro)", () => {
       fs.symlinkSync(extTasks, path.join(cwd, ".trellis", "tasks"), "dir");
       fs.writeFileSync(
         path.join(cwd, ".trellis", "config.yaml"),
-        "channel:\n  auto_trust_trellis_symlinks: false\n",
+        "teamwork:\n  auto_trust_trellis_symlinks: false\n",
       );
 
       const trustedRoots = resolveTrustedRoots(cwd);
@@ -287,7 +289,7 @@ describe("assembleContext with trusted roots (#414 repro)", () => {
   );
 
   it.skipIf(isWin)(
-    "accepts files under a channel.trusted_context_dirs allowlist entry regardless of symlinks",
+    "accepts files under a teamwork.trusted_context_dirs allowlist entry regardless of symlinks",
     () => {
       const extDir = path.join(tmpDir, "allowlisted");
       fs.mkdirSync(extDir, { recursive: true });
@@ -295,7 +297,7 @@ describe("assembleContext with trusted roots (#414 repro)", () => {
       fs.writeFileSync(contextFile, "notes content\n");
       fs.writeFileSync(
         path.join(cwd, ".trellis", "config.yaml"),
-        `channel:\n  trusted_context_dirs:\n    - ${extDir}\n`,
+        `teamwork:\n  trusted_context_dirs:\n    - ${extDir}\n`,
       );
 
       const trustedRoots = resolveTrustedRoots(cwd);
@@ -313,7 +315,7 @@ describe("assembleContext with trusted roots (#414 repro)", () => {
     fs.writeFileSync(evilFile, "should not load\n");
     fs.writeFileSync(
       path.join(cwd, ".trellis", "config.yaml"),
-      `channel:\n  trusted_context_dirs:\n    - ${trustedDir}\n`,
+      `teamwork:\n  trusted_context_dirs:\n    - ${trustedDir}\n`,
     );
 
     const trustedRoots = resolveTrustedRoots(cwd);
@@ -329,7 +331,7 @@ describe("assembleContext with trusted roots (#414 repro)", () => {
     fs.writeFileSync(contextFile, "relative entry content\n");
     fs.writeFileSync(
       path.join(cwd, ".trellis", "config.yaml"),
-      "channel:\n  trusted_context_dirs:\n    - ../rel-allowlisted\n",
+      "teamwork:\n  trusted_context_dirs:\n    - ../rel-allowlisted\n",
     );
 
     const trustedRoots = resolveTrustedRoots(cwd);
@@ -358,7 +360,7 @@ describe("agent-loader honors trusted roots", () => {
     () => {
       // .trellis itself isn't in the auto-trust list (only tasks/workspace),
       // so exercise the allowlist path instead: symlink .trellis/agents to
-      // a dir inside a channel.trusted_context_dirs entry.
+      // a dir inside a teamwork.trusted_context_dirs entry.
       const extRoot = path.join(tmpDir, "ext-root");
       const extAgents = path.join(extRoot, "agents");
       fs.mkdirSync(extAgents, { recursive: true });
@@ -371,7 +373,7 @@ describe("agent-loader honors trusted roots", () => {
       fs.symlinkSync(extAgents, path.join(cwd, ".trellis", "agents"), "dir");
       fs.writeFileSync(
         path.join(cwd, ".trellis", "config.yaml"),
-        `channel:\n  trusted_context_dirs:\n    - ${extRoot}\n`,
+        `teamwork:\n  trusted_context_dirs:\n    - ${extRoot}\n`,
       );
 
       const trustedRoots = resolveTrustedRoots(cwd);

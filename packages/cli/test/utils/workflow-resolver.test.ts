@@ -85,9 +85,7 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        async () => new Response(JSON.stringify(index), { status: 200 }),
-      ),
+      vi.fn(async () => new Response(JSON.stringify(index), { status: 200 })),
     );
 
     await expect(resolveWorkflowTemplate("does-not-exist")).rejects.toThrow(
@@ -123,9 +121,7 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        async () => new Response(JSON.stringify(index), { status: 200 }),
-      ),
+      vi.fn(async () => new Response(JSON.stringify(index), { status: 200 })),
     );
 
     await expect(resolveWorkflowTemplate("broken")).rejects.toThrow(
@@ -147,9 +143,7 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        async () => new Response(JSON.stringify(index), { status: 200 }),
-      ),
+      vi.fn(async () => new Response(JSON.stringify(index), { status: 200 })),
     );
 
     await expect(resolveWorkflowTemplate("escape")).rejects.toThrow(
@@ -181,12 +175,6 @@ describe("listWorkflowTemplates", () => {
           path: "workflows/tdd/workflow.md",
         },
         {
-          id: "channel-driven-subagent-dispatch",
-          type: "workflow",
-          name: "Channel-Driven",
-          path: "workflows/channel-driven-subagent-dispatch/workflow.md",
-        },
-        {
           id: "electron-fullstack",
           type: "spec",
           name: "Electron",
@@ -196,16 +184,13 @@ describe("listWorkflowTemplates", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        async () => new Response(JSON.stringify(index), { status: 200 }),
-      ),
+      vi.fn(async () => new Response(JSON.stringify(index), { status: 200 })),
     );
 
     const { templates } = await listWorkflowTemplates();
     const ids = templates.map((t) => t.id);
     expect(ids).toContain(NATIVE_WORKFLOW_ID);
     expect(ids).toContain("tdd");
-    expect(ids).toContain("channel-driven-subagent-dispatch");
     expect(ids).not.toContain("electron-fullstack");
   });
 });

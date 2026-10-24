@@ -1,9 +1,9 @@
 /**
  * Supervisor pre-timeout warning scheduler.
  *
- * Emits a one-shot `supervisor_warning` channel event when the worker
+ * Emits a one-shot `supervisor_warning` Channel event when the teammate
  * is approaching its lifetime timeout, so observers (dispatchers /
- * `trellis channel messages`) can see the impending kill without
+ * `trellis teamwork messages`) can see the impending termination without
  * having to poll. The event is observability-only — it never replaces
  * the eventual `killed` / `done` / `error` terminal event, and is
  * not part of the meaningful-event set so plain `wait` does not wake
@@ -42,11 +42,11 @@ export interface ScheduleSupervisorTimeoutWarningArgs {
  * (clamped at 0 when the warning lead time is greater than the timeout).
  * Guarded so the warning is emitted at most once, never after shutdown
  * has been requested, never after a terminal event has been emitted,
- * and never after the worker child has exited.
+ * and never after the teammate process has exited.
  *
  * Returns a cancel handle that callers can invoke to drop the pending
  * timer (e.g. on supervisor teardown). Append failures are logged via
- * `log.write` only and do not affect worker lifecycle.
+ * `log.write` only and do not affect teammate lifecycle.
  */
 export function scheduleSupervisorTimeoutWarning(
   args: ScheduleSupervisorTimeoutWarningArgs,

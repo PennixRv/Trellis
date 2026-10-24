@@ -1,11 +1,10 @@
 /**
- * `channel run` — one-shot wrapper for short tasks: create an ephemeral
- * channel, spawn one worker, send a single prompt, wait for `done`,
- * print the worker's final message, and clean up.
+ * `teamwork run` — one-shot wrapper for short tasks: create an ephemeral
+ * Channel, spawn one teammate, send a single prompt, wait for `done`,
+ * print the teammate's final message, and clean up.
  *
  * Scope (decided in plan-r2):
- *   - single worker only (multi-worker scenarios use the manual
- *     `create --ephemeral` → N × spawn → wait --all → prune pattern)
+ *   - single teammate only (multi-unit plans use `teamwork batch`)
  *   - failure preserves the channel and prints its path so the user can
  *     inspect; success removes it
  */
@@ -117,14 +116,14 @@ async function waitForDone(
       if (ev.kind === "done") return;
       if (ev.kind === "error") {
         const msg = (ev as { message?: string }).message ?? "(no message)";
-        throw new Error(`worker ${workerName} reported error: ${msg}`);
+        throw new Error(`teammate ${workerName} reported error: ${msg}`);
       }
       if (ev.kind === "killed") {
         const reason = (ev as { reason?: string }).reason ?? "(unknown)";
-        throw new Error(`worker ${workerName} killed before done: ${reason}`);
+        throw new Error(`teammate ${workerName} killed before done: ${reason}`);
       }
     }
-    throw new Error(`timeout waiting for ${workerName} done`);
+    throw new Error(`timeout waiting for teammate ${workerName} to finish`);
   } finally {
     clearTimeout(timer);
   }

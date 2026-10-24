@@ -7,12 +7,12 @@ not normal chat streams: the default read path is
 
 ## Forum vs Regular Channel
 
-A channel's type is set with `--type` on `channel create` and never changes:
+A channel's type is set with `--type` on `teamwork create` and never changes:
 
-- `chat` (default) — flat message timeline. `channel messages` always renders
+- `chat` (default) — flat message timeline. `teamwork messages` always renders
   the event stream. Forum-only flags such as `--thread` and `--action` are
   rejected here.
-- `forum` — thread-oriented. `channel messages` without filters renders a
+- `forum` — thread-oriented. `teamwork messages` without filters renders a
   thread-board summary instead of raw events. The `post`, `forum`, `thread`,
   and `thread rename` subcommands only apply to forum channels.
 
@@ -22,7 +22,7 @@ Both types share the same scope model (`--scope project` is the default;
 ## Create A Forum Channel
 
 ```bash
-trellis channel create design-feedback \
+trellis teamwork create design-feedback \
   --type forum \
   --scope global \
   --description "Cross-project design feedback board." \
@@ -40,7 +40,7 @@ Threads live inside a forum channel. Each thread is identified by a stable
 a thread is `opened`; everything afterwards uses the same `--thread` key.
 
 ```bash
-trellis channel post design-feedback opened \
+trellis teamwork post design-feedback opened \
   --scope global \
   --as main \
   --thread login-empty-state \
@@ -50,19 +50,19 @@ trellis channel post design-feedback opened \
   --context-raw "Spotted during the 0.4 release review." \
   --text-file /tmp/thread-open.md
 
-trellis channel post design-feedback comment \
+trellis teamwork post design-feedback comment \
   --scope global \
-  --as reviewer \
+  --as teammate-a \
   --thread login-empty-state \
   --text-file /tmp/review.md
 
-trellis channel post design-feedback status \
+trellis teamwork post design-feedback status \
   --scope global \
   --as main \
   --thread login-empty-state \
   --status closed
 
-trellis channel post design-feedback summary \
+trellis teamwork post design-feedback summary \
   --scope global \
   --as main \
   --thread login-empty-state \
@@ -87,14 +87,14 @@ required in practice — there is no anonymous thread).
 ## Read A Forum
 
 ```bash
-trellis channel messages design-feedback --scope global
-trellis channel forum design-feedback --scope global --status open
-trellis channel thread design-feedback login-empty-state --scope global
-trellis channel messages design-feedback --scope global --raw --thread login-empty-state
+trellis teamwork messages design-feedback --scope global
+trellis teamwork forum design-feedback --scope global --status open
+trellis teamwork thread design-feedback login-empty-state --scope global
+trellis teamwork messages design-feedback --scope global --raw --thread login-empty-state
 ```
 
-If a peer says "I commented on the forum", run `channel forum` first to see
-which thread changed, then drill into that thread with `channel thread <name>
+If a peer says "I commented on the forum", run `teamwork forum` first to see
+which thread changed, then drill into that thread with `teamwork thread <name>
 <thread>`. Do not jump straight to ad-hoc `events.jsonl` parsing.
 
 ## Context
@@ -111,12 +111,12 @@ that fold into the canonical `--context-file` / `--context-raw`.
 
 ```bash
 # Channel-level context (whole forum)
-trellis channel context add design-feedback \
+trellis teamwork context add design-feedback \
   --scope global \
   --raw "Upstream feedback board; please link tasks before opening threads."
 
 # Thread-level context (one thread)
-trellis channel context add design-feedback \
+trellis teamwork context add design-feedback \
   --scope global \
   --thread login-empty-state \
   --file "$PWD/.trellis/tasks/05-13-login-redesign/design.md"
@@ -131,8 +131,8 @@ trellis channel context add design-feedback \
 ### List Context
 
 ```bash
-trellis channel context list design-feedback --scope global
-trellis channel context list design-feedback --scope global --thread login-empty-state --raw
+trellis teamwork context list design-feedback --scope global
+trellis teamwork context list design-feedback --scope global --thread login-empty-state --raw
 ```
 
 `--raw` on `list` emits one JSON entry per line (useful for piping); without
@@ -142,7 +142,7 @@ An empty store prints `(no context)`.
 ### Delete Context
 
 ```bash
-trellis channel context delete design-feedback \
+trellis teamwork context delete design-feedback \
   --scope global \
   --thread login-empty-state \
   --raw "stale note"
@@ -168,11 +168,11 @@ continue with the remaining data — do not fabricate the content.
 storage address. The channel `name` you pass to every command stays the same.
 
 ```bash
-trellis channel title set design-feedback \
+trellis teamwork title set design-feedback \
   --scope global \
   --title "Design feedback board"
 
-trellis channel title clear design-feedback --scope global
+trellis teamwork title clear design-feedback --scope global
 ```
 
 - `title set` requires `--title`.
@@ -187,7 +187,7 @@ wrong key (typo, wrong slug convention, etc.). Threads do not support hard
 deletion — rename is the supported corrective action.
 
 ```bash
-trellis channel thread rename design-feedback old-key new-key \
+trellis teamwork thread rename design-feedback old-key new-key \
   --scope global \
   --as main
 ```
@@ -212,14 +212,14 @@ A common use of a global forum channel is an internal release / runtime
 changelog. One thread per notable change keeps history searchable:
 
 ```bash
-trellis channel create release-notes \
+trellis teamwork create release-notes \
   --type forum \
   --scope global \
   --description "Internal release and runtime changelog." \
   --context-raw "One thread per notable change; close when shipped." \
   --by main
 
-trellis channel post release-notes opened \
+trellis teamwork post release-notes opened \
   --scope global \
   --as main \
   --thread release-2026-q1 \

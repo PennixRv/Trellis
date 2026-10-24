@@ -44,17 +44,17 @@ function yamlInteger(
   key: string,
 ): number | undefined {
   const lines = content.split("\n");
-  let inChannel = false;
+  let inTeamwork = false;
   let inSection = false;
   for (const raw of lines) {
     const line = raw.replace(/\r$/, "");
     const trimmed = line.trimEnd();
-    if (/^channel:\s*$/.test(trimmed)) {
-      inChannel = true;
+    if (/^teamwork:\s*$/.test(trimmed)) {
+      inTeamwork = true;
       inSection = false;
       continue;
     }
-    if (inChannel && new RegExp(`^  ${section}:\\s*$`).test(trimmed)) {
+    if (inTeamwork && new RegExp(`^  ${section}:\\s*$`).test(trimmed)) {
       inSection = true;
       continue;
     }
@@ -63,8 +63,8 @@ function yamlInteger(
       if (match) return Number(match[1]);
       if (!/^ {4}\S/.test(line)) inSection = false;
     }
-    if (inChannel && /^\S/.test(line) && !/^channel:\s*$/.test(trimmed)) {
-      inChannel = false;
+    if (inTeamwork && /^\S/.test(line) && !/^teamwork:\s*$/.test(trimmed)) {
+      inTeamwork = false;
       inSection = false;
     }
   }
@@ -84,26 +84,26 @@ export function resolveTeammateRuntimeConfig(
   }
   const maxConcurrency =
     integer(
-      env.TRELLIS_CHANNEL_TEAMMATE_MAX_CONCURRENCY
-        ? Number(env.TRELLIS_CHANNEL_TEAMMATE_MAX_CONCURRENCY)
+      env.TRELLIS_TEAMWORK_TEAMMATE_MAX_CONCURRENCY
+        ? Number(env.TRELLIS_TEAMWORK_TEAMMATE_MAX_CONCURRENCY)
         : yamlInteger(content, "teammate", "max_concurrency"),
-      "channel.teammate.max_concurrency",
+      "teamwork.teammate.max_concurrency",
       true,
     ) ?? DEFAULT_CONFIG.teammate.maxConcurrency;
   const maxLiveTeammates =
     integer(
-      env.TRELLIS_CHANNEL_MAX_LIVE_TEAMMATES
-        ? Number(env.TRELLIS_CHANNEL_MAX_LIVE_TEAMMATES)
+      env.TRELLIS_TEAMWORK_MAX_LIVE_TEAMMATES
+        ? Number(env.TRELLIS_TEAMWORK_MAX_LIVE_TEAMMATES)
         : yamlInteger(content, "teammate_guard", "max_live_teammates"),
-      "channel.teammate_guard.max_live_teammates",
+      "teamwork.teammate_guard.max_live_teammates",
       true,
     ) ?? DEFAULT_CONFIG.guard.maxLiveTeammates;
   const nonBatchReserved =
     integer(
-      env.TRELLIS_CHANNEL_TEAMMATE_RESERVED
-        ? Number(env.TRELLIS_CHANNEL_TEAMMATE_RESERVED)
+      env.TRELLIS_TEAMWORK_TEAMMATE_RESERVED
+        ? Number(env.TRELLIS_TEAMWORK_TEAMMATE_RESERVED)
         : yamlInteger(content, "teammate_guard", "non_batch_reserved"),
-      "channel.teammate_guard.non_batch_reserved",
+      "teamwork.teammate_guard.non_batch_reserved",
     ) ?? DEFAULT_CONFIG.guard.nonBatchReserved;
   return {
     teammate: { maxConcurrency },
@@ -126,17 +126,17 @@ export function effectiveTeammateCapacity(input: {
 }): number {
   integer(
     input.config.teammate.maxConcurrency,
-    "channel.teammate.max_concurrency",
+    "teamwork.teammate.max_concurrency",
     true,
   );
   integer(
     input.config.guard.maxLiveTeammates,
-    "channel.teammate_guard.max_live_teammates",
+    "teamwork.teammate_guard.max_live_teammates",
     true,
   );
   integer(
     input.config.guard.nonBatchReserved,
-    "channel.teammate_guard.non_batch_reserved",
+    "teamwork.teammate_guard.non_batch_reserved",
   );
   const requested = input.requested ?? input.config.teammate.maxConcurrency;
   integer(requested, "batch.requested_capacity", true);
@@ -145,7 +145,7 @@ export function effectiveTeammateCapacity(input: {
     input.config.guard.maxLiveTeammates - input.config.guard.nonBatchReserved;
   if (availableGuard <= 0) {
     throw new Error(
-      "channel.teammate_guard has no capacity after non-batch reservations",
+      "teamwork.teammate_guard has no capacity after non-batch reservations",
     );
   }
   const capacity = Math.min(

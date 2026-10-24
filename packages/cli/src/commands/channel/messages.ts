@@ -44,7 +44,7 @@ export async function channelMessages(
   });
   const file = eventsPath(channelName, ref.project);
   if (!fs.existsSync(file)) {
-    throw new Error(`Channel '${channelName}' not found at ${file}`);
+    throw new Error(`Teamwork session '${channelName}' not found at ${file}`);
   }
 
   const all = await readChannelEvents(channelName, ref.project);
@@ -139,7 +139,7 @@ function printEvent(ev: ChannelEvent, raw: boolean): void {
       const manifests = ev.manifests;
       const agentStr = agent ? `  agent=${chalk.magenta(agent)}` : "";
       printLine(
-        `${kindTag("spawned")} by=${by}  worker=${colorTo(as)} provider=${provider}${agentStr} pid=${pid}`,
+        `${kindTag("spawned")} by=${by}  teammate=${colorTo(as)} provider=${provider}${agentStr} pid=${pid}`,
         ts,
       );
       if (files && files.length > 0) {
@@ -211,7 +211,7 @@ function printEvent(ev: ChannelEvent, raw: boolean): void {
         remaining !== undefined ? `  remaining=${remaining}ms` : "";
       const timeoutStr = timeout !== undefined ? `  timeout=${timeout}ms` : "";
       printLine(
-        `${kindTag("supervisor_warning")} by=${by}  worker=${colorTo(worker)} reason=${reason}${remainingStr}${timeoutStr}`,
+        `${kindTag("supervisor_warning")} by=${by}  teammate=${colorTo(worker)} reason=${reason}${remainingStr}${timeoutStr}`,
         ts,
       );
       break;

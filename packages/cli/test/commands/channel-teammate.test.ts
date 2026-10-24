@@ -11,7 +11,7 @@ import {
   getTeammateAdapter,
   listTeammateProviders,
 } from "../../src/commands/channel/teammate-adapters.js";
-import { registerChannelCommand } from "../../src/commands/channel/index.js";
+import { registerTeamworkCommand } from "../../src/commands/channel/index.js";
 import { resolveTeammateProfile } from "../../src/commands/channel/profiles.js";
 import { buildTeammateLaunchSpec } from "../../src/commands/channel/teammate-launch.js";
 
@@ -118,16 +118,17 @@ describe("teammate adapter contract", () => {
     const missingProof = { ...host } as Partial<typeof host>;
     delete missingProof.implicitMemoryDisabled;
     expect(() =>
-      assertTeammateHostCapability(
-        "codex",
-        missingProof as typeof host,
-      ),
+      assertTeammateHostCapability("codex", missingProof as typeof host),
     ).toThrow(/capability proof/);
   });
 
   it("freezes injected role, context, profile and host capability digests", () => {
     const cwd = project();
-    const profile = resolveTeammateProfile({ cwd, profile: "review", provider: "codex" });
+    const profile = resolveTeammateProfile({
+      cwd,
+      profile: "review",
+      provider: "codex",
+    });
     const launch = buildTeammateLaunchSpec({
       cwd,
       profile,
@@ -157,7 +158,11 @@ describe("teammate adapter contract", () => {
 
   it("rejects missing or symlinked context and unsupported profile options", () => {
     const cwd = project();
-    const profile = resolveTeammateProfile({ cwd, profile: "review", provider: "codex" });
+    const profile = resolveTeammateProfile({
+      cwd,
+      profile: "review",
+      provider: "codex",
+    });
     expect(() =>
       buildTeammateLaunchSpec({
         cwd,
@@ -190,7 +195,13 @@ describe("teammate adapter contract", () => {
 
   it("refuses the batch entrypoint before reading a plan without a verified host", async () => {
     const program = new Command();
-    registerChannelCommand(program);
+    registerTeamworkCommand(program);
+    expect(program.commands.map((command) => command.name())).toContain(
+      "teamwork",
+    );
+    expect(program.commands.map((command) => command.name())).not.toContain(
+      "channel",
+    );
     const exit = vi.spyOn(process, "exit").mockImplementation(((
       code?: number,
     ) => {
@@ -204,7 +215,7 @@ describe("teammate adapter contract", () => {
       program.parseAsync([
         "node",
         "trellis",
-        "channel",
+        "teamwork",
         "batch",
         "missing-plan.json",
       ]),

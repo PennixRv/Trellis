@@ -25,9 +25,9 @@ export async function channelKill(
   const ref = resolveExistingChannelRef(channelName, {
     scope: parseChannelScope(opts.scope),
   });
-  // Take the worker lock so kill ↔ spawn can't race: spawn won't claim a
+  // Take the teammate lock so kill ↔ spawn can't race: spawn won't claim a
   // stale pid file while we're tearing it down; we won't try to kill a
-  // worker whose pid file is mid-creation.
+  // teammate whose pid file is mid-creation.
   return withLock(
     workerLockPath(channelName, opts.as, ref.project),
     () => killLocked(channelName, opts, ref.project),
@@ -43,7 +43,7 @@ async function killLocked(
   const pidPath = workerFile(channelName, opts.as, "pid", project);
   if (!fs.existsSync(pidPath)) {
     throw new Error(
-      `Worker '${opts.as}' not running in channel '${channelName}'`,
+      `Teammate '${opts.as}' not running in channel '${channelName}'`,
     );
   }
   const supervisorPid = Number(fs.readFileSync(pidPath, "utf-8").trim());
@@ -63,7 +63,7 @@ async function killLocked(
   }
 
   if (opts.force) {
-    // Also kill the inner worker so it doesn't become an orphan.
+    // Also kill the teammate process so it doesn't become an orphan.
     const workerPidPath = workerFile(
       channelName,
       opts.as,

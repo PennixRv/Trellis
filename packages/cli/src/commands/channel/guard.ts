@@ -1,9 +1,9 @@
 /**
- * Channel worker OOM guard policy.
+ * Teamwork teammate process guard policy.
  *
- * Resolves idle-cleanup TTL and live-worker budget from CLI flag /
+ * Resolves idle-cleanup TTL and live-teammate budget from CLI flag /
  * environment / project config / built-in defaults (in that precedence
- * order), then scans the live worker registry inside a project bucket
+ * order), then scans the live teammate registry inside a project bucket
  * to enforce both constraints at spawn time.
  *
  * Boundary: this module lives in the CLI runtime layer. Core owns
@@ -35,29 +35,29 @@ import {
 } from "./store/paths.js";
 import { parseDuration } from "./wait.js";
 
-/** Built-in default idle-cleanup TTL for spawned workers (5 minutes). */
+/** Built-in default idle-cleanup TTL for spawned teammates (5 minutes). */
 export const DEFAULT_IDLE_TTL_MS = 5 * 60 * 1000;
 
-/** Built-in default live-worker budget per project/scope. */
-export const DEFAULT_MAX_LIVE_WORKERS = 6;
+/** Built-in default live-teammate budget per project/scope. */
+export const DEFAULT_MAX_LIVE_TEAMMATES = 6;
 
 /** Env var override for the idle-cleanup TTL. */
-export const ENV_IDLE_TIMEOUT = "TRELLIS_CHANNEL_WORKER_IDLE_TIMEOUT";
+export const ENV_IDLE_TIMEOUT = "TRELLIS_TEAMWORK_IDLE_TIMEOUT";
 
-/** Env var override for the live-worker budget. */
-export const ENV_MAX_LIVE_WORKERS = "TRELLIS_CHANNEL_MAX_LIVE_WORKERS";
+/** Env var override for the live-teammate budget. */
+export const ENV_MAX_LIVE_TEAMMATES = "TRELLIS_TEAMWORK_MAX_LIVE_TEAMMATES";
 
-export interface WorkerGuardConfig {
+export interface TeammateGuardConfig {
   /** Idle-cleanup TTL in ms. `0` disables idle cleanup for new spawns. */
   idleTimeoutMs: number;
-  /** Live-worker budget. `0` disables the spawn-time budget check. */
+  /** Live-teammate budget. `0` disables the spawn-time budget check. */
   maxLiveWorkers: number;
 }
 
 export interface ResolveGuardOptions {
   /** CLI `--idle-timeout` value (already millisecond-parsed). */
   flagIdleTimeoutMs?: number;
-  /** CLI `--max-live-workers` value. */
+  /** CLI `--max-live-teammates` value. */
   flagMaxLiveWorkers?: number;
   /** Override cwd for config lookup (default `process.cwd()`). */
   cwd?: string;
@@ -69,15 +69,15 @@ export interface ResolveGuardOptions {
  * Resolve the effective guard policy. Precedence:
  *   1. CLI flag (`flag*Ms` / `flagMaxLiveWorkers`)
  *   2. environment variable
- *   3. `.trellis/config.yaml` `channel.worker_guard`
+ *   3. `.trellis/config.yaml` `teamwork.teammate_guard`
  *   4. built-in default constant
  */
-export function resolveWorkerGuardConfig(
+export function resolveTeammateGuardConfig(
   opts: ResolveGuardOptions = {},
-): WorkerGuardConfig {
+): TeammateGuardConfig {
   const cwd = opts.cwd ?? process.cwd();
   const env = opts.env ?? process.env;
-  const fromConfig = loadWorkerGuardConfig(cwd);
+  const fromConfig = loadTeammateGuardConfig(cwd);
 
   const idleTimeoutMs = pickNonNegativeMs(
     opts.flagIdleTimeoutMs,
@@ -87,9 +87,9 @@ export function resolveWorkerGuardConfig(
   );
   const maxLiveWorkers = pickNonNegativeInt(
     opts.flagMaxLiveWorkers,
-    parseEnvInt(env[ENV_MAX_LIVE_WORKERS], ENV_MAX_LIVE_WORKERS),
+    parseEnvInt(env[ENV_MAX_LIVE_TEAMMATES], ENV_MAX_LIVE_TEAMMATES),
     fromConfig?.maxLiveWorkers,
-    DEFAULT_MAX_LIVE_WORKERS,
+    DEFAULT_MAX_LIVE_TEAMMATES,
   );
 
   return { idleTimeoutMs, maxLiveWorkers };
@@ -113,12 +113,12 @@ function pickNonNegativeInt(...candidates: (number | undefined)[]): number {
     if (c === undefined) continue;
     if (!Number.isInteger(c) || c < 0) {
       throw new Error(
-        `Max live workers must be a non-negative integer (got ${c})`,
+        `Max live teammates must be a non-negative integer (got ${c})`,
       );
     }
     return c;
   }
-  return DEFAULT_MAX_LIVE_WORKERS;
+  return DEFAULT_MAX_LIVE_TEAMMATES;
 }
 
 function parseEnvDuration(
@@ -153,11 +153,11 @@ interface ProjectGuardConfig {
 }
 
 /**
- * Parse the `channel.worker_guard` section out of `.trellis/config.yaml`.
+ * Parse the `teamwork.teammate_guard` section out of `.trellis/config.yaml`.
  * Mirrors the lightweight line-scanner used elsewhere in update.ts so we
  * don't pull in a YAML dependency just for this two-field section.
  */
-export function loadWorkerGuardConfig(
+export function loadTeammateGuardConfig(
   cwd: string,
 ): ProjectGuardConfig | undefined {
   const configPath = path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml");
@@ -168,15 +168,15 @@ export function loadWorkerGuardConfig(
   } catch {
     return undefined;
   }
-  return parseWorkerGuardSection(content);
+  return parseTeammateGuardSection(content);
 }
 
 /** Exposed for unit tests. */
-export function parseWorkerGuardSection(
+export function parseTeammateGuardSection(
   content: string,
 ): ProjectGuardConfig | undefined {
   const lines = content.split("\n");
-  let inChannel = false;
+  let inTeamwork = false;
   let inGuard = false;
   const found: ProjectGuardConfig = {};
   let any = false;
@@ -186,12 +186,12 @@ export function parseWorkerGuardSection(
     const trimmed = line.trimEnd();
     if (trimmed === "" || trimmed.trimStart().startsWith("#")) continue;
 
-    if (/^channel:\s*$/.test(trimmed)) {
-      inChannel = true;
+    if (/^teamwork:\s*$/.test(trimmed)) {
+      inTeamwork = true;
       inGuard = false;
       continue;
     }
-    if (inChannel && /^ {2}worker_guard:\s*$/.test(trimmed)) {
+    if (inTeamwork && /^ {2}teammate_guard:\s*$/.test(trimmed)) {
       inGuard = true;
       continue;
     }
@@ -203,13 +203,13 @@ export function parseWorkerGuardSection(
         any = true;
         continue;
       }
-      const max = trimmed.match(/^ {4}max_live_workers:\s*(.+)$/);
+      const max = trimmed.match(/^ {4}max_live_teammates:\s*(.+)$/);
       if (max) {
         const val = stripValue(max[1]);
         const n = Number(val);
         if (!Number.isInteger(n) || n < 0) {
           throw new Error(
-            `channel.worker_guard.max_live_workers must be a non-negative integer (got '${val}')`,
+            `teamwork.teammate_guard.max_live_teammates must be a non-negative integer (got '${val}')`,
           );
         }
         found.maxLiveWorkers = n;
@@ -221,8 +221,8 @@ export function parseWorkerGuardSection(
         inGuard = false;
       }
     }
-    if (inChannel && !/^ {2}\S/.test(line) && /^\S/.test(line)) {
-      inChannel = false;
+    if (inTeamwork && /^\S/.test(line) && !/^teamwork:\s*$/.test(trimmed)) {
+      inTeamwork = false;
       inGuard = false;
     }
   }
@@ -244,7 +244,7 @@ function parseGuardDuration(raw: string, key: string): number {
   if (Number.isFinite(asInt) && /^\d+$/.test(raw)) {
     if (asInt < 0) {
       throw new Error(
-        `channel.worker_guard.${key} must be non-negative (got '${raw}')`,
+        `teamwork.teammate_guard.${key} must be non-negative (got '${raw}')`,
       );
     }
     // Bare integer 0 = disabled; >0 with no unit = milliseconds.
@@ -254,7 +254,7 @@ function parseGuardDuration(raw: string, key: string): number {
     return parseDuration(raw) ?? 0;
   } catch (err) {
     throw new Error(
-      `channel.worker_guard.${key}: ${err instanceof Error ? err.message : String(err)}`,
+      `teamwork.teammate_guard.${key}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }
@@ -559,7 +559,7 @@ export interface EnforceBudgetInput {
   /** Override channel root scan path (used by tests). */
   root?: string;
   /** Effective guard policy. */
-  policy: WorkerGuardConfig;
+  policy: TeammateGuardConfig;
   /** Override `now` for deterministic tests. */
   now?: number;
   /** Override supervisor process verification (used by tests). */
@@ -626,7 +626,7 @@ export function formatBudgetOverflowError(args: {
   limit: number;
 }): string {
   const { projectKey, live, limit } = args;
-  const header = `Live worker budget exhausted for project '${projectKey}': ${live.length}/${limit} live worker(s).`;
+  const header = `Live teammate budget exhausted for project '${projectKey}': ${live.length}/${limit} live teammate(s).`;
   const rows = live
     .map((w) => {
       const provider = w.state.provider ?? "?";
@@ -635,15 +635,15 @@ export function formatBudgetOverflowError(args: {
       const pid = w.supervisorPid ?? "?";
       const verified =
         w.supervisorVerified === false ? " supervisor=unverified" : "";
-      return `  • channel='${w.channel}' worker='${w.workerId}' provider=${provider} lifecycle=${lifecycle} activity=${activity} pid=${pid}${verified}`;
+      return `  • session='${w.channel}' teammate='${w.workerId}' provider=${provider} lifecycle=${lifecycle} activity=${activity} pid=${pid}${verified}`;
     })
     .join("\n");
   const hint = [
     "Free a slot before spawning, e.g.:",
-    `  trellis channel kill <channel> --as <worker>`,
+    `  trellis teamwork kill <channel> --as <teammate>`,
     "Or override per spawn:",
-    `  trellis channel spawn ... --max-live-workers ${live.length + 1}`,
-    "Or raise the default in .trellis/config.yaml under channel.worker_guard.max_live_workers.",
+    `  trellis teamwork spawn ... --max-live-teammates ${live.length + 1}`,
+    "Or raise the default in .trellis/config.yaml under teamwork.teammate_guard.max_live_teammates.",
   ].join("\n");
   return [header, rows, hint].join("\n");
 }

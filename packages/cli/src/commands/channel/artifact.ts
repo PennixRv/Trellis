@@ -8,6 +8,8 @@ export type ReportStatus = "complete" | "blocked" | "incomplete" | "error";
 
 export interface BatchWorkUnit {
   workId: string;
+  evaluationGroup?: { id: string; kind: "committee" };
+  counterOf?: string;
   briefPath: string;
   roleId: "teammate";
   provider: "claude" | "codex" | "dsh" | "copilot";
@@ -233,6 +235,15 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function withoutFields(
+  value: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([field]) => !fields.includes(field)),
+  );
+}
+
 export function computeBatchPlanHash(value: unknown): string {
   return crypto.createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
@@ -257,6 +268,8 @@ export function validateBatchPlan(input: unknown, taskRoot: string): BatchPlan {
   if (!Array.isArray(workValue) || workValue.length === 0)
     throw new Error("batch plan work must be non-empty");
   const seen = new Set<string>();
+  const rawWorkById = new Map<string, Record<string, unknown>>();
+  const briefsById = new Map<string, Record<string, unknown>>();
   const work: BatchWorkUnit[] = workValue.map((raw, index) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw))
       throw new Error(`work[${index}] must be an object`);
@@ -264,6 +277,31 @@ export function validateBatchPlan(input: unknown, taskRoot: string): BatchPlan {
     const workId = id(item.work_id, `work[${index}].work_id`);
     if (seen.has(workId)) throw new Error(`duplicate work id '${workId}'`);
     seen.add(workId);
+    rawWorkById.set(workId, item);
+    const evaluationGroupValue = item.evaluation_group;
+    let evaluationGroup: BatchWorkUnit["evaluationGroup"];
+    if (evaluationGroupValue !== undefined) {
+      if (
+        !evaluationGroupValue ||
+        typeof evaluationGroupValue !== "object" ||
+        Array.isArray(evaluationGroupValue)
+      ) {
+        throw new Error(`work[${index}].evaluation_group must be an object`);
+      }
+      const group = evaluationGroupValue as Record<string, unknown>;
+      if (group.kind !== "committee")
+        throw new Error(`work[${index}].evaluation_group.kind is unsupported`);
+      evaluationGroup = {
+        id: id(group.id, `work[${index}].evaluation_group.id`),
+        kind: "committee",
+      };
+    }
+    const counterOf =
+      item.counter_of === undefined
+        ? undefined
+        : id(item.counter_of, `work[${index}].counter_of`);
+    if (evaluationGroup && counterOf)
+      throw new Error(`work '${workId}' cannot be both committee and counter`);
     if (item.role_id !== "teammate")
       throw new Error(`work[${index}].role_id must be teammate`);
     const provider = item.provider;
@@ -331,6 +369,7 @@ export function validateBatchPlan(input: unknown, taskRoot: string): BatchPlan {
     >;
     if (!brief || typeof brief !== "object" || Array.isArray(brief))
       throw new Error(`brief for work '${workId}' must be an object`);
+    briefsById.set(workId, brief);
     rejectSecrets(brief, `brief for work '${workId}'`);
     if (computeBatchPlanHash(brief) !== briefDigest)
       throw new Error(`brief.${workId} digest does not match the batch plan`);
@@ -385,6 +424,9 @@ export function validateBatchPlan(input: unknown, taskRoot: string): BatchPlan {
         throw new Error(`brief.${field} is not declared by the batch plan`);
       }
     }
+    if (brief.counter_of !== counterOf) {
+      throw new Error(`brief.counter_of does not match work '${workId}'`);
+    }
     const briefAcceptance = brief.acceptance;
     if (
       !Array.isArray(briefAcceptance) ||
@@ -396,6 +438,8 @@ export function validateBatchPlan(input: unknown, taskRoot: string): BatchPlan {
     }
     const unit: BatchWorkUnit = {
       workId,
+      ...(evaluationGroup ? { evaluationGroup } : {}),
+      ...(counterOf ? { counterOf } : {}),
       briefPath,
       roleId: "teammate",
       provider,
@@ -416,6 +460,123 @@ export function validateBatchPlan(input: unknown, taskRoot: string): BatchPlan {
     rejectSecrets(unit, `work[${index}]`);
     return unit;
   });
+
+  const workById = new Map(work.map((unit) => [unit.workId, unit]));
+  const committeeGroups = new Map<string, BatchWorkUnit[]>();
+  const countersByPrimary = new Map<string, BatchWorkUnit>();
+  for (const unit of work) {
+    if (unit.evaluationGroup) {
+      if (unit.counterOf)
+        throw new Error(`committee work '${unit.workId}' cannot be a counter`);
+      const members = committeeGroups.get(unit.evaluationGroup.id) ?? [];
+      members.push(unit);
+      committeeGroups.set(unit.evaluationGroup.id, members);
+    }
+    if (unit.counterOf) {
+      const primary = workById.get(unit.counterOf);
+      if (!primary || primary.workId === unit.workId)
+        throw new Error(
+          `counter '${unit.workId}' must reference a distinct work in this batch`,
+        );
+      if (primary.counterOf || primary.evaluationGroup || unit.evaluationGroup)
+        throw new Error(
+          `counter '${unit.workId}' must reference an unpaired primary work`,
+        );
+      if (countersByPrimary.has(primary.workId))
+        throw new Error(
+          `primary '${primary.workId}' cannot have multiple counters`,
+        );
+      countersByPrimary.set(primary.workId, unit);
+      if (unit.lens === primary.lens)
+        throw new Error(`counter '${unit.workId}' must use a distinct lens`);
+      const workFields = [
+        "work_id",
+        "provider",
+        "profile",
+        "model",
+        "lens",
+        "brief_path",
+        "brief_digest",
+        "counter_of",
+      ];
+      const primaryRaw = rawWorkById.get(primary.workId);
+      const counterRaw = rawWorkById.get(unit.workId);
+      const primaryBrief = briefsById.get(primary.workId);
+      const counterBrief = briefsById.get(unit.workId);
+      if (!primaryRaw || !counterRaw || !primaryBrief || !counterBrief)
+        throw new Error(`counter '${unit.workId}' is missing frozen artifacts`);
+      if (
+        canonicalJson(withoutFields(primaryRaw, workFields)) !==
+        canonicalJson(withoutFields(counterRaw, workFields))
+      ) {
+        throw new Error(
+          `counter '${unit.workId}' does not match the primary work contract`,
+        );
+      }
+      const briefFields = [
+        "work_id",
+        "provider",
+        "profile",
+        "model",
+        "lens",
+        "counter_of",
+      ];
+      if (
+        canonicalJson(withoutFields(primaryBrief, briefFields)) !==
+        canonicalJson(withoutFields(counterBrief, briefFields))
+      ) {
+        throw new Error(
+          `counter '${unit.workId}' does not match the primary brief`,
+        );
+      }
+    }
+  }
+  for (const [groupId, members] of committeeGroups) {
+    if (members.length !== 2)
+      throw new Error(
+        `committee '${groupId}' must contain exactly two work items`,
+      );
+    const first = members[0];
+    const second = members[1];
+    if (!first || !second)
+      throw new Error(`committee '${groupId}' must contain two work items`);
+    if (first.lens === second.lens)
+      throw new Error(
+        `committee '${groupId}' members must use distinct lenses`,
+      );
+    const workFields = [
+      "work_id",
+      "provider",
+      "profile",
+      "model",
+      "lens",
+      "brief_path",
+      "brief_digest",
+    ];
+    const firstRaw = rawWorkById.get(first.workId);
+    const secondRaw = rawWorkById.get(second.workId);
+    const firstBrief = briefsById.get(first.workId);
+    const secondBrief = briefsById.get(second.workId);
+    if (!firstRaw || !secondRaw || !firstBrief || !secondBrief)
+      throw new Error(`committee '${groupId}' is missing frozen artifacts`);
+    if (
+      canonicalJson(withoutFields(firstRaw, workFields)) !==
+      canonicalJson(withoutFields(secondRaw, workFields))
+    ) {
+      throw new Error(
+        `committee '${groupId}' members must share the same work contract`,
+      );
+    }
+    const briefFields = ["work_id", "provider", "profile", "model", "lens"];
+    if (
+      canonicalJson(withoutFields(firstBrief, briefFields)) !==
+      canonicalJson(withoutFields(secondBrief, briefFields))
+    ) {
+      throw new Error(
+        `committee '${groupId}' members must share the same brief contract`,
+      );
+    }
+  }
   if (
     value.protected_targets !== undefined &&
     !Array.isArray(value.protected_targets)

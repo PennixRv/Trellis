@@ -7,15 +7,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createChannel } from "../../src/commands/channel/create.js";
 import {
   DEFAULT_IDLE_TTL_MS,
-  DEFAULT_MAX_LIVE_WORKERS,
+  DEFAULT_MAX_LIVE_TEAMMATES,
   ENV_IDLE_TIMEOUT,
-  ENV_MAX_LIVE_WORKERS,
+  ENV_MAX_LIVE_TEAMMATES,
   cleanupExpiredIdleWorkers,
   enforceSpawnBudget,
   formatBudgetOverflowError,
   isIdleCleanupEligible,
-  parseWorkerGuardSection,
-  resolveWorkerGuardConfig,
+  parseTeammateGuardSection,
+  resolveTeammateGuardConfig,
   scanLiveWorkers,
   type LiveWorker,
 } from "../../src/commands/channel/guard.js";
@@ -76,12 +76,7 @@ function writeLivePid(
   channel: string,
   worker: string,
 ): void {
-  const file = path.join(
-    channelsRoot,
-    projectKey,
-    channel,
-    `${worker}.pid`,
-  );
+  const file = path.join(channelsRoot, projectKey, channel, `${worker}.pid`);
   fs.writeFileSync(file, String(process.pid));
 }
 
@@ -100,22 +95,22 @@ function writeReservation(
   fs.writeFileSync(file, JSON.stringify({ channel, worker }));
 }
 
-describe("resolveWorkerGuardConfig precedence", () => {
+describe("resolveTeammateGuardConfig precedence", () => {
   it("falls back to built-in defaults when nothing is set", () => {
-    const cfg = resolveWorkerGuardConfig({
+    const cfg = resolveTeammateGuardConfig({
       cwd: "/nonexistent",
       env: {},
     });
     expect(cfg.idleTimeoutMs).toBe(DEFAULT_IDLE_TTL_MS);
-    expect(cfg.maxLiveWorkers).toBe(DEFAULT_MAX_LIVE_WORKERS);
+    expect(cfg.maxLiveWorkers).toBe(DEFAULT_MAX_LIVE_TEAMMATES);
   });
 
   it("honors explicit flag overrides above env / config / default", () => {
-    const cfg = resolveWorkerGuardConfig({
+    const cfg = resolveTeammateGuardConfig({
       cwd: "/nonexistent",
       env: {
         [ENV_IDLE_TIMEOUT]: "10m",
-        [ENV_MAX_LIVE_WORKERS]: "9",
+        [ENV_MAX_LIVE_TEAMMATES]: "9",
       },
       flagIdleTimeoutMs: 1_000,
       flagMaxLiveWorkers: 2,
@@ -125,11 +120,11 @@ describe("resolveWorkerGuardConfig precedence", () => {
   });
 
   it("honors env values when no flag is given", () => {
-    const cfg = resolveWorkerGuardConfig({
+    const cfg = resolveTeammateGuardConfig({
       cwd: "/nonexistent",
       env: {
         [ENV_IDLE_TIMEOUT]: "30s",
-        [ENV_MAX_LIVE_WORKERS]: "3",
+        [ENV_MAX_LIVE_TEAMMATES]: "3",
       },
     });
     expect(cfg.idleTimeoutMs).toBe(30_000);
@@ -138,14 +133,14 @@ describe("resolveWorkerGuardConfig precedence", () => {
 
   it("rejects negative flag values", () => {
     expect(() =>
-      resolveWorkerGuardConfig({
+      resolveTeammateGuardConfig({
         cwd: "/nonexistent",
         env: {},
         flagIdleTimeoutMs: -1,
       }),
     ).toThrow(/non-negative duration/);
     expect(() =>
-      resolveWorkerGuardConfig({
+      resolveTeammateGuardConfig({
         cwd: "/nonexistent",
         env: {},
         flagMaxLiveWorkers: -1,
@@ -154,7 +149,7 @@ describe("resolveWorkerGuardConfig precedence", () => {
   });
 
   it("zero values pass through as 'disabled' for both guards", () => {
-    const cfg = resolveWorkerGuardConfig({
+    const cfg = resolveTeammateGuardConfig({
       cwd: "/nonexistent",
       env: {},
       flagIdleTimeoutMs: 0,
@@ -165,14 +160,14 @@ describe("resolveWorkerGuardConfig precedence", () => {
   });
 });
 
-describe("parseWorkerGuardSection", () => {
-  it("parses idle_timeout + max_live_workers", () => {
-    const parsed = parseWorkerGuardSection(
+describe("parseTeammateGuardSection", () => {
+  it("parses idle_timeout + max_live_teammates", () => {
+    const parsed = parseTeammateGuardSection(
       [
-        "channel:",
-        "  worker_guard:",
+        "teamwork:",
+        "  teammate_guard:",
         "    idle_timeout: 5m",
-        "    max_live_workers: 6",
+        "    max_live_teammates: 6",
       ].join("\n"),
     );
     expect(parsed?.idleTimeoutMs).toBe(5 * 60_000);
@@ -180,19 +175,21 @@ describe("parseWorkerGuardSection", () => {
   });
 
   it("ignores commented values", () => {
-    const parsed = parseWorkerGuardSection(
-      ["# channel:", "#   worker_guard:", "#     idle_timeout: 5m"].join("\n"),
+    const parsed = parseTeammateGuardSection(
+      ["# teamwork:", "#   teammate_guard:", "#     idle_timeout: 5m"].join(
+        "\n",
+      ),
     );
     expect(parsed).toBeUndefined();
   });
 
   it("supports bare-integer 0 as disabled", () => {
-    const parsed = parseWorkerGuardSection(
+    const parsed = parseTeammateGuardSection(
       [
-        "channel:",
-        "  worker_guard:",
+        "teamwork:",
+        "  teammate_guard:",
         "    idle_timeout: 0",
-        "    max_live_workers: 0",
+        "    max_live_teammates: 0",
       ].join("\n"),
     );
     expect(parsed?.idleTimeoutMs).toBe(0);
@@ -200,12 +197,12 @@ describe("parseWorkerGuardSection", () => {
   });
 
   it("supports quoted values with inline comments", () => {
-    const parsed = parseWorkerGuardSection(
+    const parsed = parseTeammateGuardSection(
       [
-        "channel:",
-        "  worker_guard:",
+        "teamwork:",
+        "  teammate_guard:",
         "    idle_timeout: '5m' # default idle TTL",
-        '    max_live_workers: "6" # default live budget',
+        '    max_live_teammates: "6" # default live budget',
       ].join("\n"),
     );
     expect(parsed?.idleTimeoutMs).toBe(5 * 60_000);
@@ -214,11 +211,11 @@ describe("parseWorkerGuardSection", () => {
 
   it("rejects malformed values", () => {
     expect(() =>
-      parseWorkerGuardSection(
+      parseTeammateGuardSection(
         [
-          "channel:",
-          "  worker_guard:",
-          "    max_live_workers: not-a-number",
+          "teamwork:",
+          "  teammate_guard:",
+          "    max_live_teammates: not-a-number",
         ].join("\n"),
       ),
     ).toThrow(/non-negative integer/);
@@ -419,9 +416,10 @@ describe("scanLiveWorkers + enforceSpawnBudget (integration)", () => {
         "utf-8",
       ),
     ).toBe("idle-timeout\n");
-    const events = await import("../../src/commands/channel/store/events.js").then(
-      (m) => m.readChannelEvents("c3", env.projectKey),
-    );
+    const events =
+      await import("../../src/commands/channel/store/events.js").then((m) =>
+        m.readChannelEvents("c3", env.projectKey),
+      );
     expect(events.some((e) => e.kind === "killed")).toBe(false);
   });
 
@@ -559,10 +557,10 @@ describe("scanLiveWorkers + enforceSpawnBudget (integration)", () => {
       live: result.remaining,
       limit: 1,
     });
-    expect(msg).toContain("Live worker budget exhausted");
-    expect(msg).toContain("channel='c5'");
-    expect(msg).toContain("trellis channel kill");
-    expect(msg).toContain("--max-live-workers");
+    expect(msg).toContain("Live teammate budget exhausted");
+    expect(msg).toContain("session='c5'");
+    expect(msg).toContain("trellis teamwork kill");
+    expect(msg).toContain("--max-live-teammates");
   });
 
   it("maxLiveWorkers=0 allows spawn regardless of live count", async () => {

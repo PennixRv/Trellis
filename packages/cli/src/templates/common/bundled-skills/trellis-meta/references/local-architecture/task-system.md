@@ -19,7 +19,7 @@ The Trellis task system is stored entirely under `.trellis/tasks/` in the user p
 ```
 
 | File | Purpose |
-| --- | --- |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
 | `task.json` | Task metadata: status, assignee, priority, branch, parent/child tasks, and similar fields. |
 | `prd.md` | Requirements, constraints, and acceptance criteria. Lightweight tasks may be PRD-only. |
 | `design.md` | Technical design for complex tasks: boundaries, contracts, data flow, compatibility, tradeoffs. |
@@ -33,7 +33,7 @@ The Trellis task system is stored entirely under `.trellis/tasks/` in the user p
 `task.json` records task status and metadata. Common fields:
 
 | Field | Meaning |
-| --- | --- |
+| ------------------------ | ------------------------------------------------------------------- |
 | `id` / `name` / `title` | Task identity and title. |
 | `status` | Status such as `planning`, `in_progress`, `review`, or `completed`. |
 | `priority` | `P0`, `P1`, `P2`, `P3`. |
@@ -115,12 +115,14 @@ python3 ./.trellis/scripts/task.py finish
 python3 ./.trellis/scripts/task.py archive <task>
 ```
 
+`trellis task progress [--json]` provides a read-only count of non-archived records in `planning`, `in_progress`, and `completed`. Malformed records and statuses outside those values make the result partial; use the native task lifecycle commands to change state.
+
 When modifying the task system, the AI should prefer script commands to maintain structure. Edit JSON/Markdown directly only when scripts do not cover the need.
 
 ## Local Customization Points
 
 | Need | Edit location |
-| --- | --- |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- |
 | Change the default task template | `.trellis/scripts/common/task_store.py` and task creation instructions. |
 | Change status semantics | `.trellis/workflow.md`, workflow-state hook logic, and task usage conventions. |
 | Add task lifecycle actions | `hooks.after_*` in `.trellis/config.yaml`. |

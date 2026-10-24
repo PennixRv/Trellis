@@ -589,7 +589,7 @@ export async function runWorkflowCommand(
 
   // Best-effort warning: if the resolved workflow references
   // `.trellis/agents/<name>.md` files that don't exist on disk, point the user
-  // at `trellis update` so `trellis channel spawn --agent <name>` doesn't fail
+  // at `trellis update` so `trellis teamwork spawn --agent <name>` doesn't fail
   // mid-session. Non-blocking; never errors a successful write.
   warnAboutMissingAgents(cwd, template.content);
 }

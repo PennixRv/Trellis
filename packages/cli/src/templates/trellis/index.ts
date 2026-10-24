@@ -11,7 +11,7 @@
  *   │   ├── common/           # Shared utilities (Python)
  *   │   └── *.py              # Main scripts (Python)
  *   ├── agents/                # Channel runtime agent definitions
- *   │   └── *.md               # Loaded by `trellis channel spawn --agent <name>`
+ *   │   └── *.md               # Loaded by `trellis teamwork spawn --agent <name>`
  *   ├── scripts-shell-archive/ # Archived shell scripts (for reference)
  *   ├── workflow.md           # Workflow guide
  *   ├── config.yaml            # Trellis configuration
@@ -82,12 +82,7 @@ export const configYamlTemplate = readTemplate("config.yaml");
 export const gitignoreTemplate = readTemplate("gitignore.txt");
 export const gitattributesTemplate = readTemplate("gitattributes.txt");
 
-// Channel runtime agent definitions (loaded by
-// `packages/cli/src/commands/channel/agent-loader.ts` from `.trellis/agents/`).
-// These are platform-agnostic Trellis runtime files dispatched at `trellis init`
-// and refreshed by `trellis update`.
-export const implementAgentTemplate = readTemplate("agents/implement.md");
-export const checkAgentTemplate = readTemplate("agents/check.md");
+// Teamwork participant definition loaded from `.trellis/agents/`.
 export const teammateAgentTemplate = readTemplate("agents/teammate.md");
 export const teammateProfilesTemplate = readTemplate(
   "agents/teammate-profiles.json",
@@ -139,7 +134,7 @@ export function getAllScripts(): Map<string, string> {
 }
 
 /**
- * Get all channel runtime agent definitions as a map of relative path
+ * Get the Teamwork participant definition as a map of relative path
  * (under `.trellis/agents/`) to content.
  *
  * Consumed by `trellis init` (to dispatch on first install) and by
@@ -148,8 +143,6 @@ export function getAllScripts(): Map<string, string> {
  */
 export function getAllAgents(): Map<string, string> {
   const agents = new Map<string, string>();
-  agents.set("implement.md", implementAgentTemplate);
-  agents.set("check.md", checkAgentTemplate);
   agents.set("teammate.md", teammateAgentTemplate);
   agents.set("teammate-profiles.json", teammateProfilesTemplate);
   return agents;

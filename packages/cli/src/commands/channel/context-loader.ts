@@ -1,6 +1,6 @@
 /**
  * Resolve a list of `--file` / `--jsonl` specs into the concatenated context
- * string to be embedded in the worker's system prompt.
+ * string to be embedded in the teammate's system prompt.
  *
  * --file <path-or-glob>     direct file inclusion (glob expanded via fs.globSync)
  * --jsonl <path>            parse a Trellis jsonl manifest where each line is
@@ -62,8 +62,8 @@ function jailedRealpath(
     !trustedRoots.some((root) => isUnderRoot(real, root))
   ) {
     process.stderr.write(
-      `[channel spawn] context path escapes cwd, refusing: ${path.relative(cwd, target) || target} ` +
-        `(add its real directory to channel.trusted_context_dirs in .trellis/config.yaml to allow)\n`,
+      `[teamwork spawn] context path escapes cwd, refusing: ${path.relative(cwd, target) || target} ` +
+        `(add its real directory to teamwork.trusted_context_dirs in .trellis/config.yaml to allow)\n`,
     );
     return null;
   }
@@ -114,7 +114,7 @@ export function assembleContext(
     if (!jailedJsonl) continue;
     if (!fs.existsSync(jailedJsonl)) {
       process.stderr.write(
-        `[channel spawn] --jsonl: file not found, skipping: ${jsonlPath}\n`,
+        `[teamwork spawn] --jsonl: file not found, skipping: ${jsonlPath}\n`,
       );
       continue;
     }
@@ -131,7 +131,7 @@ export function assembleContext(
         obj = JSON.parse(t) as typeof obj;
       } catch {
         process.stderr.write(
-          `[channel spawn] --jsonl: skipping unparseable line in ${jsonlPath}\n`,
+          `[teamwork spawn] --jsonl: skipping unparseable line in ${jsonlPath}\n`,
         );
         continue;
       }
@@ -167,7 +167,7 @@ export function assembleContext(
   );
   if (totalBytes > WARN_TOTAL_BYTES) {
     process.stderr.write(
-      `[channel spawn] warning: context is ${Math.round(totalBytes / 1024)}KB across ${blocks.length} files — large system prompt may exceed model context\n`,
+      `[teamwork spawn] warning: context is ${Math.round(totalBytes / 1024)}KB across ${blocks.length} files — large system prompt may exceed model context\n`,
     );
   }
 
@@ -233,7 +233,7 @@ function expandGlob(cwd: string, spec: string): string[] {
 
   if (!fs.existsSync(baseDir)) {
     process.stderr.write(
-      `[channel spawn] --file: glob base not found: ${path.relative(cwd, baseDir)}\n`,
+      `[teamwork spawn] --file: glob base not found: ${path.relative(cwd, baseDir)}\n`,
     );
     return [];
   }
@@ -242,7 +242,7 @@ function expandGlob(cwd: string, spec: string): string[] {
   walkGlob(baseDir, globSegs, matches);
   if (matches.length === 0) {
     process.stderr.write(
-      `[channel spawn] --file: glob matched no files: ${spec}\n`,
+      `[teamwork spawn] --file: glob matched no files: ${spec}\n`,
     );
   }
   return matches;
@@ -303,7 +303,7 @@ function readFileBlock(
 ): ContextBlock | null {
   if (!fs.existsSync(absPath)) {
     process.stderr.write(
-      `[channel spawn] --${source}: file not found, skipping: ${path.relative(cwd, absPath)}\n`,
+      `[teamwork spawn] --${source}: file not found, skipping: ${path.relative(cwd, absPath)}\n`,
     );
     return null;
   }
@@ -333,7 +333,7 @@ function readFileBlock(
       !trustedRoots.some((root) => isUnderRoot(real, root))
     ) {
       process.stderr.write(
-        `[channel spawn] --${source}: refusing unresolved symlink: ${path.relative(cwd, absPath)}\n`,
+        `[teamwork spawn] --${source}: refusing unresolved symlink: ${path.relative(cwd, absPath)}\n`,
       );
       return null;
     }
@@ -347,13 +347,13 @@ function readFileBlock(
   if (!stat.isFile()) return null;
   if (stat.size > MAX_PER_FILE_BYTES) {
     process.stderr.write(
-      `[channel spawn] --${source}: file too large (${Math.round(stat.size / 1024)}KB > ${MAX_PER_FILE_BYTES / 1024}KB cap), skipping: ${path.relative(cwd, absPath)}\n`,
+      `[teamwork spawn] --${source}: file too large (${Math.round(stat.size / 1024)}KB > ${MAX_PER_FILE_BYTES / 1024}KB cap), skipping: ${path.relative(cwd, absPath)}\n`,
     );
     return null;
   }
   if (stat.size > WARN_PER_FILE_BYTES) {
     process.stderr.write(
-      `[channel spawn] warning: large file (${Math.round(stat.size / 1024)}KB) included: ${path.relative(cwd, absPath)}\n`,
+      `[teamwork spawn] warning: large file (${Math.round(stat.size / 1024)}KB) included: ${path.relative(cwd, absPath)}\n`,
     );
   }
   const content = fs.readFileSync(absPath, "utf-8");

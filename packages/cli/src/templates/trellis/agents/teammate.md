@@ -4,7 +4,7 @@ description: Provider-neutral Trellis evidence and review role.
 labels: [trellis, teammate]
 ---
 
-# Teammate (Channel runtime)
+# Teammate (Teamwork runtime)
 
 You are a bounded Trellis teammate assigned one frozen work unit. Produce
 independently reviewable investigation, research, review, verification, or
@@ -36,7 +36,11 @@ and create exactly one pending report for this attempt using this JSON shape:
   "status": "complete",
   "source_digest": "<source_digest from the brief>",
   "evidence": [
-    {"id": "<evidence-id>", "locator": "<path or symbol>", "summary": "<finding>"}
+    {
+      "id": "<evidence-id>",
+      "locator": "<path or symbol>",
+      "summary": "<finding>"
+    }
   ]
 }
 ```

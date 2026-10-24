@@ -1,7 +1,7 @@
 /**
- * `trellis channel list` — table summary of all channels in `~/.trellis/channels/`.
+ * `trellis teamwork list` — table summary of Teamwork sessions in `~/.trellis/channels/`.
  *
- * Columns: name, created (ts), workers (alive/total), last activity, task.
+ * Columns: name, created (ts), teammates (alive/total), last activity, task.
  * Sorted by most recent activity first.
  */
 
@@ -115,10 +115,10 @@ export async function channelList(opts: ListOptions = {}): Promise<void> {
   }
 
   if (filtered.length === 0) {
-    console.log("(no channels match)");
+    console.log("(no Teamwork sessions match)");
     if (ephemeralHidden > 0) {
       console.log(
-        `(${ephemeralHidden} ephemeral channel${ephemeralHidden === 1 ? "" : "s"} hidden — use --all to show)`,
+        `(${ephemeralHidden} ephemeral Teamwork session${ephemeralHidden === 1 ? "" : "s"} hidden — use --all to show)`,
       );
     }
     return;
@@ -127,7 +127,7 @@ export async function channelList(opts: ListOptions = {}): Promise<void> {
   printTable(filtered);
   if (ephemeralHidden > 0) {
     console.log(
-      `\n(${ephemeralHidden} ephemeral channel${ephemeralHidden === 1 ? "" : "s"} hidden — use --all to show)`,
+      `\n(${ephemeralHidden} ephemeral Teamwork session${ephemeralHidden === 1 ? "" : "s"} hidden — use --all to show)`,
     );
   }
 }
@@ -212,7 +212,7 @@ function pidAlive(pid: number): boolean {
 function printTable(rows: ChannelSummary[]): void {
   const cols = [
     { key: "name", label: "NAME", width: 24 },
-    { key: "workers", label: "WORKERS", width: 9 },
+    { key: "workers", label: "TEAMMATES", width: 10 },
     { key: "events", label: "EVENTS", width: 7 },
     { key: "last", label: "LAST", width: 19 },
     { key: "kind", label: "KIND", width: 9 },
@@ -247,7 +247,7 @@ function printTable(rows: ChannelSummary[]): void {
     console.log(
       [
         name.padEnd(cols[0].width),
-        // workers cell needs visible-width padding (chalk adds ANSI bytes)
+        // Teammate count needs visible-width padding (chalk adds ANSI bytes).
         padVisible(workers, cols[1].width),
         events.padEnd(cols[2].width),
         last.padEnd(cols[3].width),

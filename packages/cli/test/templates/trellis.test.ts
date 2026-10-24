@@ -25,8 +25,7 @@ import {
   gitignoreTemplate,
   getAllScripts,
   getAllAgents,
-  implementAgentTemplate,
-  checkAgentTemplate,
+  teammateAgentTemplate,
   configYamlTemplate,
 } from "../../src/templates/trellis/index.js";
 
@@ -55,9 +54,10 @@ describe("trellis template constants", () => {
   };
 
   function inProgressBreadcrumb(): string {
-    const inProgressMatch = /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/.exec(
-      workflowMdTemplate,
-    );
+    const inProgressMatch =
+      /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/.exec(
+        workflowMdTemplate,
+      );
     if (!inProgressMatch) {
       throw new Error("in_progress breadcrumb block must exist in workflow.md");
     }
@@ -116,9 +116,9 @@ describe("trellis template constants", () => {
     for (const script of pyScripts) {
       expect(
         script.includes("import") ||
-        script.includes("def ") ||
-        script.includes("class ") ||
-        script.includes("#"),
+          script.includes("def ") ||
+          script.includes("class ") ||
+          script.includes("#"),
       ).toBe(true);
     }
   });
@@ -150,12 +150,14 @@ describe("trellis template constants", () => {
       path.join(repoRoot, "marketplace/workflows/tdd/workflow.md"),
       "utf-8",
     );
-    const planning = /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/.exec(
-      tddWorkflow,
-    )?.[1];
-    const planningInline = /\[workflow-state:planning-inline\]([\s\S]*?)\[\/workflow-state:planning-inline\]/.exec(
-      tddWorkflow,
-    )?.[1];
+    const planning =
+      /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/.exec(
+        tddWorkflow,
+      )?.[1];
+    const planningInline =
+      /\[workflow-state:planning-inline\]([\s\S]*?)\[\/workflow-state:planning-inline\]/.exec(
+        tddWorkflow,
+      )?.[1];
 
     for (const block of [planning, planningInline]) {
       expect(block).toContain("observable behavior slices");
@@ -228,9 +230,10 @@ describe("trellis template constants", () => {
 
     const pullBasedLabels = [...generatedPullBasedLabels, "Reasonix"];
     for (const label of pullBasedLabels) {
-      expect(pullBasedBlock, `${label} must use pull-based 2.1 guidance`).toContain(
-        label,
-      );
+      expect(
+        pullBasedBlock,
+        `${label} must use pull-based 2.1 guidance`,
+      ).toContain(label);
       expect(
         hookAutoBlock,
         `${label} must not use hook/plugin auto-handles 2.1 guidance`,
@@ -268,7 +271,9 @@ describe("trellis template constants", () => {
     expect(config).toContain('return "auto"');
     expect(config).toContain("using inline");
     expect(workflowPhase).toContain('mode = "auto"');
-    expect(workflowPhase).toContain('return "codex-sub-agent" if mode == "auto" else "codex-inline"');
+    expect(workflowPhase).toContain(
+      'return "codex-sub-agent" if mode == "auto" else "codex-inline"',
+    );
     expect(taskStore).toContain('get_codex_dispatch_mode(repo_root) == "auto"');
   });
 
@@ -311,7 +316,9 @@ describe("trellis template constants", () => {
       "Parent/child structure is not a dependency system",
     );
     expect(workflowMdTemplate).toContain("--parent <parent-dir>");
-    expect(workflowMdTemplate).toContain("task.py add-subtask <parent> <child>");
+    expect(workflowMdTemplate).toContain(
+      "task.py add-subtask <parent> <child>",
+    );
     expect(workflowMdTemplate).toContain(
       "start the child that owns the next independently verifiable deliverable",
     );
@@ -322,9 +329,7 @@ describe("trellis template constants", () => {
     expect(step).toContain("When considering a parent/child split");
     expect(step).toContain("Parent tasks own source requirements");
     expect(step).toContain("Child tasks own actual deliverables");
-    expect(step).toContain(
-      "Parent/child structure is not a dependency system",
-    );
+    expect(step).toContain("Parent/child structure is not a dependency system");
     expect(step).toContain("Do not start the parent unless");
   });
 
@@ -333,7 +338,9 @@ describe("trellis template constants", () => {
     const planningInline = workflowStateBreadcrumb("planning-inline");
     for (const block of [planning, planningInline]) {
       expect(block).toContain("Multi-deliverable scope");
-      expect(block).toContain("parent task plus independently verifiable child tasks");
+      expect(block).toContain(
+        "parent task plus independently verifiable child tasks",
+      );
       expect(block).toContain("not implied by tree position");
     }
   });
@@ -393,50 +400,39 @@ describe("getAllScripts", () => {
   it("does not contain multi_agent entries", () => {
     const scripts = getAllScripts();
     for (const [key] of scripts) {
-      expect(key, `${key} should not be a multi_agent script`).not.toContain("multi_agent");
+      expect(key, `${key} should not be a multi_agent script`).not.toContain(
+        "multi_agent",
+      );
     }
   });
 });
 
 // =============================================================================
-// getAllAgents — channel runtime agent definitions dispatched at init/update.
+// getAllAgents — Teamwork participant definition dispatched at init/update.
 // agent-loader.ts loads `.trellis/agents/<name>.md` and requires `---` YAML
 // frontmatter at the top with a flat `name: <name>` field. These tests pin the
-// contract so a future template edit can't silently break channel spawn.
+// contract so a future template edit can't silently break Teamwork spawn.
 // =============================================================================
 
 describe("getAllAgents", () => {
-  it("ships implement and check agents", () => {
+  it("ships only the generic teammate role and its profile registry", () => {
     const agents = getAllAgents();
-    expect(agents.has("implement.md")).toBe(true);
-    expect(agents.has("check.md")).toBe(true);
-    expect(agents.has("teammate.md")).toBe(true);
-    expect(agents.has("teammate-profiles.json")).toBe(true);
+    expect([...agents.keys()]).toEqual([
+      "teammate.md",
+      "teammate-profiles.json",
+    ]);
   });
 
   it("values match exported constants", () => {
     const agents = getAllAgents();
-    expect(agents.get("implement.md")).toBe(implementAgentTemplate);
-    expect(agents.get("check.md")).toBe(checkAgentTemplate);
-  });
-
-  it("teaches implementation progress and risk-proportional completion checks", () => {
-    const agents = getAllAgents();
-    const implement = agents.get("implement.md") ?? "";
-    const check = agents.get("check.md") ?? "";
-    expect(implement).toContain("task.py start");
-    expect(implement).toContain("execution.md");
-    expect(implement).toContain("Leave the task `in_progress`");
-    expect(check).toContain("Match checks to risk");
-    expect(check).toContain("add focused cases");
-    expect(check).toContain("rerun the affected tests");
+    expect(agents.get("teammate.md")).toBe(teammateAgentTemplate);
   });
 
   it("documents the native task completion loop and teammate report contract", () => {
     const skill = fs.readFileSync(
       path.join(
         process.cwd(),
-        "src/templates/common/bundled-skills/trellis-channel/SKILL.md",
+        "src/templates/common/bundled-skills/trellis-teamwork/SKILL.md",
       ),
       "utf8",
     );
@@ -445,7 +441,14 @@ describe("getAllAgents", () => {
     expect(skill).toContain("Never edit `task.json` status by hand");
     expect(skill).toContain("Match review and tests to change risk");
     expect(skill).toContain(
-      '| "派一个 implement/check teammate", "let an agent review", "提交固定批次", "批量调查/审查", "等待批次收据" | `references/teammates.md` |',
+      "`references/workflows.md` and `references/teammates.md`",
+    );
+    expect(workflowMdTemplate).toContain("After each execution-plan step");
+    expect(workflowMdTemplate).toContain(
+      "Never edit `task.json` status by hand",
+    );
+    expect(workflowMdTemplate).toContain(
+      "Match review and tests to change risk",
     );
     expect(teammate).toContain('"status": "complete"');
     expect(teammate).toContain('"source_digest"');
@@ -462,13 +465,19 @@ describe("getAllAgents", () => {
         expect(() => JSON.parse(content)).not.toThrow();
         continue;
       }
-      expect(content.startsWith("---\n"), `${file} must start with --- frontmatter`).toBe(true);
+      expect(
+        content.startsWith("---\n"),
+        `${file} must start with --- frontmatter`,
+      ).toBe(true);
       // Frontmatter must close on a `---\n` line.
       const frontmatterClose = content.indexOf("\n---\n", 4);
-      expect(frontmatterClose, `${file} must have a closing --- frontmatter line`).toBeGreaterThan(0);
+      expect(
+        frontmatterClose,
+        `${file} must have a closing --- frontmatter line`,
+      ).toBeGreaterThan(0);
       const frontmatter = content.slice(4, frontmatterClose);
       // The agent's `name:` field must match the file basename so
-      // `trellis channel spawn --agent <name>` resolves correctly.
+      // `trellis teamwork spawn --agent <name>` resolves correctly.
       const expectedName = file.replace(/\.md$/, "");
       const nameLine = frontmatter
         .split("\n")
@@ -482,7 +491,9 @@ describe("getAllAgents", () => {
   });
 
   it("teammate profile template is provider-neutral and bounded", () => {
-    const profiles = JSON.parse(getAllAgents().get("teammate-profiles.json") ?? "{}");
+    const profiles = JSON.parse(
+      getAllAgents().get("teammate-profiles.json") ?? "{}",
+    );
     expect(profiles.default_provider).toBeUndefined();
     expect(profiles.profiles).toHaveProperty("architecture");
     expect(profiles.profiles).toHaveProperty("review");

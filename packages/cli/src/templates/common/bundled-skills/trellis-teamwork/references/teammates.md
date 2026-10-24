@@ -52,7 +52,11 @@ source digest, and terminal event:
   "status": "complete",
   "source_digest": "<sha256>",
   "evidence": [
-    {"id": "<evidence-id>", "locator": "<path or symbol>", "summary": "<finding>"}
+    {
+      "id": "<evidence-id>",
+      "locator": "<path or symbol>",
+      "summary": "<finding>"
+    }
   ]
 }
 ```

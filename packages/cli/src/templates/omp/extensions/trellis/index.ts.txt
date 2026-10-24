@@ -69,7 +69,7 @@ function stripTrustValue(s: string): string {
    return s.trim().replace(/\s*#.*$/, "").trim().replace(/^['"]|['"]$/g, "");
 }
 
-function parseChannelTrustSection(content: string): { trustedDirs: string[]; autoTrustSymlinks?: boolean } {
+function parseTeamworkTrustSection(content: string): { trustedDirs: string[]; autoTrustSymlinks?: boolean } {
    const lines = content.split("\n");
    const trustedDirs: string[] = [];
    let autoTrustSymlinks: boolean | undefined;
@@ -115,7 +115,7 @@ function parseChannelTrustSection(content: string): { trustedDirs: string[]; aut
          const val = stripTrustValue(boolMatch[1]!).toLowerCase();
          if (val === "false") autoTrustSymlinks = false;
          else if (val === "true") autoTrustSymlinks = true;
-         else process.stderr.write(`[channel] channel.auto_trust_trellis_symlinks: invalid value '${val}', ignoring\n`);
+         else process.stderr.write(`[teamwork] teamwork.auto_trust_trellis_symlinks: invalid value '${val}', ignoring\n`);
          continue;
       }
    }
@@ -128,7 +128,7 @@ function resolveTrustedRoots(projectRoot: string): string[] {
    let config: { trustedDirs: string[]; autoTrustSymlinks?: boolean } = { trustedDirs: [] };
    if (existsSync(configPath)) {
       try {
-         config = parseChannelTrustSection(readFileSync(configPath, "utf-8"));
+         config = parseTeamworkTrustSection(readFileSync(configPath, "utf-8"));
       } catch {
          // ignore
       }

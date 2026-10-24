@@ -2,7 +2,7 @@
  * Load a Trellis agent definition from `.trellis/agents/<name>.md`.
  *
  * Format: YAML frontmatter (between `---` fences) + markdown body.
- *   The body becomes the system prompt injected into the worker.
+ *   The body becomes the system prompt injected into the teammate session.
  *
  *   ---
  *   name: architect
@@ -43,7 +43,7 @@ export function findAgentFile(
 ): string | null {
   // Reject path-traversal attempts (`..`, `/`, etc.) — agent names must be
   // a single safe identifier. Without this, `--agent ../../etc/passwd`
-  // would read arbitrary host files into the worker system prompt.
+  // would read arbitrary host files into the teammate system prompt.
   if (!SAFE_AGENT_NAME.test(name)) {
     throw new Error(
       `Agent name '${name}' is not allowed (must match ${SAFE_AGENT_NAME.source})`,
