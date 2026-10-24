@@ -26,8 +26,9 @@ Before reviewing, read in this order:
 2. **Review against task artifacts** — does the diff satisfy `prd.md` (and `design.md` / `implement.md` if present)?
 3. **Review against specs** — naming, structure, type safety, error handling, conventions in `.trellis/spec/`
 4. **Self-fix** — when an issue is mechanical and small, fix it directly with the editing tools you have
-5. **Run verification** — project lint and typecheck on the changed scope
-6. **Report** — concrete findings with `file:line` citations and what was fixed vs. what is open
+5. **Match checks to risk** — for complex or high-impact changes, inspect the design path end to end, add focused cases for uncovered branches, and review the implementation against expected behavior
+6. **Close findings** — fix actionable issues and rerun the affected tests, lint, and type checks; record any unresolved boundary explicitly
+7. **Report progress** — update the task execution checkpoint with completed plan steps, checks run, findings fixed, and remaining gates; keep task status `in_progress` until acceptance is complete
 
 ## Forbidden Operations
 
@@ -44,8 +45,11 @@ The supervising main session owns commits. Report the post-fix state; do not com
 3. For each issue:
    - If mechanical (lint nit, missing type, wrong import, dead branch) → fix in-place
    - If a design/judgment issue → record and report, do not silently rewrite
-4. Run the project's lint and typecheck on the changed scope after self-fixes
-5. Report
+4. Compare the final diff with the PRD, design, plan, and applicable specs; note missing requirements
+5. Scale testing and review to the change's complexity and impact; add focused cases when existing tests do not cover required behavior
+6. Fix findings and rerun affected checks; report any unresolved item with evidence and reason
+7. Append the review result and validation receipt to the task execution checkpoint without editing `task.json` directly
+8. Report
 
 ## Report Format
 

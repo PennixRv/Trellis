@@ -88,6 +88,10 @@ export const gitattributesTemplate = readTemplate("gitattributes.txt");
 // and refreshed by `trellis update`.
 export const implementAgentTemplate = readTemplate("agents/implement.md");
 export const checkAgentTemplate = readTemplate("agents/check.md");
+export const teammateAgentTemplate = readTemplate("agents/teammate.md");
+export const teammateProfilesTemplate = readTemplate(
+  "agents/teammate-profiles.json",
+);
 
 /**
  * Get all script templates as a map of relative path to content
@@ -146,5 +150,7 @@ export function getAllAgents(): Map<string, string> {
   const agents = new Map<string, string>();
   agents.set("implement.md", implementAgentTemplate);
   agents.set("check.md", checkAgentTemplate);
+  agents.set("teammate.md", teammateAgentTemplate);
+  agents.set("teammate-profiles.json", teammateProfilesTemplate);
   return agents;
 }

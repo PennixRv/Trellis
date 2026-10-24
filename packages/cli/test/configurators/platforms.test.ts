@@ -60,6 +60,11 @@ const BUNDLED_REFERENCE = path.join(
   "local-architecture",
   "overview.md",
 );
+const TEAMMATE_REFERENCE = path.join(
+  "trellis-channel",
+  "references",
+  "teammates.md",
+);
 const SPEC_BOOTSTRAP_REFERENCE = path.join(
   "trellis-spec-bootstrap",
   "references",
@@ -430,6 +435,9 @@ describe("configurePlatform", () => {
       expect(fs.readFileSync(skillPath, "utf-8")).toBe(skill.content);
     }
     expect(fs.existsSync(path.join(skillsRoot, BUNDLED_REFERENCE))).toBe(true);
+    expect(
+      fs.readFileSync(path.join(skillsRoot, TEAMMATE_REFERENCE), "utf-8"),
+    ).toContain("context frozen in the brief");
     expect(
       fs.existsSync(path.join(skillsRoot, "trellis-start", "SKILL.md")),
     ).toBe(true);
@@ -1316,7 +1324,6 @@ describe("configurePlatform", () => {
     expect(promptFiles.length).toBe(
       resolveCommands(AI_TOOLS.copilot.templateContext).length,
     );
-
     // Skills
     const skillsDir = path.join(tmpDir, ".github", "skills");
     expect(fs.existsSync(skillsDir)).toBe(true);

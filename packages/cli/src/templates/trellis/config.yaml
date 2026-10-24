@@ -121,6 +121,13 @@ channel:
   # trusted_context_dirs:
   #   - /work/user/trellis_workspace
   # auto_trust_trellis_symlinks: false
+  # Fixed-plan Channel teammate runtime. Each work unit must supply its own
+  # non-negative max_retries; there is no implicit retry default.
+  teammate:
+    max_concurrency: 1
+  teammate_guard:
+    max_live_teammates: 6
+    non_batch_reserved: 0
 
 #-------------------------------------------------------------------------------
 # Codex (dispatch behavior)

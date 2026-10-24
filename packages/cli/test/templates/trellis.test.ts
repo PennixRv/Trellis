@@ -410,6 +410,8 @@ describe("getAllAgents", () => {
     const agents = getAllAgents();
     expect(agents.has("implement.md")).toBe(true);
     expect(agents.has("check.md")).toBe(true);
+    expect(agents.has("teammate.md")).toBe(true);
+    expect(agents.has("teammate-profiles.json")).toBe(true);
   });
 
   it("values match exported constants", () => {
@@ -418,9 +420,48 @@ describe("getAllAgents", () => {
     expect(agents.get("check.md")).toBe(checkAgentTemplate);
   });
 
+  it("teaches implementation progress and risk-proportional completion checks", () => {
+    const agents = getAllAgents();
+    const implement = agents.get("implement.md") ?? "";
+    const check = agents.get("check.md") ?? "";
+    expect(implement).toContain("task.py start");
+    expect(implement).toContain("execution.md");
+    expect(implement).toContain("Leave the task `in_progress`");
+    expect(check).toContain("Match checks to risk");
+    expect(check).toContain("add focused cases");
+    expect(check).toContain("rerun the affected tests");
+  });
+
+  it("documents the native task completion loop and teammate report contract", () => {
+    const skill = fs.readFileSync(
+      path.join(
+        process.cwd(),
+        "src/templates/common/bundled-skills/trellis-channel/SKILL.md",
+      ),
+      "utf8",
+    );
+    const teammate = getAllAgents().get("teammate.md") ?? "";
+    expect(skill).toContain("## Implementation Completion");
+    expect(skill).toContain("Never edit `task.json` status by hand");
+    expect(skill).toContain("Match review and tests to change risk");
+    expect(skill).toContain(
+      '| "派一个 implement/check teammate", "let an agent review", "提交固定批次", "批量调查/审查", "等待批次收据" | `references/teammates.md` |',
+    );
+    expect(teammate).toContain('"status": "complete"');
+    expect(teammate).toContain('"source_digest"');
+    expect(teammate).toContain('"evidence"');
+    expect(teammate).toContain("attempts/<attempt-id>/report.json");
+    expect(teammate).toContain("Do not read or use");
+    expect(teammate).toContain("host exposes such memory and cannot isolate");
+  });
+
   it("each agent body starts with `---` frontmatter and a matching name field", () => {
     const agents = getAllAgents();
     for (const [file, content] of agents) {
+      if (file.endsWith(".json")) {
+        expect(() => JSON.parse(content)).not.toThrow();
+        continue;
+      }
       expect(content.startsWith("---\n"), `${file} must start with --- frontmatter`).toBe(true);
       // Frontmatter must close on a `---\n` line.
       const frontmatterClose = content.indexOf("\n---\n", 4);
@@ -438,6 +479,13 @@ describe("getAllAgents", () => {
         `${file} name field should equal "${expectedName}"`,
       ).toBe(expectedName);
     }
+  });
+
+  it("teammate profile template is provider-neutral and bounded", () => {
+    const profiles = JSON.parse(getAllAgents().get("teammate-profiles.json") ?? "{}");
+    expect(profiles.default_provider).toBeUndefined();
+    expect(profiles.profiles).toHaveProperty("architecture");
+    expect(profiles.profiles).toHaveProperty("review");
   });
 });
 

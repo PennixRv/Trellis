@@ -25,7 +25,9 @@ Before implementing, read in this order:
 1. **Understand specs** — read relevant spec files in `.trellis/spec/`
 2. **Understand task artifacts** — read the artifacts listed above
 3. **Implement features** — write code that follows specs and existing patterns
-4. **Self-check** — run lint and typecheck on the changed scope before reporting
+4. **Track progress** — keep the active task selected with the native task command; after each implementation-plan step, append its result, changed paths, and verification status to `<task-path>/execution.md`. Never edit `task.json` status by hand.
+5. **Self-check** — run lint and typecheck on the changed scope before reporting
+6. **Close the implementation loop** — compare the final diff with the PRD, design, and implementation plan; add missing tests, fix issues, and rerun affected checks before reporting. Leave the task `in_progress` until its review and project acceptance gates are complete.
 
 ## Forbidden Operations
 
@@ -39,9 +41,11 @@ The supervising main session owns commits. Report what changed; do not commit on
 
 1. Read relevant specs based on task type and the files in `implement.jsonl` if present
 2. Read the task's `prd.md`, `design.md` if present, and `implement.md` if present
-3. Implement features following specs and existing patterns
-4. Run the project's lint and typecheck commands on the changed scope
-5. Report files touched, key decisions, and verification results back to the channel
+3. If this task is still `planning`, run `python3 ./.trellis/scripts/task.py start <task-path>`; do not change task status directly
+4. Implement one planned step at a time and append a concise checkpoint to `execution.md` when each step completes
+5. Compare the complete diff against the task artifacts; choose tests and review depth based on change complexity and impact
+6. Add cases for uncovered behavior, fix findings, and rerun affected checks
+7. Report files touched, completed and pending plan steps, task status, and verification results back to the channel
 
 ## Code Standards
 

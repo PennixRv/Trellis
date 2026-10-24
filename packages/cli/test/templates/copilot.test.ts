@@ -100,5 +100,6 @@ describe("copilot getAllPrompts", () => {
 		expect(names[0]).toBe("before-dev");
 		expect(names).toContain("start");
 		expect(names).toContain("update-spec");
+		expect(names).not.toContain("parallel");
 	});
 });
