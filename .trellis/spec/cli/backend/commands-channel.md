@@ -264,6 +264,48 @@ trellis channel thread rename <name> <old-thread> <new-thread> [opts]
 
 ```
 
+### Frozen teammate batch extension
+
+The opt-in batch coordinator uses the existing Channel event store and does not
+change the ordinary Channel lifecycle or native task workflow. Its public
+submission contract is:
+
+```
+trellis channel batch <plan>
+  → requires a verified host adapter with foreground waiting, protected artifact
+    writes, native delegation disabled, implicit host memory isolated, a
+    supported transport, and a positive capacity proof; injected context is
+    limited to paths frozen in the task-owned brief
+  → without that proof: fail closed before reading the plan or writing
+    coordination state
+  → with that proof: the coordinator validates one immutable plan, owns FIFO
+    dispatch, bounded per-work retry, timeout continuation, report validation,
+    reconciliation, and one control/business receipt
+```
+
+The implementation owner is `packages/cli/src/commands/channel/coordinator.ts`.
+Core owns the coordination event schema, transition tables, idempotent append,
+replay projection, and durable receipt facts. The coordinator must not expose
+individual teammate reports to the submitting agent while a batch is running.
+Only a settled business receipt or an explicit reconciliation receipt crosses
+the submission boundary. An uncertain external side effect keeps its protected
+lease and returns `UNKNOWN` work status until a later reconciliation path
+resolves it.
+
+The plan and attempt artifacts are task-owned under
+`.trellis/tasks/<task>/teammates/<batch>/<work>/`. Brief, claim, report, and
+disposition validators bind task, batch, work, attempt, teammate, provider,
+source digest, and plan hash. Artifact writes are immutable and reject unsafe
+paths, symlinks, malformed identities, and secret-like values. Provider
+selection remains explicit or profile-derived; no provider is a public default.
+
+This extension is intentionally isolated from the existing `channel spawn`,
+`channel run`, `channel wait`, and task commands. A real Paseo or provider host
+adapter must be supplied by a later integration task before the fail-closed
+submission gate can dispatch an external process.
+
+---
+
 ### Internal modules
 
 ```ts

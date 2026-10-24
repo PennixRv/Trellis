@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/cli/backend/commands-channel.md", "reason": "Channel event, wait, supervisor, adapter, guard, and lifecycle contracts"}
+{"file": ".trellis/spec/cli/backend/trellis-core-sdk.md", "reason": "Core and CLI package boundary for durable Channel facts"}
+{"file": ".trellis/spec/cli/backend/error-handling.md", "reason": "Error and fail-closed handling requirements"}
+{"file": ".trellis/spec/cli/backend/filesystem-safety.md", "reason": "Artifact, config, path, and atomic-write safety"}
+{"file": ".trellis/tasks/10-24-parallel-channel-teammate-runtime/prd.md", "reason": "Component requirements and acceptance criteria"}
+{"file": ".trellis/tasks/10-24-parallel-channel-teammate-runtime/design.md", "reason": "Component state-machine and ownership design"}

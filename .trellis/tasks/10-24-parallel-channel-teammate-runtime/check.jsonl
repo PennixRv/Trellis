@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/cli/backend/quality-guidelines.md", "reason": "Required lint, typecheck, and quality checks"}
+{"file": ".trellis/spec/cli/unit-test/conventions.md", "reason": "Unit-test scope and regression-test rules"}
+{"file": ".trellis/spec/cli/unit-test/integration-patterns.md", "reason": "Template and cross-layer integration-test patterns"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Event, Core, CLI, and template boundary review"}
+{"file": ".trellis/spec/guides/cross-platform-thinking-guide.md", "reason": "CLI, persisted artifact, config, and provider portability review"}
+{"file": ".trellis/tasks/10-24-parallel-channel-teammate-runtime/design.md", "reason": "Acceptance review against the component design"}
