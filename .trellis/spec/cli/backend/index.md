@@ -13,7 +13,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 ## Guidelines Index
 
 | Guide | Description | Status |
-|-------|-------------|--------|
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
 | [Directory Structure](./directory-structure.md) | Module organization, file layout, design decisions | Done |
 | [Script Conventions](./script-conventions.md) | Python script standards for .trellis/scripts/ | Done |
 | [Error Handling](./error-handling.md) | Error types, handling strategies | Done |
@@ -34,7 +34,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [`trellis uninstall` Command](./commands-uninstall.md) | Uninstall orchestration: plan composition, structured-file dispatch, execute phases, `.trellis/` removal | Done |
 | [`trellis ablate` / `restore` Commands](./commands-ablate.md) | Reversible full project subtraction, external transactions, conflict-safe exact restore | Done |
 | [Uninstall Scrubbers](./uninstall-scrubbers.md) | Pure scrubber contract for structured config files (`settings.json`, `hooks.json`, `package.json`, `config.toml`) | Done |
-| [`trellis channel` Command](./commands-channel.md) | Multi-agent collaboration runtime: events.jsonl protocol, per-worker supervisor, provider adapters (claude / codex), project buckets, ephemeral / run lifecycle, ShutdownController state machine | Done |
+| [`trellis teamwork` Command](./commands-channel.md)           | Public Teamwork CLI over Core Channel: events.jsonl, teammate process supervision, frozen batch gate and receipts, provider capability contracts, project buckets, forum lifecycle, ShutdownController | Done   |
 | [Spec Injection](./spec-injection.md) | Path-scoped on-demand spec injection: frontmatter `paths:` contract, glob matching, PostToolUse hook flow, ticket-refresh state machine, identity ladder, character budgets, platform matrix | Done |
 
 ---

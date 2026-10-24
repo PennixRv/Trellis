@@ -4,6 +4,7 @@ description: "configurators/shared.ts public surface: placeholder substitution, 
 paths:
   - packages/cli/src/configurators/shared.ts
 ---
+
 # Configurator Shared Helpers
 
 How `packages/cli/src/configurators/shared.ts` is structured: what it exports, what each helper guarantees, and when a platform configurator should reach for shared logic vs. write its own.
@@ -36,7 +37,7 @@ A helper does **not** belong in `shared.ts` when it encodes platform-specific fo
 
 `configurators/shared.ts:getPythonCommandForPlatform` — returns the resolved command if init has run; otherwise the static default (`python` on Windows, `python3` elsewhere). The optional `platform` arg exists solely for unit tests; production callers must not pass it (passing it bypasses the resolved cache).
 
-`configurators/shared.ts:replacePythonCommandLiterals` — line-wise replace of literal `python3` with the resolved command, **excluding shebang lines** (`#!`). Idempotent; no-op when the resolved command is `python3`. Applied to whole template maps so even raw `.py`, `.toml`, `.md` content (templates that don't go through `resolvePlaceholders`) gets the right command on Windows. Configurators do not call it per file: `renderTemplateMap` applies it to every entry of a map, and both paths funnel through that one call — `writeTemplateMap` on init, `collectPlatformTemplates` on update. A configurator only calls it directly when it has to rewrite *before* another encoding step, e.g. `snow.ts:85` rewrites a command body before wrapping it in JSON (rewriting the JSON afterwards would still work, but the escaped body is harder to reason about).
+`configurators/shared.ts:replacePythonCommandLiterals` — line-wise replace of literal `python3` with the resolved command, **excluding shebang lines** (`#!`). Idempotent; no-op when the resolved command is `python3`. Applied to whole template maps so even raw `.py`, `.toml`, `.md` content (templates that don't go through `resolvePlaceholders`) gets the right command on Windows. Configurators do not call it per file: `renderTemplateMap` applies it to every entry of a map, and both paths funnel through that one call — `writeTemplateMap` on init, `collectPlatformTemplates` on update. A configurator only calls it directly when it has to rewrite _before_ another encoding step, e.g. `snow.ts:85` rewrites a command body before wrapping it in JSON (rewriting the JSON afterwards would still work, but the escaped body is harder to reason about).
 
 ### Placeholder substitution
 
@@ -66,7 +67,7 @@ Pi is the exception handled in `configurators/pi.ts`: `session_start` is notify-
 
 `configurators/shared.ts:resolveAllAsSkillsNeutral` — same, but neutral. Used by Codex for command-as-skill files in `.agents/skills/` (`trellis-continue/SKILL.md`, `trellis-finish-work/SKILL.md`, and — on no-hook platforms — `trellis-start/SKILL.md`). When multiple platforms write to `.agents/skills/`, byte-identity is required; running through the neutral renderer is what makes that hold. Platforms with their own command surface, such as ZCode, should keep command entrypoints in that command surface and use `resolveSkills()` for the platform skill root.
 
-`configurators/shared.ts:resolveBundledSkills` — resolves multi-file built-in skills (`trellis-channel`, `trellis-meta`, `trellis-session-insight`, `trellis-spec-bootstrap` — everything under `templates/common/bundled-skills/`) into `ResolvedSkillFile[]`. Each entry has a POSIX-relative path under the skill name (e.g. `trellis-meta/references/core/template-pipeline.md`). Bundled `SKILL.md` already owns its frontmatter — this helper does **not** wrap it. Pass the result to `collectSkillTemplates()` as its third argument; omitting it drops every bundled skill from that platform.
+`configurators/shared.ts:resolveBundledSkills` — resolves multi-file built-in skills (`trellis-teamwork`, `trellis-meta`, `trellis-session-insight`, `trellis-spec-bootstrap` — everything under `templates/common/bundled-skills/`) into `ResolvedSkillFile[]`. Each entry has a POSIX-relative path under the skill name (e.g. `trellis-meta/references/core/template-pipeline.md`). Bundled `SKILL.md` already owns its frontmatter — this helper does **not** wrap it. Pass the result to `collectSkillTemplates()` as its third argument; omitting it drops every bundled skill from that platform.
 
 ### Map builders
 
@@ -74,7 +75,7 @@ These build the `Map<relPath, content>` that a `collect<Platform>Templates()` re
 
 `configurators/shared.ts:collectSkillTemplates(skillsRoot, skills, bundledSkills?)` — single-file workflow skills as `<skillsRoot>/<name>/SKILL.md`, plus any bundled skill files at their relative paths under `<skillsRoot>/`.
 
-`configurators/shared.ts:collectBothTemplates(ctx, cmdPath, skillRoot, wrapCmd?)` — commands + skills for "both" platforms (a command surface *and* a skill root). `cmdPath(name)` returns the command's relative path so each platform keeps its own layout; `wrapCmd(filePath, content)` is the optional per-platform command wrapper. Used by cursor, antigravity, devin, kilo, qoder.
+`configurators/shared.ts:collectBothTemplates(ctx, cmdPath, skillRoot, wrapCmd?)` — commands + skills for "both" platforms (a command surface _and_ a skill root). `cmdPath(name)` returns the command's relative path so each platform keeps its own layout; `wrapCmd(filePath, content)` is the optional per-platform command wrapper. Used by cursor, antigravity, devin, kilo, qoder.
 
 `configurators/shared.ts:collectSharedHooks(hooksPath, platform)` — the platform-independent Python hook scripts from `templates/shared-hooks/` that `platform` actually registers, keyed under `hooksPath`. The list comes from `templates/shared-hooks/index.ts:SHARED_HOOKS_BY_PLATFORM` via `getSharedHookScriptsForPlatform` — configurators must not hand-pick files, because the table is also what `shared-hooks.test.ts` checks the platform's hook config against (see `platform-integration.md` "Declaring a shared hook is half the wiring"). Class-2 (pull-based) platforms are simply absent from `inject-subagent-context.py`'s entry — they can't mutate sub-agent prompts. Extension-backed platforms (Pi Agent) must not call this at all.
 
@@ -114,7 +115,7 @@ The internal `mapLegacyToolToCopilot` table is the source of truth for the mappi
 
 A platform used to be described twice: `configure<Platform>()` wrote its files to disk and `collectTemplates` returned the same set as a map for `trellis update` to diff. Two descriptions of one thing disagree eventually, and a one-sided edit ships silently — 0.5.5 wrote `.agents/skills/trellis-start/SKILL.md` from `configureCodex` with no matching `collectTemplates` entry, so upgraders' `trellis update` deleted the old skill dir and never regenerated the new one (`migrations/manifests/0.5.7.json`).
 
-There is now exactly one description. This section is the contract for it, and it is a *code-spec* trigger on two counts: the per-category write helpers that let a configurator enumerate files a second time were deleted, and the init/update agreement is a cross-layer contract enforced by a test rather than by types.
+There is now exactly one description. This section is the contract for it, and it is a _code-spec_ trigger on two counts: the per-category write helpers that let a configurator enumerate files a second time were deleted, and the init/update agreement is a cross-layer contract enforced by a test rather than by types.
 
 ### 2. Signatures
 
@@ -152,30 +153,30 @@ export function collectPlatformTemplates(id: AITool): Map<string, string> | unde
 
 **Map key** — a POSIX relative path from the project root, config-dir prefix included (`.cursor/hooks.json`, `.agents/skills/trellis-check/SKILL.md`). Never absolute, never backslashed: `writeTemplateMap` splits on `/` to build the target path, and the same string is the hash key in `.template-hashes.json`, so a Windows-shaped key would produce a different manifest on Windows than on macOS. A configurator that builds keys from `path.join` must pass them through `toPosix` first (`claude.ts:89`, `opencode.ts:67`) — see `guides/cross-platform-thinking-guide.md` → "Logical key vs filesystem path".
 
-**Map value** — the file's final content *before* the `python3` → `python` rewrite. Do not call `replacePythonCommandLiterals` per entry; `renderTemplateMap` does it for the whole map on both paths.
+**Map value** — the file's final content _before_ the `python3` → `python` rewrite. Do not call `replacePythonCommandLiterals` per entry; `renderTemplateMap` does it for the whole map on both paths.
 
 **`collectTemplates` purity** — it takes no `cwd`, and that is deliberate: it cannot read or write the project, so `trellis update` gets the same answer whatever the project looks like. It may read bundled templates off the package's own directory (`claude.ts`, `opencode.ts` walk theirs).
 
 **`configure` derivation** — `fromTemplates(collect…)` gives `configure = (cwd) => writeTemplateMap(cwd, collect…())`. 18 of 21 platforms use it.
 
-**Residual** — the only reason to spell out both fields. A residual is work that survives *after* the shared writer and cannot be expressed as a path→content pair. It must not restate the file list. Three exist:
+**Residual** — the only reason to spell out both fields. A residual is work that survives _after_ the shared writer and cannot be expressed as a path→content pair. It must not restate the file list. Three exist:
 
 | Platform | Residual | Why a map can't carry it |
-|---|---|---|
+| ------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `claude-code` | `--with-statusline` adds `.claude/hooks/statusline.py` and replaces the `settings.json` entry (`claude.ts:146-153`) | Per-init flag; `collectTemplates` has no parameter, and an entry there would force-install the statusline on projects that opted out |
 | `codex` | `ensureDir(.codex/skills)` (`codex.ts:206`) | An intentionally empty directory — a user extension point with no file in it |
 | `zcode` | one-shot stderr notice that ZCode does not hot-reload hook config (`zcode.ts:82-88`) | Console output, not a file |
 
-`codex` also post-processes the map with `preserveCodexAgentModelKeys(cwd, files)` before writing. That is a map transform, not a residual: it reads `cwd` so it cannot live in `collectTemplates`, but `update.ts:921` runs the same function over its own rendered map, so the two still agree. Note the ordering — `configureCodex` renders *before* preserving (`codex.ts:197`) so the preserved user keys are grafted onto exactly the bytes update compares against.
+`codex` also post-processes the map with `preserveCodexAgentModelKeys(cwd, files)` before writing. That is a map transform, not a residual: it reads `cwd` so it cannot live in `collectTemplates`, but `update.ts:921` runs the same function over its own rendered map, so the two still agree. Note the ordering — `configureCodex` renders _before_ preserving (`codex.ts:197`) so the preserved user keys are grafted onto exactly the bytes update compares against.
 
-**Nothing else may decide what a platform installs.** No second directory walk, no additional write inside `configure`, no "and also copy this one file" in `commands/init.ts`. Migrations still name specific paths — that is their job (deleting or renaming files a *previous* version installed) and it is a different question from what the current version installs. Tests may assert specific paths; they must not be the source of them.
+**Nothing else may decide what a platform installs.** No second directory walk, no additional write inside `configure`, no "and also copy this one file" in `commands/init.ts`. Migrations still name specific paths — that is their job (deleting or renaming files a _previous_ version installed) and it is a different question from what the current version installs. Tests may assert specific paths; they must not be the source of them.
 
 ### 4. Validation & Error Matrix
 
 Every row is a build failure, not a runtime one. All live in `test/configurators/platforms.test.ts` unless noted.
 
 | Condition | Failure |
-|---|---|
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `configure` writes a path `collectTemplates` doesn't hold | "configurePlatform writes no file collectTemplates does not describe, for every platform" — unless the path is in `CONFIGURE_ONLY_PATHS` |
 | `collectTemplates` holds a path `configure` doesn't write | "configurePlatform writes collected templates byte-for-byte for every platform" |
 | Contents differ between the two | same test, byte compare |
@@ -201,7 +202,7 @@ Two exemptions exist, both named constants with a comment:
 When you add or change a platform's file set:
 
 1. `test/configurators/platforms.test.ts` — the four whole-registry assertions in §4 cover it automatically; they derive the platform list from `PLATFORM_IDS`, so a new platform is covered the moment it is registered. **Do not add a per-platform copy of them.**
-2. `test/templates/<platform>.test.ts` — assert the *content* of what the platform emits (which agents, which commands, correct frontmatter). Assertion point: the resolver output, not the map, so a rename in the map doesn't silently pass.
+2. `test/templates/<platform>.test.ts` — assert the _content_ of what the platform emits (which agents, which commands, correct frontmatter). Assertion point: the resolver output, not the map, so a rename in the map doesn't silently pass.
 3. If the change adds a residual, add a test that exercises it directly — assertion point is the residual's own effect (a directory exists / a file is present / stderr matched), never the file set, which the registry-wide tests already own.
 4. If a path must be exempt from the parity oracle, add it to `CONFIGURE_ONLY_PATHS` or `CONFIGURE_ONLY_EMPTY_DIRS` **with a comment stating why and what the consequence is**. A silently weakened assertion is how the two-description bug survived three releases.
 
@@ -213,7 +214,10 @@ When you add or change a platform's file set:
 // configurators/foo.ts
 export async function configureFoo(cwd: string): Promise<void> {
   for (const agent of getAllAgents()) {
-    await writeFile(path.join(cwd, ".foo/agents", `${agent.name}.md`), agent.content);
+    await writeFile(
+      path.join(cwd, ".foo/agents", `${agent.name}.md`),
+      agent.content,
+    );
   }
   await writeFile(path.join(cwd, ".foo/config.json"), getConfig());
 }
@@ -257,7 +261,7 @@ Resolution happens **at template-write time** (`trellis init`, `trellis update`)
 ### Substitution table
 
 | Placeholder | Source | Resolved by | Notes |
-|-------------|--------|-------------|-------|
+| --------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | `{{PYTHON_CMD}}` | `getPythonCommandForPlatform()` | `resolvePlaceholders`, `resolvePlaceholdersNeutral`, `replacePythonCommandLiterals` (line-wise, applied additionally on every write) | Init resolves once after probing host; tests must `resetResolvedPythonCommand()` |
 | `{{CMD_REF:name}}` | `ctx.cmdRefPrefix` | `resolvePlaceholders` (per-platform) / `resolvePlaceholdersNeutral` (`` `name` (Trellis command) ``) | Use neutral form for any `.agents/skills/` write |
 | `{{EXECUTOR_AI}}` | `ctx.executorAI` | both renderers | Description of the AI executor for prompt prose |
@@ -333,7 +337,10 @@ files.set(".agents/skills/check/SKILL.md", resolvePlaceholders(tmpl, ctx));
 Correct:
 
 ```typescript
-files.set(".agents/skills/check/SKILL.md", resolvePlaceholdersNeutral(tmpl, ctx));
+files.set(
+  ".agents/skills/check/SKILL.md",
+  resolvePlaceholdersNeutral(tmpl, ctx),
+);
 ```
 
 Or call `resolveSkillsNeutral(ctx)` / `resolveAllAsSkillsNeutral(ctx)`. The neutral renderer makes byte-identity hold across platforms that target the same path.
@@ -350,14 +357,15 @@ export async function configureFoo(cwd: string): Promise<void> {
 }
 ```
 
-Correct: put `.foo/extra.json` in `collectFooTemplates()` and delete the extra write. A residual runs *after* the writer and does something a `Map<path, content>` cannot express — it never adds a file. See "Template maps" above; the parity oracle in `test/configurators/platforms.test.ts` fails on this exact shape.
+Correct: put `.foo/extra.json` in `collectFooTemplates()` and delete the extra write. A residual runs _after_ the writer and does something a `Map<path, content>` cannot express — it never adds a file. See "Template maps" above; the parity oracle in `test/configurators/platforms.test.ts` fails on this exact shape.
 
 ### Calling `getCommandTemplates()` directly in a configurator
 
 Wrong:
 
 ```typescript
-for (const cmd of getCommandTemplates()) {   // includes start.md unconditionally
+for (const cmd of getCommandTemplates()) {
+  // includes start.md unconditionally
   files.set(`.foo/commands/${cmd.name}.md`, cmd.content);
 }
 ```

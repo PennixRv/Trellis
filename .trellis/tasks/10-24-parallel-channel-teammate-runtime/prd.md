@@ -10,12 +10,12 @@ submits a frozen plan and receives a bounded receipt.
 
 ## Requirements
 
-- Preserve the beta.4 Core/CLI package boundary, public exports, event-log
-  durability, idempotency, barrier/replay behavior, and `channel run` one-shot
-  semantics.
-- Use `teammate` as the new public role and artifact vocabulary. Keep existing
-  event-log records and internal compatibility fields readable where migration
-  requires it; do not create a second public lifecycle vocabulary.
+- Preserve the beta.4 Core/CLI package boundary, Core public exports, event-log
+  durability, idempotency, barrier/replay behavior, and one-shot execution
+  semantics under the new `teamwork run` command.
+- Use `teammate` as the new public role and artifact vocabulary. Do not read or
+  migrate old Pennix fork event, configuration, identity, or artifact formats;
+  do not create a second public lifecycle vocabulary.
 - Implement the three approved business state machines: batch coordinator;
   work/attempt; and teammate execution protocol. Keep the Agent-to-program
   handoff as a command/receipt protocol rather than a fourth lifecycle.
@@ -47,9 +47,37 @@ submits a frozen plan and receives a bounded receipt.
   init, update, and agent-loader paths. Role text is not a permission boundary;
   runner/host capabilities enforce protected-source and Git read-only access
   plus attempt-artifact write access.
-- Keep the normal single-agent task path, native workflow, and one-shot Channel
-  path unchanged. Batch behavior is opt-in and must not add a task lifecycle
-  state or a Marketplace workflow.
+- Support advisor and two-perspective committee patterns as fixed-batch task
+  shapes. They reuse the generic teammate role and existing batch/work/attempt
+  state machines; participants do not read or message one another, and the
+  main agent synthesizes reports only after the batch reaches a business
+  terminal receipt. Encode the committee pair in the frozen plan and validate
+  its shared brief contract in the CLI; derive its terminal result from member
+  outcomes without adding an FSM.
+- Preserve the old fork's `counter_of` evidence-pair capability under the new
+  contract, separately from committee mode. Map primary/counter to distinct
+  work IDs in one frozen batch; the counter points to the primary work ID, and
+  the CLI checks disjoint evidence identities during acceptance. Overlap rejects
+  only the counter report and uses that work's bounded retry budget; the primary
+  report is never injected into the counter context.
+- Keep reviewer, advisor, committee, security, correctness, and architecture
+  as task lenses or Skill procedures unless they require distinct permissions,
+  tools, lifecycle, or artifact contracts. Keep execution profiles separate
+  from roles.
+- Replace the bundled `trellis-channel` Skill with one `trellis-teamwork`
+  entry that absorbs and rewrites its useful references for the new contract.
+  Register the complete beta.4 Channel command tree under the new public
+  `trellis teamwork` root and use a new `teamwork.teammate` runtime
+  configuration namespace. Retain Core Channel API/event/store names. Add no
+  old-name alias, old-format reader, or Marketplace workflow.
+- Keep the normal single-agent task path and native workflow unchanged. Preserve
+  beta.4 Core Channel behavior through the new CLI surface; batch behavior stays
+  opt-in and adds no task lifecycle state or Marketplace workflow.
+- Restore the generic read-only `trellis task progress [--json]` summary for
+  active task records. Count only `planning`, `in_progress`, and `completed`,
+  exclude archived tasks, and report malformed or unknown records as partial
+  without inventing a lifecycle state. Native task commands remain the only
+  task-state writers; task progress is separate from the batch state machines.
 - Provide deterministic unit, integration, contract, and fixture tests for
   source/schema/caller/state-machine contracts. Real Paseo, Provider, and CLI
   host execution is out of scope; without the host gate, Agent-facing batch
@@ -65,27 +93,44 @@ submits a frozen plan and receives a bounded receipt.
 - Do not add dynamic replanning, runtime work splitting/merging, runtime
   provider/model switching, an unbounded retry policy, a scheduler outside the
   Channel runtime, or a second event/artifact ledger.
+- Do not copy Paseo's peer-to-peer committee convergence loop, add dedicated
+  advisor/reviewer/committee role cards, or introduce a new committee FSM.
+  Committee membership validation is a frozen-plan contract, not a Skill-only
+  convention.
 - Do not create additional branches or Git worktrees.
 
 ## Acceptance Criteria
 
-- [ ] `v0.7.1` remains based on beta.4 and every changed source, test, template,
+- [x] `v0.7.1` remains based on beta.4 and every changed source, test, template,
       config, and generated-asset path has an owner and deterministic check.
-- [ ] Core durable facts and CLI projections implement the three state
+- [x] Core durable facts and CLI projections implement the three state
       machines, capacity formula, FIFO refill, bounded retry matrix, protected
       lease, idempotent command/claim behavior, and reconciliation rules.
-- [ ] Normal Channel and task behavior has regression coverage and unchanged
+- [x] Normal Channel and task behavior has regression coverage and unchanged
       one-shot semantics.
-- [ ] Role/profile/config resolution and all four adapter contracts are covered
+- [x] Role/profile/config resolution and all four adapter contracts are covered
       by fixtures; unsupported or unverifiable capabilities, including isolation
       from implicit host memory, fail closed. Only context frozen in the brief
       may be injected into a Teammate.
-- [ ] Artifact placement and validation reject identity, source, terminal,
+- [x] Artifact placement and validation reject identity, source, terminal,
       protected-target, secret, path, status, and missing/mismatched brief
       summary inconsistencies.
-- [ ] Template registration, init/update behavior, generated role/config assets,
-      and the bundled Channel Skill remain sourced from the Trellis template
-      owner.
-- [ ] Component lint, typecheck, Python checks, focused tests, and static review
+- [x] Template registration, init/update behavior, generated role/config assets,
+      and the bundled Teamwork Skill remain sourced from the Trellis template
+      owner. Reports for advisor/committee patterns remain hidden until the
+      existing batch terminal receipt; no new FSM or peer exchange is added.
+- [x] The public `trellis teamwork` command has no old-name alias; the new
+      `teamwork.teammate` config, Skill, and artifact paths read only their new
+      formats. Core Channel behavior remains covered against beta.4.
+- [x] Encode `counter_of` as two distinct work IDs in one frozen batch with a
+      directed primary relation, identical shared contract and retry budget,
+      distinct lens/execution identity, and no primary-report disclosure.
+      Validate evidence identity disjointness and retry only the rejected
+      counter work within its budget; do not claim semantic independence or add
+      a state machine.
+- [x] `trellis task progress` reports the three native task statuses without
+      mutating task records; archive entries are excluded, and malformed or
+      unknown records set `partial: true` in JSON output.
+- [x] Component lint, typecheck, Python checks, focused tests, and static review
       pass. The acceptance record lists deferred host-gate evidence and does
       not claim production runtime readiness.
