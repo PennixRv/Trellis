@@ -41,7 +41,8 @@ export type ChannelEventKind =
   | "turn_started"
   | "turn_finished"
   | "interrupted"
-  | "supervisor_warning";
+  | "supervisor_warning"
+  | "coordination";
 
 export const CHANNEL_EVENT_KINDS: ReadonlySet<ChannelEventKind> = new Set([
   "create",
@@ -65,6 +66,7 @@ export const CHANNEL_EVENT_KINDS: ReadonlySet<ChannelEventKind> = new Set([
   "turn_finished",
   "interrupted",
   "supervisor_warning",
+  "coordination",
 ]);
 
 export function parseChannelKind(
@@ -306,6 +308,88 @@ export interface SupervisorWarningChannelEvent
   remaining_ms: number;
 }
 
+export type CoordinationEntity = "batch" | "work" | "attempt" | "teammate";
+
+export type CoordinationBatchState =
+  | "PREPARED"
+  | "VALIDATING_PLAN"
+  | "RUNNING"
+  | "SETTLING"
+  | "ALL_ACCEPTED"
+  | "SETTLED_WITH_FAILURE"
+  | "SUSPENDED"
+  | "CANCEL_PENDING"
+  | "RECONCILIATION_REQUIRED";
+
+export type CoordinationWorkState =
+  | "QUEUED"
+  | "ASSIGNED"
+  | "EXECUTING"
+  | "REPORT_PENDING"
+  | "VALIDATING"
+  | "ACCEPTED"
+  | "FINAL_FAILED"
+  | "WAITING_FOR_MAIN_COMMAND";
+
+export type CoordinationAttemptState =
+  | "ASSIGNED"
+  | "RUNNING"
+  | "REPORT_SUBMITTED"
+  | "FAILED"
+  | "TIMEOUT_YIELDED"
+  | "WAITING_FOR_MAIN_COMMAND"
+  | "FINAL_FAILED";
+
+export type CoordinationTeammateState =
+  | "ASSIGNED"
+  | "RUNNING"
+  | "REPORT_SUBMITTED"
+  | "FAILED"
+  | "TIMEOUT_YIELDED"
+  | "WAITING_FOR_MAIN_COMMAND";
+
+export type CoordinationState =
+  | CoordinationBatchState
+  | CoordinationWorkState
+  | CoordinationAttemptState
+  | CoordinationTeammateState;
+
+export type CoordinationAction =
+  | "state_transition"
+  | "terminal_observed"
+  | "claim_created"
+  | "command_issued"
+  | "receipt_recorded"
+  | "lease_acquired"
+  | "lease_released"
+  | "reconciliation_required";
+
+export interface CoordinationChannelEvent
+  extends BaseChannelEvent<"coordination"> {
+  action: CoordinationAction;
+  entity: CoordinationEntity;
+  batchId: string;
+  workId?: string;
+  attemptId?: string;
+  teammateId?: string;
+  slot?: number;
+  retryCount?: number;
+  state?: CoordinationState;
+  planHash?: string;
+  commandId?: string;
+  claimId?: string;
+  receiptId?: string;
+  leaseId?: string;
+  protected?: boolean;
+  /** Provider session associated with this attempt, when the host exposes one. */
+  sessionId?: string;
+  /** True only when the external process has reported a terminal fact. */
+  terminal?: boolean;
+  reason?: string;
+  outcome?: string;
+  payload?: Record<string, unknown>;
+}
+
 export type GenericChannelEvent = BaseChannelEvent<
   Exclude<
     ChannelEventKind,
@@ -325,6 +409,7 @@ export type GenericChannelEvent = BaseChannelEvent<
     | "turn_finished"
     | "interrupted"
     | "supervisor_warning"
+    | "coordination"
   >
 >;
 
@@ -345,7 +430,14 @@ export type ChannelEvent =
   | TurnFinishedChannelEvent
   | InterruptedChannelEvent
   | SupervisorWarningChannelEvent
+  | CoordinationChannelEvent
   | GenericChannelEvent;
+
+export function isCoordinationEvent(
+  ev: ChannelEvent,
+): ev is CoordinationChannelEvent {
+  return ev.kind === "coordination" && typeof ev.batchId === "string";
+}
 
 export function isCreateEvent(ev: ChannelEvent): ev is CreateChannelEvent {
   return ev.kind === "create";

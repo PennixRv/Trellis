@@ -53,6 +53,14 @@ export type {
   InterruptedChannelEvent,
   SupervisorWarningChannelEvent,
   SupervisorWarningReason,
+  CoordinationChannelEvent,
+  CoordinationAction,
+  CoordinationEntity,
+  CoordinationState,
+  CoordinationBatchState,
+  CoordinationWorkState,
+  CoordinationAttemptState,
+  CoordinationTeammateState,
   InterruptReason,
   InterruptMethod,
   InterruptOutcome,
@@ -70,6 +78,7 @@ export {
   isThreadEvent,
   isContextEvent,
   isChannelMetadataEvent,
+  isCoordinationEvent,
   appendEvent,
   readLastSeq,
 } from "./internal/store/events.js";
@@ -113,6 +122,21 @@ export {
 export {
   reduceChannelMetadata,
 } from "./internal/store/channel-metadata.js";
+
+export {
+  canTransition,
+  assertCoordinationTransition,
+  isCoordinationAction,
+  reduceCoordinationState,
+} from "./internal/store/coordination.js";
+export type {
+  CoordinationProjection,
+  CoordinationBatchProjection,
+  CoordinationWorkProjection,
+  CoordinationAttemptProjection,
+  CoordinationTeammateProjection,
+  CoordinationLeaseProjection,
+} from "./internal/store/coordination.js";
 
 export type {
   ThreadState,
@@ -204,6 +228,14 @@ export type {
 } from "./api/workers.js";
 
 export { spawnWorker } from "./api/spawn.js";
+export {
+  recordCoordinationEvent,
+  readCoordinationState,
+} from "./api/coordination.js";
+export type {
+  RecordCoordinationEventInput,
+  ReadCoordinationStateInput,
+} from "./api/coordination.js";
 export {
   requestInterrupt,
   interruptWorker,
