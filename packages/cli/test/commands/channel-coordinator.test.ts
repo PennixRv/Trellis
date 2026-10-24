@@ -108,7 +108,13 @@ function createPlan(taskRoot: string, workIds: string[], maxRetries = 0) {
   return plan;
 }
 
-function writeReport(taskRoot: string, context: TeammateDispatchContext): void {
+function writeReport(
+  taskRoot: string,
+  context: TeammateDispatchContext,
+  evidence = [
+    { id: "e1", locator: "src/example.ts:1", summary: "Verified behavior." },
+  ],
+): void {
   const reportPath = path.join(
     taskRoot,
     "teammates",
@@ -128,9 +134,7 @@ function writeReport(taskRoot: string, context: TeammateDispatchContext): void {
     teammateId: context.teammateId,
     status: "complete",
     sourceDigest,
-    evidence: [
-      { id: "e1", locator: "src/example.ts:1", summary: "Verified behavior." },
-    ],
+    evidence,
   };
   fs.writeFileSync(
     reportPath,
@@ -146,6 +150,90 @@ function writeReport(taskRoot: string, context: TeammateDispatchContext): void {
       evidence: report.evidence,
     }),
   );
+}
+
+function createRelatedPlan(
+  taskRoot: string,
+  relation: "committee" | "counter",
+  maxRetries = 1,
+) {
+  const plan = createPlan(taskRoot, ["work-primary"], maxRetries);
+  const work = plan.work as Record<string, unknown>[];
+  const primary = work[0];
+  if (!primary) throw new Error("fixture is missing primary work");
+  const primaryBriefPath = path.join(taskRoot, String(primary.brief_path));
+  const primaryBrief = JSON.parse(
+    fs.readFileSync(primaryBriefPath, "utf8"),
+  ) as Record<string, unknown>;
+  const counter = relation === "counter";
+  const group = { id: "review-pair", kind: "committee" };
+  const secondBrief: Record<string, unknown> = {
+    ...primaryBrief,
+    work_id: "work-counter",
+    provider: "codex",
+    lens: counter
+      ? "Challenge assumptions and report distinct evidence"
+      : "Review the contract from an independent lens",
+    ...(counter ? { counter_of: "work-primary" } : {}),
+  };
+  const secondBriefPath = path.join(
+    taskRoot,
+    "teammates",
+    "batch-1",
+    "work-counter",
+    "brief.json",
+  );
+  fs.mkdirSync(path.dirname(secondBriefPath), { recursive: true });
+  fs.writeFileSync(secondBriefPath, JSON.stringify(secondBrief));
+  const secondWork: Record<string, unknown> = {
+    ...primary,
+    work_id: "work-counter",
+    brief_path: "teammates/batch-1/work-counter/brief.json",
+    provider: "codex",
+    lens: secondBrief.lens,
+    brief_digest: computeBatchPlanHash(secondBrief),
+    ...(counter ? { counter_of: "work-primary" } : { evaluation_group: group }),
+  };
+  if (counter) {
+    secondBrief.counter_of = "work-primary";
+    fs.writeFileSync(secondBriefPath, JSON.stringify(secondBrief));
+    secondWork.brief_digest = computeBatchPlanHash(secondBrief);
+  } else {
+    primary.evaluation_group = group;
+    fs.writeFileSync(primaryBriefPath, JSON.stringify(primaryBrief));
+    primary.brief_digest = computeBatchPlanHash(primaryBrief);
+    secondWork.brief_digest = computeBatchPlanHash(secondBrief);
+  }
+  work.push(secondWork);
+  plan.requested_capacity = 2;
+  plan.plan_hash = computeBatchPlanHash(plan);
+  return plan;
+}
+
+function appendWork(
+  plan: Record<string, unknown>,
+  taskRoot: string,
+  workId: string,
+) {
+  const work = plan.work as Record<string, unknown>[];
+  const template = work.find((item) => item.work_id === "work-primary");
+  if (!template) throw new Error("fixture is missing primary work");
+  const brief = JSON.parse(
+    fs.readFileSync(path.join(taskRoot, String(template.brief_path)), "utf8"),
+  ) as Record<string, unknown>;
+  const newBrief = { ...brief, work_id: workId };
+  const briefPath = path.join("teammates", "batch-1", workId, "brief.json");
+  fs.mkdirSync(path.dirname(path.join(taskRoot, briefPath)), {
+    recursive: true,
+  });
+  fs.writeFileSync(path.join(taskRoot, briefPath), JSON.stringify(newBrief));
+  work.push({
+    ...template,
+    work_id: workId,
+    brief_path: briefPath,
+    brief_digest: computeBatchPlanHash(newBrief),
+  });
+  plan.plan_hash = computeBatchPlanHash(plan);
 }
 
 const host = {
@@ -180,6 +268,47 @@ describe("Channel teammate coordinator", () => {
   });
 
   afterEach(() => teardown(env));
+
+  it("rejects missing host proof before guard acquisition or runtime dispatch", async () => {
+    const plan = createPlan(env.taskRoot, ["work-a"]);
+    const batchGuard = {
+      acquire: vi.fn(async () => undefined),
+      release: vi.fn(async () => undefined),
+    };
+    const dispatch = vi.fn(async () => undefined);
+
+    await expect(
+      runBatchCoordinator({
+        plan,
+        taskRoot: env.taskRoot,
+        cwd: env.projectDir,
+        host: { ...host, implicitMemoryDisabled: false },
+        guard: batchGuard,
+        config,
+        runtime: {
+          dispatch,
+          async wait() {
+            return { kind: "reconciliation", reason: "unexpected wait" };
+          },
+          async continue() {
+            return {
+              kind: "reconciliation",
+              reason: "unexpected continuation",
+            };
+          },
+        },
+      }),
+    ).rejects.toThrow(/capability proof is incomplete/);
+
+    expect(batchGuard.acquire).not.toHaveBeenCalled();
+    expect(batchGuard.release).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(
+      fs.existsSync(
+        path.join(env.taskRoot, "teammates", "batch-1", "work-a", "queue.json"),
+      ),
+    ).toBe(false);
+  });
 
   it("dispatches FIFO work into rolling slots and returns one terminal receipt", async () => {
     const plan = createPlan(env.taskRoot, ["work-a", "work-b", "work-c"]);
@@ -241,7 +370,11 @@ describe("Channel teammate coordinator", () => {
     ]);
     const workB = dispatched[1];
     writeReport(env.taskRoot, workB);
-    waiters.get("work-b")?.({ kind: "report", terminal: true, sessionId: "session-b" });
+    waiters.get("work-b")?.({
+      kind: "report",
+      terminal: true,
+      sessionId: "session-b",
+    });
 
     await threeStarted;
     await threeWaiting;
@@ -300,7 +433,11 @@ describe("Channel teammate coordinator", () => {
         },
         async wait(context) {
           return context.retryCount === 0
-            ? { kind: "failed", terminal: true, reason: "provider exited before report" }
+            ? {
+                kind: "failed",
+                terminal: true,
+                reason: "provider exited before report",
+              }
             : { kind: "report", terminal: true };
         },
         async continue() {
@@ -352,6 +489,113 @@ describe("Channel teammate coordinator", () => {
       "work-a.attempt.1",
     ]);
     expect(dispatched[0].slot).toBe(dispatched[1].slot);
+  });
+
+  it("waits for the primary before checking counter evidence and retries only the counter on overlap", async () => {
+    const plan = createRelatedPlan(env.taskRoot, "counter", 1);
+    appendWork(plan, env.taskRoot, "work-third");
+    const work = plan.work as Record<string, unknown>[];
+    work.sort(
+      (left, right) =>
+        ["work-counter", "work-primary", "work-third"].indexOf(
+          String(left.work_id),
+        ) -
+        ["work-counter", "work-primary", "work-third"].indexOf(
+          String(right.work_id),
+        ),
+    );
+    plan.requested_capacity = 2;
+    plan.plan_hash = computeBatchPlanHash(plan);
+    const dispatched: TeammateDispatchContext[] = [];
+    const waiters = new Map<string, () => void>();
+    const run = runBatchCoordinator({
+      plan,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard,
+      config,
+      runtime: {
+        async dispatch(context) {
+          dispatched.push(context);
+          writeReport(
+            env.taskRoot,
+            context,
+            context.work.workId === "work-counter" && context.retryCount > 0
+              ? [{ id: "e2", locator: "src/other.ts:2", summary: "Distinct." }]
+              : undefined,
+          );
+        },
+        wait(context) {
+          return new Promise((resolve) => {
+            waiters.set(context.attemptId, () =>
+              resolve({ kind: "report", terminal: true }),
+            );
+          });
+        },
+        async continue() {
+          throw new Error("no continuation expected");
+        },
+      },
+    });
+    await vi.waitFor(() => expect(waiters.size).toBe(2));
+    waiters.get("work-counter.attempt.0")?.();
+    await vi.waitFor(() => expect(dispatched).toHaveLength(3));
+    await vi.waitFor(async () => {
+      const state = await readCoordinationState({
+        channel: "parallel",
+        cwd: env.projectDir,
+      });
+      expect(
+        state.work.find((item) => item.workId === "work-counter")?.state,
+      ).toBe("VALIDATING");
+    });
+    waiters.get("work-primary.attempt.0")?.();
+    await vi.waitFor(() => expect(dispatched).toHaveLength(4));
+    waiters.get("work-third.attempt.0")?.();
+    waiters.get("work-counter.attempt.1")?.();
+
+    const receipt = await run;
+    expect(receipt.status).toBe("ALL_ACCEPTED");
+    expect(receipt.retryCounts["work-counter"]).toBe(1);
+    expect(dispatched.map((item) => item.attemptId)).toEqual([
+      "work-counter.attempt.0",
+      "work-primary.attempt.0",
+      "work-third.attempt.0",
+      "work-counter.attempt.1",
+    ]);
+  });
+
+  it("derives committee completion in the terminal batch receipt", async () => {
+    const plan = createRelatedPlan(env.taskRoot, "committee", 0);
+    const receipt = await runBatchCoordinator({
+      plan,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard,
+      config,
+      runtime: {
+        async dispatch(context) {
+          writeReport(env.taskRoot, context, [
+            {
+              id: context.work.workId,
+              locator: `${context.work.workId}.ts:1`,
+              summary: "Independent evidence.",
+            },
+          ]);
+        },
+        async wait() {
+          return { kind: "report", terminal: true };
+        },
+        async continue() {
+          throw new Error("no continuation expected");
+        },
+      },
+    });
+    expect(receipt.evaluationGroups).toEqual([
+      { id: "review-pair", status: "COMPLETE" },
+    ]);
   });
 
   it("continues a timed-out attempt in place without consuming a retry", async () => {
@@ -453,7 +697,11 @@ describe("Channel teammate coordinator", () => {
           dispatched.push(context);
         },
         async wait() {
-          return { kind: "failed", terminal: true, reason: "confirmed failure" };
+          return {
+            kind: "failed",
+            terminal: true,
+            reason: "confirmed failure",
+          };
         },
         async continue() {
           throw new Error("no continuation expected");

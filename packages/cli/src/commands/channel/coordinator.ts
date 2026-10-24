@@ -10,6 +10,7 @@ import {
 
 import {
   type BatchPlan,
+  type TeammateReport,
   readTeammateReport,
   writeTeammateQueueFact,
   writeTeammateClaim,
@@ -96,6 +97,22 @@ export interface BatchReceipt {
   }[];
   capacity: number;
   retryCounts: Record<string, number>;
+  evaluationGroups?: {
+    id: string;
+    status: "COMPLETE" | "INCOMPLETE";
+  }[];
+}
+
+function evidenceOverlaps(
+  left: TeammateReport,
+  right: TeammateReport,
+): boolean {
+  const identities = new Set(
+    left.evidence.map((entry) => JSON.stringify([entry.id, entry.locator])),
+  );
+  return right.evidence.some((entry) =>
+    identities.has(JSON.stringify([entry.id, entry.locator])),
+  );
 }
 
 async function recoverExistingBatch(input: {
@@ -192,6 +209,7 @@ interface ActiveWork {
   work: BatchPlan["work"][number];
   retryCount: number;
   continuations: number;
+  leaseReleased?: boolean;
   sessionId?: string;
   context: TeammateDispatchContext;
 }
@@ -466,6 +484,11 @@ export async function runBatchCoordinator(
     Promise<{ slot: number; result: AttemptWaitResult }>
   >();
   const final = new Map<string, "ACCEPTED" | "FINAL_FAILED">();
+  const acceptedReports = new Map<string, TeammateReport>();
+  const pendingCounterReports = new Map<
+    string,
+    { activeWork: ActiveWork; report: TeammateReport }
+  >();
   const retryCounts: Record<string, number> = {};
 
   async function reconcile(reason: string): Promise<BatchReceipt> {
@@ -675,6 +698,7 @@ export async function runBatchCoordinator(
   }
 
   async function release(activeWork: ActiveWork): Promise<void> {
+    if (activeWork.leaseReleased) return;
     await appendAction({
       channel: plan.channel,
       by,
@@ -685,6 +709,7 @@ export async function runBatchCoordinator(
       leaseId: `${plan.batchId}:${activeWork.context.attemptId}`,
       protected: false,
     });
+    activeWork.leaseReleased = true;
   }
 
   async function releaseGuard(): Promise<void> {
@@ -852,6 +877,70 @@ export async function runBatchCoordinator(
     });
     await release(activeWork);
     final.set(work.workId, "FINAL_FAILED");
+    await resolvePendingCounter(work.workId);
+  }
+
+  async function accept(
+    activeWork: ActiveWork,
+    report: TeammateReport,
+  ): Promise<void> {
+    const { work, context, retryCount } = activeWork;
+    writeTeammateDisposition({
+      taskRoot: input.taskRoot,
+      briefPath: work.briefPath,
+      identity: {
+        taskId: plan.taskId,
+        batchId: plan.batchId,
+        workId: work.workId,
+        attemptId: context.attemptId,
+        teammateId: context.teammateId,
+      },
+      sourceDigest: work.sourceDigest,
+      status: "accepted",
+    });
+    await appendTransition({
+      channel: plan.channel,
+      by,
+      batchId: plan.batchId,
+      entity: "work",
+      id: work.workId,
+      state: "ACCEPTED",
+      states: workStates,
+      workId: work.workId,
+      attemptId: context.attemptId,
+      teammateId: context.teammateId,
+      retryCount,
+    });
+    await release(activeWork);
+    acceptedReports.set(work.workId, report);
+    final.set(work.workId, "ACCEPTED");
+    await resolvePendingCounter(work.workId);
+  }
+
+  async function resolvePendingCounter(primaryWorkId: string): Promise<void> {
+    const counter = plan.work.find((work) => work.counterOf === primaryWorkId);
+    if (!counter) return;
+    const pending = pendingCounterReports.get(counter.workId);
+    if (!pending) return;
+    pendingCounterReports.delete(counter.workId);
+    if (final.get(primaryWorkId) === "FINAL_FAILED") {
+      await fail(
+        pending.activeWork,
+        `counter primary '${primaryWorkId}' did not complete`,
+        false,
+      );
+      return;
+    }
+    const primaryReport = acceptedReports.get(primaryWorkId);
+    if (!primaryReport) return;
+    if (evidenceOverlaps(primaryReport, pending.report)) {
+      await fail(
+        pending.activeWork,
+        `counter evidence overlaps primary '${primaryWorkId}'`,
+      );
+      return;
+    }
+    await accept(pending.activeWork, pending.report);
   }
 
   async function complete(
@@ -959,34 +1048,34 @@ export async function runBatchCoordinator(
       teammateId: context.teammateId,
       retryCount,
     });
-    writeTeammateDisposition({
-      taskRoot: input.taskRoot,
-      briefPath: work.briefPath,
-      identity: {
-        taskId: plan.taskId,
-        batchId: plan.batchId,
-        workId: work.workId,
-        attemptId: context.attemptId,
-        teammateId: context.teammateId,
-      },
-      sourceDigest: work.sourceDigest,
-      status: "accepted",
-    });
-    await appendTransition({
-      channel: plan.channel,
-      by,
-      batchId: plan.batchId,
-      entity: "work",
-      id: work.workId,
-      state: "ACCEPTED",
-      states: workStates,
-      workId: work.workId,
-      attemptId: context.attemptId,
-      teammateId: context.teammateId,
-      retryCount,
-    });
-    await release(activeWork);
-    final.set(work.workId, "ACCEPTED");
+    if (work.counterOf) {
+      const primaryStatus = final.get(work.counterOf);
+      if (primaryStatus === "FINAL_FAILED") {
+        await fail(
+          activeWork,
+          `counter primary '${work.counterOf}' did not complete`,
+          false,
+        );
+        return;
+      }
+      const primaryReport = acceptedReports.get(work.counterOf);
+      if (!primaryReport) {
+        pendingCounterReports.set(work.workId, { activeWork, report });
+        active.delete(activeWork.slot);
+        waits.delete(activeWork.slot);
+        await release(activeWork);
+        return;
+      }
+      if (evidenceOverlaps(primaryReport, report)) {
+        await fail(
+          activeWork,
+          `counter evidence overlaps primary '${work.counterOf}'`,
+          allowRetry,
+        );
+        return;
+      }
+    }
+    await accept(activeWork, report);
   }
 
   async function settle(): Promise<BatchReceipt> {
@@ -1022,6 +1111,20 @@ export async function runBatchCoordinator(
       })),
       capacity,
       retryCounts,
+      evaluationGroups: [
+        ...new Set(
+          plan.work
+            .map((work) => work.evaluationGroup?.id)
+            .filter((id): id is string => id !== undefined),
+        ),
+      ].map((id) => ({
+        id,
+        status: plan.work
+          .filter((work) => work.evaluationGroup?.id === id)
+          .every((work) => final.get(work.workId) === "ACCEPTED")
+          ? "COMPLETE"
+          : "INCOMPLETE",
+      })),
     };
     await appendAction({
       channel: plan.channel,
@@ -1032,6 +1135,12 @@ export async function runBatchCoordinator(
       id: `${plan.batchId}:${status}`,
       payload: { ...receipt },
     });
+    await assertBatchReceiptDurable(
+      plan.channel,
+      plan.batchId,
+      plan.planHash,
+      cwd,
+    );
     await releaseGuard();
     return receipt;
   }
@@ -1286,13 +1395,28 @@ export async function runBatchCoordinator(
 export async function assertBatchReceiptDurable(
   channel: string,
   batchId: string,
+  planHash: string,
+  cwd?: string,
 ): Promise<void> {
-  const state = await readCoordinationState({ channel });
+  const [state, events] = await Promise.all([
+    readCoordinationState({ channel, ...(cwd ? { cwd } : {}) }),
+    readChannelEvents({ channel, ...(cwd ? { cwd } : {}) }),
+  ]);
   const batch = state.batches.find((entry) => entry.batchId === batchId);
   if (
-    !batch ||
+    batch?.planHash !== planHash ||
     (batch.state !== "ALL_ACCEPTED" && batch.state !== "SETTLED_WITH_FAILURE")
   ) {
     throw new Error(`batch '${batchId}' has no durable terminal receipt`);
+  }
+  const receiptRecorded = events.some(
+    (event) =>
+      event.kind === "coordination" &&
+      event.batchId === batchId &&
+      event.action === "receipt_recorded" &&
+      event.payload?.status === batch.state,
+  );
+  if (!receiptRecorded) {
+    throw new Error(`batch '${batchId}' has no matching durable receipt event`);
   }
 }
