@@ -43,7 +43,7 @@ export function registerChannelCommand(program: Command): void {
   const channel = program
     .command("channel")
     .description(
-      "Multi-agent collaboration runtime — spawn / coordinate / interrupt worker agents through a shared event log",
+      "Trellis Channel runtime — coordinate agents through a shared event log",
     );
 
   channel
@@ -380,6 +380,25 @@ export function registerChannelCommand(program: Command): void {
           idleTimeoutMs: parseDuration(opts.idleTimeout),
           maxLiveWorkers: opts.maxLiveWorkers,
         });
+      } catch (err) {
+        console.error(
+          chalk.red("Error:"),
+          err instanceof Error ? err.message : err,
+        );
+        process.exit(1);
+      }
+    });
+
+  channel
+    .command("batch <plan>")
+    .description(
+      "Submit one frozen Channel teammate plan; requires an installed host adapter",
+    )
+    .action(async (_planPath: string) => {
+      try {
+        throw new Error(
+          "no verified teammate host adapter is installed; batch dispatch refused before writing coordination state",
+        );
       } catch (err) {
         console.error(
           chalk.red("Error:"),
