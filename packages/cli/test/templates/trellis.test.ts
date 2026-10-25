@@ -142,6 +142,37 @@ describe("trellis template constants", () => {
     expect(marketplaceNative).toBe(workflowMdTemplate);
   });
 
+  it("both in-progress breadcrumbs require risk-based review and complete checkpoints", () => {
+    const qualityCheck = stepSection("2.2");
+    expect(qualityCheck).toContain("complete diff with the approved task PRD");
+    expect(qualityCheck).toContain("complexity and impact");
+    expect(qualityCheck).toContain("add focused cases for uncovered behavior");
+    expect(qualityCheck).toContain("independent review");
+    expect(qualityCheck).toContain(
+      "Fix findings within the approved scope and rerun affected checks",
+    );
+
+    for (const breadcrumb of [
+      inProgressBreadcrumb(),
+      workflowStateBreadcrumb("in_progress-inline"),
+    ]) {
+      expect(breadcrumb).toContain(
+        "Compare the complete diff with the approved plan",
+      );
+      expect(breadcrumb).toContain(
+        "Match tests and review depth to risk, complexity, and impact",
+      );
+      expect(breadcrumb).toContain(
+        "add focused cases or independent review when warranted",
+      );
+      expect(breadcrumb).toContain("completed work, remaining work");
+      expect(breadcrumb).toContain("blockers or scope changes");
+      expect(breadcrumb).toContain("changed paths, verification and results");
+      expect(breadcrumb).toContain("`execution.md`");
+      expect(breadcrumb).toContain("keep the task `in_progress`");
+    }
+  });
+
   it("marketplace TDD workflow planning breadcrumbs include behavior gates", () => {
     const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
       ? process.cwd()

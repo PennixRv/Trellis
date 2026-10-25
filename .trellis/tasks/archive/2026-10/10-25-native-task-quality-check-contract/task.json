@@ -1,0 +1,29 @@
+{
+  "id": "native-task-quality-check-contract",
+  "name": "native-task-quality-check-contract",
+  "title": "补齐 native workflow 的风险分层质量检查与进度 checkpoint",
+  "description": "在现有 Phase 2 Quality Check 中明确按风险对照批准设计、决定补测与独立审查、修复复验和进度汇总；添加模板合同回归测试，同步 Marketplace native 镜像及候选 gitlink。复用 v0.7.1，不创建分支；不改根仓 workflow、门禁或生产 pin。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-25",
+  "completedAt": "2026-10-25",
+  "branch": "v0.7.1",
+  "base_branch": "pennix/v0.7-beta",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing"
+  }
+}
