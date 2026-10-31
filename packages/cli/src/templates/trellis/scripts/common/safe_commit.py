@@ -4,7 +4,7 @@ Safe git-add helpers for Trellis-owned paths.
 Why this module exists
 ----------------------
 A real user incident: a project's `.gitignore` listed `.trellis/` (company-wide
-template / personal habit). When `add_session.py` and `task.py archive` ran
+template / personal habit). When `add_session.py` ran
 their auto-commit and `git add` failed with `ignored by .gitignore`, the AI
 agent driving the workflow "fixed" it by retrying with
 `git add -f .trellis/` — which fan-out-included every ignored subtree
@@ -13,8 +13,8 @@ agent driving the workflow "fixed" it by retrying with
 
 Design
 ------
-- Scripts only stage SPECIFIC product paths (journal files, index.md, the
-  current task dir, the archive dir). Never the whole `.trellis/` tree.
+- Scripts only stage SPECIFIC product paths (journal files, index.md, and the
+  current task dir). Never the whole `.trellis/` tree.
 - If plain `git add <specific>` fails with "ignored by", DO NOT retry with
   ``-f``. The presence of `.trellis/` in `.gitignore` is treated as user
   intent ("keep .trellis/ local-only"). The script warns and skips the
@@ -37,7 +37,6 @@ from pathlib import Path
 
 from .git import run_git, run_git_retry_index_lock
 from .paths import (
-    DIR_ARCHIVE,
     DIR_TASKS,
     DIR_WORKFLOW,
     DIR_WORKSPACE,
@@ -72,8 +71,7 @@ def safe_trellis_paths_to_add(
       - .trellis/workspace/<developer>/journal-*.md
       - .trellis/workspace/<developer>/index.md
       - .trellis/tasks/<task_name>/   (ONLY the current task dir when
-        ``task_name`` is passed; plus its archive location if the task
-        already lives under archive/)
+        ``task_name`` is passed)
 
     Excluded (intentionally — these must not be staged):
       - .trellis/.backup-*, .trellis/worktrees/,
@@ -82,12 +80,11 @@ def safe_trellis_paths_to_add(
     Scope contract (see #303 / break-loop analysis): when ``task_name`` is
     passed, the task segment stages ONLY that task directory — it never walks
     ``tasks_dir.iterdir()`` over all active tasks. This mirrors
-    :func:`safe_archive_paths_to_add` and prevents dirty changes in OTHER
-    parallel-window task dirs from being bundled into the session auto-commit.
+    and prevents dirty changes in OTHER parallel-window task dirs from being
+    bundled into the session auto-commit.
 
-    Backwards-compat: with no ``task_name``, the function walks every active
-    task directory (+ the archive subtree) the old wide way. New callers
-    should always pass ``task_name``.
+    With no ``task_name``, the function walks every direct task directory.
+    New callers should always pass ``task_name``.
     """
     paths: list[str] = []
 
@@ -112,90 +109,20 @@ def safe_trellis_paths_to_add(
         return paths
 
     if task_name is not None:
-        # Narrow scope — ONLY the current task directory (active or archived).
+        # Narrow scope — ONLY the current task directory.
         # Never iterdir() all tasks: parallel-window dirty task dirs must not
         # leak into the session auto-commit.
         active_task = tasks_dir / task_name
         if active_task.is_dir():
             paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{task_name}")
-        archived_task = tasks_dir / DIR_ARCHIVE / task_name
-        if archived_task.is_dir():
-            paths.append(
-                f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}/{task_name}"
-            )
         return paths
 
-    # Legacy wide scope (no task_name): each direct child of tasks/ that is a
-    # directory and not the archive root, plus the whole archive subtree.
+    # Wide scope (no task_name): each direct task directory.
     for child in sorted(tasks_dir.iterdir()):
         if not child.is_dir():
             continue
-        if child.name == DIR_ARCHIVE:
-            continue
         paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{child.name}")
 
-    archive_dir = tasks_dir / DIR_ARCHIVE
-    if archive_dir.is_dir():
-        paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}")
-
-    return paths
-
-
-def safe_archive_paths_to_add(
-    repo_root: Path,
-    task_name: str | None = None,
-    modified_children: list[str] | None = None,
-) -> list[str]:
-    """Return paths to stage after `task.py archive`.
-
-    Scoped to ONLY the paths the archive operation actually touched:
-
-      - the archive subtree (where the freshly-moved task lives)
-      - the source task directory (for source-side deletes; caller pairs
-        this with `git rm --cached` since `git add` won't stage deletes
-        for a path that no longer exists in the working tree)
-      - any child task directories whose `task.json` was edited to drop
-        the archived parent (parent-children relationship update)
-
-    This narrow scope avoids "scope creep" — dirty changes in OTHER
-    active task dirs (parallel-window edits) are NOT bundled into the
-    archive commit. Callers handle each kind of change in its own
-    commit boundary.
-
-    Backwards-compat: with no arguments, the function walks the whole
-    `.trellis/tasks/` subtree the old way (active tasks + archive). New
-    callers should always pass `task_name`.
-    """
-    paths: list[str] = []
-    tasks_dir = repo_root / DIR_WORKFLOW / DIR_TASKS
-    if not tasks_dir.is_dir():
-        return paths
-
-    archive_dir = tasks_dir / DIR_ARCHIVE
-
-    if task_name is not None:
-        # Narrow scope — only paths that still exist on disk (so
-        # `git add` doesn't choke on the moved-away source). The caller
-        # handles the source-side deletes via `git rm --cached`
-        # explicitly.
-        if archive_dir.is_dir():
-            paths.append(
-                f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}"
-            )
-        for child_name in modified_children or []:
-            paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{child_name}")
-        return paths
-
-    # Legacy wide scope (no task_name): preserve old behavior so callers
-    # that have not been updated keep working.
-    if archive_dir.is_dir():
-        paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}")
-    for child in sorted(tasks_dir.iterdir()):
-        if not child.is_dir():
-            continue
-        if child.name == DIR_ARCHIVE:
-            continue
-        paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{child.name}")
     return paths
 
 
@@ -225,9 +152,7 @@ def safe_git_add(
 
     ``retry_on_index_lock`` opts into the bounded backoff-retry for a held
     ``.git/index.lock`` (see :func:`~.git.run_git_retry_index_lock`). It is
-    off by default: only the archive path, which has already moved the task
-    directory on disk by the time it stages, needs to wait out a transient
-    lock rather than fail.
+    off by default; callers that already changed files on disk can opt in.
     """
     if not paths:
         return True, False, ""
@@ -273,10 +198,6 @@ def print_gitignore_warning(paths: list[str]) -> None:
         )
         print(
             "[WARN]   .trellis/tasks/<task-dir>/",
-            file=sys.stderr,
-        )
-        print(
-            "[WARN]   .trellis/tasks/archive/",
             file=sys.stderr,
         )
     print("[WARN]", file=sys.stderr)

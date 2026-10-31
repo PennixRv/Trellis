@@ -1,9 +1,9 @@
 /**
- * Discover channel runtime agent names referenced by a workflow.md body.
+ * Discover Teamwork runtime agent names referenced by a workflow.md body.
  *
- * Channel-driven workflows tell the main session to run
+ * Teamwork-enabled workflows tell the main session to run
  * `trellis teamwork spawn --agent <name>`, which loads `.trellis/agents/<name>.md`
- * via `packages/cli/src/commands/channel/agent-loader.ts`. If a workflow
+ * via `packages/cli/src/commands/teamwork/agent-loader.ts`. If a workflow
  * references an agent name that is not on disk, the spawn call fails at
  * runtime. We surface that mismatch eagerly (at `trellis init --workflow` /
  * `trellis workflow --template` time) so users can run `trellis update` before
@@ -25,7 +25,7 @@ import path from "node:path";
 import { PATHS } from "../constants/paths.js";
 
 /**
- * Mirror of `SAFE_AGENT_NAME` in `commands/channel/agent-loader.ts`.
+ * Mirror of `SAFE_AGENT_NAME` in `commands/teamwork/agent-loader.ts`.
  * Names outside this charset cannot be loaded, so we silently ignore them.
  */
 const SAFE_AGENT_NAME_CHARS = "A-Za-z0-9._-";

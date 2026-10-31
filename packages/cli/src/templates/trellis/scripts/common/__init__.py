@@ -59,7 +59,6 @@ from .paths import (
     DIR_WORKFLOW,
     DIR_WORKSPACE,
     DIR_TASKS,
-    DIR_ARCHIVE,
     DIR_SPEC,
     DIR_SCRIPTS,
     FILE_DEVELOPER,

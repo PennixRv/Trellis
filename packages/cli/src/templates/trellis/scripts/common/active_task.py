@@ -8,6 +8,7 @@ session key there is no active task.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import re
@@ -18,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .io import read_json as _io_read_json, write_json as _io_write_json
+from .io import JSON_READ_MISSING, read_json as _io_read_json, read_json_checked, write_json as _io_write_json
 
 DIR_WORKFLOW = ".trellis"
 DIR_TASKS = "tasks"
@@ -665,6 +666,36 @@ def _context_path(repo_root: Path, context_key: str) -> Path:
     return _runtime_sessions_dir(repo_root) / f"{context_key}.json"
 
 
+@contextlib.contextmanager
+def _session_file_lock(context_path: Path):
+    """Serialize changes to one session's active-task pointer."""
+    lock_path = context_path.with_suffix(".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as handle:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            if handle.read(1) == b"":
+                handle.write(b"\0")
+                handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def resolve_active_task(
     repo_root: Path,
     platform_input: dict[str, Any] | None = None,
@@ -771,13 +802,51 @@ def set_active_task(
         return None
 
     context_path = _context_path(repo_root, context_key)
-    context = _read_json(context_path) or {}
-    context.update(_context_metadata(platform_input, platform, context_key))
-    context["current_task"] = canonical
-    context.setdefault("current_run", None)
-    if not _write_json(context_path, context):
-        return None
+    from .task_continuity import active_task_change_guard
+
+    with active_task_change_guard(repo_root, context_key, canonical, clearing=False) as allowed:
+        if not allowed:
+            return None
+        with _session_file_lock(context_path):
+            context = _read_json(context_path) or {}
+            context.update(_context_metadata(platform_input, platform, context_key))
+            context["current_task"] = canonical
+            context.setdefault("current_run", None)
+            if not _write_json(context_path, context):
+                return None
     return ActiveTask(canonical, "session", context_key)
+
+
+def compare_and_set_active_task(
+    repo_root: Path,
+    context_key: str,
+    expected_task: str | None,
+    task_path: str | None,
+) -> bool:
+    """Change one direct session pointer only when its current value matches."""
+    context_path = _context_path(repo_root, context_key)
+    with _session_file_lock(context_path):
+        context, reason = read_json_checked(context_path)
+        if context is None and reason == JSON_READ_MISSING:
+            if expected_task is not None or task_path is None:
+                return False
+            context = {}
+        elif context is None:
+            return False
+        current = _string_value(context.get("current_task"))
+        current_ref = _canonical_task_ref(current, repo_root) if current else None
+        expected_ref = _canonical_task_ref(expected_task, repo_root) if expected_task else None
+        if current_ref != expected_ref:
+            return False
+        if task_path is None:
+            context.pop("current_task", None)
+        else:
+            canonical = _canonical_task_ref(task_path, repo_root)
+            if canonical is None:
+                return False
+            context["current_task"] = canonical
+            context.setdefault("current_run", None)
+        return _write_json(context_path, context)
 
 
 def clear_active_task(
@@ -795,8 +864,14 @@ def clear_active_task(
         return previous
 
     context_path = _context_path(repo_root, previous.context_key)
-    if context_path.is_file():
-        _remove_file(context_path)
+    from .task_continuity import active_task_change_guard
+
+    with active_task_change_guard(repo_root, previous.context_key, previous.task_path, clearing=True) as allowed:
+        if not allowed:
+            return ActiveTask(previous.task_path, "session", previous.context_key)
+        with _session_file_lock(context_path):
+            if context_path.is_file():
+                _remove_file(context_path)
     return previous
 
 
@@ -812,15 +887,16 @@ def clear_task_from_sessions(task_path: str, repo_root: Path) -> int:
         return cleared
 
     for session_path in sessions_dir.glob("*.json"):
-        context = _read_json(session_path) or {}
-        current = _string_value(context.get("current_task"))
-        if not current:
-            continue
-        current_ref = _canonical_task_ref(current, repo_root) or normalize_task_ref(current)
-        if current_ref != target:
-            continue
-        if session_path.is_file() and _remove_file(session_path):
-            cleared += 1
+        with _session_file_lock(session_path):
+            context = _read_json(session_path) or {}
+            current = _string_value(context.get("current_task"))
+            if not current:
+                continue
+            current_ref = _canonical_task_ref(current, repo_root) or normalize_task_ref(current)
+            if current_ref != target:
+                continue
+            if session_path.is_file() and _remove_file(session_path):
+                cleared += 1
 
     return cleared
 
@@ -829,7 +905,7 @@ def repoint_task_in_sessions(old_path: str, new_path: str, repo_root: Path) -> i
     """Move every session pointer from `old_path` to `new_path`.
 
     Rename is the one lifecycle step where the task survives under a different
-    name, so clearing the pointers (what archive does) would be wrong: the user
+    name, so clearing the pointers would be wrong: the user
     would silently lose their active task and have to run `task.py start`
     again to get context injection back. Repointing keeps the session valid
     across the rename.
@@ -849,20 +925,21 @@ def repoint_task_in_sessions(old_path: str, new_path: str, repo_root: Path) -> i
         return moved
 
     for session_path in sorted(sessions_dir.glob("*.json")):
-        context = _read_json(session_path)
-        if not context:
-            continue
-        current = _string_value(context.get("current_task"))
-        if not current:
-            continue
-        current_ref = _canonical_task_ref(current, repo_root) or _relative_task_ref(
-            current, repo_root
-        )
-        if current_ref != target:
-            continue
-        context["current_task"] = replacement
-        if _write_json(session_path, context):
-            moved += 1
+        with _session_file_lock(session_path):
+            context = _read_json(session_path)
+            if not context:
+                continue
+            current = _string_value(context.get("current_task"))
+            if not current:
+                continue
+            current_ref = _canonical_task_ref(current, repo_root) or _relative_task_ref(
+                current, repo_root
+            )
+            if current_ref != target:
+                continue
+            context["current_task"] = replacement
+            if _write_json(session_path, context):
+                moved += 1
 
     return moved
 

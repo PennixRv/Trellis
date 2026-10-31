@@ -99,7 +99,7 @@ Full docs details live in `.trellis/spec/docs-site/docs/release-lifecycle.md`.
 
 ## Submodule commit ordering
 
-When a release touches `docs-site` or `marketplace`, commit and push the submodule first, then commit the submodule pointer in the main repo.
+When a release touches `docs-site`, commit and push that submodule first, then commit its pointer in the main repo.
 
 Correct order:
 
@@ -113,7 +113,7 @@ git commit -m "chore: bump docs-site for v<version>"
 git push origin <branch>
 ```
 
-`packages/cli/scripts/release.js` excludes `docs-site` and `marketplace` from its automatic pre-release staging so submodule pointer changes cannot be hidden inside a generic release commit.
+`packages/cli/scripts/release.js` excludes `docs-site` from automatic pre-release staging so its submodule pointer cannot be hidden inside a generic release commit.
 
 ### Contract: every modified submodule must be pushed before the version tag
 
@@ -124,7 +124,7 @@ fatal: remote error: upload-pack: not our ref <SHA>
 fatal: Fetched in submodule path '<name>', but it did not contain <SHA>. Direct fetching of that commit failed.
 ```
 
-This is per-submodule. Pushing `docs-site` but forgetting `marketplace` (or vice versa) still fails. Verify all submodules before `pnpm release`:
+Verify the submodule pointer before `pnpm release`:
 
 ```bash
 git submodule foreach 'git fetch origin -q; sha=$(git rev-parse HEAD); \
@@ -155,16 +155,13 @@ ignore it, which is how the v0.6.4 incident below happens a second time.
 
 Any `FAIL` line means: `cd <submodule> && git checkout -B main && git push origin main` before tagging. If the tag was already pushed when you discover the miss, recover by pushing the submodule then re-running the failed CI jobs (`gh run rerun <id> --failed`) — no new tag is needed.
 
-> **Incident note (2026-06, v0.6.4).** `marketplace/workflows/native/workflow.md` was touched as a parity mirror for a bundled template edit, committed in-submodule, and pointer-bumped in the main repo — but the submodule itself was never pushed to its `origin/main`. `pnpm release` happily tagged `v0.6.4`; CI fetched the new tag, tried to materialise the marketplace pointer `680bcbb`, and died at checkout. Fix took two commands (`git -C marketplace push origin main` + `gh run rerun --failed`) but the failure mode is invisible from main-repo `git status` (the submodule is "clean" locally), which is exactly why the verify step above is mandatory and not advisory.
-
 ### Contract: the pre-release sweep MUST exclude `.trellis/`
 
 The pre-release `git add` in `release.js` (the `chore: pre-release updates`
-commit) **must** exclude `.trellis/` from its pathspec, alongside `docs-site`
-and `marketplace`:
+commit) **must** exclude `.trellis/` from its pathspec, alongside `docs-site`:
 
 ```js
-run("git add -A -- ':!docs-site' ':!marketplace' ':!.trellis'");
+run("git add -A -- ':!docs-site' ':!.trellis'");
 ```
 
 `.trellis/tasks/` is not gitignored, so a blanket `git add -A` sweeps in any
@@ -175,7 +172,8 @@ ever allowed through `common/safe_commit.py`'s precise allowlist (see the
 through a release-time blanket stage.
 
 > **Incident note (2026-06, #303).** A `release.js` pre-release `git add -A`
-> that excluded only `docs-site`/`marketplace` swept 6 unrelated in-progress
+> that excluded only `docs-site` and the Marketplace checkout (then present)
+> swept 6 unrelated in-progress
 > community-governance task files into the pre-release commit twice
 > (`5ee43ecc`, `ec123deb`). The maintainer had to `git rm --cached` three
 > times (`d66405d9`, `81960120`, `3c3219cf`) before finally tracking the
@@ -221,7 +219,7 @@ pnpm release:promote
 2. `check-docs-changelog --type beta|rc|promote` for prerelease/promotion tracks
 3. core tests
 4. CLI tests
-5. pre-release commit excluding `docs-site`, `marketplace`, and `.trellis`
+5. pre-release commit excluding `docs-site` and `.trellis`
 6. `bump-versions.js <type>` to update both package versions together
 7. `release-preflight check-versions`
 8. version commit with the version string as the commit message

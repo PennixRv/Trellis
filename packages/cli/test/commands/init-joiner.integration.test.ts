@@ -63,22 +63,27 @@ describe("init() joiner onboarding", () => {
 
   /**
    * Helper: simulate a fresh clone of an existing Trellis project — `.trellis/`
-   * committed (with at least one archived task indicating prior work),
-   * `.developer` absent. Real fresh-clone state always has either an active or
-   * archived bootstrap task; an empty `tasks/` indicates an aborted partial
+   * committed (with at least one retained task record indicating prior work),
+   * `.developer` absent. Real fresh-clone state has a task record; an empty
+   * `tasks/` indicates an aborted partial
    * init (issue #204) and triggers the bootstrap fallback instead of joiner.
    *
-   * NOTE: the seeded `tasks/archive/` is load-bearing for the joiner branch.
-   * If you change the `tasksEmpty` predicate in init.ts (currently
-   * `!exists || readdirSync().length === 0`), audit this helper — e.g., if
-   * archive/ stops counting as "non-empty", every joiner test below regresses
-   * into the bootstrap-fallback branch and assertions flip silently.
+   * The seeded task record is load-bearing for the joiner branch. If you
+   * change the tasksEmpty predicate in init.ts, audit this helper.
    */
   function simulateExistingCheckout(): void {
     const workflow = path.join(tmpDir, DIR_NAMES.WORKFLOW);
-    fs.mkdirSync(path.join(workflow, DIR_NAMES.TASKS, "archive"), {
-      recursive: true,
-    });
+    const existingTask = path.join(
+      workflow,
+      DIR_NAMES.TASKS,
+      "10-01-existing-task",
+    );
+    fs.mkdirSync(existingTask, { recursive: true });
+    fs.writeFileSync(
+      path.join(existingTask, FILE_NAMES.TASK_JSON),
+      JSON.stringify({ status: "completed" }),
+      "utf-8",
+    );
     fs.mkdirSync(path.join(workflow, DIR_NAMES.SPEC), { recursive: true });
     fs.mkdirSync(path.join(workflow, DIR_NAMES.WORKSPACE), { recursive: true });
   }
@@ -121,7 +126,7 @@ describe("init() joiner onboarding", () => {
     );
     expect(taskJson.id).toBe("00-join-bob");
     expect(taskJson.name).toBe("00-join-bob");
-    expect(taskJson.status).toBe("in_progress");
+    expect(taskJson.status).toBe("planning");
     expect(taskJson.dev_type).toBe("docs");
     expect(taskJson.priority).toBe("P1");
     expect(taskJson.creator).toBe("bob");
@@ -136,16 +141,12 @@ describe("init() joiner onboarding", () => {
     expect(prd).toContain("You (the AI) are running this task");
     expect(prd).toContain("workflow.md");
     expect(prd).toContain(".trellis/spec/");
-    expect(prd).toContain("00-join-bob");
-    // Fallback text for empty archive
-    expect(prd).toContain("archive is empty");
+    expect(prd).toContain("start it from a session that provides Trellis session identity");
+    expect(prd).toContain("phase 5");
+    expect(prd).not.toContain("task.py archive");
     const expectedPythonCmd = process.platform === "win32" ? "python" : "python3";
     expect(prd).toContain(
       `${expectedPythonCmd} ./.trellis/scripts/task.py list --assignee bob`,
-    );
-    expect(prd).toContain(`${expectedPythonCmd} ./.trellis/scripts/task.py finish`);
-    expect(prd).toContain(
-      `${expectedPythonCmd} ./.trellis/scripts/task.py archive 00-join-bob`,
     );
 
     // init creates the joiner task but does not set repo-global current-task state.
@@ -212,7 +213,7 @@ describe("init() joiner onboarding", () => {
     ).toBe(false);
   });
 
-  it("#4 after joiner archive but .developer remains → no new task on re-init", async () => {
+  it("#4 after onboarding task removal but .developer remains → no new task on re-init", async () => {
     simulateExistingCheckout();
 
     await init({ yes: true, user: "dave", force: true });
@@ -220,7 +221,7 @@ describe("init() joiner onboarding", () => {
     expect(fs.existsSync(joinerPath)).toBe(true);
 
     // Manually create the .developer file that init_developer.py would have
-    // written (it's mocked in this test), then archive the joiner task.
+    // written (it's mocked in this test), then remove the joiner task.
     fs.writeFileSync(
       path.join(tmpDir, PATHS.DEVELOPER_FILE),
       "dave\n",
@@ -339,7 +340,7 @@ describe("init() joiner onboarding", () => {
       fs.readFileSync(path.join(joiner, FILE_NAMES.TASK_JSON), "utf-8"),
     );
     expect(taskJson.creator).toBe("frank");
-    expect(taskJson.status).toBe("in_progress");
+    expect(taskJson.status).toBe("planning");
 
     expect(fs.existsSync(path.join(tmpDir, PATHS.CURRENT_TASK_FILE))).toBe(
       false,

@@ -19,7 +19,7 @@ export const DIR_NAMES = {
   SPEC: "spec",
   /** Scripts directory (under .trellis/) */
   SCRIPTS: "scripts",
-  /** Channel runtime agent definitions (under .trellis/) */
+  /** Teamwork runtime agent definitions (under .trellis/) */
   AGENTS: "agents",
 } as const;
 

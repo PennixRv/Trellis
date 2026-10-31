@@ -600,7 +600,7 @@ When release notes or docs claim an asset is bundled, installed automatically, o
 included with Trellis, verify the whole distribution path:
 
 - [ ] Source file exists in the branch being tagged, not only in another branch,
-  docs submodule, or marketplace tree.
+  docs submodule, or external Marketplace repository.
 - [ ] `pnpm build` copies the asset into `dist/templates/**`.
 - [ ] `npm pack --dry-run --json` includes the expected `dist/**` path.
 - [ ] The built binary installs the asset in a fresh temp repository.

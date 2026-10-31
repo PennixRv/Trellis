@@ -1,7 +1,7 @@
 {
   "name": "@mindfoldhq/trellis-core",
   "version": "0.7.0-beta.4",
-  "description": "Trellis core SDK — channel and task domain primitives consumed by the Trellis CLI and downstream Node services",
+  "description": "Trellis core SDK — Teamwork Session and task domain primitives consumed by the Trellis CLI and downstream Node services",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,10 +12,10 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./channel": {
-      "types": "./dist/channel/index.d.ts",
-      "import": "./dist/channel/index.js",
-      "default": "./dist/channel/index.js"
+    "./teamwork": {
+      "types": "./dist/teamwork/index.d.ts",
+      "import": "./dist/teamwork/index.js",
+      "default": "./dist/teamwork/index.js"
     },
     "./mem": {
       "types": "./dist/mem/index.d.ts",
@@ -53,7 +53,7 @@
   },
   "keywords": [
     "trellis",
-    "channel",
+    "teamwork",
     "sdk",
     "agent",
     "events"

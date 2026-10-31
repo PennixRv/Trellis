@@ -55,7 +55,7 @@ Translation examples (glob → matches / non-matches):
         matches only that exact file
     packages/cli/src/commands/*.ts
         matches packages/cli/src/commands/update.ts
-        not     packages/cli/src/commands/channel/spawn.ts
+        not     packages/cli/src/commands/teamwork/spawn.ts
     packages/cli/src/templates/**
         matches packages/cli/src/templates/trellis/index.ts (any depth)
         not     packages/cli/src/templates (the directory itself)

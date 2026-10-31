@@ -144,7 +144,7 @@ Examples (mirrored from the `spec_match.py` module docstring; keep in sync):
 | Glob                                  | Matches                                          | Does not match                                           |
 | ------------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
 | `packages/cli/src/commands/update.ts` | only that exact file                             | anything else                                            |
-| `packages/cli/src/commands/*.ts`      | `…/commands/update.ts`                           | `…/commands/channel/spawn.ts`                            |
+| `packages/cli/src/commands/*.ts`      | `…/commands/update.ts`                           | `…/commands/teamwork/spawn.ts`                           |
 | `packages/cli/src/templates/**`       | `…/templates/trellis/index.ts` (any depth)       | `packages/cli/src/templates` (the directory path itself) |
 | `packages/**/index.ts`                | `packages/index.ts`, `packages/cli/src/index.ts` | —                                                        |
 | `src/util?.py`                        | `src/utils.py`                                   | `src/util.py`, `src/utilXY.py`                           |

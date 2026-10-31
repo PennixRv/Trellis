@@ -27,8 +27,8 @@ In dsh:
 2. The main session dispatches `trellis-agent-research`,
    `trellis-agent-implement`, and `trellis-agent-check` through DSH's native
    `subagent` tool. Each child loads exactly one matching role skill.
-3. Finish through `trellis-finish-work`, which preserves the required order:
-   commit, archive, then journal.
+3. Use phase 5 to review and close the task. `trellis-finish-work` records
+   session progress separately and does not change task lifecycle state.
 
 ## Companion plugin fallback contract
 

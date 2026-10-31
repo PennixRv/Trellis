@@ -28,7 +28,6 @@ from .git import main_worktree_root
 DIR_WORKFLOW = ".trellis"
 DIR_WORKSPACE = "workspace"
 DIR_TASKS = "tasks"
-DIR_ARCHIVE = "archive"
 DIR_SPEC = "spec"
 DIR_SCRIPTS = "scripts"
 

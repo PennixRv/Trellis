@@ -1,7 +1,7 @@
-// Root barrel — re-exports the channel and task public APIs so callers
+// Root barrel — re-exports the Teamwork and task public APIs so callers
 // can `import { ... } from "@mindfoldhq/trellis-core"`. Sub-path
-// imports (`@mindfoldhq/trellis-core/channel`, `/task`) remain the
+// imports (`@mindfoldhq/trellis-core/teamwork`, `/task`) remain the
 // recommended form for tree-shake-friendly consumption.
 
-export * from "./channel/index.js";
+export * from "./teamwork/index.js";
 export * from "./task/index.js";

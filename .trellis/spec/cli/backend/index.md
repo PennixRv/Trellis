@@ -29,12 +29,13 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [`tl mem` Command](./commands-mem.md) | Cross-platform AI session memory: subcommands, schemas, indexing, cleaning pipeline, search relevance | Done |
 | [`trellis upgrade` Command](./commands-upgrade.md) | Global CLI self-upgrade wrapper: channel inference, npm invocation, failure behavior | Done |
 | [`trellis update` Command](./commands-update.md) | Update pipeline: flags, plan composition, migration trigger semantics, apply phase, idempotency, boundaries with `migrations.md` | Done |
-| [`trellis workflow` Command](./commands-workflow.md) | Workflow marketplace templates, project-local workflow switching, hash ownership contract, and parser compatibility | Done |
+| [`trellis workflow` Command](./commands-workflow.md) | Bundled native and explicitly sourced custom workflows, local switching, and hash ownership | Done |
 | [`trellis platforms` Command](./commands-platforms.md) | Machine-readable report of configured AI platforms: `--json` shape, registry sourcing, failure behavior | Done |
 | [`trellis uninstall` Command](./commands-uninstall.md) | Uninstall orchestration: plan composition, structured-file dispatch, execute phases, `.trellis/` removal | Done |
 | [`trellis ablate` / `restore` Commands](./commands-ablate.md) | Reversible full project subtraction, external transactions, conflict-safe exact restore | Done |
 | [Uninstall Scrubbers](./uninstall-scrubbers.md) | Pure scrubber contract for structured config files (`settings.json`, `hooks.json`, `package.json`, `config.toml`) | Done |
-| [`trellis teamwork` Command](./commands-channel.md)           | Public Teamwork CLI over Core Channel: events.jsonl, teammate process supervision, frozen batch gate and receipts, provider capability contracts, project buckets, forum lifecycle, ShutdownController | Done   |
+| [`trellis teamwork` Command](./commands-teamwork.md)           | Teamwork Session CLI over Core Teamwork APIs: events.jsonl, teammate process supervision, batch receipts, provider capability contracts, project buckets, forum lifecycle, ShutdownController | Done   |
+| [Task Continuity and Ownership Transfer](./commands-task-continuity.md) | Read-only current-task continuity projection, freshness capture, and explicit task ownership transfer between direct sessions | Done |
 | [Spec Injection](./spec-injection.md) | Path-scoped on-demand spec injection: frontmatter `paths:` contract, glob matching, PostToolUse hook flow, ticket-refresh state machine, identity ladder, character budgets, platform matrix | Done |
 
 ---
@@ -58,11 +59,12 @@ Before writing backend code, read the relevant guidelines based on your task:
 - Editing `commands/mem.ts` (subcommands, platform indexers, search/cleaning pipeline) → [commands-mem.md](./commands-mem.md)
 - Editing `commands/upgrade.ts` (global CLI self-upgrade behavior) → [commands-upgrade.md](./commands-upgrade.md)
 - Editing `commands/update.ts` (flags, plan, apply phases, idempotency) → [commands-update.md](./commands-update.md) — manifest mechanics still in [migrations.md](./migrations.md)
-- Editing `commands/workflow.ts`, `utils/workflow-resolver.ts`, workflow marketplace entries, or `init --workflow` behavior → [commands-workflow.md](./commands-workflow.md)
+- Editing `commands/workflow.ts`, `utils/workflow-resolver.ts`, explicit custom workflow source handling, or `init --workflow` behavior → [commands-workflow.md](./commands-workflow.md)
 - Editing the `platforms` subcommand in `cli/index.ts` → [commands-platforms.md](./commands-platforms.md)
 - Editing `commands/uninstall.ts` or `utils/uninstall-scrubbers.ts` → [commands-uninstall.md](./commands-uninstall.md) + [uninstall-scrubbers.md](./uninstall-scrubbers.md)
 - Editing `commands/ablate.ts` or `utils/ablation-store.ts` → [commands-ablate.md](./commands-ablate.md) + [filesystem-safety.md](./filesystem-safety.md)
-- Editing `commands/channel/**` (events.jsonl protocol, supervisors, adapters, project buckets, channel-lifecycle commands) → [commands-channel.md](./commands-channel.md)
+- Editing `commands/teamwork/**` (events.jsonl protocol, supervisors, adapters, project buckets, Teamwork Session commands) → [commands-teamwork.md](./commands-teamwork.md)
+- Editing `common/task_continuity.py`, active-task pointer writes, or task ownership fences → [commands-task-continuity.md](./commands-task-continuity.md) + [filesystem-safety.md](./filesystem-safety.md)
 - Editing `shared-hooks/inject-spec-context.py`, `common/spec_match.py`, or `common/spec_inject.py` (or any spec file's `paths:` frontmatter) → [spec-injection.md](./spec-injection.md)
 
 Also read [unit-test/conventions.md](../unit-test/conventions.md) — specifically the "When to Write Tests" section.

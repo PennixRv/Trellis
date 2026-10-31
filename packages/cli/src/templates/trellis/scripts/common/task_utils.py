@@ -6,16 +6,12 @@ Provides:
     is_within_tasks_dir - Check a resolved path is a task directly under tasks/
     find_task_by_name   - Find task directory by name
     resolve_task_dir    - Resolve task directory from name, relative, or absolute path
-    archive_destination_for - Path a task would be archived to
-    archive_task_dir    - Archive task to monthly directory
     run_task_hooks      - Run lifecycle hooks for task events
 """
 
 from __future__ import annotations
 
-import shutil
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -35,10 +31,8 @@ def is_within_tasks_dir(task_dir_abs: Path, repo_root: Path | None = None) -> bo
     A real task lives directly at ``.trellis/tasks/<name>``. This returns True
     only when ``task_dir_abs`` is an immediate child of the tasks directory.
 
-    Narrows ``resolve_task_dir``'s containment for archive: that chokepoint
-    accepts anything under the tasks dir, including a task already in
-    ``archive/<YYYY-MM>/``. This rejects those, plus the tasks dir itself, so
-    ``shutil.move`` never re-archives an archived task into a nested copy.
+    The task must be a direct child of the tasks directory, not the directory
+    itself or a nested path.
     """
     if repo_root is None:
         repo_root = get_repo_root()
@@ -47,9 +41,7 @@ def is_within_tasks_dir(task_dir_abs: Path, repo_root: Path | None = None) -> bo
         tasks_resolved = get_tasks_dir(repo_root).resolve()
     except (OSError, RuntimeError):
         return False
-    if resolved.parent != tasks_resolved:
-        return False
-    return resolved.name != "archive"
+    return resolved.parent == tasks_resolved and resolved.name != "archive"
 
 
 # =============================================================================
@@ -104,91 +96,6 @@ def find_task_by_name(task_name: str, tasks_dir: Path) -> Path | None:
 
 
 # =============================================================================
-# Archive Operations
-# =============================================================================
-
-def archive_destination_for(task_dir_abs: Path) -> Path:
-    """Path a task would be archived to: <tasks>/archive/<YYYY-MM>/<name>."""
-    tasks_dir = task_dir_abs.parent
-    year_month = datetime.now().strftime("%Y-%m")
-    return tasks_dir / "archive" / year_month / task_dir_abs.name
-
-
-def archive_task_dir(task_dir_abs: Path, repo_root: Path | None = None) -> Path | None:
-    """Archive a task directory to archive/{YYYY-MM}/.
-
-    Args:
-        task_dir_abs: Absolute path to task directory.
-        repo_root: Repository root path. Defaults to auto-detected.
-
-    Returns:
-        Path to archived directory, or None on error.
-    """
-    if not task_dir_abs.is_dir():
-        print(f"Error: task directory not found: {task_dir_abs}", file=sys.stderr)
-        return None
-
-    dest = archive_destination_for(task_dir_abs)
-    month_dir = dest.parent
-
-    # Create archive directory
-    try:
-        month_dir.mkdir(parents=True, exist_ok=True)
-    except (OSError, IOError) as e:
-        print(f"Error: Failed to create archive directory: {e}", file=sys.stderr)
-        return None
-
-    # shutil.move into an existing directory moves the source *inside* it,
-    # producing archive/<month>/<task>/<task>/ and returning a path that is not
-    # where the task actually landed. That wrong path then flows into the
-    # printed result, the after_archive hook's TASK_JSON_PATH, and auto-commit
-    # staging, so refuse before the move instead.
-    if dest.exists():
-        print(
-            f"Error: refusing to archive {task_dir_abs}: "
-            f"archive destination already exists: {dest}",
-            file=sys.stderr,
-        )
-        print(
-            "Move or rename the existing archived task, then retry.",
-            file=sys.stderr,
-        )
-        return None
-
-    try:
-        shutil.move(str(task_dir_abs), str(dest))
-    except (OSError, IOError, shutil.Error) as e:
-        print(f"Error: Failed to move task to archive: {e}", file=sys.stderr)
-        return None
-
-    return dest
-
-
-def archive_task_complete(
-    task_dir_abs: Path,
-    repo_root: Path | None = None
-) -> dict[str, str]:
-    """Complete archive workflow: archive directory.
-
-    Args:
-        task_dir_abs: Absolute path to task directory.
-        repo_root: Repository root path. Defaults to auto-detected.
-
-    Returns:
-        Dict with archive result info.
-    """
-    if not task_dir_abs.is_dir():
-        print(f"Error: task directory not found: {task_dir_abs}", file=sys.stderr)
-        return {}
-
-    archive_dest = archive_task_dir(task_dir_abs, repo_root)
-    if archive_dest:
-        return {"archived_to": str(archive_dest)}
-
-    return {}
-
-
-# =============================================================================
 # Task Directory Resolution
 # =============================================================================
 
@@ -202,8 +109,7 @@ def resolve_task_dir(target_dir: str, repo_root: Path) -> Path | None:
 
     This is the containment chokepoint for every command that accepts a task
     directory argument. The candidate is resolved (following symlinks) and must
-    land strictly under ``.trellis/tasks/``; archived tasks under
-    ``archive/<YYYY-MM>/`` qualify. Traversal (``../victim``), absolute paths
+    land strictly under ``.trellis/tasks/``. Traversal (``../victim``), absolute paths
     outside the repo, a task dir symlinked out of the tasks tree, and the
     tasks directory itself are all rejected here so no caller has to re-check.
     The containment base is the tasks dir's own real location, so a

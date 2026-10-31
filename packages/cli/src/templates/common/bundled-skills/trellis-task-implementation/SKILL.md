@@ -1,0 +1,10 @@
+---
+name: trellis-task-implementation
+description: 当前任务处于任务实施阶段时，按已授权实施合同推进工作包、验证、集成与阻塞处置。
+---
+
+# 任务实施
+
+当 `current_phase_id` 为 `task_implementation` 时使用。先阅读本 Skill 同目录的 `workflow.md`，再加载目标仓库适用的 `AGENTS.md`、Trellis spec 和实现合同。
+
+按合同依赖和优先级逐项实施；主工作树主代理负责阶段接受和集成。只在执行路线获准时使用 Paseo 委派写入；Trellis Teamwork teammate 只提供只读证据。默认在当前阶段修复和验证，只有合同、授权、依赖、基线或接受条件实质失效且无法安全恢复时，才回到最早受影响的阶段。

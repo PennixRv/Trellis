@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -114,6 +115,24 @@ def write_json(path: Path, data: dict) -> bool:
 
     Returns True on success, False on error.
     """
+    if path.name == "task.json" and path.is_file():
+        workflow_dir = next((parent for parent in path.parents if parent.name == ".trellis"), None)
+        if workflow_dir is not None:
+            repo_root = workflow_dir.parent
+            from .task_utils import is_within_tasks_dir
+
+            if is_within_tasks_dir(path.parent, repo_root):
+                current, _ = read_json_checked(path)
+                if current is None:
+                    print("TASK_TRANSFER_WITHHELD: task.json cannot be checked before writing", file=sys.stderr)
+                    return False
+                from .task_continuity import task_mutation_guard
+
+                with task_mutation_guard(repo_root, path.parent, current) as allowed:
+                    if not allowed:
+                        print("TASK_TRANSFER_ACTIVE: task changes are fenced until ownership is consumed or released", file=sys.stderr)
+                        return False
+                    return write_text_atomic(path, json.dumps(data, indent=2, ensure_ascii=False))
     return write_text_atomic(path, json.dumps(data, indent=2, ensure_ascii=False))
 
 

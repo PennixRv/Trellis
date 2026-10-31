@@ -1,62 +1,50 @@
 ---
 name: commands-workflow
-description: Workflow marketplace templates, project-local workflow switching, hash ownership contract, and parser compatibility
+description: Bundled native and explicitly sourced custom workflows, local workflow switching, and hash ownership
 paths:
   - packages/cli/src/commands/workflow.ts
   - packages/cli/src/utils/workflow-resolver.ts
 ---
 # `trellis workflow` Command
 
-`trellis workflow` lists and switches the project's active `.trellis/workflow.md`
-template. It is the only command that deliberately replaces an existing
-workflow variant in-place after init. `--save <id>` instead populates the
-per-task variant library (`.trellis/workflows/<id>.md`) without touching the
-active workflow; how consumers resolve a task's selected variant is specified
-in `workflow-state-contract.md`.
+`trellis workflow` lists and switches the project's active `.trellis/workflow.md`.
+The bundled native workflow is the only default workflow source. A custom
+workflow is resolved only when the user explicitly supplies
+`--workflow-source <source>`; it is an independent extension path and is not
+part of the default workflow route or release dependency.
 
-## Scenario: workflow marketplace templates and switcher
+`--save <id>` writes to the per-task variant library
+(`.trellis/workflows/<id>.md`) without changing the active workflow. The local
+workflow selection rules remain in `workflow-state-contract.md`.
 
-### 1. Scope / Trigger
+## Scope and CLI
 
-Trigger: adding a user-facing command and init flags that change a runtime-parsed
-template, marketplace lookup behavior, and `.trellis/.template-hashes.json`
-ownership.
-
-This spec applies when editing:
-
-- `packages/cli/src/commands/workflow.ts`
-- `packages/cli/src/utils/workflow-resolver.ts`
-- `packages/cli/src/commands/init.ts` workflow-selection code
-- `packages/cli/src/configurators/workflow.ts`
-- `marketplace/workflows/**`
-- workflow-related tests
-
-### 2. Signatures
-
-CLI signatures:
+This contract applies to `commands/workflow.ts`, `utils/workflow-resolver.ts`,
+workflow selection in `commands/init.ts`, `configurators/workflow.ts`, and
+their tests. Trellis does not maintain a Marketplace checkout or workflow
+mirror. Generic registry-backed spec-template downloads are a separate feature.
 
 ```text
 trellis workflow
-trellis workflow --list
-trellis workflow --template <id>
-trellis workflow --marketplace <source> --template <id>
+trellis workflow --list [--workflow-source <source>]
+trellis workflow --template <id> [--workflow-source <source>]
 trellis workflow --template <id> --force
 trellis workflow --template <id> --create-new
-
-trellis workflow --save <id>
-trellis workflow --marketplace <source> --save <id>
-trellis workflow --save <id> --force
-trellis workflow create <id>
-trellis workflow create <id> --skip-defaults
+trellis workflow --save <id> [--workflow-source <source>] [--force]
+trellis workflow create <id> [--skip-defaults]
 
 trellis init --workflow <id>
 trellis init --workflow-source <source> --workflow <id>
 ```
 
-Resolver signatures:
+The resolver exposes only bundled content by default:
 
 ```typescript
 export const NATIVE_WORKFLOW_ID = "native";
+
+export interface WorkflowResolveOptions {
+  source?: string;
+}
 
 export interface ResolvedWorkflowTemplate {
   id: string;
@@ -65,7 +53,7 @@ export interface ResolvedWorkflowTemplate {
   description?: string;
   path: string;
   content: string;
-  source: "bundled" | "marketplace";
+  source: "bundled" | "custom";
 }
 
 export interface WorkflowTemplateListing {
@@ -74,283 +62,80 @@ export interface WorkflowTemplateListing {
   name: string;
   description?: string;
   path: string;
-  source: "bundled" | "marketplace";
+  source: "bundled" | "custom";
 }
 
-export function listWorkflowTemplates(options?: {
-  source?: string;
-}): Promise<{ templates: WorkflowTemplateListing[]; errorMessage?: string }>;
+export function listWorkflowTemplates(options?: WorkflowResolveOptions):
+  Promise<{ templates: WorkflowTemplateListing[]; errorMessage?: string }>;
 
 export function resolveWorkflowTemplate(
   id: string,
-  options?: { source?: string },
+  options?: WorkflowResolveOptions,
 ): Promise<ResolvedWorkflowTemplate>;
 ```
 
-Configurator signature:
+## Resolution and ownership
 
-```typescript
-export interface WorkflowOptions {
-  projectType: ProjectType;
-  skipSpecTemplates?: boolean;
-  packages?: DetectedPackage[];
-  remoteSpecPackages?: Set<string>;
-  workflowMdOverride?: string;
-}
-```
+- `native` resolves to `packages/cli/src/templates/trellis/workflow.md` without
+  network access. Listing without an explicit source returns only `native`.
+- A non-native id requires an explicit custom source. The resolver reads its
+  `index.json`, selects an entry with `type: "workflow"`, then fetches that
+  entry's Markdown file. A custom source is never inferred or selected by
+  default.
+- Listing with an explicit source includes its workflow entries and retains
+  the bundled `native` entry if the source cannot be reached. Resolution errors
+  identify workflow lookup or download failures.
+- The source marker is `"bundled"` for `native` and `"custom"` for explicitly
+  sourced entries.
+- After writing `native` to `.trellis/workflow.md`, refresh that file's hash in
+  `.trellis/.template-hashes.json`. After writing any non-native template,
+  remove the active workflow's hash so `trellis update` treats it as
+  user-managed content.
+- Do not add persistent configuration that makes `trellis update` select a
+  workflow variant. A switch is explicit. Per-task workflow selection remains
+  task-scoped state.
+- `--save <id>` writes only `.trellis/workflows/<id>.md`; it does not change the
+  active workflow or its hash. Library files are user-managed and untouched by
+  `trellis update`.
+- Library ids match `^[A-Za-z0-9_-]+$`, consistent with per-task resolution.
+  Existing files require `--force` to overwrite with `--save`; the active
+  workflow write modes cannot be combined with `--save`.
+- `workflow create <id>` copies the bundled native workflow to the library,
+  refuses an existing file, and leaves the active workflow and hash unchanged.
+  In an interactive terminal it asks whether to set project and personal
+  defaults, in that order; both default to no. `--skip-defaults` or non-TTY
+  execution creates only the library file.
+- `--save` warns on stderr if the written content lacks runtime parser markers;
+  it still succeeds. Warnings do not mix with stdout command results.
 
-### 3. Contracts
+## Parser and error behavior
 
-Marketplace entries use `type: "workflow"` and point to one markdown file:
-
-```json
-{
-  "id": "tdd",
-  "type": "workflow",
-  "name": "TDD Workflow",
-  "description": "Trellis workflow variant that drives Phase 2 with one red / green / refactor behavior slice at a time",
-  "path": "workflows/tdd/workflow.md",
-  "tags": ["workflow", "tdd", "testing"]
-}
-```
-
-Required built-ins:
-
-- `native`
-- `tdd`
-- `channel-driven-subagent-dispatch`
-
-Ownership contract:
-
-- `native` is Trellis-managed. After writing it, refresh the
-  `.trellis/workflow.md` hash with `updateHashes`.
-- Every non-native workflow is user-managed local content. After writing it,
-  remove `.trellis/workflow.md` from `.trellis/.template-hashes.json` with
-  `removeHash`.
-- Do not add `workflow.variant` or any other long-lived config field to make
-  `trellis update` chase a selected variant. Switching is an explicit project
-  action. (Per-task selection via `task.json.workflow` is task-scoped state,
-  not config — it does not violate this rule.)
-- `--save <id>` writes only `.trellis/workflows/<id>.md`. It never touches
-  `.trellis/workflow.md` or `.trellis/.template-hashes.json` — no
-  `updateHashes`, no `removeHash`, whether the resolved template is native or
-  marketplace.
-
-Library ownership contract (`.trellis/workflows/`):
-
-- Everything under `.trellis/workflows/` is user-managed local content: never
-  hash-tracked, never touched by `trellis update` (the directory is never in
-  update's desired-file map, same as `tasks/`). Refreshing a saved variant
-  means re-running `--save <id> --force`.
-- Library ids must match `^[A-Za-z0-9_-]+$` — the same charset the per-task
-  resolvers accept (`common/workflow_selection.py`), so every saved id is
-  resolvable and a task.json value can never escape `.trellis/workflows/`.
-- `--save` composes with `-m/--marketplace <source>` exactly like
-  `--template`, and never composes with the active-workflow write modes
-  (`--template`, `--create-new`).
-- `--list` additionally prints a `Library (.trellis/workflows/):` section
-  listing the `.md` ids found on disk (sorted); the section is omitted when
-  the directory is absent or empty.
-
-Local scaffold contract (`workflow create`):
-
-- `trellis workflow create <id>` writes
-  `.trellis/workflows/<id>.md` from the bundled native workflow. Reusing the
-  native source keeps all parser-sensitive headings, platform markers, and
-  `[workflow-state:*]` blocks intact without maintaining a second template.
-- The command never changes or removes `.trellis/workflow.md` or its template
-  hash. The global file remains the zero-config fallback.
-- In a TTY, the command asks two confirm questions in order: project default
-  (`config.yaml` `default_workflow`) and personal default (`.developer`
-  `workflow=`). Both default to no. `--skip-defaults` and non-TTY execution
-  create only the scaffold.
-- Existing variant files are never overwritten. Config and developer writes
-  are atomic and preserve unrelated content.
-
-Marker validation contract (`--save` only; warn, never block):
-
-- After writing the library file, `--save` checks the saved content for the
-  runtime parser markers and prints a single stderr warning listing whatever
-  is missing: `## Phase Index`, at least one `#### X.Y` step heading, and the
-  six native `[workflow-state:*]` blocks (`no_task`, `planning`,
-  `planning-inline`, `in_progress`, `in_progress-inline`, `completed`).
-- The file is still written and the command exits 0 — consumers degrade to
-  generic breadcrumbs / partial phase detail where markers are absent.
-- Warnings go to stderr; stdout stays reserved for command output.
-
-Runtime parser contract:
-
-- Every workflow template must keep `## Phase Index`, `## Phase 1: Plan`,
-  `#### X.Y` step headings, platform marker syntax, and all required
-  `[workflow-state:*]` blocks.
-- SessionStart, per-turn workflow-state hooks, `trellis-start`, and
-  `get_context.py --mode phase` read the resolved workflow file (the active
-  task's `.trellis/workflows/<id>.md` when selected, else the current
-  `.trellis/workflow.md` — resolution order in `workflow-state-contract.md`);
-  do not duplicate variant-specific behavior in hook scripts or skills.
-
-Native source-of-truth contract:
-
-- `packages/cli/src/templates/trellis/workflow.md` is the source of truth for
-  native workflow.
-- If `marketplace/workflows/native/workflow.md` exists, tests must enforce byte
-  identity with the bundled native template.
-
-### 4. Validation & Error Matrix
+Workflow files consumed by runtime parsers retain the phase index, numbered
+step headings, platform markers, and required `[workflow-state:*]` blocks.
+Session hooks, workflow-state injection, `trellis-start`, and
+`get_context.py --mode phase` use the task-selected library variant when one is
+present, otherwise `.trellis/workflow.md`; see `workflow-state-contract.md`.
 
 | Condition | Behavior |
 |---|---|
-| `trellis workflow --template <id>` and current workflow is modified | Exit 1 with guidance to use `--force` or `--create-new`; do not prompt, even on a TTY |
-| Interactive `trellis workflow` picker and current workflow is modified | Prompt for overwrite, create-new, or skip |
-| `--create-new` | Write a generated `workflow.md.new` file beside `.trellis/workflow.md`; do not change active workflow or hash file |
-| `--force` | Overwrite active workflow and apply the native/non-native hash contract |
-| Missing workflow id | Throw `WorkflowResolveError` / command error; CLI exits non-zero |
-| Marketplace index fetch fails | List can still show bundled native with warning; resolve fails with workflow-specific error |
-| Workflow entry path is missing, not `.md`, absolute, or contains `..` | Fail with workflow-specific error |
-| `init --workflow missing-id` | Reject; do not print and return success |
-| `init --workflow tdd` | Write marketplace content and remove `.trellis/workflow.md` hash |
-| `trellis update` after switching to non-native | Treat workflow as modified/user-managed; never silently restore native |
-| `--save <id>` where id fails `[A-Za-z0-9_-]+` | Exit 1 with invalid-id error before any resolve/fetch |
-| `--save <id>` combined with `--template` or `--create-new` | Exit 1; the library write never composes with active-workflow modes |
-| `--save <id>` and `.trellis/workflows/<id>.md` exists | Exit 1 with guidance to re-run with `--force`; `--force` overwrites the library file only |
-| `--save missing-id` | `WorkflowResolveError` surfaced as command error; nothing written |
-| `--save` of a template missing parser markers | Write the file, exit 0, one stderr warning listing the missing markers |
-| `trellis update` with saved library files present | Leave `.trellis/workflows/` untouched |
-| `workflow create <id>` | Write a native-based scaffold to `.trellis/workflows/<id>.md`; leave the global workflow and hash untouched |
-| `workflow create <id>` where the file exists | Exit 1 without changing the existing variant |
-| `workflow create <id>` where id fails `[A-Za-z0-9_-]+` | Exit 1 before creating a path |
-| Interactive scaffold creation | Ask project default first, then personal default; write only selected defaults |
-| `workflow create <id> --skip-defaults` or non-TTY | Create the scaffold without prompting or changing defaults |
+| `--template <id>` targets a modified active workflow | Fail with guidance to use `--force` or `--create-new`; do not prompt |
+| Interactive picker targets a modified active workflow | Offer overwrite, create-new, or skip |
+| `--create-new` | Write the resolved content beside the active workflow as `workflow.md.new`; leave active content and hash unchanged |
+| Custom id has no explicit source | Fail with a workflow-specific error |
+| Custom source index is unavailable | Listing retains `native` and reports a warning; resolving a custom id fails |
+| Workflow entry path is absolute, escapes its source, or is not Markdown | Fail with a workflow-specific error |
+| `init --workflow <unknown-id>` | Reject initialization rather than return success |
+| `--save` id is invalid or its destination exists without `--force` | Fail before writing; preserve existing content |
+| `--save` combines with `--template` or `--create-new` | Fail without writing |
+| `trellis update` follows a non-native switch or saved library file | Preserve the user-managed workflow content |
 
-### 5. Good/Base/Bad Cases
+## Validation
 
-- Good: `trellis workflow --template tdd` replaces a pristine native workflow,
-  removes the workflow hash, and later `trellis update` leaves TDD content in
-  place.
-- Good: `trellis workflow --save tdd` writes `.trellis/workflows/tdd.md` while
-  `.trellis/workflow.md` and `.template-hashes.json` stay byte-unchanged, and
-  a later `trellis update` leaves the library file alone.
-- Base: `trellis init --workflow native` writes bundled native workflow and
-  keeps `.trellis/workflow.md` hash-tracked.
-- Bad: `trellis workflow --template tdd` writes TDD content and records the TDD
-  hash. The next `trellis update` sees a pristine file and overwrites it with
-  native workflow.
-- Bad: `--save` removes the `.trellis/workflow.md` hash (or records one for the
-  library file). The command mutated the hash contract of a file it never
-  wrote, or turned user-managed library content into a Trellis-owned template.
+Resolver and integration tests cover bundled offline resolution, native-only
+default listing, explicit custom-source resolution, missing ids, unsafe paths,
+active workflow hash ownership, modified-file handling, library writes, and
+native scaffolding. No test or runtime path depends on a local Marketplace
+checkout or a bundled remote-workflow mirror.
 
-### 6. Tests Required
-
-Unit tests:
-
-- `resolveWorkflowTemplate("native")` returns bundled content without fetch.
-- Marketplace workflow resolution fetches `index.json` and one markdown file.
-- Missing id errors mention workflow templates, not spec templates.
-- Invalid / escaping workflow paths fail before fetch or file read.
-
-Integration tests:
-
-- `init --workflow native` keeps `.trellis/workflow.md` hash-tracked.
-- `init --workflow tdd` writes marketplace content and removes the hash.
-- `init --workflow-source <source> --workflow custom-id` writes custom content.
-- `init --workflow missing-id` rejects.
-- `trellis workflow --template tdd` writes marketplace content and removes the
-  hash.
-- Explicit `--template` with modified workflow fails even when `stdin.isTTY` is
-  true.
-- `--create-new` writes a generated `workflow.md.new` file beside `.trellis/workflow.md` and does not touch the active
-  workflow or hash.
-- `trellis update` after switching to non-native does not restore native.
-- Marketplace native mirror matches bundled native workflow when the mirror file
-  exists.
-- Real `marketplace/workflows/tdd/workflow.md` planning breadcrumbs include the
-  TDD gates: observable behavior slices, public interface under test, and mock
-  boundaries.
-- `--save tdd` writes the library file; `.trellis/workflow.md` and
-  `.template-hashes.json` are byte-unchanged.
-- `--save` on an existing library file fails without `--force` and overwrites
-  with it.
-- `--save` of a variant missing `[workflow-state:*]` blocks warns on stderr and
-  still writes the file; `--save native` emits no marker warning.
-- `--save` combined with `--template` or `--create-new` fails.
-- `--list` shows saved library ids in a `Library` section.
-- `trellis update` leaves saved library files intact.
-- `workflow create` produces the complete native workflow, preserves the
-  global workflow and hash contract, and refuses unsafe ids or existing files.
-- Interactive scaffold creation asks project then personal default and writes
-  the selected ids without disturbing unrelated config/developer content.
-
-Runtime parsing validation:
-
-```bash
-python3 ./.trellis/scripts/get_context.py --mode phase
-python3 ./.trellis/scripts/get_context.py --mode phase --step 2.1
-python3 ./.trellis/scripts/get_context.py --mode phase --step 2.2 --platform codex
-python3 ./.trellis/scripts/get_context.py --mode phase --step 2.1 --platform codex-sub-agent
-python3 ./.trellis/scripts/get_context.py --mode phase --step 2.1 --platform claude
-```
-
-### 7. Wrong vs Correct
-
-#### Wrong
-
-```typescript
-// Records non-native content as the pristine template hash.
-fs.writeFileSync(".trellis/workflow.md", tddContent);
-updateHashes(cwd, new Map([[PATHS.WORKFLOW_GUIDE_FILE, tddContent]]));
-```
-
-This makes `trellis update` auto-replace TDD with bundled native workflow later.
-
-#### Correct
-
-```typescript
-fs.writeFileSync(".trellis/workflow.md", tddContent);
-removeHash(cwd, PATHS.WORKFLOW_GUIDE_FILE);
-```
-
-Missing hash means update conservatively treats the workflow as user-managed and
-routes it through the normal modified-file decision path.
-
-#### Wrong
-
-```typescript
-if (isInteractive()) {
-  await promptForOverwrite();
-}
-```
-
-An explicit `trellis workflow --template tdd` can hang in a TTY even though it is
-a scriptable command path.
-
-#### Correct
-
-```typescript
-const explicitTemplate = Boolean(options.template);
-if (explicitTemplate || !isInteractive()) {
-  throw new WorkflowCommandError("... use --force or --create-new ...");
-}
-```
-
-Only the no-argument interactive picker may prompt for conflict resolution.
-
-#### Wrong
-
-```typescript
-// Treats a library save like an active-workflow switch.
-fs.writeFileSync(".trellis/workflows/tdd.md", finalContent);
-removeHash(cwd, PATHS.WORKFLOW_GUIDE_FILE);
-```
-
-This mutates the hash contract of `.trellis/workflow.md`, a file the `--save`
-path never wrote.
-
-#### Correct
-
-```typescript
-fs.writeFileSync(".trellis/workflows/tdd.md", finalContent);
-// No updateHashes / removeHash: the library is user-managed by definition.
-```
-
-Hash absence is what keeps `trellis update` away from the library — never add
-library paths to `.template-hashes.json`.
+When the bundled native workflow changes, verify its generated package copy and
+the behavior of `init`, `workflow --template native`, and `trellis update`.

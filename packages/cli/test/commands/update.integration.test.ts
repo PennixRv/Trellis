@@ -876,16 +876,10 @@ describe("update() integration", () => {
     // auto-updated to the current packaged template.
     expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toBe(expectedWorkflow);
     expect(readProjectFile(MANAGED_FILE)).toBe(expectedGetContext);
-    // Prefix, not the whole marker: the inline block gains members as
-    // sub-agent-less platforms are added, and this assertion is about the
-    // block surviving the update, not about who is currently in it.
+    expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toContain("## 阶段索引");
     expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toContain(
-      "[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code, DeepSeek Harness]",
+      "正式会话交接是独立附加操作",
     );
-    expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toContain(
-      "[codex-inline, Kilo, Antigravity, Devin",
-    );
-    expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).not.toContain("[Codex]");
 
     // Version-specific additive config sections still apply to a user-modified
     // config.yaml, while preserving the local content around the append.
@@ -1555,8 +1549,7 @@ describe("update() integration", () => {
     fs.writeFileSync(workflowPath, staleWorkflow, "utf-8");
 
     // Simulate an older installed workflow.md that is still pristine relative
-    // to the version that installed it. Update must replace the whole file:
-    // platform markers outside [workflow-state:*] blocks are runtime-parsed too.
+    // to the version that installed it. Update must replace the whole file.
     const hashFile = path.join(
       tmpDir,
       DIR_NAMES.WORKFLOW,
@@ -1570,15 +1563,10 @@ describe("update() integration", () => {
 
     const updated = fs.readFileSync(workflowPath, "utf-8");
     expect(updated).toBe(replacePythonCommandLiterals(workflowMdTemplate));
-    expect(updated).toContain(
-      "[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code, DeepSeek Harness]",
-    );
-    expect(updated).toContain(
-      "[/Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Snow, Oh My Pi]",
-    );
-    expect(updated).toContain("[codex-inline, Kilo, Antigravity, Devin");
-    expect(updated).not.toContain("[Codex]");
-    expect(updated).not.toContain("[Kilo, Antigravity, Windsurf]");
+    expect(updated).toContain("## 阶段索引");
+    expect(updated).toContain("阶段 1：目标探索与需求核对");
+    expect(updated).toContain("阶段 5：交付审查与收尾");
+    expect(updated).toContain("正式会话交接是独立附加操作");
     expect(updated).not.toContain("legacy body");
 
     expect(readHashesV2(hashFile)[PATHS.WORKFLOW_GUIDE_FILE]).toBe(

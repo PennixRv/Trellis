@@ -1,41 +1,73 @@
 ---
 name: trellis-teamwork
-description: Use Trellis Teamwork for fixed teammate batches, durable Channel collaboration and forums, one-shot questions, and runtime diagnostics.
+description: Use Trellis Teamwork for live multi-agent collaboration, Teamwork Sessions, teammate assignments, coordination modes, and runtime diagnostics.
 ---
 
-# Trellis Teamwork
+# trellis-teamwork
 
-The public command is `trellis teamwork`. It manages Teamwork sessions and teammate processes over the existing Core Channel event, API, and storage contracts.
+`trellis teamwork` is the local multi-agent collaboration runtime. A
+Teamwork Session is the persistent chat or forum object used by the runtime;
+it is independent from the Trellis task lifecycle and its five task phases.
+Use Teamwork when agents need a durable event log, a bounded teammate
+assignment, a one-shot consultation, or a forum discussion.
 
-Use this Skill when coordinating a fixed set of independent teammate assignments, running one bounded question, working with a durable forum/thread, or diagnosing Teamwork runtime state.
+Typical user signals: "和 codex/claude 讨论", "brainstorm with another agent", "派一个 teammate 做 review", "open a Teamwork forum", "look at this thread", "Teamwork 卡住了 / 没输出", "progress was truncated", "how do I use trellis teamwork".
 
-## Choose the route
+This skill is an index. Load only the reference file for the current job — do not preload all of them.
 
-- For independent work units with a shared terminal receipt, read `references/workflows.md` and `references/teammates.md`, then prepare one complete batch plan. Submit it once with `trellis teamwork batch <plan>`. The CLI currently fails closed before writing coordination state when no verified host adapter is installed. Do not replace that route with manual per-teammate dispatch.
-- For one bounded question, use `trellis teamwork run`; see `references/teammate-processes.md`.
-- For durable discussion or issue tracking, use a forum channel and its threads; see `references/forum.md`.
-- For the public command syntax, load `references/command-reference.md`.
-- For two independent evaluations of one frozen contract, load `references/independent-evaluation.md`.
-- For runtime state and failure diagnosis, load `references/progress-debugging.md`.
+## First Commands
 
-## Batch boundary
+```bash
+trellis --version
+trellis teamwork --help
+trellis teamwork list --all
+trellis teamwork list --scope global --all
+```
 
-Before submitting, read the active Trellis task, its closed plan, applicable specs, and the generic role card at `.trellis/agents/teammate.md`. Freeze every work unit's objective, source scope, evidence, output path, acceptance criteria, teammate identity/profile, and bounded retry policy in the plan.
+If the user names a Teamwork Session or thread, inspect it before asking for
+background:
 
-After submission, the program owns slot assignment, FIFO refill, waiting, retry classification, artifact checks, and the terminal receipt. The coordinating agent waits for that receipt and does not inspect partial teammate results or take over batch scheduling. Only after a terminal receipt may it evaluate reports, reconcile failed work, or continue the task's normal review and completion process.
+```bash
+trellis teamwork forum <session> --scope global
+trellis teamwork thread <session> <thread> --scope global
+trellis teamwork context list <session> --scope global --thread <thread>
+```
 
-Teammates use the one generic role contract. They investigate, research, review, verify, and write their assigned evidence/report; they do not implement product code or use a platform's native nested-agent mechanism. A committee is a fixed pair of independent evaluations, not teammate-to-teammate discussion.
+## Route By User Intent
 
-## Implementation Completion
+| User intent | Read |
+|---|---|
+| "和 codex/claude 讨论一下", "brainstorm with another agent" | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
+| "派一个 implement/check agent", "让 agent review", "spawn a worker" | `references/teamwork-plan-construction.md`, then `references/teammate-processes.md` |
+| "开 issue 区 / topic 群 / changelog / board", "make a forum" | `references/teamwork-plan-construction.md` |
+| "看看这个 thread", "inspect a thread" | `references/teamwork-plan-construction.md` |
+| "Teamwork 卡住了 / 没输出 / progress 被截断", "teammate stalled" | `references/teammate-processes.md` |
+| "具体命令怎么写", "what flags does X take" | `references/teamwork-plan-construction.md` |
 
-After the batch reaches a terminal receipt, continue the owning Trellis task through its normal implementation and completion gates. Compare the resulting changes with the task PRD, design, execution plan, and applicable specs. Match review and tests to change risk; add cases for uncovered behavior, fix findings, and rerun affected checks. Record completed plan steps, changed paths, verification, and the next action in `execution.md`. Never edit `task.json` status by hand; use the native task lifecycle commands, and keep the task `in_progress` until its acceptance gates pass. Use `trellis task progress [--json]` for a read-only summary of lifecycle counts; it does not update task state.
+## Core Rules
 
-## References
+- New forum Teamwork Sessions use `--type forum`. A `thread` is one item inside a forum Teamwork Session.
+- Use `--context-file` / `--context-raw` and `trellis teamwork context add/delete/list`.
+- Use `--stdin` or `--text-file` for long messages. Do not put long mixed Chinese/English text in the positional shell argument.
+- Pretty `messages` output is an operator dashboard and may truncate progress. Use `--raw` for audit.
+- `--as` is the speaker or worker handle, depending on the command. Use explicit, stable names when multiple agents or sessions are involved.
+- `--scope project` (default) operates on the current cwd's project bucket; `--scope global` operates on the shared `__global__` bucket. Pick scope deliberately — a global board is invisible from project listings unless `--scope global` is passed.
+- For brainstorm, do multiple pressure-test rounds. One answer plus one confirmation is review, not brainstorm.
+- **Dispatcher wait pattern**: use `--kind done` / `--kind turn_finished` (Trellis-emitted system events), not a user `--tag` as the completion signal. Tags are labels, not runtime completion events.
+- Teamwork Sessions are event-sourced. Do not parse `events.jsonl` first; use `forum`, `thread`, `messages --thread`, and `context list`.
+- `@mindfoldhq/trellis-core` owns reusable Teamwork Session/thread state, event append, sequence allocation, context/title projection, reducers, and task helpers. The CLI owns flags, terminal rendering, prompts, teammate lifecycle, and process exits.
+- Teamwork plan construction belongs to the current phase coordinator. Teamwork validates and executes a frozen plan; it does not select the task phase, change task status, or create a second task state machine.
+- The native host-created `subagent` remains separate from a Teamwork teammate.
 
-- `references/command-reference.md` — complete public CLI syntax.
-- `references/workflows.md` — batch preparation and route selection.
-- `references/teammate-processes.md` — teammate profiles, runtime, and one-shot work.
-- `references/teammates.md` — batch artifacts and report contract.
-- `references/independent-evaluation.md` — advisor and two-member committee contract.
-- `references/forum.md` — durable forum and thread use.
-- `references/progress-debugging.md` — runtime diagnostics.
+## Reference Files
+
+- `references/teamwork-plan-construction.md` — plan binding, task integration, Teamwork Session and forum commands, reports, and cleanup.
+- `references/teammate-configuration-matrix.md` — candidate profiles, frozen execution configuration, provider capabilities, and role boundaries.
+- `references/coordination-modes.md` — `general`, `advisor`, and `committee` semantics and selection.
+- `references/teammate-processes.md` — dispatch, context injection, waiting, interruption, retry, reconciliation, and diagnostics.
+
+## Not For
+
+- One static review where a markdown file and prompt are enough.
+- Replacing normal tool calls with self-logging.
+- Long-term memory retrieval. Use durable forum Teamwork Sessions for actionable issues, and `trellis mem` (the `trellis-session-insight` skill) for session/history search.

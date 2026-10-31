@@ -13,7 +13,7 @@ Platform marker syntax in workflow.md:
     [/Claude Code, Cursor, ...]
 
 Provides:
-    get_phase_index   - Extract the Phase Index section (no --step)
+    get_phase_index   - Extract the phase index section (no --step)
     get_step          - Extract a single step (#### X.X) section
     filter_platform   - Strip platform blocks that don't include the given name
 """
@@ -35,8 +35,9 @@ _MARKER_RE = re.compile(r"^\[(/?)([A-Za-z][^\[\]]*)\]\s*$")
 # Step heading: "#### 1.0 Title" or "#### 1.0 ..."
 _STEP_HEADING_RE = re.compile(r"^####\s+(\d+\.\d+)\b.*$")
 
-# Phase Index starts here; Phase 1/2/3 step bodies follow; ends at Breadcrumbs.
-_PHASE_INDEX_HEADING = "## Phase Index"
+# Phase Index ends when the first phase body begins.
+_PHASE_INDEX_HEADINGS = {"## 阶段索引", "## Phase Index"}
+_FIRST_PHASE_HEADING_RE = re.compile(r"^#{2,3} (?:阶段 1：|Phase 1:)")
 
 
 def _read_workflow() -> str:
@@ -75,10 +76,10 @@ def get_phase_index() -> str:
     end: int | None = None
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if start is None and stripped == _PHASE_INDEX_HEADING:
+        if start is None and stripped in _PHASE_INDEX_HEADINGS:
             start = i
             continue
-        if start is not None and stripped == "## Phase 1: Plan":
+        if start is not None and _FIRST_PHASE_HEADING_RE.match(stripped):
             end = i
             break
 

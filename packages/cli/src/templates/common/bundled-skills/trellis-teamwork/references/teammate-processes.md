@@ -1,26 +1,37 @@
-# Teammate profiles and runtime
+# Teammate processes
 
-## One generic role contract
+The coordinator creates a queue fact and an immutable claim for each
+assignment, dispatches the selected provider, waits for a terminal host fact,
+and validates the report against the assignment identity, source digest,
+evidence, path, secret, and symlink rules. The teammate writes only its
+current attempt artifacts. It does not modify product source, Git state, task
+status, or another teammate's artifacts.
 
-The only bundled role card is `.trellis/agents/teammate.md`. It is the shared instruction injected for every teammate. It limits work to investigation, research, review, verification, and assigned evidence/report writing; product source and Git state stay read-only. Do not create specialist cards or use the CLI's native nested-agent feature.
+After a timeout, the same attempt may receive a continuation. A confirmed
+execution or acceptance failure may consume that assignment's explicit retry
+budget and create a new attempt identity. An uncertain command, changed host
+identity, or unconfirmed cancellation enters reconciliation and is not
+automatically duplicated. Reconciliation is a runtime outcome; the task
+coordinator decides whether a later task phase needs a return.
 
-The role card defines behavior. A profile selects execution settings; it does not create a different role:
+Use the ordinary Teamwork Session commands for a deliberate one-shot or
+interactive discussion:
 
-- `.trellis/agents/teammate-profiles.json` contains optional `default_provider`, `default_model`, and a `profiles` map.
-- Each profile can select `provider`, `model`, `reasoning_effort`, and provider-specific `options`.
-- Explicit command or frozen-plan values override profile values; profile values override file defaults.
-- The current contract providers are Codex app-server, DSH ACP, Copilot ACP, and Claude Code CLI. A provider contract is not proof that its external host is installed or verified.
+```bash
+trellis teamwork run [name]
+trellis teamwork spawn <name> --agent <agent> --provider <provider>
+trellis teamwork send <name> --as <agent> --stdin
+trellis teamwork wait <name> --as <agent> --kind done,turn_finished
+trellis teamwork interrupt <name> --as <agent> --to <teammate> --stdin
+trellis teamwork kill <name> --as <teammate>
+```
 
-The batch host gate must prove that the selected provider preserves the frozen prompt/context, disables native and recursive delegation, keeps protected targets and Git state read-only, and supports the required lifecycle. Missing or changed proof fails closed.
+These commands operate a Teamwork Session and do not replace a frozen plan or
+create a second scheduler. Do not use them to bypass a rejected batch or to
+steer an active managed assignment manually.
 
-## Batch execution
-
-Use the batch plan and report schema in `teammates.md`. Once accepted by the CLI, the program owns execution, slot reuse, bounded retry decisions, report validation, and the terminal receipt. The coordinating agent waits for that receipt and does not issue individual send/wait/interrupt commands to steer the batch.
-
-The current checkout has provider contracts and capability snapshots, but no verified external host gate. Therefore `trellis teamwork batch <plan>` refuses before writing coordination state. Do not work around this by manually starting the same units.
-
-## Existing single-process commands
-
-The public command reference documents `teamwork spawn`, `teamwork run`, and process inspection controls retained from Core Channel. They are low-level single-process operations; they do not replace the fixed-batch coordinator or authorize a second scheduling loop. Use them only for an explicitly planned one-shot or runtime recovery that does not overlap a managed batch.
-
-Every launched process receives the generic teammate role and its selected profile. Store assigned reports only at the paths in the frozen task plan. Do not write implementation files or Git metadata.
+For a stalled process, inspect `teamwork list`, `teamwork messages --raw`, the
+provider log, and the host process state in that order. Use `kill` only when
+the process owner and current state are known. The runtime event log is the
+source of truth for coordination state; sidecar process files are diagnostic
+evidence.

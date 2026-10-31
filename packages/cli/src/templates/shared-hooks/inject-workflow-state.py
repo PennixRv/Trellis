@@ -162,7 +162,7 @@ def _resolve_active_task(root: Path, input_data: dict):
 
 def get_active_task(
     root: Path, input_data: dict
-) -> tuple[str, str, str] | None:
+) -> tuple[str, str, str, str | None] | None:
     """Return active task data, a task-record error, or no task pointer.
 
     ``(task_id, "task_error", source)`` is distinct from ``None``: a session
@@ -178,23 +178,34 @@ def get_active_task(
     if not task_dir.is_absolute():
         task_dir = root / task_dir
     if active.stale:
-        return task_dir.name, f"stale_{active.source_type}", active.source
+        return task_dir.name, f"stale_{active.source_type}", active.source, None
 
     task_json = task_dir / "task.json"
     if not task_json.is_file():
-        return task_dir.name, "task_error", active.source
+        return task_dir.name, "task_error", active.source, None
     try:
         data = json.loads(task_json.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return task_dir.name, "task_error", active.source
+        return task_dir.name, "task_error", active.source, None
     if not isinstance(data, dict):
-        return task_dir.name, "task_error", active.source
+        return task_dir.name, "task_error", active.source, None
 
     task_id = data.get("id") or task_dir.name
     status = data.get("status", "")
     if not isinstance(status, str) or not status:
-        return task_dir.name, "task_error", active.source
-    return task_id, status, active.source
+        return task_dir.name, "task_error", active.source, None
+    phase_workflow = data.get("meta", {}).get("task_workflow") if isinstance(data.get("meta"), dict) else None
+    if isinstance(phase_workflow, dict):
+        phase_id = phase_workflow.get("current_phase_id")
+        phases = phase_workflow.get("phases")
+        if phase_id is None:
+            routed = phase_workflow.get("phase_ids")
+            phase_id = routed[-1] if isinstance(routed, list) and routed else None
+        phase = phases.get(phase_id) if isinstance(phases, dict) and isinstance(phase_id, str) else None
+        if isinstance(phase_id, str) and isinstance(phase, dict):
+            phase_status = phase.get("status")
+            return task_id, phase_id, active.source, phase_status if isinstance(phase_status, str) else None
+    return task_id, status, active.source, None
 
 
 # ---------------------------------------------------------------------------
@@ -388,6 +399,7 @@ def build_breadcrumb(
     templates: dict[str, str],
     source: str | None = None,
     breadcrumb_key: str | None = None,
+    phase_status: str | None = None,
 ) -> str:
     """Build the <workflow-state>...</workflow-state> block.
 
@@ -402,7 +414,12 @@ def build_breadcrumb(
         body = templates.get(status)
     if body is None:
         body = "Refer to workflow.md for current step."
-    header = f"Status: {status}" if task_id is None else f"Task: {task_id} ({status})"
+    if task_id is None:
+        header = f"Status: {status}"
+    elif phase_status:
+        header = f"Task: {task_id}\nPhase: {status} ({phase_status})"
+    else:
+        header = f"Task: {task_id} ({status})"
     return f"<workflow-state>\n{header}\n{body}\n</workflow-state>"
 
 
@@ -471,11 +488,12 @@ def main() -> int:
             None, "no_task", templates, breadcrumb_key=no_task_key
         )
     else:
-        task_id, status, source = task
+        task_id, status, source, phase_status = task
         status_key = resolve_breadcrumb_key(status, platform, config)
         source_for_breadcrumb = None if platform == "codex" else source
         breadcrumb = build_breadcrumb(
-            task_id, status, templates, source_for_breadcrumb, breadcrumb_key=status_key
+            task_id, status, templates, source_for_breadcrumb, breadcrumb_key=status_key,
+            phase_status=phase_status,
         )
     if platform == "codex":
         parts: list[str] = []

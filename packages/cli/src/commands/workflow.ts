@@ -49,7 +49,7 @@ import { writeFileAtomic } from "../utils/atomic-write.js";
 
 export interface WorkflowCommandOptions {
   template?: string;
-  marketplace?: string;
+  workflowSource?: string;
   list?: boolean;
   force?: boolean;
   createNew?: boolean;
@@ -96,7 +96,7 @@ function printListing(templates: WorkflowTemplateListing[]): void {
     const tag =
       t.source === "bundled"
         ? chalk.gray(" (bundled)")
-        : chalk.gray(" (marketplace)");
+        : chalk.gray(" (custom source)");
     console.log(`  ${chalk.green(t.id)}${tag} — ${t.name}`);
     if (t.description) {
       console.log(chalk.gray(`    ${t.description}`));
@@ -281,7 +281,7 @@ async function writeWorkflow(
 }
 
 /**
- * The six breadcrumb statuses used by the bundled native template. Kept in
+ * Lifecycle breadcrumbs used by the bundled native template. Kept in
  * sync with `.trellis/spec/cli/backend/workflow-state-contract.md` (status
  * writer + reachability tables) — update both together.
  */
@@ -291,7 +291,6 @@ const REQUIRED_WORKFLOW_STATE_IDS = [
   "planning-inline",
   "in_progress",
   "in_progress-inline",
-  "completed",
 ];
 
 /**
@@ -302,8 +301,8 @@ const REQUIRED_WORKFLOW_STATE_IDS = [
  */
 function warnAboutMissingMarkers(content: string, relPath: string): void {
   const problems: string[] = [];
-  if (!content.includes("## Phase Index")) {
-    problems.push('missing "## Phase Index" section');
+  if (!/^## (?:阶段索引|Phase Index)$/m.test(content)) {
+    problems.push("missing workflow index section");
   }
   if (!/^#### \d+\.\d+/m.test(content)) {
     problems.push('no "#### X.Y" step heading');
@@ -346,7 +345,7 @@ async function saveWorkflowToLibrary(
   let template: ResolvedWorkflowTemplate;
   try {
     template = await resolveWorkflowTemplate(id, {
-      source: options.marketplace,
+      source: options.workflowSource,
     });
   } catch (err) {
     if (err instanceof WorkflowResolveError) {
@@ -529,7 +528,7 @@ export async function runWorkflowCommand(
   // List mode — print and exit.
   if (options.list) {
     const { templates, errorMessage } = await listWorkflowTemplates({
-      source: options.marketplace,
+      source: options.workflowSource,
     });
     printListing(templates);
     printLibraryListing(cwd);
@@ -560,7 +559,7 @@ export async function runWorkflowCommand(
       );
     }
     const { templates, errorMessage } = await listWorkflowTemplates({
-      source: options.marketplace,
+      source: options.workflowSource,
     });
     if (errorMessage) {
       console.log(chalk.yellow(`⚠ ${errorMessage}`));
@@ -576,7 +575,7 @@ export async function runWorkflowCommand(
   let template: ResolvedWorkflowTemplate;
   try {
     template = await resolveWorkflowTemplate(templateId, {
-      source: options.marketplace,
+      source: options.workflowSource,
     });
   } catch (err) {
     if (err instanceof WorkflowResolveError) {

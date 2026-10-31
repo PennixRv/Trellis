@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/core/backend/index.md", "reason": "Review Core task and phase contracts against the Core backend guidelines."}
+{"file": ".trellis/spec/cli/backend/index.md", "reason": "Review CLI commands, workflow templates and resolver against CLI backend guidelines."}
+{"file": ".trellis/spec/cli/unit-test/index.md", "reason": "Review the changed Core and CLI behavior using the repository test conventions."}

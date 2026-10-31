@@ -518,15 +518,14 @@ is a separate conversation, not a bootstrap concern.
 ## Completion
 
 When the developer confirms the checklist items above are done with real
-examples (not placeholders), guide them to run:
+examples (not placeholders), review the delivery through phase 5:
 
 \`\`\`bash
-${pythonCmd} ./.trellis/scripts/task.py finish
-${pythonCmd} ./.trellis/scripts/task.py archive 00-bootstrap-guidelines
+${pythonCmd} ./.trellis/scripts/task.py complete 00-bootstrap-guidelines
 \`\`\`
 
-After archive, every new developer who joins this project will get a
-\`00-join-<slug>\` onboarding task instead of this bootstrap task.
+Complete this task only after phase 5 accepts the delivery. The task record
+remains under \`.trellis/tasks/\`.
 
 ---
 
@@ -585,7 +584,7 @@ function getBootstrapTaskJson(
     name: BOOTSTRAP_TASK_NAME,
     title: "Bootstrap Guidelines",
     description: "Fill in project development guidelines for AI agents",
-    status: "in_progress",
+    status: "planning",
     dev_type: "docs",
     priority: "P1",
     creator: developer,
@@ -628,7 +627,7 @@ function getJoinerTaskJson(developer: string, taskName: string): TaskJson {
     title: `Joining: Onboard to this Trellis project (${developer})`,
     description:
       "Onboard a new developer to an existing Trellis project: learn the workflow, conventions, and find assigned work",
-    status: "in_progress",
+    status: "planning",
     dev_type: "docs",
     priority: "P1",
     creator: developer,
@@ -644,7 +643,6 @@ function getJoinerTaskJson(developer: string, taskName: string): TaskJson {
  * guidance lives in skills and docs.
  */
 function getJoinerPrdContent(developer: string, pythonCmd: string): string {
-  const slug = slugifyDeveloperName(developer);
   return `# Joiner Onboarding Task
 
 **You (the AI) are running this task. The developer does not read this file.**
@@ -668,13 +666,16 @@ Trellis is a workflow layer over Claude Code / Cursor / etc. that keeps AI
 agents consistent with project-specific conventions instead of writing generic
 code every session.
 
-- **Three phases**: Plan (brainstorm → \`prd.md\`) → Execute (code + check) →
-  Finish (capture + wrap). Full reference: \`.trellis/workflow.md\`.
-- **Task lifecycle**: planning → in_progress → done → archive, under
-  \`.trellis/tasks/\`.
+- **Five business phases**: goal exploration and requirements; decision
+  space construction and merging; solution design and convergence; task
+  implementation; delivery review and closeout. Each phase has its own Skill
+  and workflow. Full reference: \`.trellis/workflow.md\`.
+- **Task lifecycle**: planning → in_progress when authorized implementation
+  begins → completed or cancelled. Phase state is recorded separately in the
+  Trellis task workflow.
 - **Core slash commands**:
   - \`/trellis:continue\` — resume the current session's active task
-  - \`/trellis:finish-work\` — wrap up a finished task
+  - \`/trellis:finish-work\` — record session progress in the developer journal
   - \`/trellis:start\` — session boot from scratch (not needed here; the
     SessionStart hook does its job automatically)
 
@@ -685,15 +686,10 @@ code every session.
   conversation at every session start.
 - **\`<workflow-state>\` tag** is auto-injected with every user message,
   carrying the current task + phase hint.
-- **\`/trellis:continue\`** loads the Phase Index, reads \`prd.md\` + recent
-  activity, and routes to the right skill (\`trellis-brainstorm\` for planning,
-  \`trellis-implement\` for coding, \`trellis-check\` for verification).
-- **\`trellis-implement\` sub-agent** is spawned when code needs to be written.
-  The platform hook reads \`{TASK_DIR}/implement.jsonl\` and auto-injects those
-  spec files + \`prd.md\` into the sub-agent's prompt so it codes per project
-  conventions.
-- **\`trellis-check\` sub-agent** follows the same pattern with \`check.jsonl\`
-  — reviews changes against specs, auto-fixes issues, runs lint/typecheck.
+- **\`/trellis:continue\`** reads the active phase from the Trellis task record
+  and routes to that phase's Skill.
+- Hosts may use \`trellis-implement\` and \`trellis-check\` agents when their
+  workflow and the authorized contract call for delegated work.
 
 File layout (mention when they ask "where does what live"):
 - \`.trellis/.runtime/sessions/<session>.json\` — session active-task state, gitignored
@@ -706,9 +702,8 @@ File layout (mention when they ask "where does what live"):
 
 - Summarize \`.trellis/spec/\` for them — what coding conventions this
   specific team enforces.
-- Point at the last 5 entries in \`.trellis/tasks/archive/\` as a rhythm
-  example of how people actually work here. **If archive is empty** (the
-  project just started), skip this — don't invent examples.
+- Use relevant current task records as examples when useful. Do not infer
+  project conventions from task lifecycle status alone.
 - Not your job in this onboarding to teach them the business code itself —
   the README and their teammates handle that.
 
@@ -725,21 +720,17 @@ File layout (mention when they ask "where does what live"):
 
 ## Optional: walk through a small task end-to-end
 
-If they want to practice before touching real work, offer to pick a tiny
-P3 task or a typo fix and run the full cycle together: \`/trellis:continue\`
-→ you implement via sub-agents → \`/trellis:finish-work\`.
+If they want to practice before touching real work, offer a small task and
+follow its applicable phase route. Finish-work records the session journal;
+phase 5 and Trellis CLI control task completion.
 
 ---
 
 ## Completion
 
-When they feel oriented (or after you've covered the four topics with
-reasonable back-and-forth), guide them to run:
-
-\`\`\`bash
-${pythonCmd} ./.trellis/scripts/task.py finish
-${pythonCmd} ./.trellis/scripts/task.py archive 00-join-${slug}
-\`\`\`
+When they feel oriented, leave this task in its current lifecycle state
+unless phase 5 has accepted the delivery. The complete operation requires
+that acceptance.
 
 ---
 

@@ -879,7 +879,7 @@ async function collectTemplateFiles(
     files.set(`${PATHS.SCRIPTS}/${scriptPath}`, content);
   }
 
-  // Channel runtime agent definitions (single source of truth: getAllAgents()).
+  // Teamwork runtime agent definitions (single source of truth: getAllAgents()).
   // Backfilled by `trellis update` if missing so users who installed before the
   // bundled agents existed pick them up. Edited files take the standard
   // modified-file prompt path.

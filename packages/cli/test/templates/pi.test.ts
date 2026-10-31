@@ -255,9 +255,9 @@ describe("pi templates", () => {
     expect(templates.get(".pi/prompts/trellis-continue.md")).toContain(
       "get_context.py --mode phase",
     );
-    expect(templates.get(".pi/prompts/trellis-finish-work.md")).toContain(
-      "finish-work",
-    );
+    const finish = templates.get(".pi/prompts/trellis-finish-work.md");
+    expect(finish).toContain("Trellis CLI");
+    expect(finish).toContain("does not change task status, phase state");
   });
 
   it("extension registers the trellis_subagent tool with mode+thinking schema", () => {

@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/core/backend/index.md", "reason": "Core task record contracts and validation conventions for the phase and route model."}
+{"file": ".trellis/spec/cli/backend/index.md", "reason": "CLI command, template, resolver and shared implementation conventions."}

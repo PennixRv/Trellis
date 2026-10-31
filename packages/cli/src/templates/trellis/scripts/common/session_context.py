@@ -824,7 +824,7 @@ def get_context_text_record(repo_root: Path | None = None) -> str:
 
     # MY ACTIVE TASKS — first and prominent
     lines.append(f"## [!!!] MY ACTIVE TASKS (Assigned to {developer})")
-    lines.append("[!] Review whether any should be archived before recording this session.")
+    lines.append("Review task progress and remaining work before recording this session.")
     lines.append("")
 
     tasks_dir = get_tasks_dir(repo_root)

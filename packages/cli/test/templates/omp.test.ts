@@ -131,12 +131,9 @@ describe("omp templates", () => {
     expect(extension).toContain("readFilePrefix(targetPath");
     expect(extension).toContain("if (!key) return null;");
     expect(extension).toContain("return key;");
-    expect(extension).toContain(`if (existsSync(candidate)) {
-         sessionFilePath = candidate;
-      } else {
-         return { status: "no_task", taskDir: null, taskTitle: null };
-      }
-   } else {`);
+    expect(extension).toMatch(
+      /if \(existsSync\(candidate\)\)\s*\{\s*sessionFilePath = candidate;\s*\} else \{\s*return \{ status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null \};\s*\}\s*\} else \{/,
+    );
     expect(extension).toContain(
       "No identity: use single-session fallback only when there is exactly one session file.",
     );

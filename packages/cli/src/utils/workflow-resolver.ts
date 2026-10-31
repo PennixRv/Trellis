@@ -1,14 +1,11 @@
 /**
  * Workflow template resolver.
  *
- * Centralizes how `trellis init --workflow` and `trellis workflow` discover and
- * fetch workflow.md content. Reuses `template-fetcher` helpers for registry
- * parsing, index probing, and git/http transport. The `native` workflow is a
- * virtual entry resolved directly from the bundled `workflowMdTemplate` to
- * avoid a duplicate file on disk that could drift out of sync.
+ * Centralizes bundled and explicitly sourced custom workflow resolution. The
+ * native workflow is resolved directly from `workflowMdTemplate`.
  *
  * Boundary: command-layer callers (init.ts, commands/workflow.ts) should NOT
- * touch raw marketplace structures. They go through `resolveWorkflowTemplate`
+ * touch raw remote registry structures. They go through `resolveWorkflowTemplate`
  * and `listWorkflowTemplates` only.
  */
 
@@ -19,7 +16,6 @@ import path from "node:path";
 import { workflowMdTemplate } from "../templates/trellis/index.js";
 import {
   TIMEOUTS,
-  TEMPLATE_INDEX_URL,
   RegistryBackendError,
   parseRegistrySource,
   probeRegistryIndex,
@@ -43,8 +39,8 @@ export const NATIVE_WORKFLOW_ID = "native";
  * Resolved workflow template entry.
  *
  * `content` is the workflow.md body bytes (LF-normalized in storage).
- * `path` is the marketplace-relative path for remote entries, or
- *   `bundled:trellis/workflow.md` for the native virtual entry.
+ * `path` is relative to the custom source for remote entries, or
+ *   `bundled:trellis/workflow.md` for the native entry.
  */
 export interface ResolvedWorkflowTemplate {
   id: string;
@@ -54,7 +50,7 @@ export interface ResolvedWorkflowTemplate {
   path: string;
   content: string;
   /** Where the content came from (for error messages). */
-  source: "bundled" | "marketplace";
+  source: "bundled" | "custom";
 }
 
 /**
@@ -66,13 +62,12 @@ export interface WorkflowTemplateListing {
   name: string;
   description?: string;
   path: string;
-  source: "bundled" | "marketplace";
+  source: "bundled" | "custom";
 }
 
 export interface WorkflowResolveOptions {
   /**
-   * Optional marketplace source (giget-style or HTTPS URL).
-   * Omitted = use the default marketplace via TEMPLATE_INDEX_URL.
+   * Optional explicit source for a custom workflow (giget-style or HTTPS URL).
    */
   source?: string;
 }
@@ -92,8 +87,7 @@ function nativeListingEntry(): WorkflowTemplateListing {
     id: NATIVE_WORKFLOW_ID,
     type: "workflow",
     name: "Native Trellis Workflow",
-    description:
-      "Default Trellis Plan / Execute / Finish workflow bundled with the CLI",
+    description: "Trellis workflow bundled with the CLI",
     path: "bundled:trellis/workflow.md",
     source: "bundled",
   };
@@ -111,7 +105,7 @@ function parseSourceOrThrow(source: string): RegistrySource {
     return parseRegistrySource(source);
   } catch (err) {
     throw new WorkflowResolveError(
-      `Invalid workflow marketplace source "${source}": ${
+      `Invalid custom workflow source "${source}": ${
         err instanceof Error ? err.message : String(err)
       }`,
     );
@@ -139,15 +133,14 @@ async function fetchWorkflowEntries(
       templates: [],
       backend: probe.backend,
       errorMessage:
-        "No marketplace index.json found at the configured source. Workflow templates require an index.json.",
+        "No index.json found at the configured custom workflow source.",
     };
   }
   return { templates: probe.templates, backend: probe.backend };
 }
 
 /**
- * List available workflow templates from the default marketplace (or a
- * user-supplied source). The bundled native entry is always included first.
+ * List bundled and explicitly sourced custom workflow templates.
  *
  * Returns metadata only — no content is fetched. Use `resolveWorkflowTemplate`
  * to fetch the actual workflow.md bytes for a chosen id.
@@ -163,12 +156,10 @@ export async function listWorkflowTemplates(
 }> {
   const result: WorkflowTemplateListing[] = [nativeListingEntry()];
 
-  let registry: RegistrySource | undefined;
-  let indexUrl = TEMPLATE_INDEX_URL;
-  if (options.source) {
-    registry = parseSourceOrThrow(options.source);
-    indexUrl = `${registry.rawBaseUrl}/index.json`;
-  }
+  if (!options.source) return { templates: result };
+
+  const registry = parseSourceOrThrow(options.source);
+  const indexUrl = `${registry.rawBaseUrl}/index.json`;
 
   const fetched = await fetchWorkflowEntries(registry, indexUrl);
   if (fetched.errorMessage) {
@@ -184,7 +175,7 @@ export async function listWorkflowTemplates(
       name: t.name,
       ...(t.description ? { description: t.description } : {}),
       path: t.path,
-      source: "marketplace",
+      source: "custom",
     });
   }
 
@@ -195,8 +186,7 @@ export async function listWorkflowTemplates(
  * Resolve a workflow id to its content.
  *
  * - `native` → bundled `workflowMdTemplate` (offline, never errors).
- * - other id → fetch index via `template-fetcher`, find the matching
- *   `type: "workflow"` entry, then fetch its single file content.
+ * - other id → require an explicit custom source, then fetch its index and file.
  *
  * Errors are workflow-specific (do NOT reuse "spec template not found" copy).
  */
@@ -208,12 +198,13 @@ export async function resolveWorkflowTemplate(
     return nativeResolvedEntry();
   }
 
-  let registry: RegistrySource | undefined;
-  let indexUrl = TEMPLATE_INDEX_URL;
-  if (options.source) {
-    registry = parseSourceOrThrow(options.source);
-    indexUrl = `${registry.rawBaseUrl}/index.json`;
+  if (!options.source) {
+    throw new WorkflowResolveError(
+      `Workflow template "${id}" requires an explicit custom workflow source.`,
+    );
   }
+  const registry = parseSourceOrThrow(options.source);
+  const indexUrl = `${registry.rawBaseUrl}/index.json`;
 
   const fetched = await fetchWorkflowEntries(registry, indexUrl);
   if (fetched.errorMessage) {
@@ -234,7 +225,7 @@ export async function resolveWorkflowTemplate(
         ? ` Available workflow templates: ${available.join(", ")}`
         : "";
     throw new WorkflowResolveError(
-      `Workflow template "${id}" not found in marketplace index.${hint}`,
+      `Workflow template "${id}" not found in the custom workflow index.${hint}`,
     );
   }
   if (!entry.path?.endsWith(".md")) {
@@ -253,24 +244,21 @@ export async function resolveWorkflowTemplate(
     ...(entry.description ? { description: entry.description } : {}),
     path: entry.path,
     content,
-    source: "marketplace",
+    source: "custom",
   };
 }
 
 async function fetchWorkflowFile(
   relativePath: string,
-  registry: RegistrySource | undefined,
+  registry: RegistrySource,
   backend: RegistryBackend | undefined,
 ): Promise<string> {
   validateWorkflowPath(relativePath);
-  const useGit = registry?.preferGit ?? backend === "git";
-  if (registry && useGit) {
+  const useGit = registry.preferGit || backend === "git";
+  if (useGit) {
     return fetchWorkflowFileGit(registry, relativePath);
   }
-  const rawBase = registry
-    ? registry.rawBaseUrl
-    : TEMPLATE_INDEX_URL.replace(/\/index\.json$/, "");
-  return fetchWorkflowFileHttp(rawBase, relativePath);
+  return fetchWorkflowFileHttp(registry.rawBaseUrl, relativePath);
 }
 
 async function fetchWorkflowFileHttp(
@@ -308,7 +296,7 @@ function validateWorkflowPath(relativePath: string): void {
     normalized.split("/").some((part) => part === "..")
   ) {
     throw new WorkflowResolveError(
-      `Workflow template path "${relativePath}" must stay inside the marketplace root.`,
+      `Workflow template path "${relativePath}" must stay inside the custom source.`,
     );
   }
 }
@@ -369,7 +357,7 @@ async function fetchWorkflowFileGit(
     const rel = path.relative(sourceRoot, candidatePath);
     if (rel.startsWith("..") || path.isAbsolute(rel)) {
       throw new WorkflowResolveError(
-        `Workflow template path "${relativePath}" escapes the marketplace root.`,
+        `Workflow template path "${relativePath}" escapes the custom source.`,
       );
     }
     if (!fs.existsSync(candidatePath)) {

@@ -8,18 +8,19 @@ Usage:
     python3 task.py add-context <dir> <file> <path> [reason] # Add jsonl entry
     python3 task.py validate <dir>              # Validate jsonl files
     python3 task.py list-context <dir>          # List jsonl entries
-    python3 task.py start <dir>                 # Set active task, record current branch
+    python3 task.py start <dir>                 # Set active task; enter implementation only after phase authorization
     python3 task.py current [--source] [--json] # Show active task
     python3 task.py finish                      # Clear active task
     python3 task.py workflow <id>|--clear       # Set/clear per-task workflow selection
+    python3 task.py phase <action> <task-dir>    # Read/update task phase workflow state
+    python3 task.py cancel <task-dir> --reason <text> --evidence-ref <ref>  # Cancel task lifecycle
     python3 task.py set-branch <dir> <branch>   # Set git branch
     python3 task.py set-base-branch <dir> <branch>  # Set PR target branch
     python3 task.py set-scope <dir> <scope>     # Set scope for PR title
     python3 task.py set-meta <dir> <key> <value>  # Set a task metadata key
     python3 task.py rename <dir> <new-slug> [--dry-run]  # Rename task + references
-    python3 task.py archive <task-dir> [--skip-branch-validation]  # Archive completed task
+    python3 task.py complete <task-dir>       # Complete a phase-5 accepted task
     python3 task.py list                        # List active tasks
-    python3 task.py list-archive [month]        # List archived tasks
     python3 task.py add-subtask <parent-dir> <child-dir>     # Link child to parent
     python3 task.py remove-subtask <parent-dir> <child-dir>  # Unlink child from parent
 """
@@ -63,7 +64,6 @@ from common.workflow_selection import WORKFLOW_ID_RE, workflow_md_for_task
 from common.task_store import (
     cmd_create,
     cmd_rename,
-    cmd_archive,
     cmd_set_branch,
     cmd_set_base_branch,
     cmd_set_scope,
@@ -75,7 +75,20 @@ from common.task_context import (
     cmd_add_context,
     cmd_validate,
     cmd_list_context,
-    curated_entry_count,
+)
+from common.task_workflow import (
+    TaskWorkflowError,
+    cmd_cancel_task,
+    cmd_complete_task,
+    cmd_phase,
+    implementation_start_ready,
+)
+from common.task_continuity import (
+    add_continuity_commands,
+    assert_task_mutation_allowed,
+    continuity_capture,
+    continuity_show,
+    transfer_task_ownership,
 )
 
 
@@ -88,12 +101,11 @@ def _record_start_state(
     repo_root: Path,
     label: str = "",
 ) -> None:
-    """Move a freshly started task to in_progress and record its branch.
+    """Enter implementation and record its branch after current authorization.
 
-    Both updates share one read/write: the status flip from planning, and the
-    checked-out branch when `branch` is still empty. Recording at start is what
-    keeps `branch` trustworthy at archive time — a task whose branch is only
-    ever set by hand tends to reach archive with `branch: null`.
+    Planning and analysis tasks keep their lifecycle status while the active
+    session pointer supports workflow context. Only an authorized phase-4
+    implementation start changes `planning` to `in_progress`.
 
     Tolerant on purpose — a broken task.json does not fail `start`, because the
     session pointer is the point of the command. But the read overwrites the
@@ -112,14 +124,15 @@ def _record_start_state(
 
     applied: list[str] = []
 
-    if data.get("status") == "planning":
+    implementation_ready = implementation_start_ready(data)
+    if data.get("status") == "planning" and implementation_ready:
         data["status"] = "in_progress"
         applied.append(f"✓ Status: planning → in_progress{label}")
 
     # Only fill an empty field: an explicit `set-branch` must survive a later
     # `start` (re-starting a task after a checkout is a normal thing to do).
     base_branch_conflict: str | None = None
-    if not data.get("branch"):
+    if implementation_ready and data.get("status") == "in_progress" and not data.get("branch"):
         branch = current_branch_name(repo_root)
         if branch:
             data["branch"] = branch
@@ -139,6 +152,12 @@ def _record_start_state(
     if not applied:
         return
 
+    try:
+        assert_task_mutation_allowed(repo_root, task_json_path.parent, data)
+    except TaskWorkflowError as error:
+        print(colored(f"{error.code}: task metadata update withheld: {error}", Colors.YELLOW), file=sys.stderr)
+        return
+
     if not write_json(task_json_path, data):
         print(
             colored(
@@ -155,11 +174,10 @@ def _record_start_state(
 
     if base_branch_conflict:
         # Recorded anyway — the value is true, it just cannot describe a PR.
-        # Archive refuses this shape, so say so now rather than at the gate.
         print(
             colored(
                 f"Warning: '{base_branch_conflict}' is also this task's base_branch; "
-                "a PR cannot target its own branch, and archive will refuse it.",
+                "a PR cannot target its own branch.",
                 Colors.YELLOW,
             ),
             file=sys.stderr,
@@ -193,29 +211,6 @@ def cmd_start(args: argparse.Namespace) -> int:
         print(colored(f"Error: Task not found: {task_input}", Colors.RED))
         print("Hint: Use task name (e.g., 'my-task') or full path (e.g., '.trellis/tasks/01-31-my-task')")
         return 1
-
-    # Context-manifest gate (#573): a seeded-but-uncurated implement/check
-    # manifest means every sub-agent dispatched for this task runs with zero
-    # spec context, and nothing downstream surfaces that to the main session.
-    # An absent manifest is not gated — create seeds the files only on
-    # sub-agent-capable platforms, so absence means no sub-agent reads them.
-    if not getattr(args, "allow_empty_context", False):
-        empty_manifests = [
-            name
-            for name in ("implement.jsonl", "check.jsonl")
-            if curated_entry_count(full_path / name) == 0
-        ]
-        if empty_manifests:
-            print(colored(
-                f"Error: {' and '.join(empty_manifests)} "
-                f"{'has' if len(empty_manifests) == 1 else 'have'} no curated entries",
-                Colors.RED,
-            ))
-            print("Sub-agents (implement/check) would run with zero spec context.")
-            print(f"  Curate:  python3 .trellis/scripts/task.py add-context {task_input} implement <path> \"<why>\"")
-            print(f"  Verify:  python3 .trellis/scripts/task.py validate {task_input}")
-            print("  Intentionally empty? Re-run start with --allow-empty-context")
-            return 1
 
     # Convert to relative path for storage. repo_root is resolved because
     # full_path already is (resolve_task_dir only returns paths inside the
@@ -251,7 +246,7 @@ def cmd_start(args: argparse.Namespace) -> int:
             Colors.YELLOW,
         ))
 
-        # Still flip task.json status: planning → in_progress so downstream phases proceed.
+        # Enter implementation only when the accepted phase contract authorizes it.
         if task_json_path.is_file():
             _record_start_state(task_json_path, repo_root, " (degraded)")
             run_task_hooks("after_start", task_json_path, repo_root)
@@ -284,6 +279,11 @@ def cmd_finish(args: argparse.Namespace) -> int:
     if not current:
         print(colored("No current task set", Colors.YELLOW))
         return 0
+
+    remaining = resolve_active_task(repo_root)
+    if remaining.context_key == active.context_key and remaining.task_path == current:
+        print(colored("Error: task ownership is fenced; this session cannot clear the active task", Colors.RED))
+        return 1
 
     # Resolve task.json path before clearing
     task_json_path = repo_root / current / FILE_TASK_JSON
@@ -327,6 +327,16 @@ def cmd_current(args: argparse.Namespace) -> int:
                 "branch": data.get("branch"),
                 "base_branch": data.get("base_branch"),
             }
+            meta = data.get("meta")
+            phase_workflow = meta.get("task_workflow") if isinstance(meta, dict) else None
+            if isinstance(phase_workflow, dict):
+                current_phase_id = phase_workflow.get("current_phase_id")
+                phase_map = phase_workflow.get("phases")
+                phase_record = phase_map.get(current_phase_id) if isinstance(phase_map, dict) and isinstance(current_phase_id, str) else None
+                task_obj["current_phase_id"] = current_phase_id
+                task_obj["task_route_revision"] = phase_workflow.get("task_route_revision")
+                task_obj["input_revision"] = phase_workflow.get("input_revision")
+                task_obj["phase_status"] = phase_record.get("status") if isinstance(phase_record, dict) else None
         payload = {
             "current_task": task_obj,
             "source": active.source,
@@ -383,6 +393,12 @@ def cmd_workflow(args: argparse.Namespace) -> int:
     data = read_json(task_json_path)
     if not data:
         print(colored(f"Error: failed to read {task_json_path}", Colors.RED))
+        return 1
+
+    try:
+        assert_task_mutation_allowed(repo_root, task_dir, data)
+    except TaskWorkflowError as error:
+        print(f"{error.code}: {error}", file=sys.stderr)
         return 1
 
     if args.clear:
@@ -554,40 +570,6 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 
 # =============================================================================
-# Command: list-archive
-# =============================================================================
-
-def cmd_list_archive(args: argparse.Namespace) -> int:
-    """List archived tasks."""
-    repo_root = get_repo_root()
-    tasks_dir = get_tasks_dir(repo_root)
-    archive_dir = tasks_dir / "archive"
-    month = args.month
-
-    print(colored("Archived tasks:", Colors.BLUE))
-    print()
-
-    if month:
-        month_dir = archive_dir / month
-        if month_dir.is_dir():
-            print(f"[{month}]")
-            for d in sorted(month_dir.iterdir()):
-                if d.is_dir():
-                    print(f"  - {d.name}/")
-        else:
-            print(f"  No archives for {month}")
-    else:
-        if archive_dir.is_dir():
-            for month_dir in sorted(archive_dir.iterdir()):
-                if month_dir.is_dir():
-                    month_name = month_dir.name
-                    count = sum(1 for d in month_dir.iterdir() if d.is_dir())
-                    print(f"[{month_name}] - {count} task(s)")
-
-    return 0
-
-
-# =============================================================================
 # Help
 # =============================================================================
 
@@ -604,7 +586,7 @@ Usage:
   python3 task.py add-context <dir> <jsonl> <path> [reason]  Add entry to jsonl
   python3 task.py validate <dir>                     Validate jsonl files
   python3 task.py list-context <dir>                 List jsonl entries
-  python3 task.py start <dir>                        Set active task; records the checked-out branch when unset
+  python3 task.py start <dir>                        Set active task; enter implementation only after phase authorization
   python3 task.py current [--source]                 Show active task
   python3 task.py finish                             Clear active task
   python3 task.py workflow <id>                      Select workflow variant for active task
@@ -614,27 +596,16 @@ Usage:
   python3 task.py set-scope <dir> <scope>            Set scope for PR title
   python3 task.py set-meta <dir> <key> <value>       Set/overwrite a task metadata key
   python3 task.py rename <dir> <new-slug>            Rename task, identity fields and references
-  python3 task.py archive <task-dir>                 Archive completed task
+  python3 task.py complete <task-dir>                 Complete after phase-5 acceptance
   python3 task.py add-subtask <parent> <child>       Link child task to parent
   python3 task.py remove-subtask <parent> <child>    Unlink child from parent
   python3 task.py list [--mine] [--status <status>] [--json]  List tasks
-  python3 task.py list-archive [YYYY-MM]             List archived tasks
 
 Monorepo options:
   --package <pkg>      Package name (validated against config.yaml packages)
 
 Rename options:
   --dry-run            Print the change set without writing anything
-
-Archive options:
-  --no-commit                Skip the auto git commit after archiving
-  --skip-branch-validation   Archive despite missing or self-referential branch metadata.
-                             Archive normally refuses a task with no `branch` when it has a
-                             `base_branch` and the repo has a remote, or with
-                             `branch == base_branch`; repair those with `set-branch` /
-                             `set-base-branch` instead. Use this flag only for tasks that
-                             were never PR-backed. A recorded branch that was merged and
-                             deleted is only a warning and needs no flag.
 
 List options:
   --mine, -m           Show only tasks assigned to current developer
@@ -653,8 +624,7 @@ Examples:
   python3 task.py finish
   python3 task.py rename add-login add-sso --dry-run  # Preview the change set
   python3 task.py rename add-login add-sso
-  python3 task.py archive add-login
-  python3 task.py archive add-login --skip-branch-validation  # Task never had a branch of its own
+  python3 task.py complete add-login
   python3 task.py add-subtask parent-task child-task  # Link existing tasks
   python3 task.py remove-subtask parent-task child-task
   python3 task.py list                               # List all active tasks
@@ -714,7 +684,7 @@ def main() -> int:
     p_create.add_argument(
         "--description",
         "-d",
-        help="Task description (required, non-empty — an empty one is refused at archive)",
+        help="Task description (required, non-empty — an empty one cannot be completed)",
     )
     p_create.add_argument("--parent", help="Parent task directory (establishes subtask link)")
     p_create.add_argument("--package", help="Package name for monorepo projects")
@@ -760,12 +730,6 @@ def main() -> int:
     # start
     p_start = subparsers.add_parser("start", help="Set active task")
     p_start.add_argument("dir", help="Task directory")
-    p_start.add_argument(
-        "--allow-empty-context",
-        action="store_true",
-        help="Start even when implement.jsonl / check.jsonl have no curated entries",
-    )
-
     # current
     p_current = subparsers.add_parser("current", help="Show active task")
     p_current.add_argument("--source", action="store_true",
@@ -781,6 +745,40 @@ def main() -> int:
     p_workflow.add_argument("id", nargs="?", help="Workflow id (.trellis/workflows/<id>.md)")
     p_workflow.add_argument("--clear", action="store_true",
                             help="Remove the workflow selection (use default resolution)")
+
+    # Five-phase task workflow state.
+    p_phase = subparsers.add_parser("phase", help="Read or update task phase state")
+    p_phase.add_argument(
+        "phase_action",
+        choices=("init", "show", "artifact", "accept", "skip", "wait", "block", "resume", "return", "route", "authorize"),
+    )
+    p_phase.add_argument("task_dir", help="Task directory or task name")
+    p_phase.add_argument("--expected-route-revision", help="Current task_route_revision required for mutation")
+    p_phase.add_argument("--task-kind", help="analysis | implementation | combined (init)")
+    p_phase.add_argument("--complexity", help="simple | standard | complex (init)")
+    p_phase.add_argument("--project-context", help="new | existing (init)")
+    p_phase.add_argument("--phase-ids", help="Comma-separated phase route (init / route)")
+    p_phase.add_argument("--route-reason", help="Reason when initialization omits one or more phases")
+    p_phase.add_argument("--route-evidence-ref", action="append", help="Evidence supporting an abbreviated initial route")
+    p_phase.add_argument("--target-phase", help="Earlier phase to revisit, or first affected phase for route change")
+    p_phase.add_argument("--artifact-ref", action="append", help="Task-relative file in the current phase output")
+    p_phase.add_argument("--artifact-revision", help="Current artifact_revision required for acceptance")
+    p_phase.add_argument("--result-ref", help="Task result artifact reference")
+    p_phase.add_argument("--outcome-kind", help="Phase result kind; pending phase outcomes may accompany wait/block")
+    p_phase.add_argument("--evidence-ref", action="append", help="Evidence reference (repeatable)")
+    p_phase.add_argument("--user-confirmation-ref", help="Reference to explicit user confirmation")
+    p_phase.add_argument("--reason", help="Reason for skip, block, return, route change, or cancellation")
+    p_phase.add_argument("--contract-ref", help="Accepted implementation contract reference")
+    p_phase.add_argument("--approval-ref", help="Explicit implementation approval reference")
+    p_phase.add_argument("--closeout-disposition", help="delivery_ready | deferred | no_go (phase 5)")
+
+    add_continuity_commands(subparsers)
+
+    # cancel task lifecycle independently of phase transitions
+    p_cancel = subparsers.add_parser("cancel", help="Cancel task lifecycle")
+    p_cancel.add_argument("task_dir", help="Task directory or task name")
+    p_cancel.add_argument("--reason", required=True, help="Why the task is cancelled")
+    p_cancel.add_argument("--evidence-ref", action="append", required=True, help="Task-relative cancellation evidence")
 
     # set-branch
     p_branch = subparsers.add_parser("set-branch", help="Set git branch")
@@ -813,19 +811,6 @@ def main() -> int:
         help="Print the change set without writing anything",
     )
 
-    # archive
-    p_archive = subparsers.add_parser("archive", help="Archive task")
-    p_archive.add_argument("name", help="Task directory or name")
-    p_archive.add_argument("--no-commit", action="store_true", help="Skip auto git commit after archive")
-    p_archive.add_argument(
-        "--skip-branch-validation",
-        action="store_true",
-        help=(
-            "Archive even when branch metadata is missing or self-referential "
-            "(for tasks that were never PR-backed)"
-        ),
-    )
-
     # list
     p_list = subparsers.add_parser("list", help="List tasks")
     p_list.add_argument("--mine", "-m", action="store_true", help="My tasks only")
@@ -842,15 +827,20 @@ def main() -> int:
     p_rmsub.add_argument("parent_dir", help="Parent task directory")
     p_rmsub.add_argument("child_dir", help="Child task directory")
 
-    # list-archive
-    p_listarch = subparsers.add_parser("list-archive", help="List archived tasks")
-    p_listarch.add_argument("month", nargs="?", help="Month (YYYY-MM)")
+    # complete task lifecycle
+    p_complete = subparsers.add_parser("complete", help="Complete a phase-5 accepted task")
+    p_complete.add_argument("task_dir", help="Task directory or task name")
 
     args = parser.parse_args()
 
     if not args.command:
         show_usage()
         return 1
+
+    if args.command == "continuity":
+        return continuity_show(args) if args.continuity_action == "show" else continuity_capture(args)
+    if args.command == "transfer":
+        return transfer_task_ownership(args)
 
     commands = {
         "create": cmd_create,
@@ -861,16 +851,17 @@ def main() -> int:
         "current": cmd_current,
         "finish": cmd_finish,
         "workflow": cmd_workflow,
+        "phase": cmd_phase,
+        "complete": cmd_complete_task,
+        "cancel": cmd_cancel_task,
         "set-branch": cmd_set_branch,
         "set-base-branch": cmd_set_base_branch,
         "set-scope": cmd_set_scope,
         "set-meta": cmd_set_meta,
         "rename": cmd_rename,
-        "archive": cmd_archive,
         "add-subtask": cmd_add_subtask,
         "remove-subtask": cmd_remove_subtask,
         "list": cmd_list,
-        "list-archive": cmd_list_archive,
     }
 
     if args.command in commands:

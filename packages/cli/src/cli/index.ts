@@ -13,7 +13,7 @@ import {
   runWorkflowCommand,
   WorkflowCommandError,
 } from "../commands/workflow.js";
-import { registerTeamworkCommand } from "../commands/channel/index.js";
+import { registerTeamworkCommand } from "../commands/teamwork/index.js";
 import { registerTaskProgressCommand } from "../commands/task-progress.js";
 import { DIR_NAMES } from "../constants/paths.js";
 import { PACKAGE_NAME, VERSION } from "../constants/version.js";
@@ -124,11 +124,11 @@ program
   )
   .option(
     "--workflow <id>",
-    "Workflow template id for .trellis/workflow.md (default: native; e.g., tdd or a marketplace template)",
+    "Workflow template id for .trellis/workflow.md (default: native)",
   )
   .option(
     "--workflow-source <source>",
-    "Custom marketplace source for the --workflow lookup (e.g., gh:myorg/myrepo/marketplace)",
+    "Explicit source for a custom --workflow template (e.g., gh:myorg/myrepo/workflows)",
   )
   .action(async (options: Record<string, unknown>) => {
     try {
@@ -313,16 +313,11 @@ program
 
 const workflowCommand = program
   .command("workflow")
-  .description(
-    "List or switch the project's .trellis/workflow.md template (native, tdd, or a marketplace template)",
-  )
+  .description("List or switch the project's .trellis/workflow.md workflow")
+  .option("-t, --template <id>", "Workflow template id (default: native)")
   .option(
-    "-t, --template <id>",
-    "Workflow template id (e.g., native, tdd, or a marketplace template)",
-  )
-  .option(
-    "-m, --marketplace <source>",
-    "Custom marketplace source (e.g., gh:myorg/myrepo/marketplace)",
+    "--workflow-source <source>",
+    "Explicit source for custom workflow templates (e.g., gh:myorg/myrepo/workflows)",
   )
   .option("--list", "List available workflow templates and exit")
   .option("-f, --force", "Overwrite a modified workflow.md without asking")
@@ -338,7 +333,7 @@ const workflowCommand = program
     try {
       await runWorkflowCommand({
         template: options.template as string | undefined,
-        marketplace: options.marketplace as string | undefined,
+        workflowSource: options.workflowSource as string | undefined,
         list: options.list as boolean | undefined,
         force: options.force as boolean | undefined,
         createNew: options.createNew as boolean | undefined,

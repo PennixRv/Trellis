@@ -6,7 +6,7 @@ Syncs task events to Linear via the `linearis` CLI.
 Usage (called automatically by task.py hooks):
     python3 .trellis/scripts/hooks/linear_sync.py create
     python3 .trellis/scripts/hooks/linear_sync.py start
-    python3 .trellis/scripts/hooks/linear_sync.py archive
+    python3 .trellis/scripts/hooks/linear_sync.py complete
 
 Manual usage:
     TASK_JSON_PATH=.trellis/tasks/<name>/task.json python3 .trellis/scripts/hooks/linear_sync.py sync
@@ -168,7 +168,7 @@ def cmd_start() -> None:
     cmd_sync()
 
 
-def cmd_archive() -> None:
+def cmd_complete() -> None:
     task, _ = _read_task()
     issue = _get_linear_issue(task)
     if not issue:
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     actions = {
         "create": cmd_create,
         "start": cmd_start,
-        "archive": cmd_archive,
+        "complete": cmd_complete,
         "sync": cmd_sync,
     }
     fn = actions.get(action)

@@ -370,7 +370,7 @@ describe.skipIf(!hasPython())("spec injection (path-scoped on-demand)", () => {
       expect(
         globMatches(tmp, [
           ["src/commands/*.ts", "src/commands/update.ts"],
-          ["src/commands/*.ts", "src/commands/channel/spawn.ts"],
+          ["src/commands/*.ts", "src/commands/teamwork/spawn.ts"],
           ["src/*", "src/app.ts"],
           ["src/*", "src/nested/app.ts"],
         ]),

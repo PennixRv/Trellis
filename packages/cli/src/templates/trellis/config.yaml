@@ -18,11 +18,9 @@ max_journal_lines: 2000
 # Session Auto-Commit
 #-------------------------------------------------------------------------------
 
-# Auto-commit behavior for session journal + task archive operations.
-# - true (default): scripts auto-stage and auto-commit journal / task changes
-#   after add_session.py / task.py archive runs.
-# - false: scripts do not touch git. Files (journal-*.md, task archive moves)
-#   are still written to disk; you decide whether to git add / commit.
+# Auto-commit behavior for session journal updates.
+# - true (default): add_session.py auto-stages and commits journal changes.
+# - false: the script writes journal files without touching git.
 #
 # Use `false` if your project's .gitignore intentionally excludes `.trellis/`
 # and you want session data kept local-only, or if you prefer to review
@@ -47,8 +45,8 @@ max_journal_lines: 2000
 #     - "echo 'Task started'"
 #   after_finish:
 #     - "echo 'Task finished'"
-#   after_archive:
-#     - "echo 'Task archived'"
+#   after_complete:
+#     - "echo 'Task completed'"
 
 #-------------------------------------------------------------------------------
 # Monorepo / Packages

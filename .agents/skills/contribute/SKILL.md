@@ -1,16 +1,20 @@
 ---
 name: contribute
-description: "Guide for contributing to Trellis documentation and marketplace. Covers adding spec templates, marketplace skills, documentation pages, and submitting PRs across both the Trellis main repo and docs repo. Use when someone wants to add a new spec template, add a new skill to the marketplace, add or update documentation pages, or submit a PR to this project."
+description: "Guide for contributing to Trellis, its independent Marketplace repository, and documentation. Covers bundled Trellis assets, remote spec templates, Marketplace skills, documentation pages, and submitting PRs to the owning repositories."
 ---
 
 # Contributing to Trellis
 
-Contributions are split across two repos:
+Contributions go to the repository that owns the asset:
 
 | What | Repo | Purpose |
 |------|------|---------|
 | Documentation pages | [mindfold-ai/docs](https://github.com/mindfold-ai/docs) | Mintlify doc site |
-| Skills + Spec templates | [mindfold-ai/Trellis](https://github.com/mindfold-ai/Trellis) | `marketplace/` directory |
+| CLI, bundled workflows, and Trellis source | [mindfold-ai/Trellis](https://github.com/mindfold-ai/Trellis) | CLI and bundled assets |
+| Downloadable skills + spec templates | [mindfold-ai/marketplace](https://github.com/mindfold-ai/marketplace) | Independent registry repository |
+
+The Marketplace repository is not nested in the Trellis checkout. Clone it
+separately when changing downloadable skills or spec templates.
 
 ## Docs Repo Structure
 
@@ -45,7 +49,7 @@ docs/
 └── zh/showcase/           # Chinese showcase
 ```
 
-## Trellis Main Repo Marketplace Structure
+## Marketplace Repository Structure
 
 ```
 marketplace/
@@ -120,12 +124,12 @@ The navigation uses a **language-based structure**:
 
 ## Contributing a Spec Template
 
-Spec templates live in the **Trellis main repo** at `marketplace/specs/`.
+Spec templates live in the independent **Marketplace repository** at `specs/`.
 
 ### 1. Create template directory
 
 ```
-marketplace/specs/your-template-name/
+specs/your-template-name/
 ├── README.md              # Template overview (required)
 ├── frontend/              # Frontend guidelines
 │   ├── index.md
@@ -143,7 +147,7 @@ Structure varies by stack. Include directories relevant to your template.
 
 ### 2. Register in index.json
 
-Add your template to `marketplace/index.json` in the Trellis repo:
+Add your template to `index.json` in the Marketplace repository:
 
 ```json
 {
@@ -151,7 +155,7 @@ Add your template to `marketplace/index.json` in the Trellis repo:
   "type": "spec",
   "name": "Your Template Name",
   "description": "Brief description of the template",
-  "path": "marketplace/specs/your-template-name",
+  "path": "specs/your-template-name",
   "tags": ["relevant", "tags"]
 }
 ```
@@ -205,12 +209,12 @@ Add your template to the table in:
 
 ## Contributing a Skill
 
-Skills live in the **Trellis main repo** at `marketplace/skills/`.
+Skills live in the independent **Marketplace repository** at `skills/`.
 
 ### 1. Create skill directory
 
 ```
-marketplace/skills/your-skill/
+skills/your-skill/
 ├── SKILL.md               # Skill definition (required)
 └── references/            # Reference docs (optional)
 ```
@@ -219,7 +223,7 @@ See [Codex Skills documentation](https://code.Codex.com/docs/en/skills) for SKIL
 
 ### 2. Register in index.json
 
-Add your skill to `marketplace/index.json` in the Trellis repo:
+Add your skill to `index.json` in the Marketplace repository:
 
 ```json
 {
@@ -227,7 +231,7 @@ Add your skill to `marketplace/index.json` in the Trellis repo:
   "type": "skill",
   "name": "Your Skill Name",
   "description": "Brief description",
-  "path": "marketplace/skills/your-skill",
+  "path": "skills/your-skill",
   "tags": ["relevant", "tags"]
 }
 ```
@@ -253,7 +257,7 @@ Add your skill to the table in:
 Users install skills via:
 
 ```bash
-npx skills add mindfold-ai/Trellis/marketplace -s your-skill
+npx skills add mindfold-ai/marketplace -s your-skill
 ```
 
 ## Contributing a Showcase Project
@@ -400,19 +404,19 @@ Inline HTML is allowed (MDX). See [Mintlify docs](https://mintlify.com/docs/comp
 7. Commit with conventional message (e.g., `docs: add xxx template`)
 8. Push and create PR
 
-**For skills/spec templates** (Trellis repo):
+**For skills/spec templates** (Marketplace repository):
 
-1. Fork: `https://github.com/mindfold-ai/Trellis`
-2. Clone: `git clone https://github.com/YOUR_USERNAME/Trellis.git`
-3. Add your skill/template under `marketplace/`
-4. Update `marketplace/index.json`
+1. Fork: `https://github.com/mindfold-ai/marketplace`
+2. Clone: `git clone https://github.com/YOUR_USERNAME/marketplace.git`
+3. Add your skill under `skills/` or your spec template under `specs/`
+4. Update the repository-root `index.json`
 5. Push and create PR
 
 ## Checklist Before PR
 
 - [ ] Both EN and ZH versions created (for doc pages)
 - [ ] `docs.json` updated for both languages (for doc pages)
-- [ ] `marketplace/index.json` updated (for skills/templates)
+- [ ] Marketplace `index.json` updated (for skills/templates)
 - [ ] Overview/index pages updated with new entries
 - [ ] Local preview tested (`pnpm dev`)
 - [ ] No broken links

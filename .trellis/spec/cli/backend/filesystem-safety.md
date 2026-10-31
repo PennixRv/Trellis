@@ -7,14 +7,14 @@
 > two root causes distilled to.
 
 Applies to: `commands/update.ts`, `commands/uninstall.ts`, `utils/*`,
-`core/channel/**`, and the shipped Python under `templates/trellis/scripts/`.
+`core/teamwork/**`, and the shipped Python under `templates/trellis/scripts/`.
 
 ---
 
 ## 1. Atomic writes — never truncate a state file in place
 
 **Rule**: a file that holds durable state (attribution manifest, `task.json`,
-`config.yaml`, session pointer, channel events cursor) must be written
+`config.yaml`, session pointer, Teamwork event sequence sidecar) must be written
 **temp-in-same-dir + rename**, never `fs.writeFileSync(path, ...)` /
 `path.write_text(...)` directly. In-place writes truncate the target as their
 first step, so a crash / Ctrl-C / ENOSPC mid-write leaves a half-file. A
@@ -75,19 +75,19 @@ delete escapes the store.
 
 | Concern | Guard | Location |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| channel / teammate name         | `assertSafeName(name, kind)` — `^[A-Za-z0-9._-]+$`, rejects `.`/`..` — called inside `channelDir` (the single chokepoint every path helper passes through) | `core` + `cli` `channel/store/paths.ts` |
+| Teamwork Session / teammate name | `assertSafeName(name, kind)` — `^[A-Za-z0-9._-]+$`, rejects `.`/`..` — called inside `sessionDir` (the shared chokepoint every session path helper passes through) | `core/teamwork/internal/store/paths.ts` and `cli/commands/teamwork/store/paths.ts` |
 | `task.py archive <name>` target | `is_within_tasks_dir(task_dir_abs, repo_root)` — dir must be a direct child of `.trellis/tasks/` | `scripts/common/task_utils.py` |
 | rename-dir migration source | `dirHasManifestEntries(fromDir, hashes)` — only auto-move a dir Trellis provably created | `commands/update.ts` |
 
-> **Why the chokepoint, not the entrypoint**: validating inside `channelDir`
+> **Why the chokepoint, not the entrypoint**: validating inside `sessionDir`
 > (not in each of create/rm/run) means one guard covers every current and future
 > caller. `spawn.ts` had long _asserted_ this — a "CLI layer already validates
 > names" comment — while no such validation existed; adding the guard at the
-> `channelDir` chokepoint is what finally made that comment true.
+> `sessionDir` chokepoint is what finally made that comment true.
 
 ```ts
 // Correct: guard lives in the shared path builder
-export function channelDir(
+export function sessionDir(
   name: string,
   project = currentProjectKey(),
 ): string {
@@ -137,7 +137,7 @@ Every guard here leaves a runnable regression test whose assertion **fails
 without the guard**:
 
 - Atomic write: write-succeeds + no tmp leftover + original survives a failed write (`test/utils/atomic-write.test.ts`; Python covered via `task-archive` integration).
-- Path traversal: `create '../../victim' --force` / `rm '../../victim'` throw and the external dir survives — reproduce in a sandbox (`test/channel/name-safety`, `test/commands/channel-name-safety`).
+  - Path traversal: `teamwork create '../../victim' --force` / `teamwork rm '../../victim'` throw and the external dir survives — reproduce in a sandbox (`test/teamwork/name-safety`, `test/commands/teamwork-name-safety`).
 - Ownership/backup gates: unowned source skipped (`update-internals` rename-dir gate), `archive src` refused with `src/` intact (`task-archive` integration), overwrite-fails-preserves-spec (`template-fetcher-overwrite`), uninstall refuses dirty `--yes` (`uninstall-dirty-guard`, real git).
 - Dogfood twin sync: identical `.py` path sets in both trees, plus one byte-compare case per file (`regression.test.ts` → "regression: .trellis/scripts stays byte-identical to templates/trellis/scripts"). The file list is derived from the filesystem, so a new script is covered the moment it is added.
 
@@ -147,7 +147,7 @@ without the guard**:
 
 - [`trellis update` Command](./commands-update.md) — migration classification/apply
 - [`trellis uninstall` Command](./commands-uninstall.md) — plan/execute phases
-- [`trellis teamwork` Command](./commands-channel.md) — store paths, project buckets
+- [`trellis teamwork` Command](./commands-teamwork.md) — store paths, project buckets
 - [Script Conventions](./script-conventions.md) — Python `io.py` contract
 - [Migrations](./migrations.md) — rename/rename-dir/delete semantics
 
@@ -156,7 +156,7 @@ without the guard**:
 Teammate context containment (context-loader `jailedRealpath`, agent-loader,
 OMP extension `resolveProjectFile`) accepts realpaths inside the teammate cwd **or**
 inside a trusted root. Trusted roots resolve once per spawn
-(`channel/context-trust.ts` `resolveTrustedRoots(cwd)`):
+(`teamwork/context-trust.ts` `resolveTrustedRoots(cwd)`):
 
 1. `.trellis/config.yaml` → `teamwork.trusted_context_dirs` (list; relative
    entries resolve against cwd; missing dirs warn + skip; each entry is

@@ -26,7 +26,7 @@ Trellis is split into two version-locked packages:
 
 | Package                    | Responsibility                                                                                                                           |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `@mindfoldhq/trellis-core` | Reusable domain logic, storage primitives, reducers, task APIs, channel APIs, and typed contracts.                                       |
+| `@mindfoldhq/trellis-core` | Reusable domain logic, storage primitives, reducers, task APIs, Teamwork APIs, and typed contracts.                                      |
 | `@mindfoldhq/trellis`      | CLI argument parsing, terminal rendering, command wiring, process exit behavior, template installation, migrations, and release scripts. |
 
 The CLI should be a thin shell around core where a capability needs to be shared with other integrations. The core package must stay independent of terminal UX and CLI process control.
@@ -37,8 +37,8 @@ The CLI should be a thin shell around core where a capability needs to be shared
 
 Core owns:
 
-- channel storage and event append/read helpers
-- channel and thread state reducers
+- Teamwork Session storage and event append/read helpers
+- Teamwork Session metadata, thread, worker, and coordination state reducers
 - task record helpers that are useful outside the CLI
 - structured types shared by CLI, tests, and future SDK consumers
 - pure validation and normalization logic that should not depend on Commander or Chalk
@@ -62,14 +62,14 @@ When logic starts in the CLI but is needed by another package or embedding app, 
 CLI code must import core through public exports:
 
 ```ts
-import { createChannelStore } from "@mindfoldhq/trellis-core/channel";
+import { parseTeamworkEventKind } from "@mindfoldhq/trellis-core/teamwork";
 ```
 
 Do not deep-import core internals:
 
 ```ts
 // forbidden
-import { parseEvent } from "../../core/src/channel/internal/parse-event";
+import { parseTeamworkEventKind } from "../../core/src/teamwork/internal/store/events";
 ```
 
 Core public exports must be declared explicitly in `packages/core/package.json`. Do not expose wildcard internal paths. Export entries should provide `types`, `import`, and `default` targets.
@@ -79,7 +79,7 @@ Core public exports must be declared explicitly in `packages/core/package.json`.
 Core exposes domains as explicit subpaths, not from one root barrel:
 
 ```ts
-import { createChannelStore } from "@mindfoldhq/trellis-core/channel";
+import { parseTeamworkEventKind } from "@mindfoldhq/trellis-core/teamwork";
 import { searchMemSessions } from "@mindfoldhq/trellis-core/mem";
 ```
 
@@ -109,25 +109,25 @@ Prefer small composable functions over one function that parses options, mutates
 
 State transitions should have one owner.
 
-For channel and thread work:
+For Teamwork Session and thread work:
 
 - event file format belongs to core
 - event append and sequence allocation belong to core
-- durable idempotency for keyed mutation replays belongs to core; keyed
-  writes must check the persisted channel event log inside the append lock and
+- durable idempotency for keyed mutation replays belongs to Core; keyed
+  writes must check the persisted Teamwork Session event log inside the append lock and
   return the original same-kind event instead of duplicating JSONL rows
-- reducers that compute channel/thread summaries belong to core
-- CLI commands call core APIs and render results
+- reducers that compute session, thread, worker, and coordination projections belong to Core
+- CLI commands call Core APIs and render results
 
 Do not duplicate `lastSeq`, event classification, linked context parsing, or thread status rules across command files. Add a core helper instead, then use it from the CLI.
 
 ---
 
-## Channel runtime substrate
+## Teamwork runtime APIs
 
-Core owns the reusable channel runtime substrate so CLI, external daemons,
-and future SDK consumers share one implementation instead of each
-re-parsing `events.jsonl`, pid files, and worker state.
+Core owns reusable Teamwork event and worker APIs so the CLI and other
+integrations share one implementation instead of re-parsing `events.jsonl`
+and re-implementing durable worker state.
 
 Core owns:
 
@@ -139,10 +139,9 @@ Core owns:
 - `probeWorkerRuntime` / `reconcileWorkerLiveness` — host-local pid-file
   observation, kept separate from the durable projection;
   `reconcileWorkerLiveness` defaults to no durable writes
-- `readChannelEvents` cursor pagination (`beforeSeq` / `afterSeq` / `limit`);
-  the read-all default is preserved when no option is set
-- `watchChannels` + `channelCursorKey` — cross-channel fan-in with
-  per-channel cursors and dynamic channel discovery (project / global scope)
+- `readTeamworkEvents` and `watchTeamworkEvents` — session event reads and watches
+- `watchTeamworkSessions` + `teamworkSessionCursorKey` — cross-session event
+  fan-in with per-session cursors and dynamic project/global discovery
 - `matchesInboxPolicy` + delivery modes (`classifyDelivery`,
   `DeliveryMode`) — delivery classification
 - the provider-injected runtime contract (`WorkerRuntime`,
@@ -150,11 +149,11 @@ Core owns:
   `requestInterrupt`, and `interruptWorker`
 
 CLI owns: Commander argv, terminal rendering, exit codes, provider adapter
-implementations (`WorkerAdapter`), the supervisor process launch / signal /
+implementations, the supervisor process launch / signal /
 pid-file details, and `process.exit`. Core must not import CLI provider
-adapters or shell-specific process behavior — the `WorkerRuntime` is
-injected. Do not move `packages/cli/src/commands/channel/supervisor.ts`
-wholesale into core.
+adapters or shell-specific process behavior; the `WorkerRuntime` is
+injected. Do not move `packages/cli/src/commands/teamwork/supervisor.ts`
+wholesale into Core.
 
 ---
 

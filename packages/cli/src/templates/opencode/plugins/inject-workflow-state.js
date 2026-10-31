@@ -256,7 +256,14 @@ function getActiveTask(ctx, platformInput = null) {
     const data = JSON.parse(readFileSync(taskJsonPath, "utf-8"))
     const status = typeof data.status === "string" ? data.status : ""
     if (!status) return null
+    const phaseWorkflow = data.meta?.task_workflow
+    const phases = phaseWorkflow?.phases
+    const phaseId = phaseWorkflow?.current_phase_id || phaseWorkflow?.phase_ids?.at(-1)
+    const phase = typeof phaseId === "string" ? phases?.[phaseId] : null
     const id = data.id || taskRef.split("/").pop()
+    if (typeof phaseId === "string" && phase && typeof phase.status === "string") {
+      return { id, status: phaseId, phaseStatus: phase.status, source: active.source }
+    }
     return { id, status, source: active.source }
   } catch {
     return null
@@ -270,12 +277,16 @@ function getActiveTask(ctx, platformInput = null) {
  *   "Refer to workflow.md for current step." line
  * - no_task pseudo-status (id === null) → header omits task info
  */
-function buildBreadcrumb(id, status, templates) {
+function buildBreadcrumb(id, status, templates, phaseStatus = null) {
   let body = templates[status]
   if (body === undefined) {
     body = "Refer to workflow.md for current step."
   }
-  let header = id === null ? `Status: ${status}` : `Task: ${id} (${status})`
+  const header = id === null
+    ? `Status: ${status}`
+    : phaseStatus
+      ? `Task: ${id}\nPhase: ${status} (${phaseStatus})`
+      : `Task: ${id} (${status})`
   return `<workflow-state>\n${header}\n${body}\n</workflow-state>`
 }
 
@@ -318,7 +329,7 @@ export default async ({ directory }) => {
           const templates = loadBreadcrumbs(resolveWorkflowMd(ctx, directory, platformInput))
           const task = getActiveTask(ctx, platformInput)
           const breadcrumb = task
-            ? buildBreadcrumb(task.id, task.status, templates, task.source)
+            ? buildBreadcrumb(task.id, task.status, templates, task.phaseStatus)
             : buildBreadcrumb(null, "no_task", templates)
 
           prependEphemeralText(messages, breadcrumb)

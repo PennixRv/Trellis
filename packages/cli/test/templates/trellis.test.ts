@@ -2,11 +2,6 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  collectPlatformTemplates,
-  PLATFORM_IDS,
-} from "../../src/configurators/index.js";
-import type { AITool } from "../../src/types/ai-tools.js";
-import {
   scriptsInit,
   commonInit,
   commonPaths,
@@ -14,6 +9,8 @@ import {
   commonGitContext,
   commonTaskQueue,
   commonTaskUtils,
+  commonTaskWorkflow,
+  commonTaskContinuity,
   commonActiveTask,
   commonCliAdapter,
   getDeveloperScript,
@@ -42,6 +39,8 @@ describe("trellis template constants", () => {
     commonGitContext,
     commonTaskQueue,
     commonTaskUtils,
+    commonTaskWorkflow,
+    commonTaskContinuity,
     commonActiveTask,
     commonCliAdapter,
     getDeveloperScript,
@@ -52,17 +51,6 @@ describe("trellis template constants", () => {
     workflowMdTemplate,
     gitignoreTemplate,
   };
-
-  function inProgressBreadcrumb(): string {
-    const inProgressMatch =
-      /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/.exec(
-        workflowMdTemplate,
-      );
-    if (!inProgressMatch) {
-      throw new Error("in_progress breadcrumb block must exist in workflow.md");
-    }
-    return inProgressMatch[1];
-  }
 
   function workflowStateBreadcrumb(status: string): string {
     const match = new RegExp(
@@ -83,19 +71,6 @@ describe("trellis template constants", () => {
       throw new Error(`workflow.md step ${step} must exist`);
     }
     return match[1];
-  }
-
-  function platformBlock(section: string, openingMarker: string): string {
-    const normalizedSection = section.replace(/\r\n/g, "\n");
-    const escaped = openingMarker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const closingMarker = openingMarker.replace("[", "[/");
-    const escapedClosing = closingMarker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`${escaped}\\n([\\s\\S]*?)\\n${escapedClosing}`);
-    const match = pattern.exec(normalizedSection);
-    if (!match) {
-      throw new Error(`workflow.md block ${openingMarker} must exist`);
-    }
-    return match[0];
   }
 
   it("all templates are non-empty strings", () => {
@@ -131,164 +106,37 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).toContain("#");
   });
 
-  it("marketplace native workflow mirror matches the bundled workflow", () => {
-    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
-      ? process.cwd()
-      : path.resolve(process.cwd(), "../..");
-    const marketplaceNative = fs.readFileSync(
-      path.join(repoRoot, "marketplace/workflows/native/workflow.md"),
-      "utf-8",
-    );
-    expect(marketplaceNative).toBe(workflowMdTemplate);
-  });
-
-  it("both in-progress breadcrumbs require risk-based review and complete checkpoints", () => {
-    const qualityCheck = stepSection("2.2");
-    expect(qualityCheck).toContain("complete diff with the approved task PRD");
-    expect(qualityCheck).toContain("complexity and impact");
-    expect(qualityCheck).toContain("add focused cases for uncovered behavior");
-    expect(qualityCheck).toContain("independent review");
-    expect(qualityCheck).toContain(
-      "Fix findings within the approved scope and rerun affected checks",
-    );
-
-    for (const breadcrumb of [
-      inProgressBreadcrumb(),
-      workflowStateBreadcrumb("in_progress-inline"),
+  it("workflow index keeps the five phase Skills and transitions distinct", () => {
+    for (const phase of [
+      "goal_exploration_and_requirements",
+      "decision_space_construction_and_merging",
+      "solution_design_and_convergence",
+      "task_implementation",
+      "delivery_review_and_closeout",
     ]) {
-      expect(breadcrumb).toContain(
-        "Compare the complete diff with the approved plan",
-      );
-      expect(breadcrumb).toContain(
-        "Match tests and review depth to risk, complexity, and impact",
-      );
-      expect(breadcrumb).toContain(
-        "add focused cases or independent review when warranted",
-      );
-      expect(breadcrumb).toContain("completed work, remaining work");
-      expect(breadcrumb).toContain("blockers or scope changes");
-      expect(breadcrumb).toContain("changed paths, verification and results");
-      expect(breadcrumb).toContain("`execution.md`");
-      expect(breadcrumb).toContain("keep the task `in_progress`");
+      expect(workflowMdTemplate).toContain(`\`${phase}\``);
     }
+    expect(workflowMdTemplate).toContain("当前基线已获用户确认");
+    expect(workflowMdTemplate).toContain("实施合同已授权");
+    expect(workflowMdTemplate).toContain("会话交接");
+    expect(workflowMdTemplate).not.toContain("phase model");
   });
 
-  it("marketplace TDD workflow planning breadcrumbs include behavior gates", () => {
-    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
-      ? process.cwd()
-      : path.resolve(process.cwd(), "../..");
-    const tddWorkflow = fs.readFileSync(
-      path.join(repoRoot, "marketplace/workflows/tdd/workflow.md"),
+  it("phase entries preserve confirmation, conditional decision trees, and closeout", () => {
+    expect(stepSection("1.1")).toContain("当前资产 revision 的用户明确确认");
+    expect(stepSection("2.1")).toContain("读取阶段 2 Skill");
+    const phase2Workflow = fs.readFileSync(
+      path.join(
+        process.cwd(),
+        "src/templates/common/bundled-skills/trellis-decision-space-construction-and-merging/workflow.md",
+      ),
       "utf-8",
     );
-    const planning =
-      /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/.exec(
-        tddWorkflow,
-      )?.[1];
-    const planningInline =
-      /\[workflow-state:planning-inline\]([\s\S]*?)\[\/workflow-state:planning-inline\]/.exec(
-        tddWorkflow,
-      )?.[1];
-
-    for (const block of [planning, planningInline]) {
-      expect(block).toContain("observable behavior slices");
-      expect(block).toContain("public interface under test");
-      expect(block).toContain("mock boundaries");
-    }
-  });
-
-  it("[codex-native-subagents] workflow.md preserves the dispatch prompt for Codex native fallback", () => {
-    // The in_progress breadcrumb instructs the main agent to prefix
-    // dispatch prompts with "Active task: <path>". Codex uses native
-    // SubagentStart context injection, but retains this child-side fallback
-    // whenever a project hook is unavailable or untrusted.
-    const block = inProgressBreadcrumb();
-    expect(block).toContain("Active task:");
-    expect(workflowMdTemplate).toContain("native Codex `SubagentStart`");
-    expect(workflowMdTemplate).toContain("child-side pull fallback");
-  });
-
-  it("[codex-native-subagents] Codex uses the native hook implement block, while class-2 platforms stay pull-based", () => {
-    const implement = stepSection("2.1");
-    const hookAutoBlock = platformBlock(
-      implement,
-      "[Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Snow, Oh My Pi]",
-    );
-    const pullBasedMarker =
-      "[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code, DeepSeek Harness]";
-    const pullBasedBlock = platformBlock(implement, pullBasedMarker);
-
-    const workflowLabelByPlatform: Partial<Record<AITool, string>> = {
-      gemini: "Gemini",
-      qoder: "Qoder",
-      copilot: "Copilot",
-      trae: "Trae",
-      grok: "Grok",
-      kimi: "Kimi Code",
-      dsh: "DeepSeek Harness",
-    };
-    // Pi templates keep a pull-based fallback, but workflow 2.1 routes Pi
-    // through the extension-backed context path.
-    const extensionBackedPreludeFallbackPlatforms = new Set<AITool>(["pi"]);
-    // Codex retains a child-side prelude as a compatibility fallback, but
-    // its primary workflow route is the native SubagentStart hook block.
-    const nativePushPreludeFallbackPlatforms = new Set<AITool>(["codex"]);
-    const generatedPullBasedLabels = PLATFORM_IDS.flatMap((id) => {
-      if (
-        extensionBackedPreludeFallbackPlatforms.has(id) ||
-        nativePushPreludeFallbackPlatforms.has(id)
-      ) {
-        return [];
-      }
-      const templates = collectPlatformTemplates(id);
-      const hasPullBasedPrelude =
-        templates !== undefined &&
-        [...templates.entries()].some(
-          ([filePath, content]) =>
-            /trellis-(implement|check)/.test(filePath) &&
-            content.includes("Required: Load Trellis Context First"),
-        );
-      if (!hasPullBasedPrelude) {
-        return [];
-      }
-      const label = workflowLabelByPlatform[id];
-      expect(
-        label,
-        `${id} generates pull-based agent definitions but has no workflow marker mapping`,
-      ).toBeDefined();
-      return [label as string];
-    });
-
-    const pullBasedLabels = [...generatedPullBasedLabels, "Reasonix"];
-    for (const label of pullBasedLabels) {
-      expect(
-        pullBasedBlock,
-        `${label} must use pull-based 2.1 guidance`,
-      ).toContain(label);
-      expect(
-        hookAutoBlock,
-        `${label} must not use hook/plugin auto-handles 2.1 guidance`,
-      ).not.toContain(label);
-    }
-    expect(pullBasedBlock).toContain(
-      "The pull-based sub-agent definition auto-handles the context load requirement",
-    );
-    expect(workflowMdTemplate).toContain("default continuable background mode");
-    expect(workflowMdTemplate).toContain("native settlement notice");
-    expect(workflowMdTemplate).toContain("optional companion plugin");
-    expect(workflowMdTemplate).toContain("once per dependent child id");
-    expect(workflowMdTemplate).toContain("Without `trellis_wait`");
-    expect(workflowMdTemplate).toContain("run_in_background: false");
-    expect(workflowMdTemplate).toContain(
-      "Never simulate waiting with shell sleep, polling loops",
-    );
-    expect(workflowMdTemplate).not.toContain("Start-Sleep");
-    expect(workflowMdTemplate).toContain("trellis-agent-<role>");
-    expect(workflowMdTemplate).toContain(
-      "on Claude Code: use the Task/Agent tool, never the Skill tool",
-    );
-    expect(hookAutoBlock).toContain("codex-sub-agent");
-    expect(hookAutoBlock).toContain("SubagentStart");
+    expect(phase2Workflow).toContain("仅当选择之间存在条件依赖时使用决策树");
+    expect(phase2Workflow).toContain("prior-art review");
+    expect(stepSection("3.1")).toContain("解决必要的用户决定");
+    expect(stepSection("4.1")).toContain("只有明确授权委派 Git worktree 写入时才使用 Paseo");
+    expect(stepSection("5.2")).toContain("正式会话交接仍是独立操作");
   });
 
   it("[codex-native-subagents] template mode helpers default to auto and fail invalid values closed to inline", () => {
@@ -308,79 +156,26 @@ describe("trellis template constants", () => {
     expect(taskStore).toContain('get_codex_dispatch_mode(repo_root) == "auto"');
   });
 
-  it("[issue-237] workflow.md in_progress breadcrumb self-exempts implement/check sub-agents", () => {
-    // The in_progress breadcrumb may be injected into sub-agent turns on some
-    // hosts, so its main-session dispatch guidance must not recursively apply
-    // to a sub-agent that is already doing the requested work.
-    const block = inProgressBreadcrumb();
-    expect(block).toContain("Main-session default");
-    expect(block).toContain("Sub-agent self-exemption");
-    expect(block).toContain("already running as `trellis-implement`");
-    expect(block).toContain("do NOT spawn another `trellis-implement`");
-    expect(block).toContain("already running as `trellis-check`");
-    expect(block).toContain("do NOT spawn another `trellis-check`");
-    expect(block).toContain("main session only");
-  });
-
-  it("[issue-237] workflow.md Phase 2 dispatch steps require prompt recursion guards", () => {
-    expect(workflowMdTemplate).toContain("**Dispatch prompt guard**");
-    expect(workflowMdTemplate).toContain(
-      "already the `trellis-implement` sub-agent",
-    );
-    expect(workflowMdTemplate).toContain(
-      "not spawn another `trellis-implement` / `trellis-check`",
-    );
-    expect(workflowMdTemplate).toContain(
-      "already the `trellis-check` sub-agent",
-    );
-    expect(workflowMdTemplate).toContain(
-      "not spawn another `trellis-check` / `trellis-implement`",
-    );
-  });
-
-  it("workflow.md documents parent child task tree responsibilities", () => {
-    expect(workflowMdTemplate).toContain("### Parent / Child Task Trees");
-    expect(workflowMdTemplate).toContain(
-      "several independently verifiable deliverables",
-    );
-    expect(workflowMdTemplate).toContain(
-      "Parent/child structure is not a dependency system",
-    );
-    expect(workflowMdTemplate).toContain("--parent <parent-dir>");
-    expect(workflowMdTemplate).toContain(
-      "task.py add-subtask <parent> <child>",
-    );
-    expect(workflowMdTemplate).toContain(
-      "start the child that owns the next independently verifiable deliverable",
-    );
-  });
-
-  it("workflow.md step 1.1 includes parent child split guidance", () => {
+  it("workflow.md stage 1 provides the requirements baseline", () => {
     const step = stepSection("1.1");
-    expect(step).toContain("When considering a parent/child split");
-    expect(step).toContain("Parent tasks own source requirements");
-    expect(step).toContain("Child tasks own actual deliverables");
-    expect(step).toContain("Parent/child structure is not a dependency system");
-    expect(step).toContain("Do not start the parent unless");
+    expect(step).toContain("仅收集可能改变目标、范围");
+    expect(step).toContain("用户明确确认");
+    expect(step).toContain("当前资产 revision");
   });
 
-  it("workflow.md planning breadcrumbs mention parent child split guidance", () => {
+  it("workflow.md planning breadcrumb requires a route before implementation", () => {
     const planning = workflowStateBreadcrumb("planning");
     const planningInline = workflowStateBreadcrumb("planning-inline");
-    for (const block of [planning, planningInline]) {
-      expect(block).toContain("Multi-deliverable scope");
-      expect(block).toContain(
-        "parent task plus independently verifiable child tasks",
-      );
-      expect(block).toContain("not implied by tree position");
-    }
+    expect(planning).toContain("task.py phase init");
+    expect(planning).toContain("实施授权");
+    expect(planningInline).toContain("planning");
+    expect(planningInline).toContain("主会话");
   });
 
-  it("workflow.md ships a task_error breadcrumb that repairs the existing task", () => {
+  it("workflow.md task_error breadcrumb repairs the current task record", () => {
     const taskError = workflowStateBreadcrumb("task_error");
-    expect(taskError).toContain("Do not create or activate another task");
-    expect(taskError).toContain("repair its task.json");
-    expect(taskError).toContain("valid JSON object with a non-empty status");
+    expect(taskError).toContain("活动任务记录无法读取");
+    expect(taskError).toContain("依据现有任务资产修复该记录");
   });
 
   it("gitignoreTemplate contains ignore patterns", () => {
@@ -405,6 +200,8 @@ describe("getAllScripts", () => {
     expect(scripts.has("common/__init__.py")).toBe(true);
     expect(scripts.has("common/paths.py")).toBe(true);
     expect(scripts.has("common/active_task.py")).toBe(true);
+    expect(scripts.has("common/task_workflow.py")).toBe(true);
+    expect(scripts.has("common/task_continuity.py")).toBe(true);
     expect(scripts.has("task.py")).toBe(true);
     expect(scripts.has("get_developer.py")).toBe(true);
   });
@@ -425,6 +222,8 @@ describe("getAllScripts", () => {
     const scripts = getAllScripts();
     expect(scripts.get("__init__.py")).toBe(scriptsInit);
     expect(scripts.get("common/__init__.py")).toBe(commonInit);
+    expect(scripts.get("common/task_workflow.py")).toBe(commonTaskWorkflow);
+    expect(scripts.get("common/task_continuity.py")).toBe(commonTaskContinuity);
     expect(scripts.get("task.py")).toBe(taskScript);
   });
 
@@ -459,7 +258,7 @@ describe("getAllAgents", () => {
     expect(agents.get("teammate.md")).toBe(teammateAgentTemplate);
   });
 
-  it("documents the native task completion loop and teammate report contract", () => {
+  it("documents Teamwork ownership boundaries and teammate report contract", () => {
     const skill = fs.readFileSync(
       path.join(
         process.cwd(),
@@ -468,19 +267,10 @@ describe("getAllAgents", () => {
       "utf8",
     );
     const teammate = getAllAgents().get("teammate.md") ?? "";
-    expect(skill).toContain("## Implementation Completion");
-    expect(skill).toContain("Never edit `task.json` status by hand");
-    expect(skill).toContain("Match review and tests to change risk");
-    expect(skill).toContain(
-      "`references/workflows.md` and `references/teammates.md`",
-    );
-    expect(workflowMdTemplate).toContain("After each execution-plan step");
-    expect(workflowMdTemplate).toContain(
-      "Never edit `task.json` status by hand",
-    );
-    expect(workflowMdTemplate).toContain(
-      "Match review and tests to change risk",
-    );
+    expect(skill).toContain("independent from the Trellis task lifecycle");
+    expect(skill).toContain("Teamwork validates and executes a frozen plan");
+    expect(skill).toContain("references/teamwork-plan-construction.md");
+    expect(skill).toContain("does not select the task phase");
     expect(teammate).toContain('"status": "complete"');
     expect(teammate).toContain('"source_digest"');
     expect(teammate).toContain('"evidence"');

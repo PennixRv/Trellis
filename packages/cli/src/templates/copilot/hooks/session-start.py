@@ -257,8 +257,7 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
     if task_status == "completed":
         return (
             f"Status: COMPLETED\nTask: {task_title}\n"
-            f"Next: Archive with `python3 ./.trellis/scripts/task.py archive {task_dir.name}` "
-            "or start a new task."
+            "Next: Start another task or end the session; finish-work only records the session journal."
         )
 
     has_prd = (task_dir / "prd.md").is_file()
@@ -424,14 +423,21 @@ def _extract_range(content: str, start_header: str, end_header: str) -> str:
     lines = content.splitlines()
     start: "int | None" = None
     end: int = len(lines)
-    start_match = f"## {start_header}"
-    end_match = f"## {end_header}"
+    start_matches = {f"## {start_header}", "## 阶段索引", "## Phase Index"}
+    end_matches = {
+        f"## {end_header}",
+        f"### {end_header}",
+        "## 阶段 1：目标探索与需求核对",
+        "### 阶段 1：目标探索与需求核对",
+        "## Phase 1: Goal exploration and requirements",
+        "### Phase 1: Goal exploration and requirements",
+    }
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if start is None and stripped == start_match:
+        if start is None and stripped in start_matches:
             start = i
             continue
-        if start is not None and stripped == end_match:
+        if start is not None and stripped in end_matches:
             end = i
             break
     if start is None:
@@ -479,11 +485,11 @@ def _build_workflow_toc(workflow_path: Path) -> str:
 
     out_lines = [
         "# Development Workflow - Session Summary",
-        "Full guide: .trellis/workflow.md. Step detail: `python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>`.",
+        "Full guide: .trellis/workflow.md. Phase detail: load the Skill named in the active phase breadcrumb.",
         "",
     ]
 
-    phases = _extract_range(content, "Phase Index", "Phase 1: Plan")
+    phases = _extract_range(content, "阶段索引", "阶段 1：目标探索与需求核对")
     if phases:
         out_lines.append(_strip_breadcrumb_tag_blocks(phases).rstrip())
 

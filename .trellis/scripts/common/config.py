@@ -118,12 +118,11 @@ def get_max_journal_lines(repo_root: Path | None = None) -> int:
 def get_session_auto_commit(repo_root: Path | None = None) -> bool:
     """Whether scripts should auto-stage + auto-commit session/task changes.
 
-    Governs both ``add_session.py:_auto_commit_workspace`` and
-    ``task_store.py:_auto_commit_archive``.
+    Governs ``add_session.py:_auto_commit_workspace``.
 
     Default: ``True`` (existing behavior — auto-stage + auto-commit).
     Set ``session_auto_commit: false`` in ``.trellis/config.yaml`` to skip
-    auto-staging entirely; the journal/archive files are still written to
+    auto-staging entirely; journal files are still written to
     disk, but the user manages ``git add`` / ``git commit`` themselves.
 
     Accepts native YAML booleans (``true`` / ``false``) and the string
@@ -281,7 +280,7 @@ def get_hooks(event: str, repo_root: Path | None = None) -> list[str]:
     """Get hook commands for a lifecycle event.
 
     Args:
-        event: Event name (e.g. "after_create", "after_archive").
+        event: Event name (e.g. "after_create", "after_complete").
         repo_root: Repository root path.
 
     A hook the user believes is installed and which silently never runs is the

@@ -65,7 +65,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--step",
-        help="Step id for --mode phase, e.g. 1.1, 2.2. Omit to get the Phase Index.",
+        help="Legacy workflow step id. Omit to get the Phase Index and load the active phase Skill.",
     )
     parser.add_argument(
         "--platform",

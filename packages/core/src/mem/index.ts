@@ -9,7 +9,7 @@
  *   import { searchMemSessions } from "@mindfoldhq/trellis-core/mem";
  *
  * v1 scope: persisted-session search and context extraction only. It does not
- * read channel / forum / thread event logs and has no cursor / pagination.
+ * read Teamwork Session / forum / thread event logs and has no cursor / pagination.
  */
 
 export {

@@ -778,7 +778,6 @@ describe("regression: task lifecycle overwrite and collision safety", () => {
   const pad = (n: number): string => String(n).padStart(2, "0");
   const now = new Date();
   const datePrefix = `${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const yearMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
 
   function runTask(...args: string[]): {
     status: number | null;
@@ -903,69 +902,6 @@ describe("regression: task lifecycle overwrite and collision safety", () => {
     const after = readTaskJson(dirName);
     expect(after.title).toBe("Second");
     expect(after.status).toBe("planning");
-  });
-
-  it("[audit] archive into an existing destination fails, leaving both directories intact", () => {
-    expect(
-      runTask(
-        "create",
-        "Kid",
-        "--description",
-        "regression fixture",
-        "--slug",
-        "kid",
-        "--no-start",
-      ).status,
-    ).toBe(0);
-    const dirName = `${datePrefix}-kid`;
-
-    const destDir = taskDir("archive", yearMonth, dirName);
-    fs.mkdirSync(destDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(destDir, "task.json"),
-      JSON.stringify({ id: "previously-archived" }),
-    );
-
-    const r = runTask("archive", dirName, "--no-commit");
-    expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain("archive destination already exists");
-    // Both sides of the collision must be named, or the user cannot tell
-    // which archived task to move out of the way.
-    expect(r.stderr).toContain(`archive/${yearMonth}/${dirName}`);
-    expect(r.stderr).toContain(`Task remains at: .trellis/tasks/${dirName}`);
-
-    // No nesting, no partial state: the live task is untouched (not even
-    // flipped to completed) and the archived copy still holds its own file.
-    expect(fs.existsSync(path.join(destDir, dirName))).toBe(false);
-    expect(readTaskJson(dirName).status).toBe("planning");
-    expect(readTaskJson(dirName).completedAt).toBeNull();
-    expect(
-      JSON.parse(fs.readFileSync(path.join(destDir, "task.json"), "utf-8")).id,
-    ).toBe("previously-archived");
-  });
-
-  it("[audit] archive still succeeds when the destination is free", () => {
-    expect(
-      runTask(
-        "create",
-        "Kid",
-        "--description",
-        "regression fixture",
-        "--slug",
-        "kid",
-        "--no-start",
-      ).status,
-    ).toBe(0);
-    const dirName = `${datePrefix}-kid`;
-
-    const r = runTask("archive", dirName, "--no-commit");
-    expect(r.status, r.stderr).toBe(0);
-    expect(fs.existsSync(taskDir(dirName))).toBe(false);
-    expect(
-      fs.existsSync(
-        path.join(taskDir("archive", yearMonth, dirName), "task.json"),
-      ),
-    ).toBe(true);
   });
 
   it("[audit] create --parent on a missing task fails and creates nothing", () => {
@@ -1375,166 +1311,6 @@ describe("regression: JSON read/write failure reporting", () => {
         fs.chmodSync(taskDir(name), 0o755);
       }
       expect(readTaskJson(name).title).toBe("First");
-    },
-  );
-
-  it.skipIf(!canProvokePermissionFailure)(
-    "[audit] archive stops before moving when a child cannot be unlinked",
-    () => {
-      expect(
-        runTask([
-          "create",
-          "Mum",
-          "--description",
-          "regression fixture",
-          "--slug",
-          "mum",
-          "--no-start",
-        ]).status,
-      ).toBe(0);
-      const parentName = `${datePrefix}-mum`;
-      const childName = `${datePrefix}-kid`;
-      expect(
-        runTask([
-          "create",
-          "Kid",
-          "--description",
-          "regression fixture",
-          "--slug",
-          "kid",
-          "--no-start",
-          "--parent",
-          parentName,
-        ]).status,
-      ).toBe(0);
-
-      fs.chmodSync(taskDir(childName), 0o555);
-      try {
-        const r = runTask(["archive", parentName, "--no-commit"]);
-        expect(r.status).not.toBe(0);
-        expect(r.stderr).toContain("Failed to write");
-        expect(r.stderr).toContain(childName);
-        expect(r.stderr).toContain("Not archived");
-      } finally {
-        fs.chmodSync(taskDir(childName), 0o755);
-      }
-      // The task must still be where the user left it, not half-moved.
-      expect(fs.existsSync(taskJsonPath(parentName))).toBe(true);
-      expect(readTaskJson(childName).parent).toBe(parentName);
-    },
-  );
-
-  it.skipIf(!canProvokePermissionFailure)(
-    "[audit] archive restores the children it already unlinked when a later one fails",
-    () => {
-      const createTask = (
-        title: string,
-        slug: string,
-        parent?: string,
-      ): void => {
-        const args = [
-          "create",
-          title,
-          "--description",
-          "regression fixture",
-          "--slug",
-          slug,
-          "--no-start",
-        ];
-        if (parent) args.push("--parent", parent);
-        expect(runTask(args).status).toBe(0);
-      };
-
-      createTask("Mum", "mum2");
-      const parentName = `${datePrefix}-mum2`;
-      createTask("Kid A", "kid-a", parentName);
-      createTask("Kid B", "kid-b", parentName);
-      const firstChild = `${datePrefix}-kid-a`;
-      const failingChild = `${datePrefix}-kid-b`;
-
-      // Archive walks `children` in order, so pin the order: the failing
-      // child has to come second, after `kid-a` has already lost its link.
-      const parentJson = readTaskJson(parentName);
-      parentJson.children = [firstChild, failingChild];
-      fs.writeFileSync(
-        taskJsonPath(parentName),
-        `${JSON.stringify(parentJson, null, 2)}\n`,
-        "utf-8",
-      );
-
-      // Provoke the write failure through both mechanisms the atomic
-      // writer can hit: a read-only directory fails `mkstemp`, and a
-      // read-only target fails the final replace. Which one a platform
-      // enforces is not the point of this test.
-      fs.chmodSync(taskDir(failingChild), 0o555);
-      fs.chmodSync(taskJsonPath(failingChild), 0o444);
-      try {
-        const r = runTask(["archive", parentName, "--no-commit"]);
-        expect(r.status).not.toBe(0);
-        expect(r.stderr).toContain("Failed to write");
-        expect(r.stderr).toContain(failingChild);
-        expect(r.stderr).toContain("Not archived");
-      } finally {
-        fs.chmodSync(taskJsonPath(failingChild), 0o644);
-        fs.chmodSync(taskDir(failingChild), 0o755);
-      }
-
-      // Stopping before the move is not enough on its own: `kid-a` was
-      // unlinked before the failure, and with its parent still in the
-      // active tree that link is lost for good. It has to come back.
-      expect(fs.existsSync(taskJsonPath(parentName))).toBe(true);
-      expect(readTaskJson(firstChild).parent).toBe(parentName);
-      expect(readTaskJson(failingChild).parent).toBe(parentName);
-    },
-  );
-
-  it.skipIf(!canProvokePermissionFailure)(
-    "[audit] archive restore survives a duplicated child entry",
-    () => {
-      const create = (title: string, slug: string, parent?: string): string => {
-        const args = [
-          "create",
-          title,
-          "--description",
-          "regression fixture",
-          "--slug",
-          slug,
-          "--no-start",
-        ];
-        if (parent) args.push("--parent", parent);
-        expect(runTask(args).status).toBe(0);
-        return `${datePrefix}-${slug}`;
-      };
-
-      const parentName = create("Mum", "mum-dup");
-      const firstChild = create("Kid A", "kid-a-dup", parentName);
-      const failingChild = create("Kid B", "kid-b-dup", parentName);
-
-      // A duplicated entry makes the unlink loop visit `kid-a-dup` twice.
-      // The second visit must not snapshot the already-cleared `null`, or the
-      // restore writes that back over the real link and detaches the child
-      // while its parent is still in the active tree.
-      const parentJson = readTaskJson(parentName);
-      parentJson.children = [firstChild, firstChild, failingChild];
-      fs.writeFileSync(
-        taskJsonPath(parentName),
-        `${JSON.stringify(parentJson, null, 2)}\n`,
-        "utf-8",
-      );
-
-      fs.chmodSync(taskDir(failingChild), 0o555);
-      fs.chmodSync(taskJsonPath(failingChild), 0o444);
-      try {
-        expect(runTask(["archive", parentName, "--no-commit"]).status).not.toBe(
-          0,
-        );
-      } finally {
-        fs.chmodSync(taskJsonPath(failingChild), 0o644);
-        fs.chmodSync(taskDir(failingChild), 0o755);
-      }
-
-      expect(readTaskJson(firstChild).parent).toBe(parentName);
-      expect(readTaskJson(failingChild).parent).toBe(parentName);
     },
   );
 
@@ -3020,10 +2796,8 @@ describe("regression: current-task path normalization", () => {
     expect(taskJson.status).toBe("in_progress");
   });
 
-  it("[session-current-task] task.py start in degraded mode flips planning → in_progress", () => {
-    // Verify the status flip path of degraded mode by setting up a task with
-    // status=planning explicitly, then asserting the flip happened without a
-    // session identity being available.
+  it("[session-current-task] task.py start in degraded mode leaves planning tasks unchanged", () => {
+    // A session pointer does not authorize implementation or change lifecycle status.
     setupTaskRepo();
     const taskJsonPath = path.join(
       tmpDir,
@@ -3042,9 +2816,9 @@ describe("regression: current-task path normalization", () => {
       { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
     );
 
-    expect(output).toContain("planning → in_progress");
+    expect(output).toContain("Session identity not available");
     const after = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8"));
-    expect(after.status).toBe("in_progress");
+    expect(after.status).toBe("planning");
   });
 
   it("[session-current-task] task.py start writes session runtime state when TRELLIS_CONTEXT_ID is set", () => {
@@ -3293,10 +3067,9 @@ describe("regression: current-task path normalization", () => {
     }
   });
 
-  it("[workflow-state-r7] task.py create then task.py start is idempotent (pointer + status flip)", () => {
-    // Finding 6: R7 made cmd_create auto-call set_active_task. cmd_start also
-    // calls set_active_task. The second call must not error, and status must
-    // still flip planning → in_progress correctly.
+  it("[workflow-state-r7] task.py create then task.py start is idempotent without implementation authorization", () => {
+    // Creating or selecting a task sets session context; only an accepted and
+    // authorized phase-4 route may change planning to in_progress.
     writeTrellisScripts();
     writeProjectFile(
       path.join(".trellis", ".developer"),
@@ -3351,13 +3124,13 @@ describe("regression: current-task path normalization", () => {
       startOutput = (e.stdout ?? "") + (e.stderr ?? "");
     }
     expect(startStatus).toBe(0);
-    expect(startOutput).toContain("planning → in_progress");
+    expect(startOutput).not.toContain("planning → in_progress");
 
-    // Status flipped to in_progress.
+    // Pointer selection leaves the task in planning.
     const afterStart = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
       status: string;
     };
-    expect(afterStart.status).toBe("in_progress");
+    expect(afterStart.status).toBe("planning");
 
     // Pointer still points at the same task.
     const contextPath = path.join(
@@ -3372,161 +3145,6 @@ describe("regression: current-task path normalization", () => {
       current_task: string;
     };
     expect(context.current_task).toBe(relTaskDir);
-  });
-
-  it("[session-current-task] task.py archive deletes runtime sessions pointing at the archived task", () => {
-    setupTaskRepo();
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const contextA = path.join(
-      tmpDir,
-      ".trellis",
-      ".runtime",
-      "sessions",
-      "session-a.json",
-    );
-    const contextB = path.join(
-      tmpDir,
-      ".trellis",
-      ".runtime",
-      "sessions",
-      "session-b.json",
-    );
-    const contextOther = path.join(
-      tmpDir,
-      ".trellis",
-      ".runtime",
-      "sessions",
-      "session-other.json",
-    );
-    writeProjectFile(
-      path.join(".trellis", ".runtime", "sessions", "session-a.json"),
-      JSON.stringify({ current_task: ".trellis/tasks/issue-106" }, null, 2),
-    );
-    writeProjectFile(
-      path.join(".trellis", ".runtime", "sessions", "session-b.json"),
-      JSON.stringify({ current_task: "issue-106" }, null, 2),
-    );
-    writeProjectFile(
-      path.join(".trellis", ".runtime", "sessions", "session-other.json"),
-      JSON.stringify({ current_task: ".trellis/tasks/other-task" }, null, 2),
-    );
-
-    execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} archive issue-106 --no-commit`,
-      {
-        cwd: tmpDir,
-        encoding: "utf-8",
-        env: sessionEnv(),
-      },
-    );
-
-    expect(fs.existsSync(contextA)).toBe(false);
-    expect(fs.existsSync(contextB)).toBe(false);
-    expect(fs.existsSync(contextOther)).toBe(true);
-  });
-
-  it("[task-lifecycle] task.py create refuses an archived task dir-name collision", () => {
-    writeTrellisScripts();
-    writeProjectFile(
-      path.join(".trellis", ".developer"),
-      "name=test-dev\ninitialized_at=2026-03-27T00:00:00\n",
-    );
-    writeProjectFile(path.join(".trellis", "workflow.md"), "# Workflow\n");
-    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
-
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const createArgs = [
-      taskScriptPath,
-      "create",
-      "web auth retry",
-      "--description",
-      "regression fixture",
-      "--slug",
-      "web-auth-retry",
-      "--assignee",
-      "test-dev",
-    ];
-    const env = sessionEnv({ TRELLIS_CONTEXT_ID: "archive-collision" });
-
-    execSync(
-      `${pythonCmd} ${createArgs.map((arg) => JSON.stringify(arg)).join(" ")}`,
-      {
-        cwd: tmpDir,
-        encoding: "utf-8",
-        env,
-      },
-    );
-
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
-    const taskDirName = fs
-      .readdirSync(tasksDir)
-      .find((entry) => entry.endsWith("-web-auth-retry"));
-    expect(taskDirName).toBeDefined();
-    const activeTaskDir = path.join(tasksDir, taskDirName as string);
-    fs.writeFileSync(path.join(activeTaskDir, "prd.md"), "# PRD\n", "utf-8");
-
-    execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} archive ${JSON.stringify(taskDirName)} --no-commit`,
-      {
-        cwd: tmpDir,
-        encoding: "utf-8",
-        env,
-      },
-    );
-
-    const archiveRoot = path.join(tasksDir, "archive");
-    let archivedTaskDir: string | undefined;
-    for (const monthDir of fs.readdirSync(archiveRoot)) {
-      const candidate = path.join(archiveRoot, monthDir, taskDirName as string);
-      if (fs.existsSync(candidate)) {
-        archivedTaskDir = candidate;
-      }
-    }
-    expect(archivedTaskDir).toBeDefined();
-    const archivedTaskJsonPath = path.join(
-      archivedTaskDir as string,
-      "task.json",
-    );
-    const archivedPrdPath = path.join(archivedTaskDir as string, "prd.md");
-    const archivedTaskJsonBefore = fs.readFileSync(
-      archivedTaskJsonPath,
-      "utf-8",
-    );
-    const archivedPrdBefore = fs.readFileSync(archivedPrdPath, "utf-8");
-    const archivedTaskJson = JSON.parse(archivedTaskJsonBefore) as {
-      status: string;
-      completedAt: string | null;
-    };
-    expect(archivedTaskJson.status).toBe("completed");
-    expect(archivedTaskJson.completedAt).not.toBeNull();
-
-    const contextPath = path.join(
-      tmpDir,
-      ".trellis",
-      ".runtime",
-      "sessions",
-      "archive-collision.json",
-    );
-    expect(fs.existsSync(contextPath)).toBe(false);
-
-    const result = spawnSync(pythonCmd, createArgs, {
-      cwd: tmpDir,
-      encoding: "utf-8",
-      env,
-    });
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Task already archived");
-    expect(result.stderr).toContain(taskDirName as string);
-    expect(result.stderr).toContain(".trellis/tasks/archive/");
-    expect(fs.existsSync(path.join(tasksDir, taskDirName as string))).toBe(
-      false,
-    );
-    expect(fs.readFileSync(archivedTaskJsonPath, "utf-8")).toBe(
-      archivedTaskJsonBefore,
-    );
-    expect(fs.readFileSync(archivedPrdPath, "utf-8")).toBe(archivedPrdBefore);
-    expect(fs.existsSync(contextPath)).toBe(false);
   });
 
   it("[issue-377] task.py create normalizes a --slug carrying today's date prefix", () => {
@@ -3643,85 +3261,6 @@ describe("regression: current-task path normalization", () => {
         ),
       ),
     ).toBe(true);
-  });
-
-  it("[task-input-contract] task.py archive accepts task name, relative path, and absolute path", () => {
-    setupTaskRepo();
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-
-    // Create three additional task directories for the three input forms.
-    const taskNames = ["issue-201", "issue-202", "issue-203"];
-    for (const name of taskNames) {
-      writeProjectFile(
-        path.join(".trellis", "tasks", name, "task.json"),
-        JSON.stringify(
-          {
-            title: `Task ${name}`,
-            status: "in_progress",
-            package: null,
-          },
-          null,
-          2,
-        ),
-      );
-    }
-
-    // Form 1: bare slug
-    execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} archive ${taskNames[0]} --no-commit`,
-      {
-        cwd: tmpDir,
-        encoding: "utf-8",
-        env: sessionEnv(),
-      },
-    );
-
-    // Form 2: relative path
-    execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} archive ${JSON.stringify(`.trellis/tasks/${taskNames[1]}`)} --no-commit`,
-      {
-        cwd: tmpDir,
-        encoding: "utf-8",
-        env: sessionEnv(),
-      },
-    );
-
-    // Form 3: absolute path
-    const absPath = path.join(tmpDir, ".trellis", "tasks", taskNames[2]);
-    execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} archive ${JSON.stringify(absPath)} --no-commit`,
-      {
-        cwd: tmpDir,
-        encoding: "utf-8",
-        env: sessionEnv(),
-      },
-    );
-
-    // All three task dirs should be removed from active tasks/.
-    for (const name of taskNames) {
-      expect(
-        fs.existsSync(path.join(tmpDir, ".trellis", "tasks", name)),
-        `task ${name} should no longer exist in active tasks/`,
-      ).toBe(false);
-    }
-
-    // All three should appear under archive/<YYYY-MM>/.
-    const archiveRoot = path.join(tmpDir, ".trellis", "tasks", "archive");
-    expect(fs.existsSync(archiveRoot)).toBe(true);
-    const archivedNames = new Set<string>();
-    for (const monthDir of fs.readdirSync(archiveRoot)) {
-      const monthPath = path.join(archiveRoot, monthDir);
-      if (fs.statSync(monthPath).isDirectory()) {
-        for (const taskDir of fs.readdirSync(monthPath)) {
-          archivedNames.add(taskDir);
-        }
-      }
-    }
-    for (const name of taskNames) {
-      expect(archivedNames.has(name), `task ${name} should be archived`).toBe(
-        true,
-      );
-    }
   });
 
   it("[session-current-task] task.py start also uses platform-native session env when available", () => {
@@ -7317,7 +6856,7 @@ print(len(entries))
     expect(result.trim()).toBe("0");
   });
 
-  it("[#573] task.py validate fails for a freshly created task until manifests are curated", () => {
+  it("task.py validate accepts a task whose optional context manifests are empty", () => {
     setupTaskRepo();
     fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
@@ -7336,12 +6875,8 @@ print(len(entries))
       [taskScriptPath, "validate", relTaskDir],
       { cwd: tmpDir, encoding: "utf-8" },
     );
-    // Seed-only manifests used to pass with a green "✓ (0 entries)", so
-    // sub-agents silently ran with zero spec context (#573).
-    expect(result.status).toBe(1);
-    expect(result.stdout).toContain("0 curated entries");
-    expect(result.stdout).toContain("add-context");
-    expect(result.stdout).toContain("--allow-empty-context");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("no context entries; manifests are optional");
   });
 
   describe("[validation-preflight] task.py validate vs PR preflight contract", () => {
@@ -7350,8 +6885,7 @@ print(len(entries))
     // then trips PR preflight's `_example` scaffolding rule.
     const placeholderRow =
       '{"_example": "Fill with {\\"file\\": \\"<path>\\", \\"reason\\": \\"<why>\\"}."}\n';
-    // Curated row for the manifest not under test: an empty manifest is
-    // itself an error since #573, which would obscure the count under test.
+    // Curated row used where an entry's validation is under test.
     const curatedRow =
       '{"file":".trellis/spec/guides/index.md","reason":"guideline"}\n';
 
@@ -7405,17 +6939,11 @@ print(len(entries))
       expect(result.stdout).toContain("Validation failed (1 errors)");
     });
 
-    it("[#573] fails for empty manifests instead of passing them silently", () => {
+    it("accepts empty manifests when there are no invalid entries", () => {
       const result = validateWith("", "");
-      expect(result.status).toBe(1);
-      expect(result.stdout).toContain(
-        "implement.jsonl: ✗ (0 curated entries — sub-agents would get zero spec context)",
-      );
-      expect(result.stdout).toContain(
-        "check.jsonl: ✗ (0 curated entries — sub-agents would get zero spec context)",
-      );
-      expect(result.stdout).toContain("add-context <task> implement");
-      expect(result.stdout).toContain("--allow-empty-context");
+      expect(result.status).toBe(0);
+      expect(result.stdout.match(/no context entries; manifests are optional/g)).toHaveLength(2);
+      expect(result.stdout).toContain("All validations passed");
     });
 
     it("passes for curated entries pointing at real files", () => {
@@ -7513,79 +7041,23 @@ print(len(entries))
     });
   });
 
-  describe("[#573] task.py start seed-only context gate", () => {
-    const curatedRow =
-      '{"file":".trellis/spec/guides/index.md","reason":"guideline"}\n';
-
-    function writeManifests(implement: string | null, check: string | null): void {
-      const taskDir = path.join(tmpDir, ".trellis", "tasks", "issue-106");
-      if (implement !== null) {
-        fs.writeFileSync(path.join(taskDir, "implement.jsonl"), implement, "utf-8");
-      }
-      if (check !== null) {
-        fs.writeFileSync(path.join(taskDir, "check.jsonl"), check, "utf-8");
-      }
-    }
-
-    function runStart(...extra: string[]): ReturnType<typeof spawnSync> {
-      const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-      return spawnSync(
-        pythonCmd,
-        [taskScriptPath, "start", ".trellis/tasks/issue-106", ...extra],
-        {
-          cwd: tmpDir,
-          encoding: "utf-8",
-          // Session identity so a successful start prints "Current task set
-          // to" instead of the degraded-mode notice.
-          env: sessionEnv({ TRELLIS_CONTEXT_ID: "test-ctx-573" }),
-        },
-      );
-    }
-
-    it("blocks start when seeded manifests have zero curated entries", () => {
-      setupTaskRepo();
-      writeManifests("", "");
-      const r = runStart();
-      expect(r.status).toBe(1);
-      expect(r.stdout).toContain("no curated entries");
-      expect(r.stdout).toContain("add-context");
-      expect(r.stdout).toContain("--allow-empty-context");
-      expect(r.stdout).not.toContain("Current task set to");
-    });
-
-    it("names only the manifest that is actually empty", () => {
-      setupTaskRepo();
-      writeManifests(curatedRow, "");
-      const r = runStart();
-      expect(r.status).toBe(1);
-      expect(r.stdout).toContain("check.jsonl has no curated entries");
-      expect(r.stdout).not.toContain("implement.jsonl and check.jsonl");
-    });
-
-    it("--allow-empty-context bypasses the gate", () => {
-      setupTaskRepo();
-      writeManifests("", "");
-      const r = runStart("--allow-empty-context");
-      expect(r.status).toBe(0);
-      expect(r.stdout).toContain("Current task set to");
-    });
-
-    it("does not gate when manifests are absent (agent-less platform)", () => {
-      // `create` seeds the manifests only on sub-agent-capable platforms;
-      // absence means no sub-agent will ever read them.
-      setupTaskRepo();
-      const r = runStart();
-      expect(r.status).toBe(0);
-      expect(r.stdout).toContain("Current task set to");
-    });
-
-    it("starts normally once both manifests are curated", () => {
-      setupTaskRepo();
-      writeManifests(curatedRow, curatedRow);
-      const r = runStart();
-      expect(r.status).toBe(0);
-      expect(r.stdout).toContain("Current task set to");
-    });
+  it("task.py start accepts seeded empty context manifests", () => {
+    setupTaskRepo();
+    const taskDir = path.join(tmpDir, ".trellis", "tasks", "issue-106");
+    fs.writeFileSync(path.join(taskDir, "implement.jsonl"), "", "utf-8");
+    fs.writeFileSync(path.join(taskDir, "check.jsonl"), "", "utf-8");
+    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
+    const result = spawnSync(
+      pythonCmd,
+      [taskScriptPath, "start", ".trellis/tasks/issue-106"],
+      {
+        cwd: tmpDir,
+        encoding: "utf-8",
+        env: sessionEnv({ TRELLIS_CONTEXT_ID: "optional-context" }),
+      },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Current task set to");
   });
 
   it("[init-context-removal] task.py list-context prints 'no curated entries yet' for uncurated jsonl", () => {
@@ -7612,7 +7084,7 @@ print(len(entries))
 
   // ------------------------------------------------------------
   // workflow_phase.get_phase_index() expansion (FP round 3)
-  //   Now returns Phase Index + Phase 1/2/3 bodies (was Phase Index only).
+  //   Returns only the Phase Index before the first phase body.
   // ------------------------------------------------------------
 
   function templateWorkflowMd(): string {
@@ -7629,14 +7101,15 @@ print(len(entries))
     return readFileSync(templatePath, "utf-8");
   }
 
-  it("[workflow-state-r1] template workflow.md [workflow-state:in_progress] mentions commit (Phase 3.4)", () => {
+  it("[workflow-state-r1] template workflow.md routes active tasks through phase 4", () => {
     const wf = templateWorkflowMd();
     const match = wf.match(
       /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/,
     );
     expect(match).toBeTruthy();
     const body = match?.[1] ?? "";
-    expect(body).toMatch(/commit \(Phase 3\.4\)/i);
+    expect(body).toContain("阶段 4");
+    expect(body).toContain("trellis-before-dev");
   });
 
   it("[issue-237] all implement/check agent templates contain recursion guards", () => {
@@ -7741,91 +7214,22 @@ print(len(entries))
     }
   });
 
-  it("[workflow-state-r2] template workflow.md [workflow-state:planning] mentions artifact gates + required jsonl curation", () => {
+  it("[workflow-state-r2] planning breadcrumb initializes an evidence-backed phase route", () => {
     const wf = templateWorkflowMd();
     const match = wf.match(
       /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/,
     );
     expect(match).toBeTruthy();
     const body = match?.[1] ?? "";
-    expect(body).toMatch(/Lightweight: `prd\.md` can be enough/);
-    expect(body).toMatch(
-      /Complex: finish `prd\.md`, `design\.md`, and `implement\.md`/,
-    );
-    expect(body).toContain(
-      "curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start",
-    );
+    expect(body).toContain("task.py phase init");
+    expect(body).toContain("省略阶段记录理由和证据");
+    expect(body).toContain("实施授权");
   });
 
-  it("[#292] workflow and brainstorm templates treat seed-only jsonl as not planning-ready", () => {
+  it("[#292] bundled workflow does not require context manifests for every task", () => {
     const wf = templateWorkflowMd();
-    expect(wf).not.toContain("seed-only manifests are tolerated by consumers");
-    expect(wf).not.toContain(
-      "curated when extra spec or research context is needed",
-    );
-    expect(wf).toContain(
-      'Ready gate: both `implement.jsonl` and `check.jsonl` must contain at least one real `{"file": "...", "reason": "..."}` entry before `task.py start`.',
-    );
-    expect(wf).toContain(
-      "Runtime consumers tolerate missing or seed-only manifests for compatibility, but that tolerance is not a planning-ready state.",
-    );
-    expect(wf).toContain(
-      "`implement.jsonl` and `check.jsonl` each contain at least one real curated entry (seed row does not count)",
-    );
-
-    const templateRoot = path.join(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "src",
-      "templates",
-    );
-    const brainstormFiles = [
-      "common/skills/brainstorm.md",
-      "copilot/prompts/brainstorm.prompt.md",
-    ];
-
-    for (const relativePath of brainstormFiles) {
-      const content = fs.readFileSync(
-        path.join(templateRoot, relativePath),
-        "utf-8",
-      );
-      expect(content, relativePath).toContain(
-        "Sub-agent-dispatch tasks have real curated entries in both `implement.jsonl` and `check.jsonl`; seed-only manifests are not ready.",
-      );
-    }
-  });
-
-  it("[#320] brainstorm templates require lossless PRD convergence before start", () => {
-    const templateRoot = path.join(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "src",
-      "templates",
-    );
-    const brainstormFiles = [
-      "common/skills/brainstorm.md",
-      "copilot/prompts/brainstorm.prompt.md",
-    ];
-
-    for (const relativePath of brainstormFiles) {
-      const content = fs.readFileSync(
-        path.join(templateRoot, relativePath),
-        "utf-8",
-      );
-      expect(content, relativePath).toContain(
-        "Run the requirement convergence gate, then the PRD convergence pass.",
-      );
-      expect(content, relativePath).toContain("## PRD Convergence Pass");
-      expect(content, relativePath).toContain(
-        "Fold temporary brainstorm sections such as `What I already know`, `Assumptions`, and resolved `Open Questions`",
-      );
-      expect(content, relativePath).toContain(
-        "Preserve every file:line anchor, decision, constraint, requirement ID, and acceptance-criteria mapping.",
-      );
-      expect(content, relativePath).toContain(
-        "no unresolved temporary brainstorm sections, no duplicate facts across sections",
-      );
-    }
+    expect(wf).toContain("只有这些 agent 会读取清单时才需要维护");
+    expect(wf).not.toContain("before `task.py start`");
   });
 
   it("[workflow-state-r3-no_task] template workflow.md [workflow-state:no_task] block is present and well-formed", () => {
@@ -7835,11 +7239,8 @@ print(len(entries))
     );
   });
 
-  it("[workflow-state-r3-completed] template workflow.md [workflow-state:completed] block is present and well-formed", () => {
-    const wf = templateWorkflowMd();
-    expect(wf).toMatch(
-      /\[workflow-state:completed\]\s*\n[\s\S]+?\n\s*\[\/workflow-state:completed\]/,
-    );
+  it("[workflow-state-r3-completed] completion is represented by task state, not a workflow breadcrumb", () => {
+    expect(templateWorkflowMd()).not.toContain("[workflow-state:completed]");
   });
 
   it("[strip-breadcrumb] _strip_breadcrumb_tag_blocks only strips matched STATUS pairs (backreference parity with parser)", () => {
@@ -7911,26 +7312,19 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("## Phase Index");
-    expect(output).toContain("### Request Triage");
-    expect(output).toContain("### Planning Artifacts");
-    expect(output).toContain("### Loading Step Detail");
-    expect(output).not.toMatch(/^## Phase 1: Plan/m);
-    expect(output).not.toContain("#### 1.1 Requirement exploration");
-    expect(output).not.toContain("#### 2.1 Implement");
+    expect(output).toContain("## 阶段索引");
+    expect(output).toContain("阶段 1：目标探索与需求核对");
+    expect(output).toContain("阶段 5：交付审查与收尾");
+    expect(output).not.toContain("#### 1.1 Establish the requirements baseline");
   });
 
-  it("[workflow-v2] --mode phase --platform codex (sub-agent mode) filters out generic before-dev routing", () => {
+  it("[workflow-v2] --mode phase returns the same compact stage index on Codex", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
       templateWorkflowMd(),
     );
-    // Codex defaults to inline since 0.5.9; opt into sub-agent dispatch
-    // explicitly so the legacy spawn-trellis-implement block surfaces.
-    writeConfigYaml("codex:\n  dispatch_mode: sub-agent\n");
-
     const contextScript = path.join(
       tmpDir,
       ".trellis",
@@ -7942,14 +7336,11 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("trellis-implement");
-    expect(output).not.toContain(
-      "| About to write code / start implementing | trellis-before-dev |",
-    );
-    expect(output).not.toContain("before-dev takes under a minute");
+    expect(output).toContain("## 阶段索引");
+    expect(output).toContain("阶段 4：任务实施");
   });
 
-  it("[pi] --mode phase --platform pi uses sub-agent routing", () => {
+  it("[pi] --mode phase returns the same compact stage index", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -7968,15 +7359,11 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("trellis-implement");
-    expect(output).toContain("implement.jsonl");
-    expect(output).not.toContain(
-      "| About to write code / start implementing | trellis-before-dev |",
-    );
-    expect(output).not.toContain("before-dev takes under a minute");
+    expect(output).toContain("## 阶段索引");
+    expect(output).toContain("阶段 4：任务实施");
   });
 
-  it("[workflow-v2] step 2.1 for Codex describes native hook injection with child-side fallback", () => {
+  it("[workflow-v2] step 2.1 returns the decision-space workflow on Codex", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -7994,17 +7381,11 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("The platform hook/plugin auto-handles");
-    expect(output).toContain(
-      "For Codex, `SubagentStart` supplies native context injection",
-    );
-    expect(output).not.toContain(
-      "The pull-based sub-agent definition auto-handles",
-    );
-    expect(output).not.toContain("Load the `trellis-before-dev` skill");
+    expect(output).toContain("选择能表达相关选项及其关系的最简方式");
+    expect(output).toContain("满足既定触发条件时查找外部先例");
   });
 
-  it("[pi] step 2.1 describes extension-backed sub-agent context path", () => {
+  it("[pi] step 2.1 returns the decision-space workflow", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -8023,15 +7404,11 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("The platform hook/plugin auto-handles");
-    expect(output).toContain("Reads `implement.jsonl`");
-    expect(output).not.toContain("The Codex sub-agent definition auto-handles");
-    expect(output).not.toContain("Load the `trellis-before-dev` skill");
+    expect(output).toContain("选择能表达相关选项及其关系的最简方式");
+    expect(output).toContain("满足既定触发条件时查找外部先例");
   });
 
-  it("[workflow-v2] --mode phase --platform kilo keeps trellis-before-dev routing (agent-less path)", () => {
-    // Symmetric to the codex filter test: agent-less platforms MUST still
-    // see `trellis-before-dev` because they write code in the main session.
+  it("[workflow-v2] --mode phase returns the same compact stage index on Kilo", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -8050,8 +7427,8 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("`trellis-before-dev`");
-    expect(output).not.toContain("Dispatch the `trellis-implement` sub-agent");
+    expect(output).toContain("## 阶段索引");
+    expect(output).toContain("阶段 4：任务实施");
   });
 
   // ------------------------------------------------------------
@@ -8083,12 +7460,10 @@ print(len(entries))
     if (!workflowMatch) throw new Error("workflow block not found in payload");
     const workflowBlock = workflowMatch[1];
 
-    expect(workflowBlock).toContain("## Phase Index");
-    expect(workflowBlock).toContain("### Request Triage");
-    expect(workflowBlock).toContain("### Planning Artifacts");
-    expect(workflowBlock).toContain("### Loading Step Detail");
-    expect(workflowBlock).not.toMatch(/^## Phase 1: Plan/m);
-    expect(workflowBlock).not.toContain("#### 1.1 Requirement exploration");
+    expect(workflowBlock).toContain("## 阶段索引");
+    expect(workflowBlock).toContain("阶段 1：目标探索与需求核对");
+    expect(workflowBlock).toContain("阶段 5：交付审查与收尾");
+    expect(workflowBlock).not.toContain("#### 1.1 Establish the requirements baseline");
     // Breadcrumb tag BLOCKS (matched opening + closing pair) excluded — they're
     // consumed by inject-workflow-state.py. Inline `[workflow-state:planning]`
     // mentions in narrative prose are fine; only complete blocks are stripped.
@@ -8382,11 +7757,7 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    // The [Kilo, Antigravity, Devin] inline block content surfaces:
-    // it tells the main session to load trellis-before-dev directly.
-    expect(output).toContain("trellis-before-dev");
-    expect(output).toContain("Read `{TASK_DIR}/prd.md`");
-    // The Codex sub-agent dispatch text must NOT surface in inline mode.
+    expect(output).toContain("选择能表达相关选项及其关系的最简方式");
     expect(output).not.toMatch(/Active task: <task path>/);
   });
 
@@ -8548,9 +7919,8 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
     );
 
-    expect(output).toContain("Spawn the implement sub-agent");
-    expect(output).toContain("DeepSeek Harness");
-    expect(output).not.toMatch(/^\[DeepSeek Harness/m);
+    expect(output).toContain("选择能表达相关选项及其关系的最简方式");
+    expect(output).not.toContain("阶段 4：任务实施");
   });
 
   it("[issue-codex-dispatch-mode] codex hook injects <codex-mode> banner reflecting dispatch_mode", () => {
@@ -8711,7 +8081,7 @@ print(len(entries))
 
     // Simulate a bare "origin" remote whose default branch is main, while
     // the local checkout stays on a feature branch (#399 item 1 repro).
-    const remotePath = path.join(tmpDir, "..", "origin-bare.git");
+    const remotePath = path.join(tmpDir, "origin-bare.git");
     execSync(`git init -q --bare ${JSON.stringify(remotePath)}`, {
       cwd: tmpDir,
     });
@@ -8870,51 +8240,14 @@ print(len(entries))
     );
   });
 
-  it("[issue-399.2] task.py archive warns when the recorded branch no longer exists locally", () => {
-    setupTaskRepo();
-    execSync("git init -q -b main", { cwd: tmpDir });
-    execSync("git config user.email test@example.com", { cwd: tmpDir });
-    execSync("git config user.name Test", { cwd: tmpDir });
-    execSync("git add -A", { cwd: tmpDir });
-    execSync("git commit -q -m init", { cwd: tmpDir });
+  // --- Branch metadata is recorded only after implementation authorization ---
 
-    const taskJsonPath = path.join(
-      tmpDir,
-      ".trellis",
-      "tasks",
-      "issue-106",
-      "task.json",
-    );
-    const data = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8"));
-    data.branch = "task/deleted-branch-does-not-exist";
-    fs.writeFileSync(taskJsonPath, JSON.stringify(data, null, 2));
-
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const result = spawnSync(
-      pythonCmd,
-      [taskScriptPath, "archive", ".trellis/tasks/issue-106", "--no-commit"],
-      { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
-    );
-
-    expect(result.stderr).toContain(
-      "recorded branch 'task/deleted-branch-does-not-exist' no longer exists locally",
-    );
-  });
-
-  // --- Branch metadata recorded at start, validated at archive -------------
-
-  function initTaskGitRepo(branch: string, withRemote = false): void {
+  function initTaskGitRepo(branch: string): void {
     execSync(`git init -q -b ${branch}`, { cwd: tmpDir });
     execSync("git config user.email test@example.com", { cwd: tmpDir });
     execSync("git config user.name Test", { cwd: tmpDir });
     execSync("git add -A", { cwd: tmpDir });
     execSync("git commit -q -m init", { cwd: tmpDir });
-    if (withRemote) {
-      // Never contacted: only `git remote` (the PR-backed predicate) reads it.
-      execSync("git remote add origin https://example.invalid/repo.git", {
-        cwd: tmpDir,
-      });
-    }
   }
 
   function patchIssue106Task(fields: Record<string, unknown>): string {
@@ -8942,7 +8275,7 @@ print(len(entries))
     );
   }
 
-  it("[issue-399.3] task.py start records the checked-out branch when none is set", () => {
+  it("[issue-399.3] task.py start keeps a planning task unchanged before implementation authorization", () => {
     setupTaskRepo();
     initTaskGitRepo("main");
     execSync("git checkout -q -b feature/record-me", { cwd: tmpDir });
@@ -8959,10 +8292,10 @@ print(len(entries))
       },
     );
 
-    expect(result.stdout).toContain("Branch recorded: feature/record-me");
+    expect(result.stdout).not.toContain("Branch recorded");
     expect(readIssue106Task()).toMatchObject({
-      branch: "feature/record-me",
-      status: "in_progress",
+      branch: null,
+      status: "planning",
     });
   });
 
@@ -8991,7 +8324,7 @@ print(len(entries))
     expect(readIssue106Task().branch).toBe("task/set-by-hand");
   });
 
-  it("[issue-399.3] task.py start on a detached HEAD notes the skip and still starts", () => {
+  it("[issue-399.3] task.py start on a detached HEAD leaves planning unchanged", () => {
     setupTaskRepo();
     initTaskGitRepo("main");
     execSync("git checkout -q --detach", { cwd: tmpDir });
@@ -9009,102 +8342,11 @@ print(len(entries))
     );
 
     expect(result.status).toBe(0);
-    expect(result.stderr).toContain("no checked-out branch");
+    expect(result.stderr).not.toContain("no checked-out branch");
     expect(readIssue106Task()).toMatchObject({
       branch: null,
-      status: "in_progress",
+      status: "planning",
     });
-  });
-
-  it("[issue-399.3] task.py archive refuses a PR-backed task with no recorded branch", () => {
-    setupTaskRepo();
-    initTaskGitRepo("main", true);
-    patchIssue106Task({ branch: null, base_branch: "main" });
-
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const result = spawnSync(
-      pythonCmd,
-      [taskScriptPath, "archive", ".trellis/tasks/issue-106", "--no-commit"],
-      { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
-    );
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("no branch is recorded");
-    expect(result.stderr).toContain("task.py set-branch");
-    expect(result.stderr).toContain("--skip-branch-validation");
-    // Refused before any mutation: the task stays put, still un-completed.
-    expect(
-      fs.existsSync(path.join(tmpDir, ".trellis", "tasks", "issue-106")),
-    ).toBe(true);
-    expect(readIssue106Task().status).toBe("in_progress");
-  });
-
-  it("[issue-399.3] task.py archive refuses a task whose branch equals its base_branch", () => {
-    setupTaskRepo();
-    initTaskGitRepo("main", true);
-    patchIssue106Task({ branch: "main", base_branch: "main" });
-
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const result = spawnSync(
-      pythonCmd,
-      [taskScriptPath, "archive", ".trellis/tasks/issue-106", "--no-commit"],
-      { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
-    );
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("branch and base_branch are both 'main'");
-    expect(result.stderr).toContain("task.py set-base-branch");
-    expect(
-      fs.existsSync(path.join(tmpDir, ".trellis", "tasks", "issue-106")),
-    ).toBe(true);
-  });
-
-  it("[issue-399.3] task.py archive --skip-branch-validation archives despite missing branch metadata", () => {
-    setupTaskRepo();
-    initTaskGitRepo("main", true);
-    patchIssue106Task({ branch: null, base_branch: "main" });
-
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const result = spawnSync(
-      pythonCmd,
-      [
-        taskScriptPath,
-        "archive",
-        ".trellis/tasks/issue-106",
-        "--no-commit",
-        "--skip-branch-validation",
-      ],
-      { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
-    );
-
-    expect(result.status).toBe(0);
-    expect(
-      fs.existsSync(path.join(tmpDir, ".trellis", "tasks", "issue-106")),
-    ).toBe(false);
-  });
-
-  it("[issue-399.3] task.py archive still only warns when a PR-backed branch was merged and deleted", () => {
-    setupTaskRepo();
-    initTaskGitRepo("main", true);
-    patchIssue106Task({
-      branch: "feature/merged-and-deleted",
-      base_branch: "main",
-    });
-
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const result = spawnSync(
-      pythonCmd,
-      [taskScriptPath, "archive", ".trellis/tasks/issue-106", "--no-commit"],
-      { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
-    );
-
-    expect(result.status).toBe(0);
-    expect(result.stderr).toContain(
-      "recorded branch 'feature/merged-and-deleted' no longer exists locally",
-    );
-    expect(
-      fs.existsSync(path.join(tmpDir, ".trellis", "tasks", "issue-106")),
-    ).toBe(false);
   });
 });
 
@@ -11165,25 +10407,26 @@ describe("regression: sub-agent context injection fallback (0.5.3)", () => {
     }
   });
 
-  it("workflow.md dispatch protocol covers all platforms (not class-2 only)", () => {
+  it("workflow.md defines five separate phases and keeps session handoff independent", () => {
     const workflowPath = path.join(
       repoRootFb,
       "packages/cli/src/templates/trellis/workflow.md",
     );
     const wf = fs.readFileSync(workflowPath, "utf-8");
-    // The protocol enforces `Active task: <path>` for ALL sub-agents (no
-    // trellis-research carve-out as of 0.5.8 — research sub-agents need the
-    // task path to know which `{task_dir}/research/` to write into).
-    expect(wf).toContain("Sub-agent dispatch protocol");
-    expect(wf).toContain("all platforms");
-    expect(wf).toContain("all sub-agents");
-    expect(wf).not.toContain("EXCEPT trellis-research");
-    expect(wf).toContain("trellis-research");
-    expect(wf).toContain("Active task:");
-    // Must NOT scope the rule to class-2 only — that was the pre-0.5.3 limit.
-    expect(wf).not.toMatch(
-      /Sub-agent dispatch protocol \(class-2 platforms[^)]*\)/,
-    );
+    expect(wf).toContain("任务路线最多包含五个有序业务阶段");
+    expect(wf).toContain("每个 Skill 提供本阶段流程和图示");
+    for (const phase of [
+      "阶段 1：目标探索与需求核对",
+      "阶段 2：决策空间构造与归并",
+      "阶段 3：解决方案设计与收敛",
+      "阶段 4：任务实施",
+      "阶段 5：交付审查与收尾",
+    ]) {
+      expect(wf).toContain(phase);
+    }
+    expect(wf).toContain("正式会话交接是独立附加操作");
+    expect(wf).toContain("Trellis Teamwork | 提供可选协作和只读证据");
+    expect(wf).toContain("Paseo | 管理已授权的 Paseo workspace");
   });
 });
 
@@ -11573,62 +10816,12 @@ describe("regression: safe auto-commit when .trellis/ is gitignored (0.5.10 → 
     expect(safeCommit).toBeTruthy();
     expect(safeCommit).toContain("Do NOT use `git add -f .trellis/`");
     expect(safeCommit).toContain("safe_trellis_paths_to_add");
-    expect(safeCommit).toContain("safe_archive_paths_to_add");
     expect(safeCommit).toContain("safe_git_add");
     // 0.5.11: new hint pointing users at the config knob.
     expect(safeCommit).toContain("session_auto_commit: false");
     // 0.5.11: auto -f retry must be gone. The function body should no
     // longer issue `git add -f`.
     expect(safeCommit).not.toMatch(/\["add", "-f", "--",/);
-  });
-
-  it("[gitignore-trellis] task.py archive warns and skips when .trellis/ is ignored (default mode)", () => {
-    setupRepo({ gitignoreTrellis: true });
-    // Create a task to archive.
-    writeFile(
-      ".trellis/tasks/issue-500/task.json",
-      JSON.stringify(
-        { title: "Test archive", status: "in_progress", package: null },
-        null,
-        2,
-      ),
-    );
-    writeFile(".trellis/tasks/issue-500/prd.md", "# PRD\n");
-
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const result = spawnSync(pyCmd, [taskScriptPath, "archive", "issue-500"], {
-      cwd: tmpDir,
-      encoding: "utf-8",
-      env: { ...process.env, TRELLIS_CONTEXT_ID: "session-arch" },
-    });
-    const stderr = result.stderr ?? "";
-    // 0.5.11: must NOT retry with -f, must NOT auto-commit. Warning must
-    // surface so the user knows their .gitignore won.
-    expect(stderr).not.toContain("Auto-committed");
-    expect(stderr).toContain("ignored by your .gitignore");
-    expect(stderr).toContain("Do NOT use `git add -f .trellis/`");
-
-    const tracked = listCommittedFiles();
-    // Nothing under .trellis/ should be tracked.
-    for (const t of tracked) {
-      expect(
-        t.startsWith(".trellis/"),
-        `should not commit anything under .trellis/ (got: ${t})`,
-      ).toBe(false);
-    }
-
-    // The archive directory move on disk still happened — only git was
-    // untouched.
-    const archiveExists = fs
-      .readdirSync(path.join(tmpDir, ".trellis/tasks/archive"))
-      .some((monthDir) => {
-        const monthPath = path.join(tmpDir, ".trellis/tasks/archive", monthDir);
-        return (
-          fs.statSync(monthPath).isDirectory() &&
-          fs.existsSync(path.join(monthPath, "issue-500"))
-        );
-      });
-    expect(archiveExists).toBe(true);
   });
 
   // ===========================================================================
@@ -11669,49 +10862,6 @@ describe("regression: safe auto-commit when .trellis/ is gitignored (0.5.10 → 
         path.join(tmpDir, ".trellis/workspace/test-dev/journal-1.md"),
       ),
     ).toBe(true);
-  });
-
-  it("[session_auto_commit=false] task.py archive skips git entirely", () => {
-    setupRepo({ gitignoreTrellis: false });
-    writeConfigYaml("session_auto_commit: false\n");
-
-    writeFile(
-      ".trellis/tasks/issue-600/task.json",
-      JSON.stringify(
-        { title: "Test archive", status: "in_progress", package: null },
-        null,
-        2,
-      ),
-    );
-    writeFile(".trellis/tasks/issue-600/prd.md", "# PRD\n");
-
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const result = spawnSync(pyCmd, [taskScriptPath, "archive", "issue-600"], {
-      cwd: tmpDir,
-      encoding: "utf-8",
-      env: { ...process.env, TRELLIS_CONTEXT_ID: "session-arch-2" },
-    });
-    const stderr = result.stderr ?? "";
-    expect(stderr).not.toContain("Auto-committed");
-    expect(stderr).toContain("session_auto_commit: false");
-
-    const log = execSync("git log --oneline", {
-      cwd: tmpDir,
-      encoding: "utf-8",
-    });
-    expect(log.trim().split("\n").length).toBe(1);
-
-    // Archive directory move still happened on disk.
-    const archiveExists = fs
-      .readdirSync(path.join(tmpDir, ".trellis/tasks/archive"))
-      .some((monthDir) => {
-        const monthPath = path.join(tmpDir, ".trellis/tasks/archive", monthDir);
-        return (
-          fs.statSync(monthPath).isDirectory() &&
-          fs.existsSync(path.join(monthPath, "issue-600"))
-        );
-      });
-    expect(archiveExists).toBe(true);
   });
 
   it("[session_auto_commit] inline comment is stripped before parsing", () => {
@@ -11769,110 +10919,31 @@ describe("regression: safe auto-commit when .trellis/ is gitignored (0.5.10 → 
 });
 
 // =============================================================================
-// regression: transient .git/index.lock during archive auto-commit
+// regression: bounded retry for transient .git/index.lock
 // =============================================================================
-//
-// `task.py archive` moves the task directory on disk BEFORE it stages and
-// commits. Another process holding `.git/index.lock` for a fraction of a
-// second (IDE git integration, status daemon, a parallel session) made that
-// auto-commit fail outright, leaving the user with a completed move and a git
-// error to untangle.
-//
-// Fix: `run_git_retry_index_lock` retries ONLY index.lock failures — three
-// attempts over ~1.5s — and the archive path uses it for `add`,
-// `rm --cached` and `commit`. When the retries run out the move stays
-// complete and the commit is reported as pending: rolling the move back would
-// also have to undo the completed status, the re-parented children and the
-// cleared sessions, and a partial rollback is worse than a named pending
-// commit. The warning names the lock file and the command to run by hand.
-// =============================================================================
-
-describe("regression: bounded index.lock retry on archive auto-commit", () => {
+describe("regression: bounded index.lock retry", () => {
   let tmpDir: string;
   const pyCmd = process.platform === "win32" ? "python" : "python3";
-  const taskName = "issue-lock";
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-index-lock-"));
-    execSync("git init -q -b main", { cwd: tmpDir });
-    execSync('git config user.email "test@trellis.local"', { cwd: tmpDir });
-    execSync('git config user.name "Trellis Test"', { cwd: tmpDir });
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function writeFile(rel: string, content: string): void {
-    const abs = path.join(tmpDir, rel);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, content, "utf-8");
-  }
-
-  function lockFile(): string {
-    return path.join(tmpDir, ".git", "index.lock");
-  }
-
-  function setupRepo(): void {
+  function writeScripts(): void {
     const scriptsDir = path.join(tmpDir, ".trellis", "scripts");
     for (const [rel, content] of getAllScripts()) {
       const abs = path.join(scriptsDir, rel);
       fs.mkdirSync(path.dirname(abs), { recursive: true });
       fs.writeFileSync(abs, content, "utf-8");
     }
-    writeFile(
-      ".trellis/.developer",
-      "name=test-dev\ninitialized_at=2026-08-09T00:00:00\n",
-    );
-    writeFile(
-      `.trellis/tasks/${taskName}/task.json`,
-      JSON.stringify(
-        { title: "Locked archive", status: "in_progress", package: null },
-        null,
-        2,
-      ),
-    );
-    writeFile(`.trellis/tasks/${taskName}/prd.md`, "# PRD\n");
-    writeFile("README.md", "test\n");
-    // The task must be tracked: an untracked task dir makes a failed
-    // auto-commit inconsequential, which is not the case under test.
-    execSync("git add -A", { cwd: tmpDir });
-    execSync('git commit -q -m "init"', { cwd: tmpDir });
-  }
-
-  function runArchive(): { status: number | null; stderr: string } {
-    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
-    const result = spawnSync(pyCmd, [taskScriptPath, "archive", taskName], {
-      cwd: tmpDir,
-      encoding: "utf-8",
-      env: { ...process.env, TRELLIS_CONTEXT_ID: "session-lock" },
-    });
-    return { status: result.status, stderr: result.stderr ?? "" };
-  }
-
-  function archivedTaskExists(): boolean {
-    const archiveRoot = path.join(tmpDir, ".trellis/tasks/archive");
-    if (!fs.existsSync(archiveRoot)) return false;
-    return fs.readdirSync(archiveRoot).some((monthDir) => {
-      const monthPath = path.join(archiveRoot, monthDir);
-      return (
-        fs.statSync(monthPath).isDirectory() &&
-        fs.existsSync(path.join(monthPath, taskName))
-      );
-    });
-  }
-
-  function gitLogLines(): string[] {
-    return execSync("git log --oneline", { cwd: tmpDir, encoding: "utf-8" })
-      .trim()
-      .split("\n")
-      .filter((l) => l.length > 0);
   }
 
   it("[index-lock] retries only index.lock failures, bounded by the attempt count", () => {
-    // Deterministic cover for the retry semantics themselves: the end-to-end
-    // tests below depend on wall-clock timing, this one does not.
-    setupRepo();
+    writeScripts();
     const probe = `
 import json
 import sys
@@ -11949,78 +11020,6 @@ print(json.dumps({
     });
   });
 
-  it("[index-lock] archive survives a lock that is released mid-retry", () => {
-    setupRepo();
-    fs.writeFileSync(lockFile(), "", "utf-8");
-
-    // Released after the first attempt is certain to have hit the lock, but
-    // before the retry window (~1.5s from that first attempt) closes.
-    const releaser = spawn(
-      pyCmd,
-      [
-        "-c",
-        `import os, time; time.sleep(1.2); os.path.exists(${JSON.stringify(
-          lockFile(),
-        )}) and os.remove(${JSON.stringify(lockFile())})`,
-      ],
-      { stdio: "ignore" },
-    );
-    releaser.unref();
-
-    const { status, stderr } = runArchive();
-
-    expect(status, stderr).toBe(0);
-    expect(stderr).toContain("Auto-committed");
-    expect(archivedTaskExists()).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, ".trellis/tasks", taskName))).toBe(
-      false,
-    );
-
-    const log = gitLogLines();
-    expect(log.length).toBe(2);
-    expect(log[0]).toContain(`chore(task): archive ${taskName}`);
-
-    // The move is fully recorded — no phantom deletes left behind for the
-    // source path.
-    const dirty = execSync("git status --porcelain", {
-      cwd: tmpDir,
-      encoding: "utf-8",
-    });
-    expect(dirty).not.toContain(`.trellis/tasks/${taskName}/`);
-  });
-
-  it("[index-lock] a lock that never clears aborts with a diagnostic naming it", () => {
-    setupRepo();
-    fs.writeFileSync(lockFile(), "", "utf-8");
-
-    const { status, stderr } = runArchive();
-
-    // Failure, not a misleading success.
-    expect(status, stderr).toBe(1);
-    expect(stderr).toContain("index.lock");
-    expect(stderr).toContain("another process is holding");
-    expect(stderr).toContain("gave up after 3 attempts");
-    // Says what is left to do, so neither a user nor an agent reading the
-    // log has to guess.
-    expect(stderr).toContain("only the commit is pending");
-    expect(stderr).toContain(`git commit -m "chore(task): archive ${taskName}"`);
-    expect(stderr).toContain("Archive moved on disk");
-
-    // Consistent state: the move completed, nothing is half-moved.
-    expect(archivedTaskExists()).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, ".trellis/tasks", taskName))).toBe(
-      false,
-    );
-
-    // Nothing was committed — the pending commit is genuinely pending.
-    fs.rmSync(lockFile(), { force: true });
-    expect(gitLogLines().length).toBe(1);
-    const dirty = execSync("git status --porcelain", {
-      cwd: tmpDir,
-      encoding: "utf-8",
-    });
-    expect(dirty).toContain(`.trellis/tasks/${taskName}/`);
-  });
 });
 
 // =============================================================================
@@ -12030,7 +11029,7 @@ print(json.dumps({
 describe("regression: .trellis/scripts stays byte-identical to templates/trellis/scripts", () => {
   // `.trellis/scripts/` is Trellis's own dogfood copy;
   // `packages/cli/src/templates/trellis/scripts/` is what ships to users.
-  // They are two physical copies of the same 28 files and nothing enforced
+  // They are two physical copies of the same Python scripts and nothing enforced
   // parity, so one-sided edits landed silently — PR #390 changed the template's
   // `common/session_context.py` upgrade hint and left the dogfood copy on the
   // old wording for a month. This test turns that whole class of drift into a
@@ -12341,7 +11340,7 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
     expect(after).toContain(`".trellis/tasks/${sibling}/notes.md"`);
   });
 
-  it("[task-rename] refuses an existing destination, an archived name, a bad slug and an unknown task", () => {
+  it("[task-rename] refuses an existing destination, a bad slug and an unknown task", () => {
     const other = create("other");
     const target = create("target");
 
@@ -12349,15 +11348,6 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
     expect(occupied.status).not.toBe(0);
     expect(occupied.stderr).toContain(`Task already exists: ${other}`);
     expect(fs.existsSync(taskDir(target))).toBe(true);
-
-    fs.mkdirSync(taskDir("archive", yearMonth, `${datePrefix}-gone`), {
-      recursive: true,
-    });
-    const archived = runTask("rename", target, "gone");
-    expect(archived.status).not.toBe(0);
-    expect(archived.stderr).toContain(
-      `Task already archived: ${datePrefix}-gone`,
-    );
 
     const badSlug = runTask("rename", target, "../evil");
     expect(badSlug.status).not.toBe(0);
@@ -12420,19 +11410,23 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
     ).toBe(`.trellis/tasks/${other}`);
   });
 
-  it("[task-rename] refuses to rename an archived task", () => {
-    const target = create("target");
-    expect(runTask("archive", target, "--no-commit").status).toBe(0);
+  it("[task-rename] rejects a historical task path outside the active task directory", () => {
+    const archivedDir = taskDir("archive", yearMonth, "old-task");
+    fs.mkdirSync(archivedDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(archivedDir, "task.json"),
+      JSON.stringify({ id: "old-task" }),
+    );
 
     const r = runTask(
       "rename",
-      path.posix.join(".trellis", "tasks", "archive", yearMonth, target),
+      path.posix.join(".trellis", "tasks", "archive", yearMonth, "old-task"),
       "renamed",
     );
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain("is not an active task under");
+    expect(r.stderr).toContain("is not a task directly under");
     expect(
-      fs.existsSync(taskDir("archive", yearMonth, target, "task.json")),
+      fs.existsSync(taskDir("archive", yearMonth, "old-task", "task.json")),
     ).toBe(true);
   });
 });

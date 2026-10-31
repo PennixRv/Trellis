@@ -16,7 +16,7 @@ This project is a **TypeScript monorepo** using ES modules. It publishes a CLI p
 packages/
 ├── core/                # @mindfoldhq/trellis-core: reusable APIs
 │   ├── src/
-│   │   ├── channel/     # channel/thread storage, reducers, event protocol helpers
+│   │   ├── teamwork/    # Teamwork Session/thread storage, reducers, event helpers
 │   │   ├── task/        # reusable task record helpers
 │   │   ├── testing/     # test helpers intended for package consumers
 │   │   └── index.ts     # package public API
@@ -30,7 +30,7 @@ packages/
     │   │   ├── update.ts
     │   │   ├── uninstall.ts
     │   │   ├── mem.ts
-    │   │   └── channel/ # Channel command renderers and CLI orchestration
+    │   │   └── teamwork/ # Teamwork command renderers and CLI orchestration
     │   ├── configurators/
     │   ├── constants/
     │   ├── templates/

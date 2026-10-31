@@ -69,14 +69,14 @@ Audit ALL of these, in BOTH the source and any independent copies:
 | `packages/cli/src/templates/common/commands/continue.md` | resume-routing table: `status=... → **<step>**` |
 | `packages/cli/src/templates/common/bundled-skills/trellis-meta/references/customize-local/change-workflow.md` | resume-at status-transition table: `Phase <step> (...)` |
 | `packages/cli/src/templates/copilot/prompts/finish-work.prompt.md` | Phase 3 ASCII flow list |
-| `marketplace/workflows/{native,tdd,channel-driven-subagent-dispatch}/workflow.md` | full independent workflow copies — same step body + Phase Index + breadcrumb scope ranges |
+| `packages/cli/src/templates/trellis/workflow.md` | bundled native workflow source; workflow changes are verified against the generated package artifact |
 
 Grep patterns that catch bare-number routing (run from repo root):
 
 ```bash
-# bare-number routing arrows / bold step refs / step-N.N anywhere in templates + marketplace
+# bare-number routing arrows / bold step refs / step-N.N in workflow templates
 grep -rnE "→ \*\*[0-9]\.[0-9]+\*\*|-> \*\*[0-9]\.[0-9]+\*\*|step [0-9]\.[0-9]+|Phase [0-9]\.[0-9]+|\*\*[0-9]\.[0-9]+\*\*" \
-  packages/cli/src/templates/ marketplace/ \
+  packages/cli/src/templates/ \
   --include="*.md" --include="*.toml" --include="*.prompt.md" \
   | grep -v "/dist/"
 ```

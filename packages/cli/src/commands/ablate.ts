@@ -453,7 +453,7 @@ export async function ablate(options: AblateOptions = {}): Promise<void> {
   );
   console.log(
     chalk.gray(
-      "Git may show Trellis-managed deletions. The global CLI, channel logs, and host transcripts were not removed.",
+      "Git may show Trellis-managed deletions. The global CLI, Teamwork logs, and host transcripts were not removed.",
     ),
   );
 }

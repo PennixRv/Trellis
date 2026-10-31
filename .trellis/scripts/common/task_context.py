@@ -29,7 +29,7 @@ from .config import get_context_injection_limits
 from .git import branch_exists_locally
 from .io import read_json
 from .log import Colors, colored
-from .paths import DIR_ARCHIVE, DIR_TASKS, DIR_WORKFLOW, FILE_TASK_JSON, get_repo_root
+from .paths import DIR_TASKS, DIR_WORKFLOW, FILE_TASK_JSON, get_repo_root
 from .task_utils import resolve_task_dir
 
 # Extensions that look like code rather than spec/research docs. Entries with
@@ -91,6 +91,12 @@ def cmd_add_context(args: argparse.Namespace) -> int:
     jsonl_file = target_dir / jsonl_name
     full_path = repo_root / path
 
+    from .task_continuity import task_mutation_guard
+
+    task_data = read_json(target_dir / FILE_TASK_JSON)
+    if not isinstance(task_data, dict):
+        print(colored(f"Error: task.json is unavailable at {target_dir}", Colors.RED))
+        return 1
     entry_type = "file"
     if full_path.is_dir():
         entry_type = "directory"
@@ -114,8 +120,12 @@ def cmd_add_context(args: argparse.Namespace) -> int:
     else:
         entry = {"file": path, "reason": reason}
 
-    with jsonl_file.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    with task_mutation_guard(repo_root, target_dir, task_data) as allowed:
+        if not allowed:
+            print(colored("TASK_TRANSFER_ACTIVE: task changes are fenced until ownership is consumed or released", Colors.RED))
+            return 1
+        with jsonl_file.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     print(colored(f"Added {entry_type}: {path}", Colors.GREEN))
     return 0
@@ -124,35 +134,6 @@ def cmd_add_context(args: argparse.Namespace) -> int:
 # =============================================================================
 # Command: validate
 # =============================================================================
-
-def curated_entry_count(jsonl_file: Path) -> int | None:
-    """Count curated entries in a jsonl context manifest.
-
-    Returns None when the file does not exist — `task.py create` seeds the
-    manifests only on sub-agent-capable platforms, so an absent file means no
-    sub-agent will ever read it and callers should not gate on it. A curated
-    entry is a JSON object row carrying a truthy ``file`` (or legacy ``path``)
-    value: the same rows the sub-agent injection hook materializes.
-    """
-    if not jsonl_file.is_file():
-        return None
-    try:
-        lines = jsonl_file.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return 0
-    count = 0
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(data, dict) and (data.get("file") or data.get("path")):
-            count += 1
-    return count
-
 
 def cmd_validate(args: argparse.Namespace) -> int:
     """Validate JSONL context files."""
@@ -217,11 +198,7 @@ def _is_exempt_from_code_file_warning(file_path: str, task_rel: str) -> bool:
 def _resolve_context_entry_path(
     file_path: str, repo_root: Path, task_dir: Path | None
 ) -> Path | None:
-    """Resolve a JSONL entry, binding archived self-references to the archive copy.
-
-    Exact historical self-references are remapped only for archived tasks.
-    ``None`` means the remapped path traversed or resolved outside that archive.
-    """
+    """Bind historical self-references to their archive copy without fallback."""
     repo_path = repo_root / file_path
     if task_dir is None:
         return repo_path
@@ -231,7 +208,7 @@ def _resolve_context_entry_path(
     except ValueError:
         return repo_path
 
-    archive_prefix = (DIR_WORKFLOW, DIR_TASKS, DIR_ARCHIVE)
+    archive_prefix = (DIR_WORKFLOW, DIR_TASKS, "archive")
     if len(task_parts) != 5 or task_parts[:3] != archive_prefix:
         return repo_path
 
@@ -386,20 +363,10 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
                 print(f"  {colored(warning_message, Colors.YELLOW)}")
 
     if errors == 0 and real_entries == 0:
-        # Seed-only / empty manifest: sub-agents dispatched for this task
-        # would run with zero spec context (#573). Silent-green here is how
-        # more than half the tasks in the report ended up uncurated.
-        action = file_name.split(".", 1)[0]
         print(
-            f"  {colored(f'{file_name}: ✗ (0 curated entries — sub-agents would get zero spec context)', Colors.RED)}"
+            f"  {colored(f'{file_name}: ✓ (no context entries; manifests are optional)', Colors.YELLOW)}"
         )
-        print(
-            f"    Curate it:  python3 .trellis/scripts/task.py add-context <task> {action} <path> \"<why>\""
-        )
-        print(
-            "    Intentionally empty? Bypass at start: task.py start <task> --allow-empty-context"
-        )
-        return 1
+        return 0
 
     if errors == 0:
         print(f"  {colored(f'{file_name}: ✓ ({real_entries} entries)', Colors.GREEN)}")

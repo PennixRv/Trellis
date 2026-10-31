@@ -65,7 +65,7 @@ export interface WorkflowOptions {
   /**
    * Optional override for `.trellis/workflow.md` content. When omitted the
    * bundled native template is written. Set by `init --workflow` (or
-   * `--workflow-source`) after the resolver has fetched marketplace content.
+   * `--workflow-source`) after the resolver has fetched custom workflow content.
    * Caller is still responsible for removing the `.trellis/workflow.md` hash
    * entry for non-native workflows so update.ts treats them as user-managed.
    */
@@ -140,7 +140,7 @@ export async function createWorkflowStructure(
     executable: true,
   });
 
-  // Copy workflow.md (native bundled template or selected marketplace variant)
+  // Copy workflow.md (bundled native template or explicitly sourced custom workflow)
   await writeFile(
     path.join(cwd, PATHS.WORKFLOW_GUIDE_FILE),
     replacePythonCommandLiterals(workflowMd),
@@ -162,11 +162,11 @@ export async function createWorkflowStructure(
   // (additive-only — never overwrites a user's existing file wholesale).
   ensureGitattributes(cwd);
 
-  // Dispatch channel runtime agent definitions. These are platform-agnostic
+  // Dispatch Teamwork runtime agent definitions. These are platform-agnostic
   // Trellis runtime files consumed by `trellis teamwork spawn --agent <name>`
-  // through `packages/cli/src/commands/channel/agent-loader.ts`. They are
+  // through `packages/cli/src/commands/teamwork/agent-loader.ts`. They are
   // dispatched on every init regardless of selected workflow because the user
-  // can switch to a channel-driven workflow at any time via `trellis workflow
+  // can switch to a Teamwork-enabled workflow at any time via `trellis workflow
   // --template`.
   ensureDir(path.join(cwd, PATHS.AGENTS));
   for (const [agentFile, content] of getAllAgents()) {

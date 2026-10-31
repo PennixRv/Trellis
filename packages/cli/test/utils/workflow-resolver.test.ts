@@ -1,8 +1,8 @@
 /**
  * Unit tests for the workflow template resolver.
  *
- * Native resolution is offline (no fetch). Marketplace resolution is exercised
- * by stubbing `fetch` on the default Trellis marketplace URL.
+ * Native resolution is offline. Custom workflow resolution uses an explicit
+ * source and stubs its index and file requests.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -29,7 +29,7 @@ describe("resolveWorkflowTemplate(native)", () => {
   });
 });
 
-describe("resolveWorkflowTemplate(marketplace)", () => {
+describe("resolveWorkflowTemplate(custom source)", () => {
   it("fetches index.json, finds the workflow entry, and downloads its content", async () => {
     const index = {
       version: 1,
@@ -65,9 +65,11 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       }),
     );
 
-    const resolved = await resolveWorkflowTemplate("tdd");
+    const resolved = await resolveWorkflowTemplate("tdd", {
+      source: "gh:example/repo/workflows",
+    });
     expect(resolved.id).toBe("tdd");
-    expect(resolved.source).toBe("marketplace");
+    expect(resolved.source).toBe("custom");
     expect(resolved.content).toBe(fakeContent);
   });
 
@@ -88,12 +90,16 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       vi.fn(async () => new Response(JSON.stringify(index), { status: 200 })),
     );
 
-    await expect(resolveWorkflowTemplate("does-not-exist")).rejects.toThrow(
-      WorkflowResolveError,
-    );
-    await expect(resolveWorkflowTemplate("does-not-exist")).rejects.toThrow(
-      /workflow template/i,
-    );
+    await expect(
+      resolveWorkflowTemplate("does-not-exist", {
+        source: "gh:example/repo/workflows",
+      }),
+    ).rejects.toThrow(WorkflowResolveError);
+    await expect(
+      resolveWorkflowTemplate("does-not-exist", {
+        source: "gh:example/repo/workflows",
+      }),
+    ).rejects.toThrow(/workflow template/i);
   });
 
   it("surfaces a workflow-specific error when the index cannot be reached", async () => {
@@ -102,7 +108,11 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       vi.fn(async () => new Response("", { status: 500 })),
     );
 
-    await expect(resolveWorkflowTemplate("tdd")).rejects.toThrow(
+    await expect(
+      resolveWorkflowTemplate("tdd", {
+        source: "gh:example/repo/workflows",
+      }),
+    ).rejects.toThrow(
       /workflow template index/i,
     );
   });
@@ -124,12 +134,16 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       vi.fn(async () => new Response(JSON.stringify(index), { status: 200 })),
     );
 
-    await expect(resolveWorkflowTemplate("broken")).rejects.toThrow(
+    await expect(
+      resolveWorkflowTemplate("broken", {
+        source: "gh:example/repo/workflows",
+      }),
+    ).rejects.toThrow(
       /workflow\.md/,
     );
   });
 
-  it("rejects workflow paths that escape the marketplace root", async () => {
+  it("rejects workflow paths that escape the custom source", async () => {
     const index = {
       version: 1,
       templates: [
@@ -146,25 +160,26 @@ describe("resolveWorkflowTemplate(marketplace)", () => {
       vi.fn(async () => new Response(JSON.stringify(index), { status: 200 })),
     );
 
-    await expect(resolveWorkflowTemplate("escape")).rejects.toThrow(
-      /marketplace root/,
+    await expect(
+      resolveWorkflowTemplate("escape", {
+        source: "gh:example/repo/workflows",
+      }),
+    ).rejects.toThrow(
+      /custom source/,
     );
   });
 });
 
 describe("listWorkflowTemplates", () => {
-  it("always includes the bundled native entry first", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response("", { status: 500 })),
-    );
+  it("lists only the bundled native entry without an explicit custom source", async () => {
     const { templates, errorMessage } = await listWorkflowTemplates();
-    expect(errorMessage).toBeTruthy();
+    expect(errorMessage).toBeUndefined();
+    expect(templates).toHaveLength(1);
     expect(templates[0].id).toBe(NATIVE_WORKFLOW_ID);
     expect(templates[0].source).toBe("bundled");
   });
 
-  it("includes workflow entries from the marketplace index", async () => {
+  it("includes workflow entries only from an explicit custom source", async () => {
     const index = {
       version: 1,
       templates: [
@@ -187,10 +202,18 @@ describe("listWorkflowTemplates", () => {
       vi.fn(async () => new Response(JSON.stringify(index), { status: 200 })),
     );
 
-    const { templates } = await listWorkflowTemplates();
+    const { templates } = await listWorkflowTemplates({
+      source: "gh:example/repo/workflows",
+    });
     const ids = templates.map((t) => t.id);
     expect(ids).toContain(NATIVE_WORKFLOW_ID);
     expect(ids).toContain("tdd");
     expect(ids).not.toContain("electron-fullstack");
   });
+});
+
+it("requires an explicit custom source for non-bundled workflow ids", async () => {
+  await expect(resolveWorkflowTemplate("tdd")).rejects.toThrow(
+    /requires an explicit custom workflow source/,
+  );
 });

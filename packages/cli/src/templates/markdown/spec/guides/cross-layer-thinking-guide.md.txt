@@ -319,9 +319,10 @@ CLI input → event writer → events.jsonl → reader → filter → reducer �
 - [ ] Add at least one regression that proves history replay and live filtering
       use the same filter model
 
-**Real-world example**: Thread channels added `kind: "thread"`, `description`,
-`context`, labels, and `lastSeq`. The first implementation replayed thread
-state correctly, but several commands still re-parsed event payload fields with
-local casts. The fix was to make the core event layer own `ThreadChannelEvent`
-and `isThreadEvent`, make `reduceChannelMetadata` the only channel metadata
-projection, and make `reduceThreads` the only thread replay reducer.
+**Real-world example**: Forum Teamwork Sessions added thread events with
+`description`, `context`, labels, and sequence tracking. The first
+implementation replayed thread state correctly, but several commands still
+re-parsed event payload fields with local casts. The fix was to make Core own
+`ThreadTeamworkEvent` and `isThreadEvent`, use
+`reduceTeamworkSessionMetadata` for session metadata, and use `reduceThreads`
+for thread replay.

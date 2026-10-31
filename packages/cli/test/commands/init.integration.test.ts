@@ -1245,11 +1245,9 @@ describe("init() integration", () => {
     expect(prd).toContain("- [ ] Fill guidelines for core");
     expect(prd).toContain("- [ ] Fill guidelines for ui");
     expect(prd).toContain(
-      `${expectedPythonCmd} ./.trellis/scripts/task.py finish`,
+      `${expectedPythonCmd} ./.trellis/scripts/task.py complete 00-bootstrap-guidelines`,
     );
-    expect(prd).toContain(
-      `${expectedPythonCmd} ./.trellis/scripts/task.py archive 00-bootstrap-guidelines`,
-    );
+    expect(prd).not.toContain("task.py archive");
   });
 
   it("#16 --no-monorepo skips detection even with workspace config", async () => {

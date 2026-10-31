@@ -52,6 +52,11 @@ const BUNDLED_SKILL_NAMES = [
   "trellis-meta",
   "trellis-session-insight",
   "trellis-spec-bootstrap",
+  "trellis-goal-exploration-and-requirements",
+  "trellis-decision-space-construction-and-merging",
+  "trellis-solution-design-and-convergence",
+  "trellis-task-implementation",
+  "trellis-delivery-review-and-closeout",
 ];
 const BUNDLED_SKILL_NAME = "trellis-meta";
 const BUNDLED_REFERENCE = path.join(
@@ -63,7 +68,7 @@ const BUNDLED_REFERENCE = path.join(
 const TEAMMATE_REFERENCE = path.join(
   "trellis-teamwork",
   "references",
-  "teammates.md",
+  "teammate-configuration-matrix.md",
 );
 const SPEC_BOOTSTRAP_REFERENCE = path.join(
   "trellis-spec-bootstrap",
@@ -441,7 +446,7 @@ describe("configurePlatform", () => {
     expect(fs.existsSync(path.join(skillsRoot, BUNDLED_REFERENCE))).toBe(true);
     expect(
       fs.readFileSync(path.join(skillsRoot, TEAMMATE_REFERENCE), "utf-8"),
-    ).toContain("context frozen in the brief");
+    ).toContain("Teammate Execution Configuration");
     expect(
       fs.existsSync(path.join(skillsRoot, "trellis-start", "SKILL.md")),
     ).toBe(true);
@@ -1056,12 +1061,12 @@ describe("configurePlatform", () => {
         fs.existsSync(path.join(tmpDir, ".dsh", "skills", name, "SKILL.md")),
       ).toBe(true);
     }
-    expect(
-      fs.readFileSync(
-        path.join(tmpDir, ".dsh", "skills", "trellis-start", "SKILL.md"),
-        "utf-8",
-      ),
-    ).toContain("--platform dsh");
+    const start = fs.readFileSync(
+      path.join(tmpDir, ".dsh", "skills", "trellis-start", "SKILL.md"),
+      "utf-8",
+    );
+    expect(start).toContain("task.py phase init");
+    expect(start).toContain("Phase 5:");
 
     expect(
       fs.existsSync(

@@ -234,7 +234,7 @@ they are required for recovery. Those user-authored files may themselves
 contain prompts, responses, credentials, or other sensitive text; the CLI
 discloses this before mutation, stores the transaction under a private state
 root, and retains it only until verified restore. Ablation does not separately
-collect browser/session state, global channel logs, host transcripts, or
+collect browser/session state, global Teamwork logs, host transcripts, or
 unrelated application files.
 
 The current agent may already have Trellis instructions in context, so ablation

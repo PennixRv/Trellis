@@ -1,7 +1,7 @@
 // Public task API surface — canonical task record shape, factory,
 // schema, I/O helpers, directory validation, and phase inference.
 //
-// Task API is intentionally independent from the channel API.
+// Task API is intentionally independent from the Teamwork API.
 
 export type {
   TrellisTaskRecord,
@@ -27,5 +27,16 @@ export {
 export type { TaskDirParts } from "./paths.js";
 export { validateTaskDirName, isValidTaskDirName } from "./paths.js";
 
-export type { TrellisTaskPhase } from "./phase.js";
-export { inferTaskPhase } from "./phase.js";
+export type {
+  ProjectContext,
+  TaskComplexity,
+  TaskKind,
+  TaskPhaseAcceptance,
+  TaskPhaseId,
+  TaskPhaseRecord,
+  TaskPhaseReturnRecord,
+  TaskPhaseSkipRecord,
+  TaskPhaseStatus,
+  TaskWorkflowState,
+} from "./phase.js";
+export { isTaskPhaseId, parseTaskWorkflowState, TASK_PHASE_IDS } from "./phase.js";

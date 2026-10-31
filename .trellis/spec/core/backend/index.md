@@ -12,7 +12,7 @@ independent of CLI rendering and process-control concerns.
 | Area | Path | Purpose |
 | --- | --- | --- |
 | Root exports | `packages/core/src/index.ts` | Package root public API. Keep this small. |
-| Channel API | `packages/core/src/channel/` | Durable channel/event APIs, reducers, workers, inbox, runtime contracts. |
+| Teamwork API | `packages/core/src/teamwork/` | Durable Teamwork Session/event APIs, reducers, teammate inbox, and runtime contracts. |
 | Mem API | `packages/core/src/mem/` | Persisted AI session readers, search, filtering, dialogue extraction, and project aggregation. |
 | Task API | `packages/core/src/task/` | Reusable task record, schema, phase, and path helpers. |
 | Testing API | `packages/core/src/testing/` | Public test helpers intended for package consumers. |
@@ -23,7 +23,7 @@ independent of CLI rendering and process-control concerns.
 - Core APIs must not print terminal output, call `process.exit`, parse CLI argv,
   or depend on Chalk / Commander / Inquirer.
 - CLI code must import core through public exports such as
-  `@mindfoldhq/trellis-core/channel`, not deep paths under `packages/core/src`.
+  `@mindfoldhq/trellis-core/teamwork`, not deep paths under `packages/core/src`.
 - Public subpaths must be declared explicitly in `packages/core/package.json`.
 - Core and CLI publish together with the same version.
 - Detailed package-boundary rules currently live in
@@ -37,8 +37,8 @@ independent of CLI rendering and process-control concerns.
   `packages/core/**` or moving logic between CLI and core.
 - Read `.trellis/spec/cli/unit-test/conventions.md` before adding or changing
   core tests.
-- For channel changes, also read
-  `.trellis/spec/cli/backend/commands-channel.md`.
+- For Teamwork changes, also read
+  `.trellis/spec/cli/backend/commands-teamwork.md`.
 - For mem changes, also read `.trellis/spec/cli/backend/commands-mem.md`.
 
 ## Quality Check

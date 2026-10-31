@@ -2,28 +2,21 @@
 description: "Trellis Copilot prompt: Method 1: Simple parameters"
 ---
 
-[!] **Prerequisite**: This command should only be used AFTER the human has tested and committed the code.
+[!] **Prerequisite**: Record verified progress and the actual commit references for this session. Do not imply that the task is complete merely because work was committed.
 
-**Do NOT run `git commit` directly** — the scripts below handle their own commits for `.trellis/` metadata. You only need to read git history (`git log`, `git status`, `git diff`) and run the Python scripts.
+Task status and phase state are changed only through Trellis CLI. This prompt records the developer session journal; it does not archive, complete, or cancel tasks.
 
 ---
 
 ## Record Work Progress
 
-### Step 1: Get Context & Check Tasks
+### Step 1: Get Context
 
 ```bash
 python3 ./.trellis/scripts/get_context.py --mode record
 ```
 
-[!] Archive tasks whose work is **actually done** — judge by work status, not the `status` field in task.json:
-- Code committed? → Archive it (don't wait for PR)
-- All acceptance criteria met? → Archive it
-- Don't skip archiving just because `status` still says `planning` or `in_progress`
-
-```bash
-python3 ./.trellis/scripts/task.py archive <task-name>
-```
+Review the current phase, changed files, recent commits, remaining work, and blockers. Use phase 5 and the Trellis CLI to complete or cancel a task when its acceptance conditions are met.
 
 ### Step 2: One-Click Add Session
 
@@ -62,5 +55,4 @@ EOF
 |---------|---------|
 | `python3 ./.trellis/scripts/get_context.py --mode record` | Get context for record-session |
 | `python3 ./.trellis/scripts/add_session.py --title "..." --commit "..."` | **One-click add session (recommended, branch auto-complete)** |
-| `python3 ./.trellis/scripts/task.py archive <name>` | Archive completed task (auto-commits) |
 | `python3 ./.trellis/scripts/task.py list` | List active tasks |

@@ -2,9 +2,9 @@
  * Public input / output types for `@mindfoldhq/trellis-core/mem`.
  *
  * This model serves persisted AI-session retrieval and dialogue-context
- * extraction only. It is intentionally separate from the channel event schema:
- * channel keeps its own event log as the source of truth, and v1 mem never
- * reads channel events.
+ * extraction only. It is intentionally separate from the Teamwork event schema:
+ * Teamwork keeps its own event log as the source of truth, and v1 mem never
+ * reads Teamwork events.
  */
 
 export const MEM_SOURCE_KINDS = [

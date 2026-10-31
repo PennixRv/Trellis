@@ -117,14 +117,17 @@ describe("dsh collectDshTemplates", () => {
     );
   });
 
-  it("resolves entry-skill placeholders for dsh", () => {
+  it("collects the phase-aware entry skill for DSH", () => {
     const files = collectDshTemplates();
     const start = files.get(".dsh/skills/trellis-start/SKILL.md");
     const finish = files.get(".dsh/skills/trellis-finish-work/SKILL.md");
 
-    expect(start).toContain("--platform dsh");
+    expect(start).toContain("task.py phase init");
+    expect(start).toContain("Phase 1:");
+    expect(start).toContain("Phase 5:");
     expect(start).toContain("name: trellis-start");
-    expect(finish).toContain("`trellis-finish-work`");
+    expect(finish).toContain("Task completion and cancellation are handled in phase 5");
+    expect(finish).toContain("formal session handoff to its separate");
   });
 
   it("writes workflow + bundled skills byte-identically to Pi's shared writes", () => {

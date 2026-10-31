@@ -71,7 +71,7 @@ function getTaskStatus(ctx, platformInput = null) {
   const taskStatus = taskData.status || "unknown"
 
   if (taskStatus === "completed") {
-    return `Status: COMPLETED\nTask: ${taskTitle}\nNext-Action: Run /trellis:finish-work. If the working tree is dirty, return to Phase 3.4 first.`
+    return `Status: COMPLETED\nTask: ${taskTitle}\nNext-Action: Start another task or end the session; finish-work only records the session journal.`
   }
 
   const hasPrd = existsSync(join(taskDir, "prd.md"))
@@ -393,8 +393,8 @@ Trellis compact SessionStart context. Use it to orient the session; load details
   if (workflowContent) {
     const allLines = workflowContent.split("\n")
     const overviewLines = [
-      "# Development Workflow - Session Summary",
-      "Full guide: .trellis/workflow.md. Step detail: `python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>`.",
+      "# 工作流会话摘要",
+      "完整说明：.trellis/workflow.md。阶段详情：读取当前阶段提示指定的 Skill。",
       "",
     ]
 
@@ -402,9 +402,17 @@ Trellis compact SessionStart context. Use it to orient the session; load details
     let rangeEnd = allLines.length
     for (let i = 0; i < allLines.length; i++) {
       const stripped = allLines[i].trim()
-      if (rangeStart === -1 && stripped === "## Phase Index") {
+      if (rangeStart === -1 && ["## 阶段索引", "## Phase Index"].includes(stripped)) {
         rangeStart = i
-      } else if (rangeStart !== -1 && stripped === "## Phase 1: Plan") {
+      } else if (
+        rangeStart !== -1 &&
+        [
+          "## 阶段 1：目标探索与需求核对",
+          "### 阶段 1：目标探索与需求核对",
+          "## Phase 1: Goal exploration and requirements",
+          "### Phase 1: Goal exploration and requirements",
+        ].includes(stripped)
+      ) {
         rangeEnd = i
         break
       }
