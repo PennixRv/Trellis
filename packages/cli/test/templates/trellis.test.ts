@@ -181,6 +181,7 @@ describe("trellis template constants", () => {
   it("gitignoreTemplate contains ignore patterns", () => {
     expect(gitignoreTemplate).toContain(".developer");
     expect(gitignoreTemplate).toContain("__pycache__");
+    expect(gitignoreTemplate).toContain(".task-phase.lock");
   });
 });
 

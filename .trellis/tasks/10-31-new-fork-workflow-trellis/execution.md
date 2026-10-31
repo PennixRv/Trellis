@@ -15,3 +15,4 @@
 - 已将此决定补入本任务 PRD、设计和实施计划。Marketplace submodule 在删除前工作区干净，HEAD 为 `c6cf8bb0ea3689bfda19a128854d8d85a6401706`；仅从 Trellis fork 移除其 `.gitmodules` 声明和 gitlink，没有修改独立 Marketplace 仓库。同步更新 workflow resolver 合同、Trellis meta 与 contributor 指引、仓库结构和发布规范、CI/release 配置及测试；显式 custom workflow source 与通用 spec-template registry 保留。
 - 范围补正后的完整验证通过：Core 22 个测试文件、403 项通过、1 项跳过；CLI 91 个测试文件、2,073 项通过、2 项跳过；`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm --filter @mindfoldhq/trellis lint:py`、本 owner task `task.py validate`、模板脚本 parity 和 `git diff --check` 均通过。Python 检查为 0 个错误、68 条导出导入未使用警告。
 - GitNexus impact/detect_changes 未运行：该隔离 worktree 没有 `.gitnexus` runner，当前宿主没有暴露对应工具；以 `rg` 调用点审查、当前源码核对、完整差异审阅及上述测试验证替代。任务仍为 `in_progress`，等待根任务接受组件证据；根仓 gitlink、组合验收、发布、安装和现场切换尚未执行。
+- 提交钩子检查发现已移除的 Marketplace 子模块仍被 `.husky/pre-commit` 强制初始化；已删除该初始化要求，钩子全量测试随后通过。提交审查还发现 task phase 锁文件属于运行态，未保留在 Git，并将 `.task-phase.lock` 加入仓库与生成项目的 ignore；恢复被编辑器改动影响的既有 Python 脚本可执行位。
