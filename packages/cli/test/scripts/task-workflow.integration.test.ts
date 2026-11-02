@@ -1631,16 +1631,41 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
 
     runOkAs(root, "target-session", "start", TASK);
     expect(JSON.parse(transfer("target-session", "claim", 3)).status).toBe("claimed");
-    expect(JSON.parse(transfer("target-session", "consume", 4)).status).toBe("consumed");
-    expect(JSON.parse(runOkAs(root, "target-session", "current", "--json")).current_task.dir).toBe(`.trellis/tasks/${TASK}`);
+    const targetWriteBeforeConsume = runTaskAs(root, "target-session", "set-meta", TASK, "owner", "premature");
+    expect(targetWriteBeforeConsume.status).toBe(1);
+    expect(targetWriteBeforeConsume.stderr).toContain("TASK_TRANSFER_ACTIVE");
+
+    const targetContextPath = path.join(root, ".trellis", ".runtime", "sessions", "target-session.json");
+    const targetContext = fs.readFileSync(targetContextPath, "utf-8");
+    fs.writeFileSync(targetContextPath, "{ not json");
+    const failedTakeover = runTaskAs(root, "replacement-session", "transfer", "claim", ...packageArgs, "--expected-generation", "4", "--explicit-user-request");
+    expect(failedTakeover.status).toBe(1);
+    expect(failedTakeover.stdout).toContain("TASK_TRANSFER_RECOVERY_REQUIRED");
+    expect(JSON.parse(transfer("replacement-session", "status", 4))).toMatchObject({ status: "claimed", generation: 4, target_session_id: "target-session" });
+    fs.writeFileSync(targetContextPath, targetContext);
+
+    const takeover = JSON.parse(transfer("replacement-session", "claim", 4));
+    expect(takeover).toMatchObject({ status: "claimed", generation: 5, target_session_id: "replacement-session" });
+    expect(JSON.parse(runTaskAs(root, "target-session", "current", "--json").stdout).current_task).toBeNull();
+    const staleTargetClaim = runTaskAs(root, "target-session", "transfer", "claim", ...packageArgs, "--expected-generation", "4", "--explicit-user-request");
+    expect(staleTargetClaim.status).toBe(1);
+    expect(staleTargetClaim.stdout).toContain("TASK_TRANSFER_STALE_GENERATION");
+    const previousTargetConsume = runTaskAs(root, "target-session", "transfer", "consume", ...packageArgs, "--expected-generation", "5", "--explicit-user-request");
+    expect(previousTargetConsume.status).toBe(1);
+    expect(previousTargetConsume.stdout).toContain("TASK_TRANSFER_WITHHELD");
+    const replacementWriteBeforeConsume = runTaskAs(root, "replacement-session", "set-meta", TASK, "owner", "premature");
+    expect(replacementWriteBeforeConsume.status).toBe(1);
+    expect(replacementWriteBeforeConsume.stderr).toContain("TASK_TRANSFER_ACTIVE");
+    expect(JSON.parse(transfer("replacement-session", "consume", 5)).status).toBe("consumed");
+    expect(JSON.parse(runOkAs(root, "replacement-session", "current", "--json")).current_task.dir).toBe(`.trellis/tasks/${TASK}`);
     const sourceRestart = runTaskAs(root, "source-session", "start", TASK);
     expect(sourceRestart.status).toBe(1);
-    const activeRename = runTaskAs(root, "target-session", "rename", TASK, "renamed-phase-workflow-test");
+    const activeRename = runTaskAs(root, "replacement-session", "rename", TASK, "renamed-phase-workflow-test");
     expect(activeRename.status).toBe(1);
     expect(activeRename.stderr).toContain("TASK_TRANSFER_TASK_ID_LOCKED");
-    runOkAs(root, "target-session", "set-meta", TASK, "owner", "target");
+    runOkAs(root, "replacement-session", "set-meta", TASK, "owner", "replacement");
 
-    const staleGeneration = runTaskAs(root, "target-session", "transfer", "consume", ...packageArgs, "--expected-generation", "4", "--explicit-user-request");
+    const staleGeneration = runTaskAs(root, "replacement-session", "transfer", "consume", ...packageArgs, "--expected-generation", "5", "--explicit-user-request");
     expect(staleGeneration.status).toBe(1);
     expect(staleGeneration.stdout).toContain("TASK_TRANSFER_STALE_GENERATION");
   });

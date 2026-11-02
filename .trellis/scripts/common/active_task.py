@@ -849,6 +849,24 @@ def compare_and_set_active_task(
         return _write_json(context_path, context)
 
 
+def clear_active_task_if_matches(repo_root: Path, context_key: str, expected_task: str) -> bool:
+    """Clear one session pointer when it still references the expected task."""
+    context_path = _context_path(repo_root, context_key)
+    with _session_file_lock(context_path):
+        context, reason = read_json_checked(context_path)
+        if context is None:
+            return reason == JSON_READ_MISSING
+        if not isinstance(context, dict):
+            return False
+        current = _string_value(context.get("current_task"))
+        current_ref = _canonical_task_ref(current, repo_root) if current else None
+        expected_ref = _canonical_task_ref(expected_task, repo_root)
+        if current_ref != expected_ref:
+            return True
+        context.pop("current_task", None)
+        return _write_json(context_path, context)
+
+
 def clear_active_task(
     repo_root: Path,
     platform_input: dict[str, Any] | None = None,

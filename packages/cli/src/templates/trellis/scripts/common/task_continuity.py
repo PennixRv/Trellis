@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .active_task import (
     compare_and_set_active_task,
+    clear_active_task_if_matches,
     resolve_active_task,
 )
 from .git import run_git
@@ -411,7 +412,7 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                         write_json(path, record)
                         raise ContinuityError("TASK_TRANSFER_RECOVERY_REQUIRED", "source pointer remains after retirement")
                     record["status"] = "ready"
-                elif operation == "claim" and record["status"] in {"ready", "claiming", "recovery_required"}:
+                elif operation == "claim" and record["status"] in {"ready", "claiming", "recovery_required", "claimed"}:
                     if record["status"] == "recovery_required" and record["target_session_id"] != context_key:
                         raise ContinuityError("TASK_TRANSFER_WITHHELD", "only the recorded target session can recover a claim")
                     if current_path not in {None, record["task_path"]}:
@@ -420,6 +421,15 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                         record.update({"status": "claiming", "generation": record["generation"] + 1, "target_session_id": context_key})
                         if not write_json(path, record):
                             raise ContinuityError("TASK_TRANSFER_WRITE_FAILED", "could not record target claim")
+                    elif record["status"] == "claimed":
+                        previous_target = record["target_session_id"]
+                        if previous_target == context_key:
+                            raise ContinuityError("TASK_TRANSFER_INVALID_TRANSITION", "the current target must consume ownership instead of claiming it again")
+                        if previous_target is not None and not clear_active_task_if_matches(root, previous_target, record["task_path"]):
+                            raise ContinuityError("TASK_TRANSFER_RECOVERY_REQUIRED", "previous target pointer could not be cleared")
+                        record.update({"status": "claiming", "generation": record["generation"] + 1, "target_session_id": context_key})
+                        if not write_json(path, record):
+                            raise ContinuityError("TASK_TRANSFER_WRITE_FAILED", "could not record target takeover")
                     if current_path is None and not compare_and_set_active_task(root, context_key, None, record["task_path"]):
                         record["status"] = "recovery_required"
                         write_json(path, record)
