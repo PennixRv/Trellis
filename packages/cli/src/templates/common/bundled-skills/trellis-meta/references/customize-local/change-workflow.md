@@ -2,17 +2,17 @@
 
 Read the installed project's .trellis/workflow.md before changing phase activities, route guidance, or platform entry points.
 
-## The five business phases
+## Business phases
 
-1. Goal exploration and requirements
-2. Decision space construction and merging
-3. Solution design and convergence
-4. Task implementation
-5. Delivery review and closeout
+- Goal Exploration and Requirements Confirmation Phase
+- Decision Space Construction and Consolidation Phase
+- Solution Design and Convergence Phase
+- Task Implementation and Test Verification Phase
+- Delivery Review and On-Site Closeout Phase
 
 Each phase has its own Skill and workflow diagram. Keep their activities distinct. Trellis CLI owns task lifecycle and phase state; do not encode a second route in a Skill, Hook, or command.
 
-Phase 1 requires explicit user confirmation of the current requirements revision before the route enters phase 2 or 3. Phase 3 acceptance and implementation authorization are separate. Phase 4 follows the authorized contract. Phase 5 reviews the current delivery and handles task completion or cancellation. Routes may skip phases when the task record contains sufficient reason and evidence.
+The Goal Exploration and Requirements Confirmation Phase requires explicit user confirmation of the current requirements revision before the route enters Decision Space Construction and Consolidation Phase or Solution Design and Convergence Phase. Acceptance in Solution Design and Convergence Phase does not grant implementation authorization. Task Implementation and Test Verification Phase follows the authorized contract. During Delivery Review and On-Site Closeout Phase, review the current delivery and handle task completion or cancellation. Routes may skip phases when the task record contains sufficient reason and evidence.
 
 ## Change workflow assets
 

@@ -302,14 +302,8 @@ def _load_owner(path: Path) -> dict | None:
     return record
 
 
-def _fresh_continuity(root: Path, task_dir: Path, data: dict, task_id: str) -> str:
-    projection = _projection(root, task_dir, data, task_id)
-    digest = _digest(projection)
-    task_path = task_dir.relative_to(root).as_posix()
-    saved, _ = _read_record(_continuity_path(root, task_path))
-    if not saved or saved.get("schema_version") != 1 or saved.get("source_digest") != digest:
-        raise ContinuityError("TASK_TRANSFER_STALE_CONTINUITY", "current task continuity has not been captured or is stale")
-    return digest
+def _current_projection_digest(root: Path, task_dir: Path, data: dict, task_id: str) -> str:
+    return _digest(_projection(root, task_dir, data, task_id))
 
 
 def transfer_task_ownership(args: argparse.Namespace) -> int:
@@ -347,9 +341,16 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                 context_key, current_path = _direct_pointer(root, task_path)
                 if current_path is None:
                     raise ContinuityError("TASK_TRANSFER_WITHHELD", "source session has no current task")
-                continuity_digest = _fresh_continuity(root, task_dir, data, task_id)
+                continuity_digest = _current_projection_digest(root, task_dir, data, task_id)
+                if args.expected_continuity_digest is not None:
+                    if not PACKAGE_DIGEST_RE.fullmatch(args.expected_continuity_digest):
+                        raise ContinuityError("TASK_TRANSFER_INVALID_INPUT", "expected continuity digest must be a SHA-256 digest")
+                    if continuity_digest != args.expected_continuity_digest:
+                        raise ContinuityError("TASK_TRANSFER_STALE_CONTINUITY", "current task projection differs from the package snapshot")
                 if record is not None:
                     if record["status"] == "quiescing" and record["generation"] == args.expected_generation + 1 and record["source_session_id"] == context_key and record["package_id"] == args.package_id and record["package_digest"] == args.package_digest:
+                        if record["continuity_digest"] != continuity_digest:
+                            raise ContinuityError("TASK_TRANSFER_STALE_CONTINUITY", "task continuity changed during ownership transfer")
                         result = record
                         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
                         return 0
@@ -370,7 +371,7 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                     raise ContinuityError("TASK_TRANSFER_STALE_PACKAGE", "session package identity or digest changed")
                 if args.expected_generation != record["generation"]:
                     raise ContinuityError("TASK_TRANSFER_STALE_GENERATION", f"expected generation {args.expected_generation}, current generation is {record['generation']}")
-                if operation != "release" and _fresh_continuity(root, task_dir, data, task_id) != record["continuity_digest"]:
+                if operation != "release" and _current_projection_digest(root, task_dir, data, task_id) != record["continuity_digest"]:
                     raise ContinuityError("TASK_TRANSFER_STALE_CONTINUITY", "task continuity changed during ownership transfer")
                 if operation != "release" and _route_snapshot(data) != record["route"]:
                     raise ContinuityError("TASK_TRANSFER_STALE_ROUTE", "task phase, route, input, or implementation authorization changed")
@@ -457,6 +458,7 @@ def add_continuity_commands(subparsers) -> None:
     transfer.add_argument("--task-path", required=True)
     transfer.add_argument("--package-id", required=True)
     transfer.add_argument("--package-digest", required=True)
+    transfer.add_argument("--expected-continuity-digest")
     transfer.add_argument("--expected-generation", type=int)
     transfer.add_argument("--explicit-user-request", action="store_true")
 

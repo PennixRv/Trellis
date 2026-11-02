@@ -123,10 +123,10 @@ describe("dsh collectDshTemplates", () => {
     const finish = files.get(".dsh/skills/trellis-finish-work/SKILL.md");
 
     expect(start).toContain("task.py phase init");
-    expect(start).toContain("Phase 1:");
-    expect(start).toContain("Phase 5:");
+    expect(start).toContain("Goal Exploration and Requirements Confirmation Phase");
+    expect(start).toContain("Delivery Review and On-Site Closeout Phase");
     expect(start).toContain("name: trellis-start");
-    expect(finish).toContain("Task completion and cancellation are handled in phase 5");
+    expect(finish).toContain("Task completion and cancellation are handled during Delivery Review and On-Site Closeout Phase");
     expect(finish).toContain("formal session handoff to its separate");
   });
 

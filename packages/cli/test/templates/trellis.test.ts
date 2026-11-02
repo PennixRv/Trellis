@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getCommandTemplates } from "../../src/templates/common/index.js";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -106,7 +107,7 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).toContain("#");
   });
 
-  it("workflow index keeps the five phase Skills and transitions distinct", () => {
+  it("workflow index keeps named business-phase Skills and transitions distinct", () => {
     for (const phase of [
       "goal_exploration_and_requirements",
       "decision_space_construction_and_merging",
@@ -115,6 +116,16 @@ describe("trellis template constants", () => {
       "delivery_review_and_closeout",
     ]) {
       expect(workflowMdTemplate).toContain(`\`${phase}\``);
+      expect(workflowMdTemplate).toContain(`${phase}[`);
+    }
+    for (const title of [
+      "目标探索与需求核对阶段",
+      "决策空间构造与归并阶段",
+      "解决方案设计与收敛阶段",
+      "任务实施与测试验证阶段",
+      "交付审查与现场收尾阶段",
+    ]) {
+      expect(workflowMdTemplate).toContain(`| ${title} |`);
     }
     expect(workflowMdTemplate).toContain("当前基线已获用户确认");
     expect(workflowMdTemplate).toContain("实施合同已授权");
@@ -122,21 +133,75 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).not.toContain("phase model");
   });
 
+  it("keeps Task Implementation and Test Verification Phase tools conditional on the task and change", () => {
+    const implementationState = workflowStateBreadcrumb("in_progress");
+    expect(implementationState).toContain("运行与改动相称的验证");
+    expect(implementationState).toContain("可使用 `trellis-before-dev`");
+    expect(implementationState).toContain("可使用 `trellis-check`");
+  });
+
   it("phase entries preserve confirmation, conditional decision trees, and closeout", () => {
     expect(stepSection("1.1")).toContain("当前资产 revision 的用户明确确认");
-    expect(stepSection("2.1")).toContain("读取阶段 2 Skill");
-    const phase2Workflow = fs.readFileSync(
+    expect(stepSection("2.1")).toContain("读取决策空间构造与归并阶段 Skill");
+    const decisionSpaceConstructionAndMergingWorkflow = fs.readFileSync(
       path.join(
         process.cwd(),
         "src/templates/common/bundled-skills/trellis-decision-space-construction-and-merging/workflow.md",
       ),
       "utf-8",
     );
-    expect(phase2Workflow).toContain("仅当选择之间存在条件依赖时使用决策树");
-    expect(phase2Workflow).toContain("prior-art review");
+    expect(decisionSpaceConstructionAndMergingWorkflow).toContain("仅当选择之间存在条件依赖时使用决策树");
+    expect(decisionSpaceConstructionAndMergingWorkflow).toContain("prior-art review");
     expect(stepSection("3.1")).toContain("解决必要的用户决定");
     expect(stepSection("4.1")).toContain("只有明确授权委派 Git worktree 写入时才使用 Paseo");
     expect(stepSection("5.2")).toContain("正式会话交接仍是独立操作");
+  });
+
+  it("phase diagrams use standard names and show conditional delivery acceptance", () => {
+    const phaseSkills: [string, string][] = [
+      ["trellis-goal-exploration-and-requirements", "目标探索与需求核对阶段"],
+      ["trellis-decision-space-construction-and-merging", "决策空间构造与归并阶段"],
+      ["trellis-solution-design-and-convergence", "解决方案设计与收敛阶段"],
+      ["trellis-task-implementation", "任务实施与测试验证阶段"],
+      ["trellis-delivery-review-and-closeout", "交付审查与现场收尾阶段"],
+    ];
+    const workflows = new Map(
+      phaseSkills.map(([name]) => [
+        name,
+        fs.readFileSync(
+          path.resolve(
+            __dirname,
+            "../../src/templates/common/bundled-skills",
+            name,
+            "workflow.md",
+          ),
+          "utf-8",
+        ),
+      ]),
+    );
+    for (const [name, title] of phaseSkills) {
+      const content = workflows.get(name) ?? "";
+      expect(content).toContain(`# ${title}流程`);
+      const diagrams = [...content.matchAll(/```mermaid\s*([\s\S]*?)```/g)];
+      expect(diagrams.length, `${name} should contain a workflow diagram`).toBeGreaterThan(0);
+      for (const [, diagram] of diagrams) {
+        expect(diagram).not.toMatch(/阶段\s*[一二三四五1-5]/);
+      }
+    }
+    const deliveryWorkflow = workflows.get("trellis-delivery-review-and-closeout") ?? "";
+    const deliveryDiagram = deliveryWorkflow.match(/```mermaid\s*([\s\S]*?)```/)?.[1] ?? "";
+    expect(deliveryDiagram).toContain("必要用户决定缺失");
+    expect(deliveryDiagram).toContain("pennix-decision-grill 同步请求用户接受");
+    expect(deliveryDiagram).toContain("Trellis CLI 接受 delivery_ready 或 no_go");
+    expect(deliveryDiagram).toContain(
+      "交付合同、用户明确要求或不可由主代理替代的价值/风险取舍要求用户接受",
+    );
+    expect(deliveryDiagram).toContain('child_disposition -->|"无关联子任务"| cancelReview');
+    expect(deliveryDiagram).toContain("使当前交付候选失效并判断最早受影响阶段");
+    expect(deliveryDiagram).toContain("Trellis CLI 将路线收敛为仅‘交付审查与现场收尾阶段’并记录原因");
+    expect(deliveryDiagram).toContain("关联子任务如何处置？");
+    expect(deliveryDiagram).toContain("记录子任务标识与依据后解除父子关系");
+    expect(deliveryDiagram).toContain("另行执行子任务自身的取消流程");
   });
 
   it("[codex-native-subagents] template mode helpers default to auto and fail invalid values closed to inline", () => {
@@ -156,11 +221,24 @@ describe("trellis template constants", () => {
     expect(taskStore).toContain('get_codex_dispatch_mode(repo_root) == "auto"');
   });
 
-  it("workflow.md stage 1 provides the requirements baseline", () => {
+  it("workflow.md Goal Exploration and Requirements Confirmation Phase provides the baseline", () => {
     const step = stepSection("1.1");
     expect(step).toContain("仅收集可能改变目标、范围");
     expect(step).toContain("用户明确确认");
     expect(step).toContain("当前资产 revision");
+  });
+
+  it("records routing judgment without a fixed complexity matrix", () => {
+    const goalExplorationAndRequirementsSkill = fs.readFileSync(
+      path.resolve(
+        __dirname,
+        "../../src/templates/common/bundled-skills/trellis-goal-exploration-and-requirements/workflow.md",
+      ),
+      "utf-8",
+    );
+    expect(goalExplorationAndRequirementsSkill).toContain("复杂度判断的实际触发维度与理由");
+    expect(goalExplorationAndRequirementsSkill).toContain("不机械计分或套用固定路由矩阵");
+    expect(goalExplorationAndRequirementsSkill).toContain("路线发生变化时，使用 Trellis CLI 更新受影响的分类和阶段");
   });
 
   it("workflow.md planning breadcrumb requires a route before implementation", () => {
@@ -170,6 +248,13 @@ describe("trellis template constants", () => {
     expect(planning).toContain("实施授权");
     expect(planningInline).toContain("planning");
     expect(planningInline).toContain("主会话");
+  });
+
+  it("start command enters the requirements Skill and follows the current phase route", () => {
+    const start = getCommandTemplates().find((command) => command.name === "start")?.content ?? "";
+    expect(start).toContain("trellis-goal-exploration-and-requirements");
+    expect(start).toContain("business phase route");
+    expect(start).not.toContain("trellis-brainstorm");
   });
 
   it("workflow.md task_error breadcrumb repairs the current task record", () => {
@@ -239,17 +324,18 @@ describe("getAllScripts", () => {
 });
 
 // =============================================================================
-// getAllAgents — Teamwork participant definition dispatched at init/update.
+// getAllAgents — project agent roles dispatched at init/update.
 // agent-loader.ts loads `.trellis/agents/<name>.md` and requires `---` YAML
 // frontmatter at the top with a flat `name: <name>` field. These tests pin the
 // contract so a future template edit can't silently break Teamwork spawn.
 // =============================================================================
 
 describe("getAllAgents", () => {
-  it("ships only the generic teammate role and its profile registry", () => {
+  it("ships the Teamwork and delegated worktree roles with the profile registry", () => {
     const agents = getAllAgents();
     expect([...agents.keys()]).toEqual([
       "teammate.md",
+      "delegated-worktree-primary-agent.md",
       "teammate-profiles.json",
     ]);
   });
@@ -257,6 +343,9 @@ describe("getAllAgents", () => {
   it("values match exported constants", () => {
     const agents = getAllAgents();
     expect(agents.get("teammate.md")).toBe(teammateAgentTemplate);
+    expect(agents.get("delegated-worktree-primary-agent.md")).toContain(
+      "sole task-specific implementation contract",
+    );
   });
 
   it("documents Teamwork ownership boundaries and teammate report contract", () => {

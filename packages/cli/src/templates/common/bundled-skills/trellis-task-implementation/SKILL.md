@@ -1,9 +1,9 @@
 ---
 name: trellis-task-implementation
-description: 当前任务处于任务实施阶段时，按已授权实施合同推进工作包、验证、集成与阻塞处置。
+description: 当前任务处于任务实施与测试验证阶段时，按已授权实施合同推进工作包、验证、集成与阻塞处置。
 ---
 
-# 任务实施
+# 任务实施与测试验证阶段
 
 当 `current_phase_id` 为 `task_implementation` 时使用。先阅读本 Skill 同目录的 `workflow.md`，再加载目标仓库适用的 `AGENTS.md`、Trellis spec 和实现合同。
 

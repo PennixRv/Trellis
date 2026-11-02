@@ -16,7 +16,7 @@ Task status and phase state are changed only through Trellis CLI. This prompt re
 python3 ./.trellis/scripts/get_context.py --mode record
 ```
 
-Review the current phase, changed files, recent commits, remaining work, and blockers. Use phase 5 and the Trellis CLI to complete or cancel a task when its acceptance conditions are met.
+Review the current phase, changed files, recent commits, remaining work, and blockers. Use the Delivery Review and On-Site Closeout Phase Skill with the Trellis CLI to complete or cancel a task when its acceptance conditions are met.
 
 ### Step 2: One-Click Add Session
 

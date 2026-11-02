@@ -3069,7 +3069,7 @@ describe("regression: current-task path normalization", () => {
 
   it("[workflow-state-r7] task.py create then task.py start is idempotent without implementation authorization", () => {
     // Creating or selecting a task sets session context; only an accepted and
-    // authorized phase-4 route may change planning to in_progress.
+     // authorized Task Implementation and Test Verification Phase route may change planning to in_progress.
     writeTrellisScripts();
     writeProjectFile(
       path.join(".trellis", ".developer"),
@@ -7101,14 +7101,14 @@ print(len(entries))
     return readFileSync(templatePath, "utf-8");
   }
 
-  it("[workflow-state-r1] template workflow.md routes active tasks through phase 4", () => {
+  it("[workflow-state-r1] template workflow.md routes active tasks through Task Implementation and Test Verification Phase", () => {
     const wf = templateWorkflowMd();
     const match = wf.match(
       /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/,
     );
     expect(match).toBeTruthy();
     const body = match?.[1] ?? "";
-    expect(body).toContain("阶段 4");
+    expect(body).toContain("任务实施与测试验证阶段");
     expect(body).toContain("trellis-before-dev");
   });
 
@@ -7313,8 +7313,8 @@ print(len(entries))
     );
 
     expect(output).toContain("## 阶段索引");
-    expect(output).toContain("阶段 1：目标探索与需求核对");
-    expect(output).toContain("阶段 5：交付审查与收尾");
+    expect(output).toContain("目标探索与需求核对阶段");
+    expect(output).toContain("交付审查与现场收尾阶段");
     expect(output).not.toContain("#### 1.1 Establish the requirements baseline");
   });
 
@@ -7337,7 +7337,7 @@ print(len(entries))
     );
 
     expect(output).toContain("## 阶段索引");
-    expect(output).toContain("阶段 4：任务实施");
+    expect(output).toContain("任务实施与测试验证阶段");
   });
 
   it("[pi] --mode phase returns the same compact stage index", () => {
@@ -7360,7 +7360,7 @@ print(len(entries))
     );
 
     expect(output).toContain("## 阶段索引");
-    expect(output).toContain("阶段 4：任务实施");
+    expect(output).toContain("任务实施与测试验证阶段");
   });
 
   it("[workflow-v2] step 2.1 returns the decision-space workflow on Codex", () => {
@@ -7428,7 +7428,7 @@ print(len(entries))
     );
 
     expect(output).toContain("## 阶段索引");
-    expect(output).toContain("阶段 4：任务实施");
+    expect(output).toContain("任务实施与测试验证阶段");
   });
 
   // ------------------------------------------------------------
@@ -7461,8 +7461,8 @@ print(len(entries))
     const workflowBlock = workflowMatch[1];
 
     expect(workflowBlock).toContain("## 阶段索引");
-    expect(workflowBlock).toContain("阶段 1：目标探索与需求核对");
-    expect(workflowBlock).toContain("阶段 5：交付审查与收尾");
+    expect(workflowBlock).toContain("目标探索与需求核对阶段");
+    expect(workflowBlock).toContain("交付审查与现场收尾阶段");
     expect(workflowBlock).not.toContain("#### 1.1 Establish the requirements baseline");
     // Breadcrumb tag BLOCKS (matched opening + closing pair) excluded — they're
     // consumed by inject-workflow-state.py. Inline `[workflow-state:planning]`
@@ -7920,7 +7920,7 @@ print(len(entries))
     );
 
     expect(output).toContain("选择能表达相关选项及其关系的最简方式");
-    expect(output).not.toContain("阶段 4：任务实施");
+    expect(output).not.toContain("### 任务实施与测试验证阶段");
   });
 
   it("[issue-codex-dispatch-mode] codex hook injects <codex-mode> banner reflecting dispatch_mode", () => {
@@ -10407,20 +10407,20 @@ describe("regression: sub-agent context injection fallback (0.5.3)", () => {
     }
   });
 
-  it("workflow.md defines five separate phases and keeps session handoff independent", () => {
+  it("workflow.md defines distinct business phases and keeps session handoff independent", () => {
     const workflowPath = path.join(
       repoRootFb,
       "packages/cli/src/templates/trellis/workflow.md",
     );
     const wf = fs.readFileSync(workflowPath, "utf-8");
-    expect(wf).toContain("任务路线最多包含五个有序业务阶段");
-    expect(wf).toContain("每个 Skill 提供本阶段流程和图示");
+    expect(wf).toContain("任务路线从下表列出的业务阶段中按需选取，组成有序路线");
+    expect(wf).toContain("每个阶段对应一个提供本阶段流程和图示的 Skill");
     for (const phase of [
-      "阶段 1：目标探索与需求核对",
-      "阶段 2：决策空间构造与归并",
-      "阶段 3：解决方案设计与收敛",
-      "阶段 4：任务实施",
-      "阶段 5：交付审查与收尾",
+      "目标探索与需求核对阶段",
+      "决策空间构造与归并阶段",
+      "解决方案设计与收敛阶段",
+      "任务实施与测试验证阶段",
+      "交付审查与现场收尾阶段",
     ]) {
       expect(wf).toContain(phase);
     }

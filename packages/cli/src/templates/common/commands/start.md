@@ -12,13 +12,13 @@ Read the applicable spec indexes before editing code. The active phase breadcrum
 
 ## Route the current request
 
-- No active Trellis task: use the taskless route when the request is clear, low-risk, reversible, authorized, and immediately verifiable. Otherwise load trellis-brainstorm to create a task and initialize a phase route.
+- No active Trellis task: use the taskless route when the request is clear, low-risk, reversible, authorized, and immediately verifiable. Otherwise create the task with the user's consent and load `trellis-goal-exploration-and-requirements`.
 - Task with no initialized route: inspect its current requirements, choose the applicable ordered phases with evidence for omissions, then initialize the route through task.py phase init.
-- Phase 1: load trellis-goal-exploration-and-requirements. Do not leave until the user confirms the current requirements artifact revision.
-- Phase 2: load trellis-decision-space-construction-and-merging.
-- Phase 3: load trellis-solution-design-and-convergence. An accepted implementation contract still requires separate implementation authorization.
-- Phase 4: load trellis-task-implementation and the target repository's applicable specs.
-- Phase 5: load trellis-delivery-review-and-closeout.
+- Goal Exploration and Requirements Confirmation Phase: load `trellis-goal-exploration-and-requirements`. Do not leave until the user confirms the current requirements artifact revision.
+- Decision Space Construction and Consolidation Phase: load `trellis-decision-space-construction-and-merging`.
+- Solution Design and Convergence Phase: load `trellis-solution-design-and-convergence`. An accepted implementation contract still requires separate implementation authorization.
+- Task Implementation and Test Verification Phase: load `trellis-task-implementation` and the target repository's applicable specs.
+- Delivery Review and On-Site Closeout Phase: load `trellis-delivery-review-and-closeout`.
 
 Task lifecycle status does not replace the business phase route. Use Trellis CLI to inspect or change task and phase state.
 

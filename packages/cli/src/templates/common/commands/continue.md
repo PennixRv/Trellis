@@ -12,7 +12,7 @@ Resume from the active Trellis task and its current phase. The task record and p
 
 Follow the active phase breadcrumb to the matching bundled phase Skill and its workflow.md. Use the task CLI to inspect or change phase state. A resume does not itself accept an artifact, grant authorization, or move the task.
 
-Task lifecycle status and business phase are separate. A planning task may still be in phases 1–3; in_progress indicates authorized phase 4; completed and cancelled are terminal lifecycle states. Phase 5 review and acceptance remain explicit.
+Task lifecycle status and business phase are separate. A planning task may remain in Goal Exploration and Requirements Confirmation Phase, Decision Space Construction and Consolidation Phase, or Solution Design and Convergence Phase. `in_progress` marks authorized Task Implementation and Test Verification Phase; `completed` and `cancelled` are terminal lifecycle states. Delivery Review and On-Site Closeout Phase remains explicit.
 
 ## Phase operations
 

@@ -88,8 +88,11 @@ export const configYamlTemplate = readTemplate("config.yaml");
 export const gitignoreTemplate = readTemplate("gitignore.txt");
 export const gitattributesTemplate = readTemplate("gitattributes.txt");
 
-// Teamwork participant definition loaded from `.trellis/agents/`.
+// Project agent roles loaded from `.trellis/agents/`.
 export const teammateAgentTemplate = readTemplate("agents/teammate.md");
+export const delegatedWorktreeAgentTemplate = readTemplate(
+  "agents/delegated-worktree-primary-agent.md",
+);
 export const teammateProfilesTemplate = readTemplate(
   "agents/teammate-profiles.json",
 );
@@ -142,7 +145,7 @@ export function getAllScripts(): Map<string, string> {
 }
 
 /**
- * Get the Teamwork participant definition as a map of relative path
+ * Get project agent role assets as a map of relative path
  * (under `.trellis/agents/`) to content.
  *
  * Consumed by `trellis init` (to dispatch on first install) and by
@@ -152,6 +155,10 @@ export function getAllScripts(): Map<string, string> {
 export function getAllAgents(): Map<string, string> {
   const agents = new Map<string, string>();
   agents.set("teammate.md", teammateAgentTemplate);
+  agents.set(
+    "delegated-worktree-primary-agent.md",
+    delegatedWorktreeAgentTemplate,
+  );
   agents.set("teammate-profiles.json", teammateProfilesTemplate);
   return agents;
 }

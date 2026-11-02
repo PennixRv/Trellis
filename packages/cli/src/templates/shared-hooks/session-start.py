@@ -465,9 +465,6 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             "Next-Action: Task lifecycle is complete. Start another task or end the session; finish-work only records the session journal."
         )
 
-    has_prd = (task_dir / "prd.md").is_file()
-    has_design = (task_dir / "design.md").is_file()
-    has_implement_plan = (task_dir / "implement.md").is_file()
     implement_jsonl = task_dir / "implement.jsonl"
     check_jsonl = task_dir / "check.jsonl"
     jsonl_ready = (
@@ -475,31 +472,13 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
         and (not check_jsonl.is_file() or _has_curated_jsonl_entry(check_jsonl))
     )
 
-    if task_status == "planning" and not has_prd:
-        return (
-            f"Status: PLANNING\nTask: {task_title}\n"
-            f"Present: {present_line}\n"
-            "Next-Action: Load `trellis-brainstorm` and write `prd.md`. Stay in planning."
-        )
-
     if task_status == "planning":
-        missing_complex = [
-            name for name, exists in (
-                ("design.md", has_design),
-                ("implement.md", has_implement_plan),
-            )
-            if not exists
+        next_bits = [
+            "Follow the current per-turn workflow-state; task lifecycle status and artifact presence do not identify the business phase",
+            "If no phase route is initialized, load `trellis-goal-exploration-and-requirements` and confirm the requirements baseline before initializing the route",
         ]
-        next_bits: list[str] = []
-        if missing_complex:
-            next_bits.append(
-                "Lightweight task can request start review with PRD-only; "
-                f"complex task must add {', '.join(missing_complex)} before start"
-            )
-        else:
-            next_bits.append("Planning artifacts are present; ask for review before `task.py start`")
         if not jsonl_ready:
-            next_bits.append("curate `implement.jsonl` and `check.jsonl` before sub-agent mode start")
+            next_bits.append("curate task context manifests only when a dispatched agent needs them")
         return (
             f"Status: PLANNING\nTask: {task_title}\n"
             f"Present: {present_line}\n"
@@ -509,7 +488,7 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
     return (
         f"Status: {str(task_status).upper()}\nTask: {task_title}\n"
         f"Present: {present_line}\n"
-        "Next-Action: Follow the matching per-turn workflow-state. "
+        "Next-Action: Follow the matching per-turn workflow-state; task lifecycle status does not identify the business phase. "
         "Implementation/check context order is jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if present`."
     )
 
@@ -768,17 +747,19 @@ def _extract_range(content: str, start_header: str, end_header: str) -> str:
     end_matches = {
         f"## {end_header}",
         f"### {end_header}",
-        "## 阶段 1：目标探索与需求核对",
-        "### 阶段 1：目标探索与需求核对",
-        "## Phase 1: Goal exploration and requirements",
-        "### Phase 1: Goal exploration and requirements",
     }
+    phase_titles = ("目标探索与需求核对阶段", "Goal Exploration and Requirements Confirmation Phase")
     for i, line in enumerate(lines):
         stripped = line.strip()
         if start is None and stripped in start_matches:
             start = i
             continue
-        if start is not None and stripped in end_matches:
+        heading = stripped.lstrip("#").strip()
+        is_phase_heading = stripped.startswith(("## ", "### ")) and any(
+            heading == title or heading.endswith((f"：{title}", f": {title}"))
+            for title in phase_titles
+        )
+        if start is not None and (stripped in end_matches or is_phase_heading):
             end = i
             break
     if start is None:
@@ -840,7 +821,7 @@ def _build_workflow_overview(workflow_path: Path) -> str:
         "",
     ]
 
-    phases = _extract_range(content, "阶段索引", "阶段 1：目标探索与需求核对")
+    phases = _extract_range(content, "阶段索引", "目标探索与需求核对阶段")
     if phases:
         out_lines.append(_strip_breadcrumb_tag_blocks(phases).rstrip())
 

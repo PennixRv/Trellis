@@ -185,4 +185,51 @@ describe.skipIf(!hasPython())("non-list `children` in a parent task.json", () =>
     expect(r.status).toBe(0);
     expect(readChildren(tmp, PARENT)).toEqual([]);
   });
+
+  it("allows a cancelled parent to unlink a child recorded as independently continuing", () => {
+    const child = "08-19-standalone";
+    makeTask(tmp, child, { parent: PARENT });
+    makeTask(tmp, PARENT, {
+      status: "cancelled",
+      children: [child],
+      meta: {
+        task_workflow: {
+          phases: {
+            delivery_review_and_closeout: {
+              acceptance: { child_dispositions: { [child]: "independent" } },
+            },
+          },
+        },
+      },
+    });
+
+    const result = runTask(
+      tmp,
+      "remove-subtask",
+      `.trellis/tasks/${PARENT}`,
+      `.trellis/tasks/${child}`,
+    );
+
+    expect(result.status).toBe(0);
+    expect(readChildren(tmp, PARENT)).toEqual([]);
+    expect(JSON.parse(fs.readFileSync(path.join(tmp, ".trellis", "tasks", child, "task.json"), "utf-8")).parent).toBeNull();
+  });
+
+  it("does not unlink a child after the parent has completed closeout", () => {
+    const child = "08-19-standalone";
+    makeTask(tmp, child, { parent: PARENT });
+    makeTask(tmp, PARENT, { status: "completed", children: [child] });
+
+    const result = runTask(
+      tmp,
+      "remove-subtask",
+      `.trellis/tasks/${PARENT}`,
+      `.trellis/tasks/${child}`,
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("completed parent cannot unlink");
+    expect(readChildren(tmp, PARENT)).toEqual([child]);
+    expect(JSON.parse(fs.readFileSync(path.join(tmp, ".trellis", "tasks", child, "task.json"), "utf-8")).parent).toBe(PARENT);
+  });
 });

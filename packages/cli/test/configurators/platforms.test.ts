@@ -1066,7 +1066,7 @@ describe("configurePlatform", () => {
       "utf-8",
     );
     expect(start).toContain("task.py phase init");
-    expect(start).toContain("Phase 5:");
+    expect(start).toContain("Delivery Review and On-Site Closeout Phase:");
 
     expect(
       fs.existsSync(

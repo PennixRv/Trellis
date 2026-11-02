@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
+from .git import run_git
 from .io import read_json_checked, write_json
 from .paths import FILE_TASK_JSON, get_repo_root
 from .task_utils import is_within_tasks_dir, resolve_task_dir, run_task_hooks
@@ -76,11 +79,31 @@ def _state(meta: dict) -> dict:
     if not isinstance(state.get("phases"), dict) or not isinstance(state.get("phase_ids"), list):
         raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "task phase workflow has an invalid shape")
     try:
-        _validate_route(",".join(state["phase_ids"]), require_requirements_first=False)
+        _validate_route(",".join(state["phase_ids"]))
+        _validate_classification(
+            state.get("task_kind"),
+            state.get("complexity"),
+            state.get("project_context"),
+            state["phase_ids"],
+        )
     except (TypeError, TaskWorkflowError) as error:
-        raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "task phase route is invalid") from error
+        raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "task phase classification or route is invalid") from error
     if not ROUTE_REVISION.fullmatch(str(state.get("task_route_revision", ""))) or not ROUTE_REVISION.fullmatch(str(state.get("input_revision", ""))):
         raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "task phase revision is invalid")
+    admission = state.get("route_dependency_admission")
+    if admission is not None and (
+        not isinstance(admission, dict)
+        or not ROUTE_REVISION.fullmatch(str(admission.get("task_route_revision", "")))
+        or admission.get("admission_state") not in {"ready", "missing", "stale", "incompatible", "blocked"}
+        or not isinstance(admission.get("dependencies"), list)
+        or not admission["dependencies"]
+        or any(not isinstance(value, str) or not value.strip() for value in admission["dependencies"])
+        or len(set(admission["dependencies"])) != len(admission["dependencies"])
+        or not isinstance(admission.get("evidence_refs"), list)
+        or any(not isinstance(value, str) or not value.strip() for value in admission["evidence_refs"])
+        or len(set(admission["evidence_refs"])) != len(admission["evidence_refs"])
+    ):
+        raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "route dependency admission has an invalid shape")
     if state.get("current_phase_id") is not None and state["current_phase_id"] not in state["phase_ids"]:
         raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "current phase is not in the task route")
     for phase_id in state["phase_ids"]:
@@ -92,30 +115,55 @@ def _state(meta: dict) -> dict:
             if (
                 not isinstance(acceptance, dict)
                 or acceptance.get("artifact_revision") != record.get("artifact_revision")
-                or not isinstance(acceptance.get("user_confirmation_ref"), str)
-                or not acceptance["user_confirmation_ref"].strip()
+                or not isinstance(acceptance.get("evidence_refs"), list)
+                or not acceptance["evidence_refs"]
             ):
-                raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "accepted phase 1 must retain confirmation for its current artifact revision")
+                raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "accepted Goal Exploration and Requirements Confirmation Phase must retain confirmation for its current artifact revision")
     return state
 
 
-def implementation_start_ready(data: dict) -> bool:
+def implementation_start_ready(data: dict, task_dir: Path) -> bool:
     meta = data.get("meta")
     state = meta.get("task_workflow") if isinstance(meta, dict) else None
     if not isinstance(state, dict) or state.get("current_phase_id") != PHASE_IDS[3]:
         return False
+    phase_ids = state.get("phase_ids")
+    if not isinstance(phase_ids, list) or PHASE_IDS[3] not in phase_ids:
+        return False
     if state.get("task_kind") not in {"implementation", "combined"}:
         return False
     authorization = state.get("implementation_authorization")
+    contract_ref = authorization.get("contract_ref") if isinstance(authorization, dict) else None
+    approval_ref = authorization.get("approval_ref") if isinstance(authorization, dict) else None
+    if (
+        not isinstance(authorization, dict)
+        or authorization.get("task_route_revision") != state.get("task_route_revision")
+        or not isinstance(contract_ref, str)
+        or not contract_ref.strip()
+        or not isinstance(approval_ref, str)
+        or not approval_ref.strip()
+    ):
+        return False
+    _require_current_requirements_confirmation(task_dir, state)
+    if PHASE_IDS[2] not in phase_ids:
+        skip_records = state.get("skip_records")
+        skipped_design = skip_records.get(PHASE_IDS[2]) if isinstance(skip_records, dict) else None
+        evidence = skipped_design.get("evidence_refs") if isinstance(skipped_design, dict) else None
+        return isinstance(evidence, list) and contract_ref in evidence
     design = state.get("phases", {}).get(PHASE_IDS[2])
-    return (
-        isinstance(authorization, dict)
-        and authorization.get("task_route_revision") == state.get("task_route_revision")
-        and isinstance(design, dict)
+    if not (
+        isinstance(design, dict)
         and design.get("status") == "accepted"
         and design.get("outcome_kind") == "implementation_contract"
-        and design.get("result_ref") == authorization.get("contract_ref")
-    )
+        and design.get("result_ref") == contract_ref
+    ):
+        return False
+    artifact_refs = design.get("artifact_refs")
+    if not isinstance(artifact_refs, list) or any(not isinstance(ref, str) for ref in artifact_refs):
+        return False
+    if _artifact_digest(task_dir, artifact_refs) != design.get("artifact_revision"):
+        raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "Solution Design and Convergence Phase implementation contract changed after acceptance; refresh and accept the current artifact before implementation")
+    return True
 
 
 def _save(task_file: Path, data: dict) -> None:
@@ -179,18 +227,37 @@ def _require_current_requirements_confirmation(task_dir: Path, state: dict) -> N
     if PHASE_IDS[0] not in state["phase_ids"]:
         return
     requirements = state["phases"].get(PHASE_IDS[0], {})
+    withdrawal = state.get("return_record")
+    skip_records = state.get("skip_records")
+    skipped_requirements = skip_records.get(PHASE_IDS[0]) if isinstance(skip_records, dict) else None
+    if (
+        state["phase_ids"] == [PHASE_IDS[0], PHASE_IDS[4]]
+        and state.get("current_phase_id") == PHASE_IDS[4]
+        and isinstance(requirements, dict)
+        and requirements.get("status") == "skipped"
+        and isinstance(skipped_requirements, dict)
+        and skipped_requirements.get("task_route_revision") == state.get("task_route_revision")
+        and isinstance(withdrawal, dict)
+        and isinstance(withdrawal.get("from"), str)
+        and withdrawal["from"] in PHASE_ID_SET
+        and withdrawal.get("to") == PHASE_IDS[4]
+        and withdrawal.get("task_route_revision") == state.get("task_route_revision")
+        and isinstance(withdrawal.get("evidence_refs"), list)
+        and bool(withdrawal["evidence_refs"])
+    ):
+        return
     acceptance = requirements.get("acceptance") if isinstance(requirements, dict) else None
     if (
         not isinstance(acceptance, dict)
         or requirements.get("status") != "accepted"
         or acceptance.get("artifact_revision") != requirements.get("artifact_revision")
-        or not isinstance(acceptance.get("user_confirmation_ref"), str)
-        or not acceptance["user_confirmation_ref"].strip()
+        or not isinstance(acceptance.get("evidence_refs"), list)
+        or not acceptance["evidence_refs"]
     ):
-        raise TaskWorkflowError("TASK_PHASE_USER_CONFIRMATION_REQUIRED", "phase 1 requirements must be accepted with explicit user confirmation before continuing")
+        raise TaskWorkflowError("TASK_PHASE_USER_CONFIRMATION_REQUIRED", "Goal Exploration and Requirements Confirmation Phase must be accepted with explicit user confirmation before continuing")
     current_revision = _artifact_digest(task_dir, requirements.get("artifact_refs", []))
     if current_revision != requirements["artifact_revision"]:
-        raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "phase 1 artifacts changed after user confirmation; return to phase 1 and obtain confirmation for the current revision")
+        raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "Goal Exploration and Requirements Confirmation Phase artifacts changed after user confirmation; return to Goal Exploration and Requirements Confirmation Phase and obtain confirmation for the current revision")
 
 
 def _next_phase(state: dict, phase_id: str) -> str | None:
@@ -199,6 +266,7 @@ def _next_phase(state: dict, phase_id: str) -> str | None:
 
 
 def _advance(state: dict, phase_id: str) -> None:
+    state["route_dependency_admission"] = None
     following = _next_phase(state, phase_id)
     state["current_phase_id"] = following
     if following is not None:
@@ -207,6 +275,7 @@ def _advance(state: dict, phase_id: str) -> None:
 
 
 def _invalidate_from(state: dict, first_phase: str, keep_first: bool = False) -> None:
+    state["route_dependency_admission"] = None
     first_index = PHASE_IDS.index(first_phase)
     for phase_id in state["phase_ids"]:
         if PHASE_IDS.index(phase_id) < first_index:
@@ -258,16 +327,29 @@ def _artifact_digest(task_dir: Path, refs: list[str]) -> str:
     return digest.hexdigest()
 
 
-def _validate_route(value: str | None, require_requirements_first: bool = True) -> list[str]:
+def _validate_route(value: str | None) -> list[str]:
     raw = _required_text(value, "--phase-ids")
     phases = raw.split(",")
     if not phases or any(phase not in PHASE_ID_SET for phase in phases):
         raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "--phase-ids must contain declared phase identifiers")
     if len(set(phases)) != len(phases) or phases != [phase for phase in PHASE_IDS if phase in phases]:
         raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "--phase-ids must be unique and follow the defined phase order")
-    if require_requirements_first and phases[0] != PHASE_IDS[0]:
-        raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "the requirements alignment phase must remain first")
+    if phases[0] != PHASE_IDS[0]:
+        raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "Goal Exploration and Requirements Confirmation Phase must remain first")
+    if phases[-1] != PHASE_IDS[-1]:
+        raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "--phase-ids must include Delivery Review and On-Site Closeout Phase")
     return phases
+
+
+def _validate_classification(task_kind: str | None, complexity: str | None, project_context: str | None, phases: list[str]) -> None:
+    if task_kind not in {"analysis", "implementation", "combined"}:
+        raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--task-kind must be analysis, implementation, or combined")
+    if complexity not in {"simple", "standard", "complex"}:
+        raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--complexity must be simple, standard, or complex")
+    if project_context not in {"new", "existing"}:
+        raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--project-context must be new or existing")
+    if task_kind == "analysis" and PHASE_IDS[3] in phases:
+        raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "analysis tasks cannot include the Task Implementation and Test Verification Phase")
 
 
 def _increment(value: str, allow_zero: bool = False) -> str:
@@ -304,12 +386,7 @@ def _init(args: argparse.Namespace, task_dir: Path, data: dict, meta: dict) -> i
             raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "an abbreviated route needs at least one --route-evidence-ref")
     elif route_reason or route_evidence:
         raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "route rationale is only used when a phase is omitted")
-    if args.task_kind not in {"analysis", "implementation", "combined"}:
-        raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--task-kind must be analysis, implementation, or combined")
-    if args.complexity not in {"simple", "standard", "complex"}:
-        raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--complexity must be simple, standard, or complex")
-    if args.project_context not in {"new", "existing"}:
-        raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--project-context must be new or existing")
+    _validate_classification(args.task_kind, args.complexity, args.project_context, phases)
     input_revision = "1"
     meta["task_workflow"] = {
         "schema_version": 1,
@@ -321,6 +398,7 @@ def _init(args: argparse.Namespace, task_dir: Path, data: dict, meta: dict) -> i
         "current_phase_id": phases[0],
         "input_revision": input_revision,
         "phases": {phase: _phase_record(input_revision, "active" if phase == phases[0] else "not_started") for phase in phases},
+        "route_dependency_admission": None,
         "implementation_authorization": None,
         "closeout_disposition": None,
         "skip_records": {
@@ -341,6 +419,7 @@ def _show(state: dict) -> int:
 
 def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -> int:
     action = args.phase_action
+    child_dispositions: dict[str, str] = {}
     if action == "show":
         return _show(state)
 
@@ -355,13 +434,14 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
     rerouting_to_requirements = action == "route" and args.target_phase == PHASE_IDS[0]
     if current != PHASE_IDS[0] and not returning_to_requirements and not rerouting_to_requirements:
         _require_current_requirements_confirmation(task_dir, state)
-    if action not in {"show", "resume", "route", "authorize"} and record.get("status") != "active":
+    if action not in {"show", "resume", "route", "authorize", "admission"} and record.get("status") != "active":
         raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "only the active phase can be changed")
 
     if action == "artifact":
         refs = _refs(args.artifact_ref, "--artifact-ref")
         revision = _artifact_digest(task_dir, refs)
         if revision != record["artifact_revision"] or refs != record["artifact_refs"]:
+            state["route_dependency_admission"] = None
             record["artifact_revision"] = revision
             record["artifact_refs"] = refs
             state["input_revision"] = _increment(state["input_revision"])
@@ -377,6 +457,17 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         record["evidence_refs"] = _refs(args.evidence_ref, "--evidence-ref")
         record["outcome_kind"] = args.outcome_kind
         record["acceptance"] = None
+    elif action == "admission":
+        if current != PHASE_IDS[3]:
+            raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "route dependency admission is recorded at Task Implementation and Test Verification Phase")
+        if args.admission_state is None:
+            raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--admission-state is required for dependency admission")
+        state["route_dependency_admission"] = {
+            "task_route_revision": state["task_route_revision"],
+            "dependencies": _refs(args.dependency, "--dependency", required=True),
+            "admission_state": args.admission_state,
+            "evidence_refs": _refs(args.evidence_ref, "--evidence-ref", required=True),
+        }
     elif action == "resume":
         if record["status"] not in {"waiting_user", "blocked"}:
             raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "only a waiting or blocked phase can resume")
@@ -384,12 +475,9 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
     elif action == "skip":
         reason = _required_text(args.reason, "--reason")
         evidence = _refs(args.evidence_ref, "--evidence-ref", required=True)
-        confirmation = args.user_confirmation_ref
         if current == PHASE_IDS[0]:
-            raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "requirements alignment always requires minimum alignment and acceptance")
+            raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "The Goal Exploration and Requirements Confirmation Phase must reach minimum alignment and acceptance and cannot be skipped")
         record.update({"status": "skipped", "reason": reason, "evidence_refs": evidence})
-        if confirmation:
-            record["acceptance"] = {"artifact_revision": record["artifact_revision"], "result_revision": record["result_revision"], "evidence_refs": evidence, "user_confirmation_ref": confirmation}
         state["skip_records"][current] = {"reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
         _advance(state, current)
     elif action == "accept":
@@ -400,30 +488,29 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         evidence = _refs(args.evidence_ref, "--evidence-ref", required=True)
         result_ref = _required_text(args.result_ref, "--result-ref")
         outcome = _required_text(args.outcome_kind, "--outcome-kind")
-        confirmation = args.user_confirmation_ref
         if current == PHASE_IDS[0]:
             if outcome != "accepted":
-                raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "phase 1 can advance only with phase_result=accepted")
-            if not confirmation or not confirmation.strip():
-                raise TaskWorkflowError("TASK_PHASE_USER_CONFIRMATION_REQUIRED", "phase 1 acceptance requires an explicit user confirmation reference")
-            confirmation = _required_text(confirmation, "--user-confirmation-ref")
+                raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "Goal Exploration and Requirements Confirmation Phase can advance only with phase_result=accepted")
         if current == PHASE_IDS[2] and outcome not in {"implementation_contract", "analysis_conclusion", "no_go"}:
-            raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "phase 3 must remain active for pending_user_decision or deferred; accept implementation_contract, analysis_conclusion, or no_go")
+            raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "Solution Design and Convergence Phase must remain active for pending_user_decision or deferred; accept implementation_contract, analysis_conclusion, or no_go")
         if result_ref not in record["artifact_refs"]:
             raise TaskWorkflowError("TASK_PHASE_RESULT_NOT_BOUND", "--result-ref must be included in the current phase artifact refs")
         if current == PHASE_IDS[3]:
             authorization = state.get("implementation_authorization")
             if not isinstance(authorization, dict) or authorization.get("task_route_revision") != state["task_route_revision"]:
-                raise TaskWorkflowError("TASK_PHASE_IMPLEMENTATION_NOT_AUTHORIZED", "phase 4 requires a current implementation authorization")
+                raise TaskWorkflowError("TASK_PHASE_IMPLEMENTATION_NOT_AUTHORIZED", "Task Implementation and Test Verification Phase requires a current implementation authorization")
         if current == PHASE_IDS[4]:
             if args.closeout_disposition not in {"delivery_ready", "no_go", "cancelled"}:
-                raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "phase 5 requires --closeout-disposition delivery_ready, no_go, or cancelled")
+                raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "Delivery Review and On-Site Closeout Phase requires --closeout-disposition delivery_ready, no_go, or cancelled")
             if outcome != args.closeout_disposition:
-                raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "phase 5 outcome must match --closeout-disposition")
+                raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "Delivery Review and On-Site Closeout Phase outcome must match --closeout-disposition")
             if args.closeout_disposition == "cancelled":
                 withdrawal = state.get("return_record")
-                if not isinstance(withdrawal, dict) or withdrawal.get("to") != PHASE_IDS[4] or not withdrawal.get("user_confirmation_ref"):
-                    raise TaskWorkflowError("TASK_PHASE_USER_CONFIRMATION_REQUIRED", "cancellation closeout requires a user-confirmed route to phase 5")
+                if not isinstance(withdrawal, dict) or withdrawal.get("to") != PHASE_IDS[4] or not withdrawal.get("evidence_refs"):
+                    raise TaskWorkflowError("TASK_PHASE_USER_CONFIRMATION_REQUIRED", "cancellation closeout requires a user-confirmed route to Delivery Review and On-Site Closeout Phase")
+            child_dispositions = _validate_child_dispositions(
+                task_dir, data, args.closeout_disposition, args.child_disposition
+            )
             state["closeout_disposition"] = args.closeout_disposition
         record["result_revision"] = _increment(record["result_revision"], allow_zero=True)
         record.update({"status": "accepted", "result_ref": result_ref, "outcome_kind": outcome, "reason": None, "evidence_refs": evidence})
@@ -433,7 +520,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
             "input_revision": record["input_revision"],
             "task_route_revision": state["task_route_revision"],
             "evidence_refs": evidence,
-            **({"user_confirmation_ref": confirmation} if confirmation else {}),
+            **({"child_dispositions": child_dispositions} if current == PHASE_IDS[4] and child_dispositions else {}),
         }
         state["input_revision"] = _increment(state["input_revision"])
         # The authorization is the explicit boundary into implementation.
@@ -454,18 +541,30 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         state["phases"][target]["input_revision"] = state["input_revision"]
         state["return_record"] = {"from": current, "to": target, "reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
     elif action == "route":
-        phases = _validate_route(args.phase_ids, require_requirements_first=False)
+        phases = _validate_route(args.phase_ids)
+        task_kind = args.task_kind if args.task_kind is not None else state["task_kind"]
+        complexity = args.complexity if args.complexity is not None else state["complexity"]
+        project_context = args.project_context if args.project_context is not None else state["project_context"]
+        _validate_classification(task_kind, complexity, project_context, phases)
         reason = _required_text(args.reason, "--reason")
         target = _required_text(args.target_phase, "--target-phase")
         evidence = _refs(args.evidence_ref, "--evidence-ref", required=True)
         old_ids = state["phase_ids"]
         changed = [phase for phase in PHASE_IDS if (phase in old_ids) != (phase in phases)]
+        classification_changed = any(
+            new != state[field]
+            for field, new in (
+                ("task_kind", task_kind),
+                ("complexity", complexity),
+                ("project_context", project_context),
+            )
+        )
         withdrawal_route = (
             target == PHASE_IDS[4]
-            and phases == [PHASE_IDS[4]]
-            and bool(args.user_confirmation_ref)
+            and phases == [PHASE_IDS[0], PHASE_IDS[4]]
+            and bool(evidence)
         )
-        if not changed and target == current:
+        if not changed and not classification_changed and target == current:
             raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "the updated route and target are unchanged")
         earliest_change = min((PHASE_IDS.index(phase) for phase in changed), default=PHASE_IDS.index(target))
         if target not in PHASE_ID_SET or (PHASE_IDS.index(target) > earliest_change and not withdrawal_route):
@@ -475,6 +574,9 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         previous_current = state.get("current_phase_id")
         state["task_route_revision"] = _increment(state["task_route_revision"])
         state["input_revision"] = _increment(state["input_revision"])
+        state["task_kind"] = task_kind
+        state["complexity"] = complexity
+        state["project_context"] = project_context
         state["phase_ids"] = phases
         state["phases"] = {phase: old_phases.get(phase, _phase_record(state["input_revision"])) for phase in phases}
         affected = [phase for phase in phases if PHASE_IDS.index(phase) >= PHASE_IDS.index(target)]
@@ -486,7 +588,11 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
                 "evidence_refs": [],
                 "acceptance": None,
             })
-        if previous_current in phases and PHASE_IDS.index(previous_current) < PHASE_IDS.index(target):
+        if (
+            not withdrawal_route
+            and previous_current in phases
+            and PHASE_IDS.index(previous_current) < PHASE_IDS.index(target)
+        ):
             state["current_phase_id"] = previous_current
             state["phases"][previous_current]["status"] = "active"
         else:
@@ -501,27 +607,46 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         state["skip_records"] = {}
         for phase_id in omitted:
             state["skip_records"][phase_id] = {"reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
+        if withdrawal_route and state["phases"][PHASE_IDS[0]].get("status") != "accepted":
+            state["phases"][PHASE_IDS[0]].update({
+                "status": "skipped",
+                "result_ref": None,
+                "outcome_kind": None,
+                "reason": reason,
+                "evidence_refs": evidence,
+                "acceptance": None,
+            })
+            state["skip_records"][PHASE_IDS[0]] = {
+                "reason": reason,
+                "evidence_refs": evidence,
+                "task_route_revision": state["task_route_revision"],
+            }
         state["implementation_authorization"] = None
         state["closeout_disposition"] = None
+        state["route_dependency_admission"] = None
         state["return_record"] = {
             "from": current,
             "to": target,
             "reason": reason,
             "evidence_refs": evidence,
             "task_route_revision": state["task_route_revision"],
-            **({"user_confirmation_ref": _required_text(args.user_confirmation_ref, "--user-confirmation-ref")} if withdrawal_route else {}),
         }
     elif action == "authorize":
         if current not in {PHASE_IDS[2], PHASE_IDS[3]}:
-            raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "implementation authorization is recorded at the phase 4 entry")
+            raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "implementation authorization is recorded at the Task Implementation and Test Verification Phase entry")
         contract_ref = _required_text(args.contract_ref, "--contract-ref")
         approval_ref = _required_text(args.approval_ref, "--approval-ref")
         design = state["phases"].get(PHASE_IDS[2])
         if PHASE_IDS[2] in state["phase_ids"]:
-            if design.get("status") != "accepted" or design.get("outcome_kind") != "implementation_contract" or design.get("result_ref") != contract_ref:
-                raise TaskWorkflowError("TASK_PHASE_CONTRACT_NOT_ACCEPTED", "authorize the accepted implementation contract from phase 3")
+            if not isinstance(design, dict) or design.get("status") != "accepted" or design.get("outcome_kind") != "implementation_contract" or design.get("result_ref") != contract_ref:
+                raise TaskWorkflowError("TASK_PHASE_CONTRACT_NOT_ACCEPTED", "authorize the accepted implementation contract from Solution Design and Convergence Phase")
+            artifact_refs = design.get("artifact_refs")
+            if not isinstance(artifact_refs, list) or any(not isinstance(ref, str) for ref in artifact_refs):
+                raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "accepted Solution Design and Convergence Phase artifact references are invalid")
+            if _artifact_digest(task_dir, artifact_refs) != design.get("artifact_revision"):
+                raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "Solution Design and Convergence Phase implementation contract changed after acceptance; refresh and accept the current artifact before authorization")
         elif contract_ref not in state.get("skip_records", {}).get(PHASE_IDS[2], {}).get("evidence_refs", []):
-            raise TaskWorkflowError("TASK_PHASE_CONTRACT_NOT_ACCEPTED", "when phase 3 is omitted, the implementation contract must be among its route evidence")
+            raise TaskWorkflowError("TASK_PHASE_CONTRACT_NOT_ACCEPTED", "when Solution Design and Convergence Phase is omitted, the implementation contract must be among its route evidence")
         state["implementation_authorization"] = {"contract_ref": contract_ref, "approval_ref": approval_ref, "task_route_revision": state["task_route_revision"]}
         if current == PHASE_IDS[2]:
             _advance(state, current)
@@ -545,6 +670,265 @@ def cmd_phase(args: argparse.Namespace) -> int:
         print(f"{error.code}: {error}", file=sys.stderr)
         return 1
 
+
+DELEGATION_DEPENDENCIES = {"pennix-lifecycle", "paseo", "git"}
+
+
+def _git_output(args: list[str], cwd: Path) -> str:
+    code, output, error = run_git(args, cwd=cwd)
+    if code != 0:
+        raise TaskWorkflowError("TASK_DELEGATE_GIT_INVALID", error.strip() or "Git validation failed")
+    return output.strip()
+
+
+def _paseo_json(args: list[str], cwd: Path, code: str) -> dict | list:
+    try:
+        result = subprocess.run(
+            ["paseo", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8"
+        )
+    except OSError as error:
+        raise TaskWorkflowError(code, f"could not run Paseo: {error}") from error
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise TaskWorkflowError(code, detail or f"Paseo exited with status {result.returncode}")
+    try:
+        value = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise TaskWorkflowError(code, "Paseo did not return valid JSON") from error
+    if not isinstance(value, (dict, list)):
+        raise TaskWorkflowError(code, "Paseo returned an invalid response")
+    return value
+
+
+def _paseo_list(args: list[str], cwd: Path, code: str) -> list[dict]:
+    value = _paseo_json(args, cwd, code)
+    if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+        raise TaskWorkflowError(code, "Paseo returned an invalid list response")
+    return value
+
+
+def cmd_delegate_start(args: argparse.Namespace) -> int:
+    try:
+        repo_root = get_repo_root().resolve()
+        child_dir = _task_dir(args.child_task)
+        child_data, _ = _load(child_dir)
+        parent_ref = child_data.get("parent")
+        if not isinstance(parent_ref, str) or not parent_ref.strip():
+            raise TaskWorkflowError("TASK_DELEGATE_PARENT_LINK_INVALID", "child task has no parent link")
+        parent_dir = _task_dir(parent_ref)
+        lock_dirs = sorted((parent_dir, child_dir), key=str)
+        with _task_lock(lock_dirs[0]), _task_lock(lock_dirs[1]):
+            parent_data, parent_meta = _load(parent_dir)
+            child_data, child_meta = _load(child_dir)
+            if child_data.get("parent") != parent_dir.name or child_dir.name not in parent_data.get("children", []):
+                raise TaskWorkflowError("TASK_DELEGATE_PARENT_LINK_INVALID", "parent and child task links do not match")
+            if parent_data.get("status") != "in_progress" or not implementation_start_ready(parent_data, parent_dir):
+                raise TaskWorkflowError("TASK_DELEGATE_IMPLEMENTATION_NOT_AUTHORIZED", "parent task is not at an authorized Task Implementation and Test Verification Phase entry")
+
+            state = _state(parent_meta)
+            admission = state.get("route_dependency_admission")
+            if not isinstance(admission, dict):
+                raise TaskWorkflowError("TASK_DELEGATE_ADMISSION_REQUIRED", "parent task has no current route dependency admission")
+            dependencies = admission.get("dependencies", [])
+            if (
+                admission.get("admission_state") != "ready"
+                or admission.get("task_route_revision") != state.get("task_route_revision")
+                or not DELEGATION_DEPENDENCIES.issubset(set(dependencies))
+                or not admission.get("evidence_refs")
+            ):
+                raise TaskWorkflowError("TASK_DELEGATE_ADMISSION_REQUIRED", "route dependency admission must be current, ready, evidenced, and include Pennix Lifecycle, Paseo, and Git")
+
+            contract_path = child_dir / "prd.md"
+            try:
+                resolved_contract = contract_path.resolve(strict=True)
+                resolved_contract.relative_to(child_dir.resolve())
+                contract_bytes = resolved_contract.read_bytes()
+                contract = contract_bytes.decode("utf-8")
+            except (OSError, UnicodeError, ValueError) as error:
+                raise TaskWorkflowError("TASK_DELEGATE_CONTRACT_INVALID", f"child task prd.md is unavailable: {error}") from error
+            if not contract.strip():
+                raise TaskWorkflowError("TASK_DELEGATE_CONTRACT_INVALID", "child task prd.md is empty")
+
+            branch_value = child_data.get("branch")
+            base_value = child_data.get("base_branch")
+            if not isinstance(branch_value, str) or not isinstance(base_value, str):
+                raise TaskWorkflowError("TASK_DELEGATE_GIT_INVALID", "child task branch and base_branch must be set")
+            branch = _required_text(branch_value, "child task branch")
+            base_branch = _required_text(base_value, "child task base_branch")
+            if branch == base_branch:
+                raise TaskWorkflowError("TASK_DELEGATE_GIT_INVALID", "child task branch and base_branch must differ")
+            _git_output(["check-ref-format", "--branch", branch], repo_root)
+            _git_output(["check-ref-format", "--branch", base_branch], repo_root)
+            top_level = Path(_git_output(["rev-parse", "--show-toplevel"], repo_root)).resolve()
+            if top_level != repo_root:
+                raise TaskWorkflowError("TASK_DELEGATE_GIT_INVALID", "Trellis repository root does not match the Git checkout")
+            base_commit = _git_output(["rev-parse", "--verify", "--end-of-options", f"{base_branch}^{{commit}}"], repo_root)
+            branch_exists, _, _ = run_git(["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=repo_root)
+            if branch_exists not in {0, 1}:
+                raise TaskWorkflowError("TASK_DELEGATE_GIT_INVALID", "could not check whether the child task branch already exists")
+
+            if shutil.which("paseo") is None:
+                raise TaskWorkflowError("TASK_DELEGATE_PASEO_UNAVAILABLE", "Paseo CLI is not available on PATH")
+            try:
+                version = subprocess.run(["paseo", "--version"], cwd=repo_root, capture_output=True, text=True, encoding="utf-8")
+            except OSError as error:
+                raise TaskWorkflowError("TASK_DELEGATE_PASEO_UNAVAILABLE", f"could not run Paseo: {error}") from error
+            if version.returncode != 0:
+                raise TaskWorkflowError("TASK_DELEGATE_PASEO_UNAVAILABLE", (version.stderr or version.stdout).strip() or "Paseo CLI preflight failed")
+            role_path = repo_root / ".trellis" / "agents" / "delegated-worktree-primary-agent.md"
+            try:
+                role = role_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError) as error:
+                raise TaskWorkflowError("TASK_DELEGATE_ROLE_MISSING", f"delegated worktree role is unavailable: {error}") from error
+
+            authorization = state.get("implementation_authorization")
+            if not isinstance(authorization, dict) or not isinstance(authorization.get("approval_ref"), str):
+                raise TaskWorkflowError("TASK_DELEGATE_AUTHORIZATION_INVALID", "current implementation authorization is invalid")
+            contract_digest = hashlib.sha256(contract_bytes).hexdigest()
+            previous = child_meta.get("delegated_worktree_execution_record")
+            reuse_workspace = False
+            workspace_id = None
+            worktree = None
+            if previous is not None:
+                if not isinstance(previous, dict):
+                    raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "existing execution mapping is invalid; reconcile it before starting another run")
+                if previous.get("authorization_ref") == authorization["approval_ref"]:
+                    raise TaskWorkflowError("TASK_DELEGATE_REAUTHORIZATION_REQUIRED", "reconcile the prior execution and record fresh implementation authorization before retrying")
+                if (
+                    previous.get("parent_task_id") != parent_dir.name
+                    or previous.get("parent_task_route_revision") != state["task_route_revision"]
+                    or previous.get("implementation_contract_sha256") != contract_digest
+                    or previous.get("branch") != branch
+                ):
+                    raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "the prior execution belongs to a different route, contract, or branch; create a newly authorized child task")
+                previous_workspace_id = previous.get("workspace_id")
+                previous_worktree_path = previous.get("worktree_path")
+                if not isinstance(previous_workspace_id, str) or not previous_workspace_id.strip() or not isinstance(previous_worktree_path, str) or not previous_worktree_path.strip():
+                    raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "the prior execution mapping is incomplete; reconcile the Paseo workspace and worktree before retrying")
+                previous_worktree = Path(previous_worktree_path).expanduser().resolve()
+                agents = _paseo_list([
+                    "agent", "ls", "--all", "--global", "--background", "--json",
+                    "--label", f"trellis.task_id={child_dir.name}",
+                ], repo_root, "TASK_DELEGATE_RECONCILIATION_REQUIRED")
+                for agent in agents:
+                    agent_id = agent.get("id")
+                    if agent.get("status") != "closed":
+                        raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "a Paseo agent for this child task is not confirmed closed")
+                    if agent_id == previous.get("agent_id"):
+                        agent_cwd = agent.get("cwd")
+                        if not isinstance(agent_cwd, str) or Path(agent_cwd).expanduser().resolve() != previous_worktree:
+                            raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "the recorded Paseo agent does not match the mapped worktree")
+                if previous.get("agent_id") and not any(agent.get("id") == previous.get("agent_id") for agent in agents):
+                    raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "the recorded Paseo agent is not present for reconciliation")
+                workspaces = _paseo_list(["workspace", "ls", "--background", "--json"], repo_root, "TASK_DELEGATE_RECONCILIATION_REQUIRED")
+                workspace_row = next((item for item in workspaces if item.get("workspaceId") == previous_workspace_id), None)
+                if workspace_row is not None:
+                    workspace_cwd = workspace_row.get("cwd")
+                    if not isinstance(workspace_cwd, str) or Path(workspace_cwd).expanduser().resolve() != previous_worktree or not previous_worktree.is_dir():
+                        raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "the recorded Paseo workspace does not match its existing worktree")
+                    worktree = previous_worktree
+                    worktree_root = Path(_git_output(["rev-parse", "--show-toplevel"], worktree)).resolve()
+                    common_dir = Path(_git_output(["rev-parse", "--git-common-dir"], repo_root))
+                    worktree_common_dir = Path(_git_output(["rev-parse", "--git-common-dir"], worktree))
+                    common_dir = (common_dir if common_dir.is_absolute() else repo_root / common_dir).resolve()
+                    worktree_common_dir = (worktree_common_dir if worktree_common_dir.is_absolute() else worktree / worktree_common_dir).resolve()
+                    if (
+                        worktree_root != worktree
+                        or worktree_common_dir != common_dir
+                        or _git_output(["branch", "--show-current"], worktree) != branch
+                        or _git_output(["rev-parse", "HEAD"], worktree) != base_commit
+                        or _git_output(["status", "--porcelain", "--untracked-files=all"], worktree)
+                    ):
+                        raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "the prior worktree is not clean at the authorized branch and Git base; preserve and reconcile it before retrying")
+                    workspace_id = previous_workspace_id
+                    reuse_workspace = True
+                else:
+                    if previous_worktree.exists() or branch_exists == 0:
+                        raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "the prior workspace is unavailable but its worktree or branch remains; reconcile it before rebuilding")
+            elif branch_exists == 0:
+                raise TaskWorkflowError("TASK_DELEGATE_GIT_INVALID", f"child task branch already exists: {branch}")
+
+            record = {
+                "parent_task_id": parent_dir.name,
+                "parent_task_route_revision": state["task_route_revision"],
+                "authorization_ref": authorization["approval_ref"],
+                "implementation_contract_ref": "prd.md",
+                "implementation_contract_sha256": contract_digest,
+                "branch": branch,
+                "base_commit": base_commit,
+                "workspace_id": workspace_id,
+                "worktree_path": str(worktree) if worktree else None,
+                "agent_id": None,
+                "status": "starting",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+            child_meta["delegated_worktree_execution_record"] = record
+            _save(child_dir / FILE_TASK_JSON, child_data)
+
+            try:
+                if not reuse_workspace:
+                    workspace = _paseo_json([
+                        "workspace", "create", "--isolation", "worktree", "--path", str(repo_root),
+                        "--mode", "branch-off", "--worktree-slug", child_dir.name,
+                        "--new-branch", branch, "--base", base_commit,
+                        "--title", child_data.get("title") or child_dir.name, "--json",
+                    ], repo_root, "TASK_DELEGATE_WORKSPACE_FAILED")
+                    if not isinstance(workspace, dict):
+                        raise TaskWorkflowError("TASK_DELEGATE_WORKSPACE_FAILED", "Paseo returned an invalid workspace response")
+                    workspace_id = workspace.get("workspaceId")
+                    worktree_path = workspace.get("cwd")
+                    if not isinstance(workspace_id, str) or not workspace_id.strip() or not isinstance(worktree_path, str) or not worktree_path.strip():
+                        raise TaskWorkflowError("TASK_DELEGATE_WORKSPACE_FAILED", "Paseo workspace response lacks workspaceId or cwd")
+                    worktree = Path(worktree_path).expanduser()
+                    if not worktree.is_absolute():
+                        worktree = repo_root / worktree
+                    worktree = worktree.resolve()
+                    record.update({"workspace_id": workspace_id, "worktree_path": str(worktree), "status": "workspace_created"})
+                    _save(child_dir / FILE_TASK_JSON, child_data)
+                if not isinstance(worktree, Path) or not isinstance(workspace_id, str):
+                    raise TaskWorkflowError("TASK_DELEGATE_WORKSPACE_FAILED", "Paseo workspace mapping is incomplete")
+                worktree_root = Path(_git_output(["rev-parse", "--show-toplevel"], worktree)).resolve()
+                common_dir = Path(_git_output(["rev-parse", "--git-common-dir"], repo_root))
+                worktree_common_dir = Path(_git_output(["rev-parse", "--git-common-dir"], worktree))
+                common_dir = (common_dir if common_dir.is_absolute() else repo_root / common_dir).resolve()
+                worktree_common_dir = (worktree_common_dir if worktree_common_dir.is_absolute() else worktree / worktree_common_dir).resolve()
+                if worktree_root != worktree or worktree_common_dir != common_dir:
+                    raise TaskWorkflowError("TASK_DELEGATE_WORKSPACE_FAILED", "Paseo workspace is not a worktree of the task repository")
+                if _git_output(["branch", "--show-current"], worktree) != branch or _git_output(["rev-parse", "HEAD"], worktree) != base_commit:
+                    raise TaskWorkflowError("TASK_DELEGATE_WORKSPACE_FAILED", "Paseo worktree branch or base does not match the child task")
+
+                prompt = (
+                    "Follow the delegated worktree role below. The child task's prd.md is the sole task-specific implementation contract; "
+                    "the parent authorization and Git baseline are execution metadata. Do not accept task phases or change task lifecycle state.\n\n"
+                    f"Parent task: {parent_dir.name}\nParent route revision: {state['task_route_revision']}\n"
+                    f"Authorized contract: prd.md\nBranch: {branch}\nBase commit: {base_commit}\n\n"
+                    f"{role}\n\n## Child task prd.md\n{contract}"
+                )
+                agent = _paseo_json([
+                    "run", "--workspace", workspace_id, "--no-wait", "--json",
+                    "--title", child_data.get("title") or child_dir.name,
+                    "--label", f"trellis.task_id={child_dir.name}",
+                    "--label", f"trellis.parent_task_id={parent_dir.name}", prompt,
+                ], repo_root, "TASK_DELEGATE_AGENT_START_FAILED")
+                if not isinstance(agent, dict):
+                    raise TaskWorkflowError("TASK_DELEGATE_AGENT_START_FAILED", "Paseo returned an invalid agent response")
+                agent_id = agent.get("agentId")
+                if not isinstance(agent_id, str) or not agent_id.strip():
+                    raise TaskWorkflowError("TASK_DELEGATE_AGENT_START_FAILED", "Paseo run response lacks agentId")
+                record.update({"agent_id": agent_id, "status": "running"})
+                _save(child_dir / FILE_TASK_JSON, child_data)
+            except TaskWorkflowError as error:
+                record["status"] = "reconciliation_required"
+                record["last_error"] = {"code": error.code, "reason": str(error)}
+                _save(child_dir / FILE_TASK_JSON, child_data)
+                raise
+
+            print(json.dumps(record, ensure_ascii=False))
+            return 0
+    except TaskWorkflowError as error:
+        print(f"{error.code}: {error}", file=sys.stderr)
+        return 1
+
 def cmd_cancel_task(args: argparse.Namespace) -> int:
     try:
         task_dir = _task_dir(args.task_dir)
@@ -555,6 +939,8 @@ def cmd_cancel_task(args: argparse.Namespace) -> int:
             readiness_error = task_closeout_readiness(data, "cancelled")
             if readiness_error:
                 raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", readiness_error)
+            _validate_child_dispositions(task_dir, data, "cancelled", None, from_acceptance=True)
+            _assert_delegated_resources_closed(task_dir, data)
             meta["task_cancellation"] = {
                 "reason": _required_text(args.reason, "--reason"),
                 "evidence_refs": _refs(args.evidence_ref, "--evidence-ref", required=True),
@@ -592,14 +978,82 @@ def task_closeout_readiness(data: dict, disposition: str) -> str | None:
             return f"task phase {phase_id} is not accepted or skipped"
     closeout = state["phases"].get(PHASE_IDS[4]) if PHASE_IDS[4] in state["phase_ids"] else None
     if not closeout or closeout.get("status") != "accepted":
-        return "phase 5 must be accepted before ending the task"
+        return "Delivery Review and On-Site Closeout Phase must be accepted before ending the task"
     if state.get("closeout_disposition") != disposition:
-        return f"phase 5 disposition is {state.get('closeout_disposition')}; expected {disposition}"
+        return f"Delivery Review and On-Site Closeout Phase disposition is {state.get('closeout_disposition')}; expected {disposition}"
     if disposition == "cancelled":
         withdrawal = state.get("return_record")
-        if not isinstance(withdrawal, dict) or withdrawal.get("to") != PHASE_IDS[4] or not withdrawal.get("user_confirmation_ref"):
-            return "cancellation requires a user-confirmed route to phase 5"
+        if not isinstance(withdrawal, dict) or withdrawal.get("to") != PHASE_IDS[4] or not withdrawal.get("evidence_refs"):
+            return "cancellation requires a user-confirmed route to Delivery Review and On-Site Closeout Phase"
     return None
+
+
+def _validate_child_dispositions(
+    task_dir: Path,
+    data: dict,
+    disposition: str,
+    requested: list[str] | None,
+    *,
+    from_acceptance: bool = False,
+) -> dict[str, str]:
+    children = data.get("children", [])
+    if not isinstance(children, list) or any(not isinstance(child, str) or not child.strip() for child in children):
+        raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", "linked child task list is malformed")
+    state = data.get("meta", {}).get("task_workflow", {})
+    closeout = state.get("phases", {}).get(PHASE_IDS[4], {})
+    acceptance = closeout.get("acceptance") if isinstance(closeout, dict) else None
+    if from_acceptance:
+        choices = acceptance.get("child_dispositions") if isinstance(acceptance, dict) else None
+        if children and not isinstance(choices, dict):
+            raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", "closeout must record a disposition for every linked child task")
+        choices = choices or {}
+    else:
+        choices = {}
+        for item in requested or []:
+            child_id, separator, choice = item.partition("=")
+            child_id, choice = child_id.strip(), choice.strip()
+            if not separator or not child_id or not choice or child_id in choices:
+                raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--child-disposition must use unique <task-id>=<choice> values")
+            choices[child_id] = choice
+        if set(choices) != set(children):
+            if children or choices:
+                raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", "record exactly one disposition for every linked child task")
+    allowed = {"integrated"} if disposition in {"delivery_ready", "no_go"} else {"continue", "independent", "cancelled"}
+    if set(choices) != set(children) or any(choice not in allowed for choice in choices.values()):
+        raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", "child task dispositions do not match the closeout outcome")
+    for child_id, choice in choices.items():
+        child_dir = _task_dir(child_id)
+        child_data, _ = _load(child_dir)
+        if child_data.get("parent") != task_dir.name:
+            raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", f"child task link is inconsistent: {child_id}")
+        if choice == "integrated" and child_data.get("status") != "completed":
+            raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", f"child task is not completed and integrated: {child_id}")
+        if choice == "cancelled" and child_data.get("status") != "cancelled":
+            raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", f"child task must be cancelled through its own flow: {child_id}")
+    return choices
+
+
+def _assert_delegated_resources_closed(task_dir: Path, data: dict) -> None:
+    repo_root = get_repo_root()
+    children = data.get("children", [])
+    if not isinstance(children, list):
+        raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", "linked child task list is malformed")
+    for task_id in [task_dir.name, *children]:
+        _, child_meta = _load(_task_dir(task_id))
+        record = child_meta.get("delegated_worktree_execution_record")
+        if record is None:
+            continue
+        agent_id = record.get("agent_id") if isinstance(record, dict) else None
+        if not isinstance(agent_id, str) or not agent_id.strip():
+            raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated execution status is unknown for {task_id}; preserve the current state")
+        agents = _paseo_list(
+            ["agent", "ls", "--all", "--global", "--background", "--json", "--label", f"trellis.task_id={task_id}"],
+            repo_root,
+            "TASK_PHASE_RESOURCE_ACTIVE",
+        )
+        agent = next((item for item in agents if item.get("id") == agent_id), None)
+        if agent is None or agent.get("status") != "closed":
+            raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated Paseo agent for {task_id} is not confirmed closed; preserve the current state")
 
 
 def cmd_complete_task(args: argparse.Namespace) -> int:
@@ -613,14 +1067,17 @@ def cmd_complete_task(args: argparse.Namespace) -> int:
             _require_current_requirements_confirmation(task_dir, state)
             disposition = state.get("closeout_disposition")
             if disposition not in {"delivery_ready", "no_go"}:
-                raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", "phase 5 must accept delivery_ready or no_go before complete")
+                raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", "Delivery Review and On-Site Closeout Phase must accept delivery_ready or no_go before complete")
             closeout = state["phases"][PHASE_IDS[4]]
             if _artifact_digest(task_dir, closeout.get("artifact_refs", [])) != closeout.get("artifact_revision"):
-                raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "phase 5 artifacts changed after acceptance; review the current delivery candidate again")
+                raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "Delivery Review and On-Site Closeout Phase artifacts changed after acceptance; review the current delivery candidate again")
             readiness_error = task_closeout_readiness(data, disposition)
             if readiness_error:
                 raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", readiness_error)
-            if state.get("task_kind") in {"implementation", "combined"} and data.get("status") != "in_progress":
+            _validate_child_dispositions(task_dir, data, disposition, None, from_acceptance=True)
+            _assert_delegated_resources_closed(task_dir, data)
+            implementation = state["phases"].get(PHASE_IDS[3])
+            if isinstance(implementation, dict) and implementation.get("status") == "accepted" and data.get("status") != "in_progress":
                 raise TaskWorkflowError("TASK_PHASE_IMPLEMENTATION_NOT_STARTED", "implementation tasks must enter in_progress before complete")
             data["status"] = "completed"
             data["completedAt"] = datetime.now().strftime("%Y-%m-%d")

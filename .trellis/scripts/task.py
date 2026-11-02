@@ -19,7 +19,7 @@ Usage:
     python3 task.py set-scope <dir> <scope>     # Set scope for PR title
     python3 task.py set-meta <dir> <key> <value>  # Set a task metadata key
     python3 task.py rename <dir> <new-slug> [--dry-run]  # Rename task + references
-    python3 task.py complete <task-dir>       # Complete a phase-5 accepted task
+    python3 task.py complete <task-dir>       # Complete after Delivery Review and On-Site Closeout Phase acceptance
     python3 task.py list                        # List active tasks
     python3 task.py add-subtask <parent-dir> <child-dir>     # Link child to parent
     python3 task.py remove-subtask <parent-dir> <child-dir>  # Unlink child from parent
@@ -80,6 +80,7 @@ from common.task_workflow import (
     TaskWorkflowError,
     cmd_cancel_task,
     cmd_complete_task,
+    cmd_delegate_start,
     cmd_phase,
     implementation_start_ready,
 )
@@ -104,8 +105,8 @@ def _record_start_state(
     """Enter implementation and record its branch after current authorization.
 
     Planning and analysis tasks keep their lifecycle status while the active
-    session pointer supports workflow context. Only an authorized phase-4
-    implementation start changes `planning` to `in_progress`.
+    session pointer supports workflow context. Only the start of an authorized
+    Task Implementation and Test Verification Phase changes `planning` to `in_progress`.
 
     Tolerant on purpose — a broken task.json does not fail `start`, because the
     session pointer is the point of the command. But the read overwrites the
@@ -124,7 +125,14 @@ def _record_start_state(
 
     applied: list[str] = []
 
-    implementation_ready = implementation_start_ready(data)
+    try:
+        implementation_ready = implementation_start_ready(data, task_json_path.parent)
+    except TaskWorkflowError as error:
+        print(
+            colored(f"Warning: Implementation start withheld; task.json not updated: {error.code}: {error}", Colors.YELLOW),
+            file=sys.stderr,
+        )
+        return
     if data.get("status") == "planning" and implementation_ready:
         data["status"] = "in_progress"
         applied.append(f"✓ Status: planning → in_progress{label}")
@@ -596,7 +604,7 @@ Usage:
   python3 task.py set-scope <dir> <scope>            Set scope for PR title
   python3 task.py set-meta <dir> <key> <value>       Set/overwrite a task metadata key
   python3 task.py rename <dir> <new-slug>            Rename task, identity fields and references
-  python3 task.py complete <task-dir>                 Complete after phase-5 acceptance
+  python3 task.py complete <task-dir>                 Complete after Delivery Review and On-Site Closeout Phase acceptance
   python3 task.py add-subtask <parent> <child>       Link child task to parent
   python3 task.py remove-subtask <parent> <child>    Unlink child from parent
   python3 task.py list [--mine] [--status <status>] [--json]  List tasks
@@ -746,17 +754,17 @@ def main() -> int:
     p_workflow.add_argument("--clear", action="store_true",
                             help="Remove the workflow selection (use default resolution)")
 
-    # Five-phase task workflow state.
+    # Business-phase task workflow state.
     p_phase = subparsers.add_parser("phase", help="Read or update task phase state")
     p_phase.add_argument(
         "phase_action",
-        choices=("init", "show", "artifact", "accept", "skip", "wait", "block", "resume", "return", "route", "authorize"),
+        choices=("init", "show", "artifact", "accept", "skip", "wait", "block", "resume", "return", "route", "authorize", "admission"),
     )
     p_phase.add_argument("task_dir", help="Task directory or task name")
     p_phase.add_argument("--expected-route-revision", help="Current task_route_revision required for mutation")
-    p_phase.add_argument("--task-kind", help="analysis | implementation | combined (init)")
-    p_phase.add_argument("--complexity", help="simple | standard | complex (init)")
-    p_phase.add_argument("--project-context", help="new | existing (init)")
+    p_phase.add_argument("--task-kind", help="analysis | implementation | combined (init / route)")
+    p_phase.add_argument("--complexity", help="simple | standard | complex (init / route)")
+    p_phase.add_argument("--project-context", help="new | existing (init / route)")
     p_phase.add_argument("--phase-ids", help="Comma-separated phase route (init / route)")
     p_phase.add_argument("--route-reason", help="Reason when initialization omits one or more phases")
     p_phase.add_argument("--route-evidence-ref", action="append", help="Evidence supporting an abbreviated initial route")
@@ -766,11 +774,16 @@ def main() -> int:
     p_phase.add_argument("--result-ref", help="Task result artifact reference")
     p_phase.add_argument("--outcome-kind", help="Phase result kind; pending phase outcomes may accompany wait/block")
     p_phase.add_argument("--evidence-ref", action="append", help="Evidence reference (repeatable)")
-    p_phase.add_argument("--user-confirmation-ref", help="Reference to explicit user confirmation")
     p_phase.add_argument("--reason", help="Reason for skip, block, return, route change, or cancellation")
     p_phase.add_argument("--contract-ref", help="Accepted implementation contract reference")
     p_phase.add_argument("--approval-ref", help="Explicit implementation approval reference")
-    p_phase.add_argument("--closeout-disposition", help="delivery_ready | deferred | no_go (phase 5)")
+    p_phase.add_argument("--closeout-disposition", help="delivery_ready | no_go | cancelled (Delivery Review and On-Site Closeout Phase)")
+    p_phase.add_argument("--child-disposition", action="append", help="Child task disposition as <task-id>=integrated|continue|independent|cancelled (repeatable at closeout)")
+    p_phase.add_argument("--dependency", action="append", help="Route dependency identifier (admission)")
+    p_phase.add_argument("--admission-state", choices=("ready", "missing", "stale", "incompatible", "blocked"), help="Dependency admission result")
+
+    p_delegate = subparsers.add_parser("delegate-start", help="Start an authorized child task in a Paseo worktree")
+    p_delegate.add_argument("child_task", help="Linked child task directory or name")
 
     add_continuity_commands(subparsers)
 
@@ -828,7 +841,7 @@ def main() -> int:
     p_rmsub.add_argument("child_dir", help="Child task directory")
 
     # complete task lifecycle
-    p_complete = subparsers.add_parser("complete", help="Complete a phase-5 accepted task")
+    p_complete = subparsers.add_parser("complete", help="Complete after Delivery Review and On-Site Closeout Phase acceptance")
     p_complete.add_argument("task_dir", help="Task directory or task name")
 
     args = parser.parse_args()
@@ -852,6 +865,7 @@ def main() -> int:
         "finish": cmd_finish,
         "workflow": cmd_workflow,
         "phase": cmd_phase,
+        "delegate-start": cmd_delegate_start,
         "complete": cmd_complete_task,
         "cancel": cmd_cancel_task,
         "set-branch": cmd_set_branch,

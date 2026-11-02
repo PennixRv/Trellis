@@ -4,15 +4,15 @@ The installed project's .trellis/workflow.md is the local workflow source. Read 
 
 ## Business phases
 
-The workflow has five distinct business phases with separate activities, outputs, and transition conditions:
+The workflow keeps its business phases distinct, with separate activities, outputs, and transition conditions:
 
-1. Goal exploration and requirements
-2. Decision space construction and merging
-3. Solution design and convergence
-4. Task implementation
-5. Delivery review and closeout
+- Goal Exploration and Requirements Confirmation Phase
+- Decision Space Construction and Consolidation Phase
+- Solution Design and Convergence Phase
+- Task Implementation and Test Verification Phase
+- Delivery Review and On-Site Closeout Phase
 
-The task route may skip a phase when evidence shows it adds no value. Phase 1 still requires explicit user confirmation of the current requirements revision before entering phase 2 or 3. An accepted phase-3 implementation contract does not grant implementation authorization. Phase 5 reviews delivery and handles task completion or cancellation.
+The task route may skip a phase when evidence shows it adds no value. The Goal Exploration and Requirements Confirmation Phase requires explicit user confirmation of the current requirements revision before the route enters Decision Space Construction and Consolidation Phase or Solution Design and Convergence Phase. Acceptance in Solution Design and Convergence Phase does not grant implementation authorization. During Delivery Review and On-Site Closeout Phase, review the current delivery and handle task completion or cancellation.
 
 Phase identifiers, route revisions, accepted artifact revisions, and authorization are stored and changed through Trellis CLI. Skills and Hooks guide or surface the active phase; they do not create another state source. Formal session handoff is independent of the task and its phases.
 

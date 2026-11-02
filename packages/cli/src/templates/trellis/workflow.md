@@ -2,7 +2,7 @@
 
 ## 核心原则
 
-1. 保持五个业务阶段各自独立。每个阶段都有自己的活动、产物、接受条件和回流路径。
+1. 保持下表列出的业务阶段各自独立。每个阶段都有自己的活动、产物、接受条件和回流路径。
 2. 任务与阶段事实由 Trellis CLI 管理。Skills、Hooks、Teamwork、Paseo 和其他组件按各自职责提供指引、证据或执行能力。
 3. 采用满足任务风险和验收需要的最小流程。可以基于证据跳过阶段；边界清楚、风险低、可逆、已获授权且能立即验证的请求可以不创建 Trellis task。
 4. 在任务资产中记录决定和当前证据。不得从阶段状态、Teamwork 结果或会话交接状态推断任务状态。
@@ -32,9 +32,9 @@ python3 ./.trellis/scripts/task.py complete <task>
 python3 ./.trellis/scripts/task.py cancel <task> --reason "<reason>" --evidence-ref <reference>
 ```
 
-使用 `phase artifact`、`accept`、`skip`、`wait`、`block`、`resume`、`return`、`route` 和 `authorize` 执行对应的阶段操作。准确参数以 `task.py --help` 为准。跳过阶段必须提供理由和证据；阶段 1 不可跳过。
+使用 `phase artifact`、`accept`、`skip`、`wait`、`block`、`resume`、`return`、`route` 和 `authorize` 执行对应的阶段操作。准确参数以 `task.py --help` 为准。跳过阶段必须提供理由和证据；目标探索与需求核对阶段不可省略。
 
-只有阶段路线已到达获准的实施入口时，`task.py start` 才会将任务从 `planning` 改为 `in_progress`。分析任务可在阶段 5 后仍处于 `planning` 时完成。`complete` 和 `cancel` 会清除任务的运行时会话指针；任务记录保留在原位置。
+只有阶段路线已到达获准的实施入口时，`task.py start` 才会将任务从 `planning` 改为 `in_progress`。分析任务可在交付审查与现场收尾阶段后仍处于 `planning` 时完成。`complete` 和 `cancel` 会清除任务的运行时会话指针；任务记录保留在原位置。
 
 在支持原生实施或检查 agent 的平台上，任务上下文清单（`implement.jsonl`、`check.jsonl`）用于提供相关规范和研究资料。只有这些 agent 会读取清单时才需要维护；清单不能替代任务资产或阶段证据。
 
@@ -52,29 +52,29 @@ python3 ./.trellis/scripts/add_session.py --title "<title>" --summary "<summary>
 
 ## 阶段索引
 
-任务路线最多包含五个有序业务阶段。下表列出各阶段及其对应的 Skill；每个 Skill 提供本阶段流程和图示。
+任务路线从下表列出的业务阶段中按需选取，组成有序路线；每个阶段对应一个提供本阶段流程和图示的 Skill。
 
-| 阶段 | `phase_id` | 阶段 Skill | 目的 |
+| 业务阶段 | 内部标识 | 对应 Skill | 目的 |
 | --- | --- | --- | --- |
-| 阶段 1：目标探索与需求核对 | `goal_exploration_and_requirements` | `trellis-goal-exploration-and-requirements` | 建立并由用户明确确认当前目标与需求基线。 |
-| 阶段 2：决策空间构造与归并 | `decision_space_construction_and_merging` | `trellis-decision-space-construction-and-merging` | 识别、比较并整理实质选择及其依赖。 |
-| 阶段 3：解决方案设计与收敛 | `solution_design_and_convergence` | `trellis-solution-design-and-convergence` | 收敛决策，并接受分析结论或实施合同。 |
-| 阶段 4：任务实施 | `task_implementation` | `trellis-task-implementation` | 实施并验证已获授权的合同。 |
-| 阶段 5：交付审查与收尾 | `delivery_review_and_closeout` | `trellis-delivery-review-and-closeout` | 审查当前交付、处理缺口并完成或取消任务。 |
+| 目标探索与需求核对阶段 | `goal_exploration_and_requirements` | `trellis-goal-exploration-and-requirements` | 建立并由用户明确确认当前目标与需求基线。 |
+| 决策空间构造与归并阶段 | `decision_space_construction_and_merging` | `trellis-decision-space-construction-and-merging` | 识别、比较并整理实质选择及其依赖。 |
+| 解决方案设计与收敛阶段 | `solution_design_and_convergence` | `trellis-solution-design-and-convergence` | 收敛决策，并接受分析结论或实施合同。 |
+| 任务实施与测试验证阶段 | `task_implementation` | `trellis-task-implementation` | 实施并验证已获授权的合同。 |
+| 交付审查与现场收尾阶段 | `delivery_review_and_closeout` | `trellis-delivery-review-and-closeout` | 审查当前交付、处理缺口并完成或取消任务。 |
 
 ```mermaid
 flowchart LR
   request["用户请求"] --> triage{"是否需要 Trellis task？"}
   triage -->|"否；边界清楚、低风险、可逆、已授权且可验证"| direct["直接处理并验证"]
-  triage -->|"是"| p1["阶段 1：目标与需求"]
-  p1 -->|"当前基线已获用户确认"| p2["阶段 2：决策空间"]
-  p2 -->|"已接受或有证据的跳过记录"| p3["阶段 3：方案设计"]
-  p3 -->|"实施合同已授权"| p4["阶段 4：任务实施"]
-  p3 -->|"分析结论或 no_go"| p5["阶段 5：交付审查"]
-  p4 -->|"交付候选"| p5
+  triage -->|"是"| goal_exploration_and_requirements["目标探索与需求核对阶段"]
+  goal_exploration_and_requirements -->|"当前基线已获用户确认"| decision_space_construction_and_merging["决策空间构造与归并阶段"]
+  decision_space_construction_and_merging -->|"已接受或有证据的跳过记录"| solution_design_and_convergence["解决方案设计与收敛阶段"]
+  solution_design_and_convergence -->|"实施合同已授权"| task_implementation["任务实施与测试验证阶段"]
+  solution_design_and_convergence -->|"分析结论或 no_go"| delivery_review_and_closeout["交付审查与现场收尾阶段"]
+  task_implementation -->|"交付候选"| delivery_review_and_closeout
 ```
 
-图示表达常见阶段转换，不是固定路线矩阵。适用时，任务可基于证据省略阶段 2 至阶段 5。进入阶段 2 或阶段 3 的路线必须保留用户对当前阶段 1 基线的明确确认。`no_go` 仍须经过阶段 5。正式会话交接是独立附加操作，只有用户明确要求时才执行，也不是任务推进或收尾的前置条件。
+图示表达常见阶段转换，不是固定路线矩阵。目标探索与需求核对阶段保留当前目标和需求基线的用户确认；后续业务阶段可按任务需要和现有证据省略。进入决策空间构造与归并阶段或解决方案设计与收敛阶段的路线均须保留该确认。`no_go` 仍须经过交付审查与现场收尾阶段。正式会话交接是独立附加操作，只有用户明确要求时才执行，也不是任务推进或收尾的前置条件。
 
 <!-- 宿主 Hook 从以下区块读取每轮工作流提示。 -->
 
@@ -87,7 +87,7 @@ flowchart LR
 [/workflow-state:task_error]
 
 [workflow-state:planning]
-任务尚未初始化阶段路线。核对需求后，按适用性选择有序阶段，并为省略阶段记录理由和证据，再使用 `task.py phase init`。阶段 3 的实施合同获接受且另行取得实施授权前，不得开始实施。
+任务尚未初始化阶段路线。核对需求后，按适用性选择有序阶段，并为省略阶段记录理由和证据，再使用 `task.py phase init`。解决方案设计与收敛阶段的实施合同获接受且另行取得实施授权前，不得开始实施。
 [/workflow-state:planning]
 
 [workflow-state:planning-inline]
@@ -95,7 +95,7 @@ flowchart LR
 [/workflow-state:planning-inline]
 
 [workflow-state:in_progress]
-任务生命周期状态为 `in_progress`。读取下方当前阶段提示。阶段 4 遵循已接受的合同、适用规范以及 `trellis-before-dev` 和 `trellis-check`；已配置时可使用宿主原生 agent 路径。实施变更不得超出授权范围。
+任务生命周期状态为 `in_progress`。读取下方当前阶段提示。任务实施与测试验证阶段按已接受合同和目标包适用规范推进，并运行与改动相称的验证。代码修改前或切换目标包时，可使用 `trellis-before-dev` 辅助定位规范；需要完整质量核验时，可使用 `trellis-check`。已配置时可使用宿主原生 agent 路径。实施变更不得超出授权范围。
 [/workflow-state:in_progress]
 
 [workflow-state:in_progress-inline]
@@ -103,7 +103,7 @@ flowchart LR
 [/workflow-state:in_progress-inline]
 
 [workflow-state:goal_exploration_and_requirements]
-读取 `trellis-goal-exploration-and-requirements` 及其 `workflow.md`。用户明确确认当前需求资产 revision 前，不得离开阶段 1。
+读取 `trellis-goal-exploration-and-requirements` 及其 `workflow.md`。用户明确确认当前需求资产 revision 前，不得离开目标探索与需求核对阶段。
 [/workflow-state:goal_exploration_and_requirements]
 
 [workflow-state:decision_space_construction_and_merging]
@@ -122,43 +122,43 @@ flowchart LR
 读取 `trellis-delivery-review-and-closeout` 及其 `workflow.md`。核对当前合同和 revision，解决缺口或按影响回流，并在完成或取消任务前确认资源安全。
 [/workflow-state:delivery_review_and_closeout]
 
-### 阶段 1：目标探索与需求核对
+### 目标探索与需求核对阶段
 
 #### 1.1 建立需求基线
 
-读取阶段 1 Skill。仅收集可能改变目标、范围、接受标准、约束或路线的证据。将当前基线记录为阶段产物，并在推进前取得绑定其当前资产 revision 的用户明确确认。
+读取目标探索与需求核对阶段 Skill。仅收集可能改变目标、范围、接受标准、约束或路线的证据。将当前基线记录为阶段产物，并在推进前取得绑定其当前资产 revision 的用户明确确认。
 
-### 阶段 2：决策空间构造与归并
+### 决策空间构造与归并阶段
 
 #### 2.1 整理实质决策
 
-读取阶段 2 Skill。选择能表达相关选项及其关系的最简方式。满足既定触发条件时查找外部先例；Teamwork 仍是可选的只读证据支持。
+读取决策空间构造与归并阶段 Skill。选择能表达相关选项及其关系的最简方式。满足既定触发条件时查找外部先例；Teamwork 仍是可选的只读证据支持。
 
-### 阶段 3：解决方案设计与收敛
+### 解决方案设计与收敛阶段
 
 #### 3.1 收敛当前方案
 
-读取阶段 3 Skill。解决必要的用户决定，并依据当前目标、风险、责任、依赖、验证、停止与恢复条件及重要后果审查方案。通过 Trellis CLI 接受当前阶段结果。
+读取解决方案设计与收敛阶段 Skill。解决必要的用户决定，并依据当前目标、风险、责任、依赖、验证、停止与恢复条件及重要后果审查方案。通过 Trellis CLI 接受当前阶段结果。
 
-### 阶段 4：任务实施
+### 任务实施与测试验证阶段
 
 #### 4.1 实施已授权合同
 
-读取阶段 4 Skill、源码 owner 仓库适用的 `AGENTS.md` 和规范。按合同顺序推进必要工作包。Teamwork 仅提供只读协作；只有明确授权委派 Git worktree 写入时才使用 Paseo。
+读取任务实施与测试验证阶段 Skill、源码 owner 仓库适用的 `AGENTS.md` 和规范。按合同顺序推进必要工作包。Teamwork 仅提供只读协作；只有明确授权委派 Git worktree 写入时才使用 Paseo。
 
 #### 4.2 验证与集成
 
-按风险和影响选择相称的验证深度，集成已接受工作并记录当前证据。在阶段 4 修复局部问题。只有合同、目标、授权、依赖或接受条件需要修订时，才回到最早受影响的前置阶段。
+按风险和影响选择相称的验证深度，集成已接受工作并记录当前证据。在任务实施与测试验证阶段中修复局部问题。只有合同、目标、授权、依赖或接受条件需要修订时，才回到最早受影响的前置阶段。
 
-### 阶段 5：交付审查与收尾
+### 交付审查与现场收尾阶段
 
 #### 5.1 审查当前交付
 
-读取阶段 5 Skill。依据已接受合同和需求审查当前结果，核验必需工作及验证，记录允许保留的遗留，并将未解决的缺口回流到最早受影响的阶段。
+读取交付审查与现场收尾阶段 Skill。依据已接受合同和需求审查当前结果，核验必需工作及验证，记录允许保留的遗留，并将未解决的缺口回流到最早受影响的阶段。
 
 #### 5.2 完成或取消任务
 
-只有阶段 5 交付结果获接受且必需资源安全时才使用 `complete`。只有用户明确撤回并完成阶段 5 取消审查后才使用 `cancel --reason`。正式会话交接仍是独立操作。
+只有交付审查与现场收尾阶段结果获接受且必需资源安全时才使用 `complete`。只有用户明确撤回并完成交付审查与现场收尾阶段中的取消审查后才使用 `cancel --reason`。正式会话交接仍是独立操作。
 
 ## 跨组件职责
 

@@ -218,7 +218,7 @@ describe("shared-hooks capability table", () => {
     }
   });
 
-  it("shared session-start.py injects compact task artifact guidance", () => {
+  it("shared session-start.py treats lifecycle status separately from the phase route", () => {
     const sessionStart = getSharedHookScripts().find(
       (h) => h.name === "session-start.py",
     );
@@ -230,10 +230,10 @@ describe("shared-hooks capability table", () => {
     expect(content).toContain("<trellis-workflow>");
     expect(content).toContain("Task context order");
     expect(content).toContain("jsonl entries -> `prd.md`");
-    expect(content).toContain(
-      "Lightweight task can request start review with PRD-only",
-    );
-    expect(content).toContain("complex task must add");
+    expect(content).toContain("task lifecycle status and artifact presence do not identify the business phase");
+    expect(content).toContain("trellis-goal-exploration-and-requirements");
+    expect(content).not.toContain("trellis-brainstorm");
+    expect(content).not.toContain("complex task must add");
     expect(content).not.toContain("Status: READY");
     expect(content).not.toContain("<workflow>");
   });

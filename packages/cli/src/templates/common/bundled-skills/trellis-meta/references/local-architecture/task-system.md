@@ -25,7 +25,7 @@ The active task pointer is scoped to an AI session under .trellis/.runtime/sessi
     python3 ./.trellis/scripts/task.py complete <task>
     python3 ./.trellis/scripts/task.py cancel <task> --reason "<reason>" --evidence-ref <reference>
 
-Use phase operations through task.py phase for artifact revisions, acceptance, evidence-backed skips, waits, blocks, resume, return, route, and authorization. Consult task.py help for current arguments. Completion and cancellation occur only after phase-5 review.
+Use phase operations through task.py phase for artifact revisions, acceptance, evidence-backed skips, waits, blocks, resume, return, route, and authorization. Consult task.py help for current arguments. Completion and cancellation occur only after Delivery Review and On-Site Closeout Phase.
 
 The read-only trellis task progress command summarizes planning, in_progress, and completed lifecycle records. It does not change task state.
 

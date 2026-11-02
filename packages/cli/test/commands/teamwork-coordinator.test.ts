@@ -36,9 +36,24 @@ function setup(): TestEnv {
     recursive: true,
   });
   fs.mkdirSync(taskRoot, { recursive: true });
-  const phase1 = "goal_exploration_and_requirements";
-  const phase2 = "decision_space_construction_and_merging";
+  const goalExplorationAndRequirements = "goal_exploration_and_requirements";
+  const decisionSpaceConstructionAndMerging = "decision_space_construction_and_merging";
+  const solutionDesignAndConvergence = "solution_design_and_convergence";
+  const taskImplementation = "task_implementation";
+  const deliveryReviewAndCloseout = "delivery_review_and_closeout";
   const artifactRevision = "e".repeat(64);
+  const notStartedPhase = {
+    status: "not_started",
+    input_revision: "1",
+    artifact_revision: artifactRevision,
+    result_revision: "0",
+    artifact_refs: [],
+    result_ref: null,
+    outcome_kind: null,
+    reason: null,
+    evidence_refs: [],
+    acceptance: null,
+  };
   fs.writeFileSync(
     path.join(taskRoot, "task.json"),
     JSON.stringify({
@@ -51,11 +66,11 @@ function setup(): TestEnv {
           task_kind: "combined",
           complexity: "standard",
           project_context: "existing",
-          phase_ids: [phase1, phase2],
-          current_phase_id: phase2,
+          phase_ids: [goalExplorationAndRequirements, decisionSpaceConstructionAndMerging, solutionDesignAndConvergence, taskImplementation, deliveryReviewAndCloseout],
+          current_phase_id: decisionSpaceConstructionAndMerging,
           input_revision: "1",
           phases: {
-            [phase1]: {
+            [goalExplorationAndRequirements]: {
               status: "accepted",
               input_revision: "1",
               artifact_revision: artifactRevision,
@@ -71,21 +86,15 @@ function setup(): TestEnv {
                 input_revision: "1",
                 task_route_revision: "1",
                 evidence_refs: ["requirements.md"],
-                user_confirmation_ref: "user-message:approved",
               },
             },
-            [phase2]: {
+            [decisionSpaceConstructionAndMerging]: {
+              ...notStartedPhase,
               status: "active",
-              input_revision: "1",
-              artifact_revision: artifactRevision,
-              result_revision: "0",
-              artifact_refs: [],
-              result_ref: null,
-              outcome_kind: null,
-              reason: null,
-              evidence_refs: [],
-              acceptance: null,
             },
+            [solutionDesignAndConvergence]: notStartedPhase,
+            [taskImplementation]: notStartedPhase,
+            [deliveryReviewAndCloseout]: notStartedPhase,
           },
           implementation_authorization: null,
           closeout_disposition: null,

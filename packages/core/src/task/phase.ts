@@ -30,7 +30,7 @@ export interface TaskPhaseAcceptance {
   input_revision: string;
   task_route_revision: string;
   evidence_refs: string[];
-  user_confirmation_ref?: string;
+  child_dispositions?: Record<string, "integrated" | "continue" | "independent" | "cancelled">;
 }
 
 export interface TaskPhaseRecord {
@@ -117,7 +117,13 @@ export function parseTaskWorkflowState(value: unknown): TaskWorkflowState {
       );
     })
   ) {
-    throw new Error("task_workflow.phase_ids must be unique, ordered, and begin with requirements alignment");
+    throw new Error("task_workflow.phase_ids must be unique, ordered, and begin with Goal Exploration and Requirements Confirmation Phase");
+  }
+  if (phaseIds[phaseIds.length - 1] !== TASK_PHASE_IDS[4]) {
+    throw new Error("task_workflow.phase_ids must end with Delivery Review and On-Site Closeout Phase");
+  }
+  if (state.task_kind === "analysis" && phaseIds.includes(TASK_PHASE_IDS[3])) {
+    throw new Error("analysis tasks cannot include the Task Implementation and Test Verification Phase");
   }
   if (
     state.current_phase_id !== null &&
@@ -156,10 +162,10 @@ export function parseTaskWorkflowState(value: unknown): TaskWorkflowState {
       record.status === "accepted" &&
       (!isRecord(record.acceptance) ||
         record.acceptance.artifact_revision !== record.artifact_revision ||
-        typeof record.acceptance.user_confirmation_ref !== "string" ||
-        !record.acceptance.user_confirmation_ref.trim())
+        !Array.isArray(record.acceptance.evidence_refs) ||
+        record.acceptance.evidence_refs.length === 0)
     ) {
-      throw new Error("accepted phase 1 must retain confirmation for its current artifact revision");
+      throw new Error("accepted Goal Exploration and Requirements Confirmation Phase must retain confirmation for its current artifact revision");
     }
   }
   if (!isRecord(state.skip_records)) {
@@ -185,7 +191,9 @@ export function parseTaskWorkflowState(value: unknown): TaskWorkflowState {
     if (
       !isRecord(authorization) ||
       typeof authorization.contract_ref !== "string" ||
+      !authorization.contract_ref.trim() ||
       typeof authorization.approval_ref !== "string" ||
+      !authorization.approval_ref.trim() ||
       authorization.task_route_revision !== state.task_route_revision
     ) {
       throw new Error("task_workflow.implementation_authorization is invalid");
@@ -225,8 +233,11 @@ function validateAcceptance(value: unknown, phaseId: TaskPhaseId): void {
     !isRevision(value.task_route_revision) ||
     !isStringArray(value.evidence_refs) ||
     value.evidence_refs.length === 0 ||
-    (value.user_confirmation_ref !== undefined &&
-      typeof value.user_confirmation_ref !== "string")
+    (value.child_dispositions !== undefined &&
+      (!isRecord(value.child_dispositions) ||
+        Object.entries(value.child_dispositions).some(
+          ([id, disposition]) => !id.trim() || !["integrated", "continue", "independent", "cancelled"].includes(String(disposition)),
+        )))
   ) {
     throw new Error(`task_workflow.phases.${phaseId}.acceptance is invalid`);
   }

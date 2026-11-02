@@ -142,7 +142,7 @@ describe("init() joiner onboarding", () => {
     expect(prd).toContain("workflow.md");
     expect(prd).toContain(".trellis/spec/");
     expect(prd).toContain("start it from a session that provides Trellis session identity");
-    expect(prd).toContain("phase 5");
+    expect(prd).toContain("Delivery Review and On-Site Closeout Phase");
     expect(prd).not.toContain("task.py archive");
     const expectedPythonCmd = process.platform === "win32" ? "python" : "python3";
     expect(prd).toContain(

@@ -518,13 +518,13 @@ is a separate conversation, not a bootstrap concern.
 ## Completion
 
 When the developer confirms the checklist items above are done with real
-examples (not placeholders), review the delivery through phase 5:
+examples (not placeholders), review and close the delivery in Delivery Review and On-Site Closeout Phase:
 
 \`\`\`bash
 ${pythonCmd} ./.trellis/scripts/task.py complete 00-bootstrap-guidelines
 \`\`\`
 
-Complete this task only after phase 5 accepts the delivery. The task record
+Complete this task only after the Delivery Review and On-Site Closeout Phase accepts the delivery. The task record
 remains under \`.trellis/tasks/\`.
 
 ---
@@ -666,9 +666,9 @@ Trellis is a workflow layer over Claude Code / Cursor / etc. that keeps AI
 agents consistent with project-specific conventions instead of writing generic
 code every session.
 
-- **Five business phases**: goal exploration and requirements; decision
-  space construction and merging; solution design and convergence; task
-  implementation; delivery review and closeout. Each phase has its own Skill
++ **Business phases**: Goal Exploration and Requirements Confirmation Phase; decision
+  space construction and merging; Solution Design and Convergence Phase; task
+  implementation; Delivery Review and On-Site Closeout Phase. Each phase has its own Skill
   and workflow. Full reference: \`.trellis/workflow.md\`.
 - **Task lifecycle**: planning → in_progress when authorized implementation
   begins → completed or cancelled. Phase state is recorded separately in the
@@ -722,14 +722,14 @@ File layout (mention when they ask "where does what live"):
 
 If they want to practice before touching real work, offer a small task and
 follow its applicable phase route. Finish-work records the session journal;
-phase 5 and Trellis CLI control task completion.
+Delivery acceptance happens in Delivery Review and On-Site Closeout Phase; Trellis CLI controls task completion.
 
 ---
 
 ## Completion
 
 When they feel oriented, leave this task in its current lifecycle state
-unless phase 5 has accepted the delivery. The complete operation requires
+unless the delivery has been accepted through Delivery Review and On-Site Closeout Phase. The complete operation requires
 that acceptance.
 
 ---

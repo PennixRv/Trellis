@@ -4,7 +4,7 @@ description: "Trellis Copilot prompt: Start Session"
 
 # Start Session
 
-Initialize a Trellis-managed development session. This platform has no session-start hook, so manually load the equivalent context by following these steps (each one mirrors a section the hook would otherwise inject).
+Use this prompt to inspect or refresh Trellis context. Copilot also supplies SessionStart context and a per-turn workflow-state breadcrumb through its hooks.
 
 ---
 
@@ -38,15 +38,13 @@ cat .trellis/spec/<package>/<layer>/index.md   # for each relevant layer
 Index files list the specific guideline docs to read when you actually start coding.
 
 ## Step 4: Decide next action
-From Step 1 you know the current task and status. Check the task directory:
+Use the current `<workflow-state>` breadcrumb to identify the business phase; task lifecycle status (`planning` or `in_progress`) and artifact presence do not identify that phase. If the breadcrumb is missing or stale, inspect the task with `task.py phase show <task>` and follow the matching phase Skill in `.trellis/workflow.md`.
 
-- **Active task status `planning` + no `prd.md`** → Phase 1.1. Load the `trellis-brainstorm` skill.
-- **Active task status `planning` + `prd.md` exists** → stay in Phase 1. Lightweight tasks can be PRD-only; complex tasks need `design.md` + `implement.md`. Load the relevant Phase 1 step detail before `task.py start`.
-- **Active task status `in_progress`** → Phase 2 step 2.1. Load the step detail:
-  ```bash
-  {{PYTHON_CMD}} ./.trellis/scripts/get_context.py --mode phase --step 2.1 --platform {{CLI_FLAG}}
-  ```
-- **No active task** → classify first. For simple conversation / small task, ask only whether this turn should create a Trellis task. For complex work, ask whether you may create a Trellis task and enter planning. If the user says no, skip Trellis for this session.
+- **An active phase is recorded** → continue that phase and load its matching Skill.
+- **The task has no initialized phase route** → load `trellis-goal-exploration-and-requirements`, align and obtain the user's confirmation of the current requirements baseline, then initialize the applicable ordered route with `task.py phase init`.
+- **No active task** → classify first. Handle a clear, low-risk, reversible, authorized, immediately verifiable request directly; otherwise ask for task-creation consent and begin with `trellis-goal-exploration-and-requirements`.
+
+`task.py start` enters implementation only after an accepted implementation contract from Solution Design and Convergence Phase and separate implementation authorization.
 
 ---
 
@@ -54,7 +52,11 @@ From Step 1 you know the current task and status. Check the task directory:
 
 | User intent | Skill |
 |---|---|
-| New feature / unclear requirements | `trellis-brainstorm` |
+| Goal and requirements | `trellis-goal-exploration-and-requirements` |
+| Decision alternatives | `trellis-decision-space-construction-and-merging` |
+| Solution design | `trellis-solution-design-and-convergence` |
+| Implementation | `trellis-task-implementation` |
+| Delivery review | `trellis-delivery-review-and-closeout` |
 | About to write code | `trellis-before-dev` |
 | Done coding / quality check | `trellis-check` |
 | Stuck / fixed same bug multiple times | `trellis-break-loop` |

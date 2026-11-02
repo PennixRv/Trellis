@@ -1,6 +1,6 @@
 # Finish Work
 
-Record progress in the developer session journal when ending this session. This command does not change task status, phase state, or implementation authorization. Task completion and cancellation are handled in phase 5 through Trellis CLI.
+Record progress in the developer session journal when ending this session. This command does not change task status, phase state, or implementation authorization. Task completion and cancellation are handled during Delivery Review and On-Site Closeout Phase through Trellis CLI.
 
 ## Review the current session
 

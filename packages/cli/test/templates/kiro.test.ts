@@ -6,6 +6,8 @@ import {
 
 interface KiroAgentJson {
   name: string;
+  description?: string;
+  prompt?: string;
   resources?: string[];
   hooks?: Record<string, { command: string }[]>;
 }
@@ -50,6 +52,21 @@ describe("kiro templates", () => {
     expect(JSON.stringify(trellis.hooks)).not.toContain(
       "inject-subagent-context.py",
     );
+  });
+
+  it("routes the main agent by the current named workflow state", () => {
+    const trellis = parseAgent("trellis");
+    const guidance = `${trellis.description}\n${trellis.prompt}`;
+
+    expect(guidance).toContain("Goal Exploration and Requirements Confirmation Phase");
+    expect(guidance).toContain("Solution Design and Convergence Phase");
+    expect(guidance).toContain("Task Implementation and Test Verification Phase");
+    expect(guidance).toContain("Delivery Review and On-Site Closeout Phase");
+    expect(guidance).toContain("taskless route");
+    expect(guidance).toContain("task lifecycle status and artifact presence do not");
+    expect(guidance).toContain("implementation authorization");
+    expect(guidance).not.toContain("plan / implement / check phases");
+    expect(guidance).not.toContain("For complex work, write `prd.md`");
   });
 
   it("the 3 sub-agents keep agentSpawn → inject-subagent-context.py", () => {

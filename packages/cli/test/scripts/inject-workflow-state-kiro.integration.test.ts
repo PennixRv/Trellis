@@ -52,7 +52,7 @@ function setupRepo(tmp: string): void {
       "No active task. Classify the turn before creating a Trellis task.",
       "[/workflow-state:no_task]",
       "",
-      "### 阶段 1：目标探索与需求核对",
+      "### 目标探索与需求核对阶段",
       "",
     ].join("\n"),
   );

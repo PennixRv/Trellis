@@ -4,7 +4,7 @@
 
 整理目标、范围、成功条件、关键约束和责任方。区分已知事实、假设、证据冲突和未知事项；缺少会改变目标或路线的用户事实时，通过 `pennix-decision-grill` 同步询问。记录会阻断推进的问题及恢复条件；不影响当前路线的事项可明确责任方和后续处理。
 
-形成 `phase_output`，至少包含当前目标与需求基线、必要证据、不确定性、`phase_result` 和非约束性的 `route_advice`。阶段可等待用户补充或因依赖阻塞；只有用户确认当前基线且阶段产物有效时，才以 `accepted` 离开本阶段。将阶段产物及引用提交 Trellis CLI 核验后，向用户展示简明基线并请求确认或修订。
+形成 `phase_output`，至少包含当前目标与需求基线、必要证据、不确定性、`phase_result` 和非约束性的 `route_advice`。`route_advice` 简要说明任务类型、复杂度画像和项目背景如何影响阶段选择，并记录复杂度判断的实际触发维度与理由；不机械计分或套用固定路由矩阵，也不要求固定字段或篇幅。路线发生变化时，使用 Trellis CLI 更新受影响的分类和阶段，并按影响范围重新核验。阶段可等待用户补充或因依赖阻塞；只有用户确认当前基线且阶段产物有效时，才以 `accepted` 离开本阶段。将阶段产物及引用提交 Trellis CLI 核验后，向用户展示简明基线并请求确认或修订。
 
 ```mermaid
 flowchart TD
@@ -12,7 +12,7 @@ flowchart TD
   evidence --> baseline["整理目标、范围、成功条件与约束"]
   baseline --> enough{"关键事实是否足以形成基线？"}
   enough -->|"否，需用户补充"| ask["Trellis CLI 记录 needs_user_input；同步询问"]
-  ask --> wait["等待答复并留在阶段 1"]
+  ask --> wait["等待答复并留在目标探索与需求核对阶段"]
   wait --> evidence
   enough -->|"否，依赖阻断"| blocked["记录 blocked 与恢复条件"]
   blocked -->|"依赖恢复后"| evidence
@@ -22,12 +22,12 @@ flowchart TD
   decision -->|"要求修订"| evidence
   decision -->|"尚未确认"| wait
   decision -->|"明确确认"| gate["以当前 artifact_revision 记录确认并接受阶段"]
-  gate --> route["按当前路线选择下一阶段；跳过阶段 2 也保留此确认"]
+  gate --> route["按当前路线选择后续阶段；跳过决策空间构造与归并阶段也保留此确认"]
 ```
 
 ### 离开阶段的条件
 
 - `accepted` 及明确用户确认必须绑定当前 `artifact_revision`；产物改变后重新核验并取得确认。
 - `needs_user_input` 或 `blocked` 时不推进阶段游标。
-- `terminated` 不代表用户撤回任务；如用户明确撤回，按阶段 5 的取消审查处理。
-- 阶段 1 可直接进入阶段 3，但不能绕过需求基线确认。
+- `terminated` 不代表用户撤回任务；如用户明确撤回，按交付审查与现场收尾阶段中的取消审查处理。
+- 可从目标探索与需求核对阶段直接进入解决方案设计与收敛阶段，但不能绕过需求基线确认。

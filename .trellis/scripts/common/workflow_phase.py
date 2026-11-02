@@ -35,9 +35,9 @@ _MARKER_RE = re.compile(r"^\[(/?)([A-Za-z][^\[\]]*)\]\s*$")
 # Step heading: "#### 1.0 Title" or "#### 1.0 ..."
 _STEP_HEADING_RE = re.compile(r"^####\s+(\d+\.\d+)\b.*$")
 
-# Phase Index ends when the first phase body begins.
+# Phase Index ends at the first section heading that follows it.
 _PHASE_INDEX_HEADINGS = {"## 阶段索引", "## Phase Index"}
-_FIRST_PHASE_HEADING_RE = re.compile(r"^#{2,3} (?:阶段 1：|Phase 1:)")
+_NEXT_PHASE_SECTION_RE = re.compile(r"^#{2,3}\s+")
 
 
 def _read_workflow() -> str:
@@ -65,7 +65,7 @@ def get_phase_index() -> str:
     """Return the compact Phase Index summary from workflow.md.
 
     SessionStart and no-step phase context use this small summary as their
-    orientation payload. Detailed Phase 1/2/3 instructions are loaded with
+    orientation payload. Detailed phase instructions are loaded with
     ``get_step`` on demand. ``[workflow-state:STATUS]`` tag blocks are
     consumed by the per-turn hook, so they're stripped from this output.
     """
@@ -79,7 +79,7 @@ def get_phase_index() -> str:
         if start is None and stripped in _PHASE_INDEX_HEADINGS:
             start = i
             continue
-        if start is not None and _FIRST_PHASE_HEADING_RE.match(stripped):
+        if start is not None and _NEXT_PHASE_SECTION_RE.match(stripped):
             end = i
             break
 

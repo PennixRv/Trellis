@@ -3,7 +3,7 @@ name: trellis-goal-exploration-and-requirements
 description: 当前任务处于目标探索与需求核对阶段时，核对目标、范围、成功条件、约束、证据与用户确认。
 ---
 
-# 目标探索与需求核对
+# 目标探索与需求核对阶段
 
 当 Trellis 任务的 `current_phase_id` 为 `goal_exploration_and_requirements` 时使用。先阅读本 Skill 同目录的 `workflow.md`，再按当前项目事实选择必要的探索深度和证据来源。
 

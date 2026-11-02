@@ -1,4 +1,4 @@
-# 设计：Trellis Teamwork 与五阶段运行时改造
+# 设计：Trellis Teamwork 与业务阶段运行时改造
 
 ## 目标与边界
 
@@ -10,13 +10,21 @@
 
 ## 组件职责与数据流
 
-Trellis Core 定义可复用的任务记录、阶段与路线数据结构及其校验；Trellis CLI 是这些持久事实的唯一写入和接受入口；bundled native workflow、五个阶段 Skill 与 resolver 将当前任务事实投影为阶段内操作指引。Pennix Skills 后续更新其路由与决策协助，通过稳定查询接口读取 Trellis 状态，不另建阶段或任务状态。
+Trellis Core 定义可复用的任务记录、阶段与路线数据结构及其校验；Trellis CLI 是这些持久事实的唯一写入和接受入口；bundled native workflow、各业务阶段对应的 Skill 与 resolver 将当前任务事实投影为阶段内操作指引。Pennix Skills 后续更新其路由与决策协助，通过稳定查询接口读取 Trellis 状态，不另建阶段或任务状态。
 
-任务记录保存任务身份、适用阶段、当前阶段、路线及 `task_route_revision`、阶段输入和结果 revision、授权及接受事实。阶段 workflow 说明本阶段活动、用户交互、产物和转换条件；阶段是否适用由任务路线决定，跳过或回流有记录依据，不把不同阶段的内部流程合并成通用流程。
+任务记录保存任务身份、适用阶段、当前阶段、路线及 `task_route_revision`、按需记录的路线依赖准入、阶段输入和结果 revision、授权及接受事实。阶段 workflow 说明本阶段活动、用户交互、产物和转换条件；阶段是否适用由任务路线决定，跳过或回流有记录依据，不把不同阶段的内部流程合并成通用流程。
 
-阶段 1 的基线在用户确认前不构成已接受需求；确认绑定当前 `artifact_revision`。输入、目标或范围修订使旧确认失效。阶段 2–5 根据其各自职责形成决策空间、收敛方案、实施和交付审查结果，Trellis CLI 只在当前 revision 与所需证据有效时接受结果并写入阶段转换。
+“目标探索与需求核对阶段”的基线在用户确认前不构成已接受需求；确认绑定当前 `artifact_revision`。输入、目标或范围修订使旧确认失效。“决策空间构造与归并阶段”“解决方案设计与收敛阶段”“任务实施与测试验证阶段”和“交付审查与现场收尾阶段”分别按各自职责形成决策空间、收敛方案、实施和交付审查结果，Trellis CLI 只在当前 revision 与所需证据有效时接受结果并写入阶段转换。
 
 Teamwork 作为任务内协作能力读取当前阶段、路线与输入 revision，并将这些事实及计划摘要绑定到派发和报告核验。Teamwork 不写入 Trellis 阶段或接受状态。被主线接受链引用的报告与证据保留为任务产物；批次临时数据在批次结束后清理，Teamwork Session 按自身生命周期管理。
+
+## 实施委派入口
+
+路线依赖准入保存在 `task_workflow.route_dependency_admission`，只描述当前任务路线实际选用的依赖、`admission_state`、`evidence_refs` 和绑定的 `task_route_revision`。`task.py phase admission` 通过现有 Trellis CLI 写入；路线变化、阶段回流或当前阶段产物变化会清除此准入结果。没有外部依赖的路线无需创建准入记录。
+
+`.trellis/scripts/task.py delegate-start <child-task>` 是唯一实施委派启动入口。它通过任务已有的双向 parent/children 关系定位父任务，核验父任务当前处于已授权的“任务实施与测试验证阶段”，并检查当前准入为 `ready`、revision 匹配且覆盖本次使用的 Pennix Lifecycle、Paseo 和 Git。子任务 `prd.md` 作为唯一实施输入；入口读取其当前摘要，并使用子任务已有的 `branch` 与 `base_branch` 作为目标分支和基线。它不新增 brief、调度器或派发状态机。
+
+通过准入后，入口核验 Paseo CLI 与 daemon 可用，使用 Paseo 原生 workspace 和 run 命令创建隔离的 Git worktree、验证实际分支与基线，再把委派工作树主代理角色和子任务 `prd.md` 派生为 `initialPrompt`。子任务当前 `delegated_worktree_execution_record` 保存 workspace、worktree、agent、分支、基线和合同摘要映射；启动结果不明时标为需核实并保留现状，不自动重试。再次启动要求有新的实施授权，并确认旧代理已结束；仅复用身份匹配、干净且仍处于原基线的 workspace/worktree。若旧 workspace、worktree 和分支均已核实清除，可按新授权重建；所需映射缺失、agent 状态无法核实、资源仍在或现场内容有变化时停止并保留现场。`TASK_DELEGATE_REAUTHORIZATION_REQUIRED` 表示重试尚无新的实施授权；`TASK_DELEGATE_RECONCILIATION_REQUIRED` 表示旧 agent 或资源映射尚不能核实。该记录不接受实施结果，实施验证、Git 集成、结果接受和资源清理由现有任务实施与测试验证阶段与交付审查流程核验。
 
 ## Teamwork 改名与资产合同
 

@@ -44,6 +44,15 @@ describe("copilot getAllHooks", () => {
 		expect(sessionStart).toBeDefined();
 		expect(sessionStart?.content ?? "").not.toMatch(EMPTY_EXCEPT_PASS_RE);
 	});
+
+	it("routes by the current phase instead of lifecycle status or artifact presence", () => {
+		const content = getAllHooks().find((hook) => hook.name === "session-start.py")?.content ?? "";
+		expect(content).toContain("current per-turn workflow-state");
+		expect(content).toContain("do not identify the business phase");
+		expect(content).toContain("trellis-goal-exploration-and-requirements");
+		expect(content).not.toContain("trellis-brainstorm");
+		expect(content).not.toContain("complex task must add");
+	});
 });
 
 describe("copilot getHooksConfig", () => {
@@ -101,5 +110,19 @@ describe("copilot getAllPrompts", () => {
 		expect(names).toContain("start");
 		expect(names).toContain("update-spec");
 		expect(names).not.toContain("parallel");
+	});
+
+	it("routes start and brainstorm prompts through the current phase model", () => {
+		const prompts = getAllPrompts();
+		const start = prompts.find((prompt) => prompt.name === "start")?.content ?? "";
+		const brainstorm = prompts.find((prompt) => prompt.name === "brainstorm")?.content ?? "";
+		expect(start).toContain("current `<workflow-state>` breadcrumb");
+		expect(start).toContain("trellis-goal-exploration-and-requirements");
+		expect(start).not.toContain("trellis-brainstorm");
+		expect(start).not.toContain("Phase 2 step 2.1");
+		expect(start).not.toContain("This platform has no session-start hook");
+		expect(brainstorm).toContain("trellis-goal-exploration-and-requirements");
+		expect(brainstorm).not.toContain("must respond at least once");
+		expect(brainstorm).not.toContain("Complex tasks must have");
 	});
 });

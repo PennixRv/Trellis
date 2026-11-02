@@ -357,6 +357,47 @@ describe("opencode session-start history detection", () => {
     );
   });
 
+  it("does not infer the business phase from planning status or missing artifacts", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trellis-opencode-phase-"));
+    const taskDir = join(dir, ".trellis", "tasks", "demo-task");
+    mkdirSync(taskDir, { recursive: true });
+    writeFileSync(
+      join(taskDir, "task.json"),
+      JSON.stringify({
+        id: "demo-task",
+        status: "planning",
+        meta: {
+          task_workflow: {
+            current_phase_id: "solution_design_and_convergence",
+            phase_ids: [
+              "goal_exploration_and_requirements",
+              "solution_design_and_convergence",
+              "delivery_review_and_closeout",
+            ],
+          },
+        },
+      }),
+    );
+    const context = buildSessionContext({
+      directory: dir,
+      getActiveTask: () => ({ taskPath: ".trellis/tasks/demo-task", source: "test", stale: false }),
+      getContextKey: () => null,
+      getCurrentTask: () => null,
+      readFile: () => "",
+      readProjectFile: () => "",
+      resolveTaskDir: () => taskDir,
+      runScript: () => "",
+    });
+
+    try {
+      expect(context).toContain("task lifecycle status and artifact presence do not identify the business phase");
+      expect(context).not.toContain("trellis-brainstorm");
+      expect(context).not.toContain("PRD-only");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("injects startup context onto the latest user message without mutating stored parts", async () => {
     const hooks = (await sessionStartPlugin({
       directory: "/tmp/trellis-opencode-test",

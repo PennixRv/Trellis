@@ -1258,6 +1258,18 @@ def cmd_remove_subtask(args: argparse.Namespace) -> int:
         return 1
     if not _task_mutation_allowed(repo_root, parent_dir, parent_data) or not _task_mutation_allowed(repo_root, child_dir, child_data):
         return 1
+    if parent_data.get("status") == "completed":
+        print("Error: A completed parent cannot unlink a child after closeout acceptance.", file=sys.stderr)
+        return 1
+    if parent_data.get("status") == "cancelled":
+        workflow = parent_data.get("meta", {}).get("task_workflow", {})
+        phases = workflow.get("phases", {}) if isinstance(workflow, dict) else {}
+        closeout = phases.get("delivery_review_and_closeout", {}) if isinstance(phases, dict) else {}
+        acceptance = closeout.get("acceptance", {}) if isinstance(closeout, dict) else {}
+        choices = acceptance.get("child_dispositions", {}) if isinstance(acceptance, dict) else {}
+        if child_data.get("parent") != parent_dir.name or not isinstance(choices, dict) or choices.get(child_dir.name) != "independent":
+            print("Error: A cancelled parent can unlink only a child recorded as independently continuing in its accepted closeout.", file=sys.stderr)
+            return 1
 
     # Remove child from parent's children list
     parent_children = _ensure_children_list(parent_data)

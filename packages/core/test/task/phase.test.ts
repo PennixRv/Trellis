@@ -7,7 +7,7 @@ import {
 } from "../../src/task/index.js";
 
 describe("task phase identifiers", () => {
-  it("exposes the five distinct business phases", () => {
+  it("exposes the canonical business phase identifiers", () => {
     expect(TASK_PHASE_IDS).toEqual([
       "goal_exploration_and_requirements",
       "decision_space_construction_and_merging",
@@ -31,11 +31,11 @@ describe("task phase identifiers", () => {
       task_kind: "combined",
       complexity: "standard",
       project_context: "existing",
-      phase_ids: [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2]],
+      phase_ids: [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2], TASK_PHASE_IDS[4]],
       current_phase_id: TASK_PHASE_IDS[0],
       input_revision: "1",
       phases: Object.fromEntries(
-        [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2]].map((phaseId, index) => [
+        [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2], TASK_PHASE_IDS[4]].map((phaseId, index) => [
           phaseId,
           {
             status: index === 0 ? "active" : "not_started",
@@ -64,12 +64,104 @@ describe("task phase identifiers", () => {
     };
 
     expect(parseTaskWorkflowState(state)).toEqual(state);
+    const analysisRouteWithImplementation = {
+      ...state,
+      task_kind: "analysis",
+      phase_ids: [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2], TASK_PHASE_IDS[3], TASK_PHASE_IDS[4]],
+      phases: {
+        ...state.phases,
+        [TASK_PHASE_IDS[3]]: {
+          status: "not_started",
+          input_revision: "1",
+          artifact_revision: artifactRevision,
+          result_revision: "0",
+          artifact_refs: [],
+          result_ref: null,
+          outcome_kind: null,
+          reason: null,
+          evidence_refs: [],
+          acceptance: null,
+        },
+      },
+    };
+    expect(() => parseTaskWorkflowState(analysisRouteWithImplementation)).toThrow(
+      /analysis tasks cannot include the Task Implementation and Test Verification Phase/,
+    );
     expect(() =>
       parseTaskWorkflowState({ ...state, phase_ids: [TASK_PHASE_IDS[2]] }),
-    ).toThrow(/begin with requirements alignment/);
+    ).toThrow(/begin with Goal Exploration and Requirements Confirmation Phase/);
+    expect(() =>
+      parseTaskWorkflowState({
+        ...state,
+        phase_ids: [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2]],
+      }),
+    ).toThrow(/end with Delivery Review and On-Site Closeout Phase/);
+    const authorization = {
+      contract_ref: "design.md",
+      approval_ref: "user-message:implementation-approved",
+      task_route_revision: "1",
+    };
+    expect(
+      parseTaskWorkflowState({ ...state, implementation_authorization: authorization }),
+    ).toMatchObject({ implementation_authorization: authorization });
+    expect(() =>
+      parseTaskWorkflowState({
+        ...state,
+        implementation_authorization: { ...authorization, contract_ref: " " },
+      }),
+    ).toThrow(/implementation_authorization is invalid/);
+    expect(() =>
+      parseTaskWorkflowState({
+        ...state,
+        implementation_authorization: { ...authorization, approval_ref: " " },
+      }),
+    ).toThrow(/implementation_authorization is invalid/);
+
+    const skippedPhase = {
+      status: "skipped",
+      input_revision: "1",
+      artifact_revision: artifactRevision,
+      result_revision: "1",
+      artifact_refs: [],
+      result_ref: null,
+      outcome_kind: null,
+      reason: "The decision branch was unnecessary",
+      evidence_refs: ["prd.md"],
+      acceptance: {
+        artifact_revision: artifactRevision,
+        result_revision: "1",
+        input_revision: "1",
+        task_route_revision: "1",
+        evidence_refs: ["prd.md"],
+      },
+    };
+    const confirmedSkipState = {
+      ...state,
+      phase_ids: [TASK_PHASE_IDS[0], TASK_PHASE_IDS[1], TASK_PHASE_IDS[2], TASK_PHASE_IDS[4]],
+      phases: { ...state.phases, [TASK_PHASE_IDS[1]]: skippedPhase },
+      skip_records: {
+        [TASK_PHASE_IDS[1]]: {
+          reason: skippedPhase.reason,
+          evidence_refs: skippedPhase.evidence_refs,
+          task_route_revision: "1",
+        },
+      },
+    };
+    expect(parseTaskWorkflowState(confirmedSkipState)).toEqual(confirmedSkipState);
+
+    const returnRecord = {
+      from: TASK_PHASE_IDS[2],
+      to: TASK_PHASE_IDS[0],
+      reason: "Requirements changed",
+      evidence_refs: ["user-message:requirements-changed"],
+      task_route_revision: "1",
+    };
+    expect(
+      parseTaskWorkflowState({ ...state, return_record: returnRecord }).return_record,
+    ).toEqual(returnRecord);
   });
 
-  it("requires accepted phase 1 to retain confirmation for its current artifact revision", () => {
+  it("requires accepted Goal Exploration and Requirements Confirmation Phase to retain evidence for its current artifact revision", () => {
     const artifactRevision = "e".repeat(64);
     const phase1 = {
       status: "accepted",
@@ -87,7 +179,6 @@ describe("task phase identifiers", () => {
         input_revision: "1",
         task_route_revision: "1",
         evidence_refs: ["prd.md"],
-        user_confirmation_ref: "user-message:requirements-approved",
       },
     };
     const state = {
@@ -96,10 +187,24 @@ describe("task phase identifiers", () => {
       task_kind: "analysis",
       complexity: "simple",
       project_context: "existing",
-      phase_ids: [TASK_PHASE_IDS[0]],
-      current_phase_id: null,
+      phase_ids: [TASK_PHASE_IDS[0], TASK_PHASE_IDS[4]],
+      current_phase_id: TASK_PHASE_IDS[4],
       input_revision: "2",
-      phases: { [TASK_PHASE_IDS[0]]: phase1 },
+      phases: {
+        [TASK_PHASE_IDS[0]]: phase1,
+        [TASK_PHASE_IDS[4]]: {
+          status: "active",
+          input_revision: "2",
+          artifact_revision: artifactRevision,
+          result_revision: "0",
+          artifact_refs: [],
+          result_ref: null,
+          outcome_kind: null,
+          reason: null,
+          evidence_refs: [],
+          acceptance: null,
+        },
+      },
       implementation_authorization: null,
       closeout_disposition: null,
       skip_records: {},
@@ -112,11 +217,11 @@ describe("task phase identifiers", () => {
         phases: {
           [TASK_PHASE_IDS[0]]: {
             ...phase1,
-            acceptance: { ...phase1.acceptance, user_confirmation_ref: " " },
+            acceptance: { ...phase1.acceptance, evidence_refs: [] },
           },
         },
       }),
-    ).toThrow(/confirmation for its current artifact revision/);
+    ).toThrow(/acceptance is invalid/);
     expect(() =>
       parseTaskWorkflowState({
         ...state,

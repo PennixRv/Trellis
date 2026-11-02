@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   getAllAgents,
+  getAllHooks,
   getConfigTemplate,
   getHooksConfig,
 } from "../../src/templates/codex/index.js";
@@ -110,6 +111,17 @@ describe("codex native sub-agent hooks", () => {
     expect(config.hooks.PreToolUse[0]?.hooks[0]?.command).toContain(
       ".codex/hooks/inject-spec-context.py",
     );
+  });
+});
+
+describe("codex SessionStart phase guidance", () => {
+  it("does not infer the business phase from lifecycle status or artifact presence", () => {
+    const content = getAllHooks().find((hook) => hook.name === "session-start.py")?.content ?? "";
+    expect(content).toContain("current per-turn workflow-state");
+    expect(content).toContain("do not identify the business phase");
+    expect(content).toContain("trellis-goal-exploration-and-requirements");
+    expect(content).not.toContain("trellis-brainstorm");
+    expect(content).not.toContain("complex task must add");
   });
 });
 

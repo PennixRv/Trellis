@@ -1564,8 +1564,8 @@ describe("update() integration", () => {
     const updated = fs.readFileSync(workflowPath, "utf-8");
     expect(updated).toBe(replacePythonCommandLiterals(workflowMdTemplate));
     expect(updated).toContain("## 阶段索引");
-    expect(updated).toContain("阶段 1：目标探索与需求核对");
-    expect(updated).toContain("阶段 5：交付审查与收尾");
+    expect(updated).toContain("目标探索与需求核对阶段");
+    expect(updated).toContain("交付审查与现场收尾阶段");
     expect(updated).toContain("正式会话交接是独立附加操作");
     expect(updated).not.toContain("legacy body");
 
