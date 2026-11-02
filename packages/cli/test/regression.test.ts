@@ -1404,6 +1404,7 @@ describe("regression: JSON read/write failure reporting", () => {
     >;
     expect(Object.keys(healthyPayload).sort()).toEqual([
       "current_task",
+        "session_source",
       "source",
       "stale",
     ]);
@@ -8063,7 +8064,9 @@ print(len(entries))
 
     const parsed = JSON.parse(output) as {
       current_task: { dir: string; title: string; status: string } | null;
+      session_source: string | null;
     };
+    expect(parsed.session_source).toBe("session:json-current-session");
     expect(parsed.current_task).toMatchObject({
       dir: ".trellis/tasks/issue-106",
       title: "Issue 106 task",
