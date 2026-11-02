@@ -13,7 +13,7 @@ import {
   runTeamworkCoordinator,
   type TeammateDispatchContext,
 } from "../../src/commands/teamwork/coordinator.js";
-import { readCoordinationState } from "@mindfoldhq/trellis-core/teamwork";
+import { readCoordinationState } from "@pennixrv/trellis-core/teamwork";
 
 const sourceDigest = "a".repeat(64);
 

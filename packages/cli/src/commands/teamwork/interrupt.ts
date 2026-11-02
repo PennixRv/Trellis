@@ -1,7 +1,7 @@
 import {
   requestInterrupt,
   type TeamworkSessionScope,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import { parseTeamworkSessionScope } from "./store/schema.js";
 import { resolveTeamworkSessionTextBody } from "./text-body.js";

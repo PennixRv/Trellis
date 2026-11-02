@@ -1,7 +1,7 @@
 /**
  * TeamworkSession schema re-exports.
  *
- * Canonical source: `@mindfoldhq/trellis-core/teamwork`. This module is
+ * Canonical source: `@pennixrv/trellis-core/teamwork`. This module is
  * kept as a thin pass-through during the supervisor/wait migration so
  * CLI runtime code (supervisor, spawn, kill, wait) can continue to
  * import from a stable local path while command files migrate to the
@@ -19,7 +19,7 @@ export {
   asStringArray,
   asContextEntries,
   buildContextEntries,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 export type {
   TeamworkSessionScope,
@@ -31,7 +31,7 @@ export type {
   RawContextEntry,
   ThreadAction,
   EventOrigin,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 /**
  * CSV parser kept colocated with the schema for CLI command files that

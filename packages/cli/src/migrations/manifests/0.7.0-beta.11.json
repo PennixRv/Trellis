@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.11",
+  "description": "Pennix v0.7 beta parallel evidence workflow contracts",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Improvements:**\n- Add project-local subnode evidence profiles with deterministic model/reasoning resolution and durable spawn receipts.\n- Add a write-once FIFO queue helper with fail-closed claims and abandonment markers for coordinator-driven dispatch.\n- Align the Marketplace workflow with profile selection, acceptance gates, recovery, and queue boundaries.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}

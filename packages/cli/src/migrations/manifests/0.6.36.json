@@ -1,0 +1,9 @@
+{
+  "version": "0.6.36",
+  "description": "Restores the missing manifest for the published Codex Channel owner-session fix.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Internal:**\n- Records the 0.6.36 Channel owner-session release so adjacent-version update paths remain complete.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

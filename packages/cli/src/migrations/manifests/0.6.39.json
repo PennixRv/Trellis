@@ -1,0 +1,9 @@
+{
+  "version": "0.6.39",
+  "description": "Restores active-task visibility and adds direct completion guidance for analysis-only tasks.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fixes:**\n- Projects one unique developer-owned resumable task as read-only workflow context when no session pointer exists.\n- Analysis-only research, audit, and design tasks can complete declared evidence work directly from planning and archive without entering implementation.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal trellis update flow."
+}

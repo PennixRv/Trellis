@@ -20,7 +20,7 @@ import type { Readable, Writable } from "node:stream";
 import {
   DEFAULT_INBOX_POLICY,
   type InboxPolicy,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import { shouldUseSystemPromptFile } from "./adapters/claude.js";
 import type { CodexSandboxMode } from "./adapters/codex.js";

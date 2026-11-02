@@ -2,7 +2,7 @@
  * Teamwork event local module.
  *
  * Canonical types, reducers, and seq-allocating append come from
- * `@mindfoldhq/trellis-core`. Supervisor / spawn / kill still import
+ * `@pennixrv/trellis-core`. Supervisor / spawn / kill still import
  * `appendEvent` from here so their call sites stay stable; the
  * implementation is core's, including torn-tail seq recovery.
  *
@@ -17,7 +17,7 @@ import {
   reduceTeamworkSessionMetadata,
   type TeamworkEvent,
   type TeamworkSessionMetadata,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import { eventsPath } from "./paths.js";
 
@@ -32,7 +32,7 @@ export {
   reduceTeamworkSessionMetadata,
   appendEvent,
   readLastSeq,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 export type {
   TeamworkEvent,
@@ -49,7 +49,7 @@ export type {
   ProgressTeamworkEvent,
   SupervisorWarningTeamworkEvent,
   AppendablePartial,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 export async function readTeamworkEvents(
   name: string,

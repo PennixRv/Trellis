@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { InboxPolicy } from "@mindfoldhq/trellis-core/teamwork";
+import type { InboxPolicy } from "@pennixrv/trellis-core/teamwork";
 
 import { loadAgent } from "./agent-loader.js";
 import type { CodexSandboxMode } from "./adapters/codex.js";

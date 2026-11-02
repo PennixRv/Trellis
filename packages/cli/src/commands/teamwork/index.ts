@@ -28,7 +28,7 @@ import { teamworkSessionTitleClear, teamworkSessionTitleSet } from "./title.js";
 import { runSupervisor } from "./supervisor.js";
 import { teamworkSessionWait, parseDuration } from "./wait.js";
 import { parseCsv } from "./store/schema.js";
-import { parseInboxPolicy } from "@mindfoldhq/trellis-core/teamwork";
+import { parseInboxPolicy } from "@pennixrv/trellis-core/teamwork";
 
 function parseNonNegativeInteger(value: string): number {
   if (!/^\d+$/.test(value)) {

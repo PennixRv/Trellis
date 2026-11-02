@@ -7,7 +7,7 @@ import {
   listTeamworkSessionContext,
   listThreadContext,
   type TeamworkSessionScope,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import { parseTeamworkSessionScope } from "./store/schema.js";
 

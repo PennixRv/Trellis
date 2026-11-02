@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.51",
+  "description": "最终方案复核先于封口，一次明确答复批准封口与推进",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "规划流程先展示完整方案，再征询封口并批准推进或补充修改；原生 seal/approve/start 保留任务、版本与摘要门禁，同步继续、重规划和平台入口。",
+  "migrations": [],
+  "notes": "不新增任务状态或批准字段，不迁移历史任务。已有充分授权继续复用；用户修改的生成资产和第三方工作流仍遵守原生更新保护。"
+}

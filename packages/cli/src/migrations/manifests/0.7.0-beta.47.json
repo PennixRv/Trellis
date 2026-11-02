@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.47",
+  "description": "简体中文默认用户文档模板与双格式解析",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "原生 workflow、任务 PRD、workspace 和 spec 源模板使用中文优先正文；阶段标题和日志续写支持旧英文及新双语格式。",
+  "migrations": [],
+  "notes": "不迁移既有用户文档或历史日志。原生 workflow 继续按模板哈希更新，用户冲突和第三方 workflow 保持原生保护。"
+}

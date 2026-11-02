@@ -1,0 +1,9 @@
+{
+  "version": "0.6.38",
+  "description": "Extends public npm visibility verification after publish.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fix:**\n- Waits through the bounded public npm propagation window before reporting a release verification failure.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal trellis update flow."
+}

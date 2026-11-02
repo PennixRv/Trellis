@@ -1,0 +1,9 @@
+{
+  "version": "0.6.35",
+  "description": "Records the published 0.6.35 version-only release so adjacent-version update paths remain complete.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Internal:**\n- Restores the missing published 0.6.35 manifest; that release contained only package version changes.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

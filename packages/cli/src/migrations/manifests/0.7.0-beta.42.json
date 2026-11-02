@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.42",
+  "description": "Bounded in-progress amendments and retired Herdr cleanup",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Allow explicit low-risk same-task amendments to remain in progress while preserving replan gates for material changes. Remove the retired Herdr workflow hook and integration residue.",
+  "migrations": [],
+  "notes": "No migrations. Existing task state and user-owned Herdr history remain untouched."
+}

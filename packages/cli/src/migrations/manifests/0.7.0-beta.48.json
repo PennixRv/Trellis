@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.48",
+  "description": "工作流资源留存与安全清理边界",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Channel、Grok 输出、FastCtx 后台任务和 Trellis 备份增加有界留存与原生清理入口；清理默认只读预览，并在无法证明归属或状态异常时安全停止。",
+  "migrations": [],
+  "notes": "不迁移既有项目资产或运行态数据。新清理入口由各组件原生所有者执行，未知、活动或无归属资源继续保留。"
+}

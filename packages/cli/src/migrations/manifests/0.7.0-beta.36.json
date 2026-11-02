@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.36",
+  "description": "Harden Channel lifecycle and task evidence contracts",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Channel worker delivery, task ownership, plan sealing, and evidence validation now fail closed at their trust boundaries.",
+  "migrations": [],
+  "notes": "No runtime migration is required."
+}

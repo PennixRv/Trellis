@@ -7,7 +7,7 @@ description: "Understand and customize the local Trellis architecture inside a u
 
 This skill is for local Trellis users who have already run `trellis init` in a project. After reading it, an AI should understand the Trellis architecture, operating model, and customization entry points inside that user project, then modify the generated `.trellis/` and platform directory files according to the user's request.
 
-Trellis v0.6 adds three architectural surfaces on top of the pre-v0.6 workflow / persistence / platform model. First, the Teamwork runtime: `trellis teamwork` coordinates teammate processes through project-scoped JSONL event logs at `~/.trellis/teamwork/<project>/<session>/events.jsonl`, with a process guard, forum threads, durable idempotency keys, and a bundled `.trellis/agents/teammate.md` role card. Second, cross-session memory: `trellis mem list | search | context | extract | projects` reads raw Claude Code, Codex, and Pi Agent JSONL already on disk, slices by `--phase brainstorm|implement|all`, and never uploads anything. Third, a dual-package npm release: `@mindfoldhq/trellis` (CLI) and `@mindfoldhq/trellis-core` (SDK with `/teamwork`, `/task`, `/mem`, `/testing` subpaths) ship in lockstep on one version. Treat these as first-class customization surfaces alongside the per-platform integration files.
+Trellis v0.6 adds three architectural surfaces on top of the pre-v0.6 workflow / persistence / platform model. First, the Teamwork runtime: `trellis teamwork` coordinates teammate processes through project-scoped JSONL event logs at `~/.trellis/teamwork/<project>/<session>/events.jsonl`, with a process guard, forum threads, durable idempotency keys, and a bundled `.trellis/agents/teammate.md` role card. Second, cross-session memory: `trellis mem list | search | context | extract | projects` reads raw Claude Code, Codex, and Pi Agent JSONL already on disk, slices by `--phase brainstorm|implement|all`, and never uploads anything. Third, a dual-package npm release: `@pennixrv/trellis` (CLI) and `@pennixrv/trellis-core` (SDK with `/teamwork`, `/task`, `/mem`, `/testing` subpaths) ship in lockstep on one version. Treat these as first-class customization surfaces alongside the per-platform integration files.
 
 The default operating scope is local files in the user project:
 
@@ -17,7 +17,7 @@ The default operating scope is local files in the user project:
 - User-owned Teamwork Session store outside the project tree: `~/.trellis/teamwork/<project>/<session>/events.jsonl`.
 - Raw platform conversation logs queryable via `trellis mem`: `~/.claude/projects/`, `~/.codex/sessions/`, and `~/.pi/agent/sessions/` (OpenCode adapter degraded for the v0.6 line).
 
-Do not assume the user has the Trellis source repository. Do not default to modifying the global npm install directory or `node_modules` — both `@mindfoldhq/trellis` and `@mindfoldhq/trellis-core` ship as published packages sharing one version and one git tag per release.
+Do not assume the user has the Trellis source repository. Do not default to modifying the global npm install directory or `node_modules` — both `@pennixrv/trellis` and `@pennixrv/trellis-core` ship as published packages sharing one version and one git tag per release.
 
 ## How To Use
 
@@ -36,7 +36,7 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 - `references/local-architecture/workflow.md`: Phases, routing, workflow-state blocks, the bundled `native` workflow, and explicitly sourced custom workflows in `.trellis/workflow.md`.
 - `references/local-architecture/task-system.md`: Task directories, active task, JSONL context, parent/child task trees, and task runtime.
 - `references/local-architecture/spec-system.md`: How `.trellis/spec/` is organized, injected, and refreshed from a `registry.spec` source.
-- `references/local-architecture/workspace-memory.md`: `.trellis/workspace/` journals plus `trellis mem` cross-session recall and the `@mindfoldhq/trellis-core/mem` SDK.
+- `references/local-architecture/workspace-memory.md`: `.trellis/workspace/` journals plus `trellis mem` cross-session recall and the `@pennixrv/trellis-core/mem` SDK.
 - `references/local-architecture/context-injection.md`: Hooks, sub-agent preludes, and Teamwork message inbox routing.
 - `references/local-architecture/multi-agent-teamwork.md`: `trellis teamwork`, Teamwork Session storage, teammate process guard, task ownership boundary, and bundled `.trellis/agents/` runtime instructions.
 - `references/local-architecture/bundled-skills.md`: Bundled skills under `packages/cli/src/templates/common/bundled-skills/` and how `getBundledSkillTemplates()` ships them to platform skill roots.
@@ -77,9 +77,9 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 ## Do Not
 
 - Do not treat Trellis upstream source code as the default target for local customization.
-- Do not modify the global npm install directory or `node_modules/@mindfoldhq/trellis` or `node_modules/@mindfoldhq/trellis-core` to implement project needs; both packages ship in lockstep.
+- Do not modify the global npm install directory or `node_modules/@pennixrv/trellis` or `node_modules/@pennixrv/trellis-core` to implement project needs; both packages ship in lockstep.
 - Do not overwrite user-modified local files with default templates; check `.trellis/.template-hashes.json` first and prefer `.new` sidecar files over destructive overwrites.
 - Do not put team-private project rules into a public bundled skill; put project rules in `.trellis/spec/`, a project-local skill, the current task, or the workspace journal — `trellis update` will overwrite anything inside a bundled skill directory.
-- Do not hand-edit `~/.trellis/teamwork/<project>/<session>/events.jsonl`; sequence numbers are assigned under a file lock and replay-safe writes go through the `trellis teamwork` CLI or the `@mindfoldhq/trellis-core/teamwork` SDK.
+- Do not hand-edit `~/.trellis/teamwork/<project>/<session>/events.jsonl`; sequence numbers are assigned under a file lock and replay-safe writes go through the `trellis teamwork` CLI or the `@pennixrv/trellis-core/teamwork` SDK.
 - Do not edit `.claude/agents/trellis-implement.md` (or any other per-platform sub-agent file) when the goal is to change Teamwork teammate behavior — edit `.trellis/agents/teammate.md` instead.
 - Do not describe removed or never-shipped mechanisms as current Trellis behavior; cross-check against the local `.trellis/config.yaml` and the installed CLI's `trellis --help` before claiming a knob exists.

@@ -21,7 +21,7 @@ import {
   reduceWorkerRegistry,
   type TeamworkEvent,
   type WorkerState,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import { DIR_NAMES } from "../../constants/paths.js";
 

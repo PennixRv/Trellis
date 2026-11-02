@@ -8,7 +8,7 @@ import {
   type TeamworkSessionScope,
   type ContextTeamworkEvent,
   type ThreadTeamworkEvent,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import {
   parseTeamworkSessionScope,

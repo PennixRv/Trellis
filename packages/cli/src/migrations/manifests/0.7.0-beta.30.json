@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.30",
+  "description": "Refresh legacy migration descriptions and retain safe cleanup",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Bundled legacy migration metadata uses neutral extension and handoff descriptions. Version identifiers, migration targets, hash-guarded cleanup, and native task/session behavior remain unchanged.",
+  "migrations": [],
+  "notes": "Upgrade the CLI and refresh project assets. Selected workflow sources and local task/history records are preserved. No task or ownership migration is required."
+}

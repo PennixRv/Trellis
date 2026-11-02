@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.7",
+  "description": "Pennix v0.7 beta release verification normalization",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Bug Fixes:**\n- Normalize npm's single-item JSON array response during local and CI visibility verification.",
+  "migrations": [],
+  "notes": "Run `npm install -g @pennixrv/trellis@beta` then `trellis update`. No `--migrate` required."
+}

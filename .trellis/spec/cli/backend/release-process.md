@@ -10,8 +10,8 @@ Trellis publishes two npm packages from one git tag:
 
 | Package | Role | Published by |
 |---|---|---|
-| `@mindfoldhq/trellis` | User-facing CLI | GitHub Actions only |
-| `@mindfoldhq/trellis-core` | Programmatic core APIs used by the CLI and external integrations | GitHub Actions only |
+| `@pennixrv/trellis` | User-facing CLI | GitHub Actions only |
+| `@pennixrv/trellis-core` | Programmatic core APIs used by the CLI and external integrations | GitHub Actions only |
 
 The package pair is version-locked. Every published version must exist for both packages with the exact same version and npm dist-tag.
 
@@ -21,6 +21,9 @@ The package pair is version-locked. Every published version must exist for both 
 
 Official npm publishing must happen through `.github/workflows/publish.yml`.
 
+The workflow uses the repository's `NPM_TOKEN` secret and npm provenance. Do
+not publish either package from a local machine.
+
 Do not run `npm publish` or `pnpm publish` locally for official Trellis packages. Local machines may run `pnpm pack`, `release-preflight`, tests, lint, typecheck, and dry-run checks, but not package publication.
 
 If a CI publish looks partial or inconsistent:
@@ -28,8 +31,8 @@ If a CI publish looks partial or inconsistent:
 1. Inspect the GitHub Actions publish run.
 2. Verify public npm visibility:
    ```bash
-   npm view @mindfoldhq/trellis@<version> version dist-tags --json --registry=https://registry.npmjs.org/
-   npm view @mindfoldhq/trellis-core@<version> version dist-tags --json --registry=https://registry.npmjs.org/
+   npm view @pennixrv/trellis@<version> version dist-tags --json --registry=https://registry.npmjs.org/
+   npm view @pennixrv/trellis-core@<version> version dist-tags --json --registry=https://registry.npmjs.org/
    ```
 3. Fix the workflow or release scripts.
 4. Re-run the CI path or move the tag after the fix when the same version is still the intended release artifact.
@@ -52,7 +55,7 @@ node packages/cli/scripts/release-preflight.js verify-npm --package all
 | Shared tag | Git tag `v<version>` must match both package versions. |
 | Shared npm dist-tag | `beta` for `-beta.N`, `rc` for `-rc.N`, `alpha` for `-alpha.N`, `latest` for GA. |
 | Source dependency | CLI source depends on core with `workspace:*`. |
-| Packed dependency | Published CLI package must depend on `@mindfoldhq/trellis-core` with the exact release version. |
+| Packed dependency | Published CLI package must depend on `@pennixrv/trellis-core` with the exact release version. |
 
 `packages/cli/scripts/release-preflight.js` is the source of truth for these checks.
 
@@ -79,6 +82,14 @@ A new beta cycle starts from the current stable/release baseline and uses the ne
 
 Stable fixes normally flow from `main` to beta/rc by cherry-pick. Beta-only features do not flow back to `main` by cherry-pick; rewrite them as stable-ready commits when needed.
 
+The stable release commands in `packages/cli/scripts/release.js` enforce
+`main` and push the branch with the version tag. That branch guard is separate
+from `.github/workflows/publish.yml`: the workflow also accepts a pushed `v*`
+tag and validates the tagged source without requiring a merge into `main`.
+When a task selects a release commit on another existing branch, follow that
+task's approved release route and trigger the workflow with its exact tag;
+do not use the branch-based stable release command.
+
 ---
 
 ## Docs-site lifecycle
@@ -91,7 +102,7 @@ The docs-site root path holds the current stable docs. Beta and RC content live 
 | Beta to RC | `docs-site/scripts/docs-beta-to-rc.sh` | Before the first `pnpm release:rc`, for example `0.6.0-rc.0`. |
 | RC to GA | `docs-site/scripts/docs-promote.sh` | Before `pnpm release:promote`. |
 
-Per-patch beta, RC, or GA releases do not run these lifecycle scripts. They add changelog MDX files, update `docs-site/docs.json`, commit the docs-site submodule first, then bump the submodule pointer in the main repo.
+Per-patch beta, RC, or GA releases do not run these lifecycle scripts. They add changelog MDX files, update `docs-site/docs.json`, commit the docs-site submodule first, then bump the submodule pointer in the Trellis repository.
 
 Full docs details live in `.trellis/spec/docs-site/docs/release-lifecycle.md`.
 
@@ -99,13 +110,13 @@ Full docs details live in `.trellis/spec/docs-site/docs/release-lifecycle.md`.
 
 ## Submodule commit ordering
 
-When a release touches `docs-site`, commit and push that submodule first, then commit its pointer in the main repo.
+When a release touches `docs-site`, commit and push that submodule first, then commit its pointer in the Trellis repository. Use the existing branch selected for the docs change; the tagged Trellis commit must reference a docs commit reachable from an `origin` ref.
 
 Correct order:
 
 ```bash
 cd docs-site
-git add . && git commit -m "docs: changelog v<version>" && git push origin main
+git add . && git commit -m "docs: changelog v<version>" && git push
 
 cd ..
 git add docs-site
@@ -153,7 +164,7 @@ ignore it, which is how the v0.6.4 incident below happens a second time.
 **Instead**: fetch, then ask whether the SHA is an ancestor of the remote branch
 — that is the same question CI answers when it materialises the pointer.
 
-Any `FAIL` line means: `cd <submodule> && git checkout -B main && git push origin main` before tagging. If the tag was already pushed when you discover the miss, recover by pushing the submodule then re-running the failed CI jobs (`gh run rerun <id> --failed`) — no new tag is needed.
+Any `FAIL` line means the referenced commit is not reachable from a fetched remote branch or tag. Push it to the existing approved branch for that submodule before tagging; do not create or switch branches just to satisfy this check. If the tag was already pushed when you discover the miss, push the submodule commit and re-run the failed CI jobs (`gh run rerun <id> --failed`) — no new tag is needed.
 
 ### Contract: the pre-release sweep MUST exclude `.trellis/`
 
@@ -240,12 +251,12 @@ Required order:
 1. install dependencies
 2. `release-preflight check-versions --require-tag`
 3. `pnpm typecheck`
-4. `pnpm test`
-5. `pnpm build`
+4. `pnpm build`
+5. `pnpm test`
 6. `release-preflight verify-packed-cli`
 7. `release-preflight publish-plan --github`
-8. publish `@mindfoldhq/trellis-core` if missing
-9. publish `@mindfoldhq/trellis` if missing
+8. publish `@pennixrv/trellis-core` if missing
+9. publish `@pennixrv/trellis` if missing
 10. `release-preflight verify-npm --package all`
 
 Core publishes first because the CLI package depends on the exact core version in the packed artifact.
@@ -280,7 +291,7 @@ the npm package contains it.
 Example for a built-in multi-file skill:
 
 ```bash
-pnpm --filter @mindfoldhq/trellis build
+pnpm --filter @pennixrv/trellis build
 
 cd packages/cli
 npm pack --dry-run --json | grep 'dist/templates/common/bundled-skills/<skill>/SKILL.md'
@@ -308,7 +319,7 @@ git -C "$tmpdir" init -q
 - [ ] Manifest exists for the target version.
 - [ ] English and Chinese docs-site changelogs exist and match 1:1.
 - [ ] `docs-site/docs.json` points to the new changelog.
-- [ ] Submodule commits are pushed before main repo pointer commits.
+- [ ] Submodule commits are pushed before Trellis repository pointer commits.
 - [ ] `node packages/cli/scripts/release-preflight.js check-versions` passes.
 - [ ] `node packages/cli/scripts/release-preflight.js verify-packed-cli` passes.
 - [ ] Release-claimed bundled assets are verified in `npm pack --dry-run --json` and a fresh temp-directory `trellis init` / `trellis update --dry-run` smoke test.

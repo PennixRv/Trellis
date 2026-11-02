@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.16",
+  "description": "Refresh coordinator handoff and worker extension boundaries",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Refresh bundled coordinator handoff and subnode extension-isolation guidance. These release notes describe the legacy update; current behavior follows the selected workflow.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}

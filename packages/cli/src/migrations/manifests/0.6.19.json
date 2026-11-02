@@ -1,0 +1,9 @@
+{
+  "version": "0.6.19",
+  "description": "Adds managed Codex subnode workflow assets and removes the retired governed Channel profile gate.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**New:**\n- Adds managed Codex subnode workflow assets.\n\n**Bug fixes:**\n- Removes the retired governed Channel profile gate.",
+  "migrations": [],
+  "notes": "No migration required. Existing projects can upgrade normally."
+}

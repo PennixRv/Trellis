@@ -1,0 +1,9 @@
+{
+  "version": "0.6.23",
+  "description": "Improves Channel subnode artifact validation and aligns the Pennix Marketplace workflow source.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Bug fixes:**\n- Makes optional subnode retry and counter fields optional, and permits an empty `completed_scope` when no assigned work started.\n- Aligns the fork with the Pennix Marketplace workflow source.\n\n**Internal:**\n- Restores the missing release manifest so adjacent-version `trellis update` paths remain complete.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

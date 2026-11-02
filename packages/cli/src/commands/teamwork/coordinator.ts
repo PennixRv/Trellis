@@ -4,14 +4,14 @@ import path from "node:path";
 import {
   isTaskPhaseId,
   parseTaskWorkflowState,
-} from "@mindfoldhq/trellis-core/task";
+} from "@pennixrv/trellis-core/task";
 import {
   assertCoordinationTransition,
   readTeamworkEvents,
   readCoordinationState,
   recordCoordinationEvent,
   type CoordinationState,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import {
   type TeamworkPlan,

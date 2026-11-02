@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.6",
+  "description": "Pennix v0.7 beta release tag isolation",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Bug Fixes:**\n- Beta release pushes only its newly-created tag, preventing unrelated local tags from triggering npm publish workflows.",
+  "migrations": [],
+  "notes": "Run `npm install -g @pennixrv/trellis@beta` then `trellis update`. No `--migrate` required."
+}

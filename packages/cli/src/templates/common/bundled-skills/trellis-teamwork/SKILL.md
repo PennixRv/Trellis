@@ -55,7 +55,7 @@ trellis teamwork context list <session> --scope global --thread <thread>
 - For brainstorm, do multiple pressure-test rounds. One answer plus one confirmation is review, not brainstorm.
 - **Dispatcher wait pattern**: use `--kind done` / `--kind turn_finished` (Trellis-emitted system events), not a user `--tag` as the completion signal. Tags are labels, not runtime completion events.
 - Teamwork Sessions are event-sourced. Do not parse `events.jsonl` first; use `forum`, `thread`, `messages --thread`, and `context list`.
-- `@mindfoldhq/trellis-core` owns reusable Teamwork Session/thread state, event append, sequence allocation, context/title projection, reducers, and task helpers. The CLI owns flags, terminal rendering, prompts, teammate lifecycle, and process exits.
+- `@pennixrv/trellis-core` owns reusable Teamwork Session/thread state, event append, sequence allocation, context/title projection, reducers, and task helpers. The CLI owns flags, terminal rendering, prompts, teammate lifecycle, and process exits.
 - Teamwork plan construction belongs to the current phase coordinator. Teamwork validates and executes a frozen plan; it does not select the task phase, change task status, or create a second task state machine.
 - The native host-created `subagent` remains separate from a Teamwork teammate.
 

@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.17",
+  "description": "Make Trellis update honor selected workflow provenance",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Workflow update fix:**\n- Generic `trellis update` now resolves the project's selected workflow from immutable provenance instead of comparing a Marketplace workflow with bundled native bytes.\n- Legacy untracked custom workflows remain outside the generic update set.\n- Provenance identity checks are shared by update and verify, with a regression test preventing false native `.new` candidates.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}

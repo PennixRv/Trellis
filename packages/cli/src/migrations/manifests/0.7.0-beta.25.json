@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.25",
+  "description": "Preserve identity during unbound task recovery",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Unbound task projections retain resolved direct session identity. Formal ownership retirement and claim distinguish read-only candidates from direct bindings. Recovery guidance checks identity separately and preserves planning activation gates.",
+  "migrations": [],
+  "notes": "Run trellis update after upgrading. Refresh a separately selected Marketplace workflow using its explicit immutable ref. Candidate projections remain read-only; foreign-session isolation and ownership fencing remain enforced. No identity injection or automatic task selection is required."
+}

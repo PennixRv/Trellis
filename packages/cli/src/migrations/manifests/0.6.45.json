@@ -1,0 +1,9 @@
+{
+  "version": "0.6.45",
+  "description": "Fixes malformed indentation in the historical Pennix Codex workflow hook migration.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fix:**\n- Corrected the generated Python Hook indentation under `else:` so migrated Pennix Codex hooks remain valid Python.",
+  "migrations": [],
+  "notes": "The compatibility migration remains content-precise and preserves recognized Pennix dispatch customizations."
+}

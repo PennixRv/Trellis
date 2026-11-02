@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1",
+  "description": "引入新的 Trellis 任务工作流、Teamwork 协作和默认内置原生工作流。",
+  "breaking": true,
+  "recommendMigrate": false,
+  "changelog": "稳定版引入新的 Trellis 任务工作流和 Teamwork 协作，默认工作流随 CLI 打包提供。旧 Channel 运行时数据不会迁移到新的任务模型。",
+  "migrations": [],
+  "notes": "本版本不迁移或导入旧 Channel 运行时数据。"
+}

@@ -17,7 +17,7 @@ import {
   DEFAULT_INBOX_POLICY,
   matchesInboxPolicy,
   type InboxPolicy,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import type { WorkerAdapter } from "../adapters/index.js";
 import { appendEvent } from "../store/events.js";

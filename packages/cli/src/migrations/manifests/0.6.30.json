@@ -1,0 +1,9 @@
+{
+  "version": "0.6.30",
+  "description": "Hardens task archive safety and release staging for the 0.6.30 release.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fixes:**\n- Protects task archive operations from partial moves and keeps release staging scoped to Trellis-owned files.\n- Adds regression coverage for archive failure handling and release staging boundaries.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

@@ -4,7 +4,7 @@ import {
   resolveTeamworkSession,
   type TeamworkSessionScope,
   type TeamworkSessionType,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import {
   parseTeamworkSessionScope,

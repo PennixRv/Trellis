@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.8",
+  "description": "Pennix v0.7 beta decision-chain replanning",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Features:**\n- Add an auditable same-task replan transition for material implementation-time decisions.\n- Preserve every planning interval in `trellis mem --phase brainstorm`.",
+  "migrations": [],
+  "notes": "Run `npm install -g @pennixrv/trellis@beta` then `trellis update`. No `--migrate` required."
+}

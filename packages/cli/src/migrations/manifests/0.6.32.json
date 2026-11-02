@@ -1,0 +1,9 @@
+{
+  "version": "0.6.32",
+  "description": "Exposes task lifecycle progress and completes the 0.6.32 workflow release record.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Enhancements:**\n- Exposes planned, active, completed, and child-task progress for read-only workflow consumers.\n\n**Fixes:**\n- Records the release and workflow verification changes without requiring a project migration.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

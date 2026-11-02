@@ -1,0 +1,9 @@
+{
+  "version": "0.6.34",
+  "description": "Records the published 0.6.34 release before the sealed-handoff lifecycle release.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Internal:**\n- Restores the published 0.6.34 release manifest so adjacent-version update paths remain complete.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

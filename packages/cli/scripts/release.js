@@ -8,8 +8,11 @@
  *   -> version check -> version commit -> tag -> push
  */
 import { execSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { computeNext } from "./bump-versions.js";
+import { checkSubmodules } from "./release-preflight.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLI_DIR = path.resolve(__dirname, "..");
@@ -61,6 +64,26 @@ function hasGitDiff() {
 function docsGuard(type) {
   if (type === "beta" || type === "rc" || type === "promote") {
     run(`node scripts/check-docs-changelog.js --type ${type}`);
+  }
+}
+
+function assertNextVersionManifest(type) {
+  const current = JSON.parse(
+    fs.readFileSync(path.join(CLI_DIR, "package.json"), "utf-8"),
+  ).version;
+  const next = computeNext(current, type);
+  const manifestPath = path.join(
+    CLI_DIR,
+    "src",
+    "migrations",
+    "manifests",
+    `${next}.json`,
+  );
+  if (!fs.existsSync(manifestPath)) {
+    fail(
+      `Missing target migration manifest: ${path.relative(CLI_DIR, manifestPath)}. ` +
+        "Create it before releasing so trellis update has a complete version chain.",
+    );
   }
 }
 
@@ -133,16 +156,20 @@ function main() {
   assertBranchMatchesType(type, branch);
   console.log(`releasing ${type} from branch "${branch}"`);
 
+  assertNextVersionManifest(type);
+  checkSubmodules();
   run("node scripts/check-manifest-continuity.js");
   docsGuard(type);
-  run("pnpm --filter @mindfoldhq/trellis-core test");
+  run("pnpm build");
   run("pnpm test");
 
   // Exclude .trellis/ from the pre-release sweep: dirty task/workspace files
   // (parallel in-progress work, runtime artifacts) must never be swept into
   // "chore: pre-release updates" (#303). Staging .trellis/ only ever goes
   // through safe_commit.py's precise allowlist, never a blanket `git add -A`.
-  run("git add -A -- ':!docs-site' ':!.trellis'");
+  run("git add -A -- . ':!docs-site' ':(exclude,glob).trellis/**'", {
+    cwd: path.resolve(CLI_DIR, "../.."),
+  });
   if (hasGitDiff()) {
     run("git commit -m 'chore: pre-release updates'");
   }
@@ -155,7 +182,7 @@ function main() {
   // Push HEAD to the branch we are actually on, by name. `HEAD` alone relies
   // on the remote having a same-named branch, and a bare `main` pushes the
   // local main ref regardless of where the release commit lives.
-  run(`git push origin "HEAD:${branch}" --tags`);
+  run(`git push origin "HEAD:${branch}" "refs/tags/v${version}"`);
   assertPushLanded(branch, `v${version}`);
 }
 

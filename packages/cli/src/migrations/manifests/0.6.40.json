@@ -1,0 +1,9 @@
+{
+  "version": "0.6.40",
+  "description": "Restores active-task visibility when a session pointer is unavailable.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fix:**\n- Projects one unique developer-owned resumable task as read-only workflow context when no Trellis session pointer exists.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal trellis update flow."
+}

@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.14",
+  "description": "Synchronize the task help template and dogfood copy",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fixes:**\n- Keep the dogfood task script byte-identical to the packaged template so release regression checks and consumers receive the same help output.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}

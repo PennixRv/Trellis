@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { parseTaskWorkflowState } from "@mindfoldhq/trellis-core/task";
+import { parseTaskWorkflowState } from "@pennixrv/trellis-core/task";
 
 const TEMPLATE_SCRIPTS = path.resolve(
   __dirname,

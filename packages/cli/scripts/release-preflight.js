@@ -3,8 +3,8 @@
  * Shared release / publish preflight.
  *
  * One source of truth for:
- *   1. Version match between `@mindfoldhq/trellis` and
- *      `@mindfoldhq/trellis-core` (and the current git tag when checked from
+ *   1. Version match between `@pennixrv/trellis` and
+ *      `@pennixrv/trellis-core` (and the current git tag when checked from
  *      a tag context).
  *   2. The npm dist-tag derived from the shared version (`beta`, `rc`,
  *      `alpha`, or `latest`).
@@ -24,7 +24,7 @@
  *                                    skipped (but version mismatches still
  *                                    fail loudly).
  *   verify-packed-cli                Pack the CLI and assert its dependency
- *                                    on @mindfoldhq/trellis-core resolves
+ *                                    on @pennixrv/trellis-core resolves
  *                                    to the exact shared version (not
  *                                    "workspace:*" or a loose range).
  *   verify-npm [--package all|core|cli]
@@ -40,7 +40,7 @@
  * version/tag mismatch. Version equality is checked first; npm existence
  * decides per-package skip.
  */
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +55,18 @@ const YELLOW = "\x1b[33m";
 const GREEN = "\x1b[32m";
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
+
+export function checkSubmodules(repoRoot = REPO_ROOT) {
+  const status = execFileSync("git", ["submodule", "status", "--recursive"], {
+    cwd: repoRoot, encoding: "utf-8",
+  });
+  if (status.split("\n").some((line) => line && line[0] !== " ")) {
+    throw new Error("Submodules must be initialized, clean and match committed pointers before release");
+  }
+  execFileSync("git", ["submodule", "foreach", "--recursive", "--quiet",
+    'git fetch --prune origin --quiet && test -n "$(git for-each-ref --contains HEAD --format="%(refname)" refs/remotes/origin/)"',
+  ], { cwd: repoRoot, stdio: "pipe" });
+}
 
 function readJSON(p) {
   return JSON.parse(fs.readFileSync(p, "utf-8"));
@@ -86,6 +98,23 @@ export function computeNpmTag(version) {
   return "latest";
 }
 
+export function npmVersionMatches(raw, version) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  return (
+    parsed === version ||
+    (Array.isArray(parsed) && parsed.length === 1 && parsed[0] === version)
+  );
+}
+
+export function npmVersionValue(value) {
+  return Array.isArray(value) && value.length === 1 ? value[0] : value;
+}
+
 export function npmVersionExists(pkgName, version) {
   try {
     const out = execSync(
@@ -95,7 +124,7 @@ export function npmVersionExists(pkgName, version) {
     if (!out) return false;
     // npm returns the literal version string for an exact-version match,
     // and an empty body for unknown versions.
-    return JSON.parse(out) === version;
+    return npmVersionMatches(out, version);
   } catch (err) {
     const stderr = err.stderr?.toString() ?? "";
     if (stderr.includes("E404") || stderr.includes("not found")) return false;
@@ -118,7 +147,10 @@ async function sleep(ms) {
 }
 
 async function retry(label, fn) {
-  const attempts = 6;
+  // npm publication can take longer than the original 50-second window to
+  // reach the public registry. Keep the verification bound while allowing
+  // the normal propagation delay observed in CI.
+  const attempts = 18;
   let lastError;
   for (let i = 1; i <= attempts; i += 1) {
     try {
@@ -247,18 +279,18 @@ function verifyPackedCli() {
       stdio: ["pipe", "pipe", "pipe"],
     });
     const packedPkg = readJSON(path.join(extractDir, "package/package.json"));
-    const dep = packedPkg.dependencies?.["@mindfoldhq/trellis-core"];
+    const dep = packedPkg.dependencies?.["@pennixrv/trellis-core"];
     if (!dep) {
-      fail(`packed CLI is missing dependency on @mindfoldhq/trellis-core.`);
+      fail(`packed CLI is missing dependency on @pennixrv/trellis-core.`);
     }
     if (dep !== v.cliVersion) {
       fail(
-        `packed CLI depends on @mindfoldhq/trellis-core@"${dep}" but expected exact "${v.cliVersion}".\n` +
+        `packed CLI depends on @pennixrv/trellis-core@"${dep}" but expected exact "${v.cliVersion}".\n` +
           `pnpm should rewrite workspace:* to the exact published version; got "${dep}" instead.`,
       );
     }
     console.log(
-      `${GREEN}ok${RESET} packed CLI pins @mindfoldhq/trellis-core to exact ${v.cliVersion}.`,
+      `${GREEN}ok${RESET} packed CLI pins @pennixrv/trellis-core to exact ${v.cliVersion}.`,
     );
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -275,13 +307,17 @@ async function verifyNpm({ packageFilter }) {
 
   for (const pkg of packages) {
     await retry(`${pkg.name}@${v.cliVersion}`, () => {
-      const version = npmViewJSON(`${pkg.name}@${v.cliVersion} version`);
+      const version = npmVersionValue(
+        npmViewJSON(`${pkg.name}@${v.cliVersion} version`),
+      );
       if (version !== v.cliVersion) {
         fail(
           `${pkg.name}@${v.cliVersion} is not visible on the public npm registry.`,
         );
       }
-      const taggedVersion = npmViewJSON(`${pkg.name}@${tag} version`);
+      const taggedVersion = npmVersionValue(
+        npmViewJSON(`${pkg.name}@${tag} version`),
+      );
       if (taggedVersion !== v.cliVersion) {
         fail(
           `${pkg.name}@${tag} resolves to ${taggedVersion ?? "nothing"}, expected ${v.cliVersion}.`,
@@ -342,4 +378,6 @@ async function main() {
   fail(`unknown command: ${cmd}`);
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

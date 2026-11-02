@@ -1,0 +1,9 @@
+{
+  "version": "0.6.43",
+  "description": "Ships the isolated active-task resolver to the dogfood script tree.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fix:**\n- Keep the dogfood and published active-task resolver scripts synchronized so isolated session fallback behavior is identical in development and installed projects.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal trellis update flow."
+}

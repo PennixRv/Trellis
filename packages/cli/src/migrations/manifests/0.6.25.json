@@ -1,0 +1,9 @@
+{
+  "version": "0.6.25",
+  "description": "Prevents a known target session from inheriting a foreign active-task pointer.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Bug fixes:**\n- Keeps session-scoped active-task resolution isolated when a known session has no usable pointer.\n- Preserves identity-less single-session fallback for compatible sub-agent environments.\n\n**Internal:**\n- Restores the missing release manifest so adjacent-version `trellis update` paths remain complete.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

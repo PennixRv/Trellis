@@ -1,0 +1,9 @@
+{
+  "version": "0.6.37",
+  "description": "Completes one-shot Codex subnodes terminally and records the release-manifest guard.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fixes:**\n- Completed `subnode` workers now retain terminal `done` state and use the final assistant reply for Channel delivery.\n- Release now refuses a target version without a migration manifest.",
+  "migrations": [],
+  "notes": "No project migration is required. Existing projects can run the normal `trellis update` flow."
+}

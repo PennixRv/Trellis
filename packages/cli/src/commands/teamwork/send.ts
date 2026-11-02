@@ -2,7 +2,7 @@ import {
   parseDeliveryMode,
   sendMessage as coreSendMessage,
   type TeamworkSessionScope,
-} from "@mindfoldhq/trellis-core/teamwork";
+} from "@pennixrv/trellis-core/teamwork";
 
 import { parseTeamworkSessionScope, parseCsv } from "./store/schema.js";
 import { resolveTeamworkSessionTextBody } from "./text-body.js";

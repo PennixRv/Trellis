@@ -1,0 +1,9 @@
+{
+  "version": "0.6.21",
+  "description": "Safely merges managed project instructions and moves task-scoped research recording into Trellis.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Enhancements:**\n- `trellis init` now creates a managed Trellis block in an existing `AGENTS.md` without overwriting user-authored content; malformed markers are preserved and offered as a `.new` merge candidate.\n- Adds the bundled `trellis-research-record` Skill for verified findings in active Trellis tasks.\n\n**Bug fixes:**\n- Clarifies that a live Channel wait continuation must be resumed before any other host action, avoiding accidental shell or diagnostic calls during event waiting.",
+  "migrations": [],
+  "notes": "No migration required. Existing projects can run `trellis update`; modified or malformed project instructions remain protected by the normal conflict flow."
+}

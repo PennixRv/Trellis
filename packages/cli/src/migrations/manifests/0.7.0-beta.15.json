@@ -1,0 +1,9 @@
+{
+  "version": "0.7.0-beta.15",
+  "description": "Ship synchronized task script copies",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fixes:**\n- Ship the synchronized task help script in the beta release so packaged templates and the repository dogfood copy stay identical.",
+  "migrations": [],
+  "notes": "Run npm install -g @pennixrv/trellis@beta then trellis update. No --migrate required."
+}
