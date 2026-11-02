@@ -3,7 +3,7 @@
 ## 执行前条件
 
 - 父任务与本 owner task 方案已获批准，本任务已按 Trellis 原生流程启动；后续依照以下步骤和适用检查推进。
-- 核验当前分支、HEAD 与工作区；目标基线为 `fa678d8bedd6ddc3891ad69706c79418a75bf147`，集成分支为 `pennix/new-fork-workflow`。
+- 在唯一 Trellis submodule checkout 中使用既有 `v0.7.1` 分支，以 `fa678d8bedd6ddc3891ad69706c79418a75bf147` 为任务基线；保留并沿该分支继续已有的 Teamwork 实现提交 `2af004be`、运行时修正 `70db2bf6` 和后续任务提交。不得新建分支或额外工作树。
 - 开始代码修改前按 `trellis-before-dev` 读取 `.trellis/spec/core/backend/`、`.trellis/spec/cli/backend/`、`.trellis/spec/cli/unit-test/` 中适用的完整指导；核对 Core、CLI、模板与现有测试入口。
 
 ## 有序步骤
@@ -34,4 +34,4 @@ pnpm build
 
 ## 回退
 
-开发始终限定在本任务 worktree。单项改动未通过验证时先保留证据并修复；若需改变已批准范围、状态合同或对外接口，停止并返回 Trellis 计划审查。只有局部改动无法在已批准合同内修复时，才回退该未集成改动；不得清理其他工作树内容或重写基线历史。
+本任务源码始终在项目内 Trellis submodule checkout 的既有 `v0.7.1` 分支上修改。单项改动未通过验证时先保留证据并修复；若需改变已批准范围、状态合同或对外接口，停止并返回 Trellis 计划审查。只有局部改动无法在已批准合同内修复时，才回退该未集成改动；不得清理其他 checkout 内容或重写基线历史。

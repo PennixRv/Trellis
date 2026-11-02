@@ -2,7 +2,7 @@
 
 ## 目标与边界
 
-本设计落实父任务步骤 1–4，目标基线为 Trellis `fa678d8bedd6ddc3891ad69706c79418a75bf147`。产品源码、测试、模板和随附文档只在 Trellis 仓库及 `pennix/new-fork-workflow` worktree 内修改。Pennix Skills 主线路由、Pennix Lifecycle、Paseo 和独立 Marketplace 仓库的变更不属于本任务。
+本设计落实父任务步骤 1–4，目标基线为 Trellis `fa678d8bedd6ddc3891ad69706c79418a75bf147`。产品源码、测试、模板和随附文档只在根仓 `Trellis` submodule 的既有 `v0.7.1` 分支 checkout 内修改，保留该分支上的 Teamwork 历史，不新建开发分支或额外 Git worktree。此约束只规定当前任务的源码落点；本设计中的实施委派仍按已批准的产品合同，通过 Paseo 创建和管理运行时 Git worktree。Pennix Skills 主线路由、Pennix Lifecycle、Paseo 和独立 Marketplace 仓库的变更不属于本任务。
 
 ## Workflow 来源边界
 
@@ -36,4 +36,4 @@ Teamwork Skill 仅分发 `teamwork-plan-construction.md`、`teammate-configurati
 
 ## 失败与回退
 
-所有改动位于隔离的 Trellis 分支/worktree；尚未进入根仓发布或安装。局部验证失败时在当前 owner task 中修复并重验。若发现父任务合同、公开接口或影响范围需要改变，停止依赖步骤，记录事实并回到计划审查；若某组改名遗漏导致合同不一致，按受影响路径修正或在尚未集成时恢复该组改动。不得用兼容层掩盖错误命名，也不得执行数据迁移。
+所有改动位于根仓 `Trellis` submodule 的既有分支与 checkout；尚未进入根仓发布或安装。局部验证失败时在当前 owner task 中修复并重验。若发现父任务合同、公开接口或影响范围需要改变，停止依赖步骤，记录事实并回到计划审查；若某组改名遗漏导致合同不一致，按受影响路径修正或在尚未集成时恢复该组改动。不得用兼容层掩盖错误命名，也不得执行数据迁移。

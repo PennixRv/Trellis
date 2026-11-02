@@ -6,7 +6,7 @@
 
 ## Requirements
 
-- 目标基线为 `fa678d8bedd6ddc3891ad69706c79418a75bf147`，集成目标分支为 `pennix/new-fork-workflow`；产品源码只在本 Trellis worktree 修改。
+- owner task 起始基线为 `fa678d8bedd6ddc3891ad69706c79418a75bf147`；实施在根仓 `Trellis` submodule 的既有 `v0.7.1` checkout 中继续。保留从该基线延续的 Teamwork 提交链、当前任务改动及未跟踪 GitNexus Skill 资产，不新建分支或额外 Git worktree。
 - 第一项产品源码变更必须先完成既有 Channel 产品到 Teamwork 的改名及已批准资产收敛：Core/API、CLI、事件与字段、存储、配置、模板、测试和文档保持同一 Teamwork 命名合同；公开命令根为 `trellis teamwork`，持久实例为 `TeamworkSession`，原子项为 `TeammateAssignment`，协作模式为 `general`、`advisor`、`committee`。
 - 阶段状态、路线、revision、授权和接受事实只有 Trellis 任务记录及 Trellis CLI 可写。不得新增第二状态源或第二状态机；阶段可以按任务需要选择、跳过或回流，跳过和回流保留当前合同要求的理由及证据。
 - Trellis fork 的主 workflow 只使用 bundled native source；移除 Marketplace nested submodule 及其作为 workflow 默认来源、mirror、catalog 和发布依赖的路径。保留仅由用户明确指定的 custom workflow source，作为独立扩展路径；不修改独立 Marketplace 仓库，也不移除通用的 registry-backed spec-template 能力。

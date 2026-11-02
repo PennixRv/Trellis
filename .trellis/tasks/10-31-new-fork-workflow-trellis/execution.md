@@ -65,3 +65,14 @@
 - 按根任务核心模型术语表，统一 workflow 表格、主路由图、五个阶段 Skill、Trellis Meta 说明、平台提示及 CLI/Core 阶段状态描述中的中文与英文标准全称；保留机器标识、Skill slug 和 Trellis 原生步骤编号。
 - 将改动从独立 Trellis owner worktree 迁入根仓 `Trellis` submodule checkout，并核对迁移前后文件内容与模式一致；模板 dogfood 脚本与运行副本逐字节一致。迁移后阶段图完成 Mermaid 渲染和视觉复核。
 - 验证通过：CLI 定向测试 10 个文件、704 项；Core 阶段测试 4 项；CLI `typecheck`；owner task 原生校验、模板与 dogfood 脚本 parity 及 `git diff --check`。owner task 仍为 `in_progress`，尚待根任务接纳和组合验收。
+
+## 2026-11-02：Trellis 目标分支落点修正
+
+- 用户指定 Trellis 改动应继续落在既有 `v0.7.1` 分支。核验该分支从基线 `fa678d8bedd6ddc3891ad69706c79418a75bf147` 起是现有任务提交链的祖先；原误用分支上的 Teamwork 与后续提交、当前计划文档差异及未跟踪 GitNexus Skill 资产均须完整保留并迁入正确分支。
+- Trellis submodule 的远端默认跟踪分支仍由根仓 `.gitmodules` 配置；当前 owner task 的实际工作分支按 task 记录使用 `v0.7.1`。根仓 gitlink 在根任务接纳组件证据后再固定。
+
+## 2026-11-02：提交前完整性复核
+
+- 核对新增的六组 GitNexus Skill：`.agents/skills/gitnexus-{cli,debugging,exploring,guide,impact-analysis,refactoring}/SKILL.md` 与 `.claude/skills/` 下对应文件逐字节一致；各 `name` 与目录 slug 对齐，未发现相对链接或缺失引用。
+- 使用当前项目忽略目录中的 GitNexus CLI 核对 Skill 所用 `analyze`、`impact`、`context`、`detect-changes` 命令选项；调用写法与当前 CLI 帮助一致。保留 GitNexus CLI/doctor 的只读验收结果，不把忽略的 `.gitnexus` 运行数据纳入提交。
+- 本次未改动 Trellis 源码函数；变更为任务证据与 Skill 文档。此前 Core/CLI 全量测试、typecheck、lint、build、release check 和 workflow 定向测试均通过；当前 owner task 原生验证与 `git diff --check` 通过。根侧组合验收待组件提交及 gitlink 固定后执行。
