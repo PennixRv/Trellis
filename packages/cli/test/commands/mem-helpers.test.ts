@@ -7,7 +7,7 @@
  * and terminal formatting.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import * as nodePath from "node:path";
 
 import {
@@ -52,6 +52,43 @@ describe("parseArgv", () => {
   it("treats trailing --flag (no value) as boolean true", () => {
     const r = parseArgv(["list", "--json"]);
     expect(r.flags.json).toBe(true);
+  });
+
+  it.each([
+    ["list", "--task", "old-task"],
+    ["list", "--platform"],
+    ["list", "--cwd", "--json"],
+    ["list", "--grep", "word"],
+    ["context", "id", "--phase", "all"],
+    ["unknown"],
+    ["extract", "id", "extra"],
+    ["list", "--json", "--json"],
+  ])(
+    "rejects invalid CLI arguments without silently widening scope: %j",
+    (...args) => {
+      const exit = vi.spyOn(process, "exit").mockImplementation(() => {
+        throw new Error("exit 2");
+      });
+      const error = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      try {
+        expect(() => parseArgv(args)).toThrow("exit 2");
+        expect(exit).toHaveBeenCalledWith(2);
+        expect(error).toHaveBeenCalled();
+      } finally {
+        exit.mockRestore();
+        error.mockRestore();
+      }
+    },
+  );
+
+  it("supports default-list flags and help without required positionals", () => {
+    expect(parseArgv(["--json", "--limit", "3"])).toMatchObject({
+      cmd: "list",
+      flags: { json: true, limit: "3" },
+    });
+    expect(parseArgv(["context", "--help"]).flags.help).toBe(true);
   });
 });
 

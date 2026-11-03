@@ -59,6 +59,11 @@ import {
 import { VERSION } from "../../src/constants/version.js";
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../../src/constants/paths.js";
 import { computeHash } from "../../src/utils/template-hash.js";
+import {
+  loadAssetBackup,
+  planAssetRestore,
+  restoreAssetBackup,
+} from "../../src/utils/asset-backup.js";
 import { workflowMdTemplate } from "../../src/templates/trellis/index.js";
 import {
   COPILOT_INSTRUCTIONS_BLOCK_END,
@@ -175,6 +180,43 @@ describe("update() integration", () => {
     }
   }
 
+  it("replaces known beta.8 brainstorm assets with intake while preserving customized and unrelated skills", async () => {
+    await init({
+      yes: true,
+      force: true,
+      claude: true,
+      codex: true,
+      cursor: true,
+    });
+    const original = fs.readFileSync(
+      new URL("../fixtures/brainstorm-beta8.md", import.meta.url),
+      "utf-8",
+    );
+    const legacy = ".agents/skills/trellis-brainstorm/SKILL.md";
+    const customized = ".claude/skills/trellis-brainstorm/SKILL.md";
+    const unknown = ".cursor/skills/private-exploration/SKILL.md";
+    writeProjectFile(legacy, original);
+    writeProjectFile(customized, `${original}\nuser instructions\n`);
+    writeProjectFile(unknown, "project-owned exploration");
+    writeProjectFile(".trellis/tasks/old/task.json", "protected task");
+    writeProjectFile(".trellis/session-handoffs/old.json", "protected history");
+    await update({ yes: true });
+    expect(fs.existsSync(projectFile(legacy))).toBe(false);
+    expect(readProjectFile(customized)).toContain("user instructions");
+    expect(readProjectFile(unknown)).toBe("project-owned exploration");
+    for (const directory of [".agents", ".claude", ".cursor"]) {
+      expect(
+        readProjectFile(`${directory}/skills/trellis-request-intake/SKILL.md`),
+      ).toContain("earliest affected phase");
+    }
+    expect(readProjectFile(".trellis/tasks/old/task.json")).toBe(
+      "protected task",
+    );
+    expect(readProjectFile(".trellis/session-handoffs/old.json")).toBe(
+      "protected history",
+    );
+  });
+
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-update-int-"));
     vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
@@ -253,10 +295,8 @@ describe("update() integration", () => {
         new URL("research-record.md", fixtures),
         "utf-8",
       ),
-      ".agents/skills/trellis-meta/references/core/overview.md": fs.readFileSync(
-        new URL("meta-core-overview.md", fixtures),
-        "utf-8",
-      ),
+      ".agents/skills/trellis-meta/references/core/overview.md":
+        fs.readFileSync(new URL("meta-core-overview.md", fixtures), "utf-8"),
       ".claude/skills/trellis-before-dev/SKILL.md.backup": fs.readFileSync(
         new URL("before-dev.backup.md", fixtures),
         "utf-8",
@@ -310,7 +350,9 @@ describe("update() integration", () => {
     expect(readProjectFile(".agents/skills/user-note/SKILL.md")).toBe(
       "user skill\n",
     );
-    expect(readProjectFile(modifiedReference)).toBe("user-modified reference\n");
+    expect(readProjectFile(modifiedReference)).toBe(
+      "user-modified reference\n",
+    );
     expect(readProjectFile(currentReference)).toBe(currentContent);
     const backups = fs
       .readdirSync(projectFile(".trellis"))
@@ -1724,11 +1766,21 @@ describe("update() integration", () => {
       backupDirs[0] as string,
     );
     expect(
-      fs.existsSync(path.join(backupDir, ".opencode", "package.json")),
-    ).toBe(true);
-    expect(
-      fs.existsSync(path.join(backupDir, ".opencode", "node_modules")),
+      fs.existsSync(path.join(backupDir, "files", ".opencode", "package.json")),
     ).toBe(false);
+    expect(
+      fs.existsSync(path.join(backupDir, "files", ".opencode", "node_modules")),
+    ).toBe(false);
+    const backup = loadAssetBackup(tmpDir, backupDirs[0] as string);
+    expect(backup.update).toBe("succeeded");
+    expect(
+      backup.entries.some((entry) => entry.path.includes("node_modules")),
+    ).toBe(false);
+    const plan = planAssetRestore(tmpDir, backup.id);
+    restoreAssetBackup(tmpDir, backup.id, { yes: true, review: plan.review });
+    expect(fs.readFileSync(targetFull, "utf-8")).toBe(
+      "user customized content",
+    );
   });
 
   it("#workflow-md-r4 updates workflow.md as one runtime template when hash-tracked", async () => {

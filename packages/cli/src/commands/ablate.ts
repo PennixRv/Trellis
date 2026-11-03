@@ -31,6 +31,7 @@ import {
   type PathFingerprint,
 } from "../utils/ablation-store.js";
 import { writeFileAtomic } from "../utils/atomic-write.js";
+import { assertNoAssetRecovery } from "../utils/asset-backup.js";
 import {
   homedirBypassEnabled,
   homedirGuardMessage,
@@ -424,6 +425,7 @@ export async function ablate(options: AblateOptions = {}): Promise<void> {
 
   const entries = buildAblationEntries(projectRoot, plan, prunableDirectories);
   withAblationProjectLock(transactionPaths, () => {
+    assertNoAssetRecovery(projectRoot);
     if (lstatIfPresent(transactionPaths.transactionDir)) {
       throw new Error(
         "This project is already ablated or has an interrupted ablation. Run `trellis restore` first.",

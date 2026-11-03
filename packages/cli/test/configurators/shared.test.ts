@@ -535,7 +535,7 @@ describe("resolveSkillsNeutral / resolveAllAsSkillsNeutral", () => {
     const neutral = resolveSkillsNeutral(AI_TOOLS.codex.templateContext);
     const cmdRefNames = [
       "start",
-      "brainstorm",
+      "request-intake",
       "check",
       "break-loop",
       "update-spec",

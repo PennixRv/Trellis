@@ -1,0 +1,191 @@
+{
+  "version": "0.7.1-beta.9",
+  "description": "统一请求接入、阶段 Skill 与可验证资产维护",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "以 request-intake 负责新请求分流，探索、候选和完整方案由既有业务阶段承接；同步 Trellis、Pennix Skills 与 Extra 合同，修复 mem 参数校验，新增受共享维护锁保护的资产快照、恢复和备份清理。",
+  "aiInstructions": "先预览项目更新；仅删除已知内容哈希的 trellis-brainstorm，定制旧 Skill 必须报告并保留。使用原生 backup 命令核验、恢复或清理备份；任务、规范、日志、交接历史和活动恢复受保护。",
+  "migrations": [
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".kilocode/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".kiro/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agent/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".devin/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".qoder/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".codebuddy/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".github/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".factory/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".reasonix/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".zcode/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trae/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".omp/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".grok/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".snow/skills/trellis-brainstorm/SKILL.md",
+      "description": "Replace the generated legacy requirements workflow with request intake and the five phase Skills; preserve customized content",
+      "allowed_hashes": [
+        "42458f1c6b43b6ee4d8e3181895ee9d9bdfa8fbcf04c7657444928d645f189b6",
+        "757d49f67fb7c9f27f8eb1c3f3e91fc4462447aa73da54cee44971693a832e7e",
+        "7a40745cf3b0a0c6a813f68f19161ca167e433dd8f4a7f8fdf339d90ca2ebe6c"
+      ]
+    }
+  ],
+  "notes": "不需要 --migrate。新增 backup 命令默认只预览恢复与清理；只有明确 --yes 才执行，恢复还需要当前 --review 摘要。"
+}

@@ -281,7 +281,7 @@ describe("ablation-store", () => {
     });
 
     expect(() => restoreAblationTransaction(transaction)).toThrow(
-      /ablation operation is already in progress/,
+      /maintenance operation is already in progress/,
     );
     expect(fs.existsSync(path.join(projectDir, "managed.txt"))).toBe(false);
 
@@ -308,7 +308,7 @@ describe("ablation-store", () => {
         holder.stdout.once("data", () => resolve());
       });
       expect(() => stage()).toThrow(
-        /ablation operation is already in progress/,
+        /maintenance operation is already in progress/,
       );
       expect(
         fs.existsSync(getTransactionPaths(projectDir).transactionDir),

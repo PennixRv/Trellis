@@ -41,7 +41,7 @@ The user resumed work after a gap and the context is implicit.
 - "我们上次做到哪了"
 - "接着昨天那个任务"
 
-Reach: `trellis mem list --task <current-task-dir>` to find the most recent sessions tied to the active task, then `extract` the last one.
+Reach: first read the current task's native phase, ownership, and recorded progress. Use `trellis mem list --cwd <project-root>` and `search "<task-id or distinctive topic>" --cwd <project-root>` to find candidate sessions, then inspect them with `context` or `extract`. The CLI has no `--task` filter; project membership and recency do not prove that a session owns the task. History supplements current task state and does not transfer ownership.
 
 ## Familiar-bug debugging
 
@@ -80,7 +80,7 @@ The user explicitly wants to look back at this task — not as a forced step, on
 - "记一下这次踩的坑"
 - "复盘下这个任务"
 
-Reach: identify the current task's session id (from `.trellis/.runtime/sessions/*.json` or `mem list --task <task-dir>`), then `extract <id> --phase brainstorm` and `--phase implement`. Present a summary — surface concrete file:line citations where possible. Whether to also write the summary somewhere (PRD, spec, notes file) is the user's call; offer, don't auto-write.
+Reach: use the task's recorded host session identifier as a candidate, or search its distinctive topic within `--cwd <project-root>`, then verify the session content. `extract <id> --phase brainstorm` and `--phase implement` are historical dialogue slices based on recorded create/start calls, not the current five workflow phases; use `--phase all` when those boundaries do not apply. Present concrete citations where possible. Write findings only to an authorized natural task or knowledge location.
 
 ## Anti-patterns: do NOT reach for `mem` here
 

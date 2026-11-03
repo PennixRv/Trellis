@@ -607,52 +607,97 @@ function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
   }
 }
 
-function acquireProjectLock(paths: TransactionPaths): void {
+interface ProjectLock {
+  content: string;
+  ino: number;
+  dev: number;
+}
+
+function acquireProjectLock(paths: TransactionPaths): ProjectLock {
   ensurePrivateDirectory(paths.stateRoot);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const fd = fs.openSync(paths.lockFile, "wx", 0o600);
+      const content = JSON.stringify({ pid: process.pid, nonce: randomUUID() });
       try {
-        fs.writeSync(fd, String(process.pid));
+        fs.writeSync(fd, content);
+        const stat = fs.fstatSync(fd);
+        return { content, ino: stat.ino, dev: stat.dev };
       } finally {
         fs.closeSync(fd);
       }
-      return;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
 
-    let holderPid = 0;
-    try {
-      holderPid = Number(fs.readFileSync(paths.lockFile, "utf-8").trim());
-    } catch {
-      continue;
-    }
-    if (holderPid && pidAlive(holderPid)) {
+    const stat = fs.lstatSync(paths.lockFile);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
       throw new Error(
-        `Another Trellis ablation operation is already in progress for this project (pid ${holderPid}).`,
+        "Unknown Trellis maintenance lock; inspect it before retrying.",
       );
     }
-    try {
-      fs.unlinkSync(paths.lockFile);
-    } catch {
-      // A concurrent process changed the lock; retry the atomic create once.
+    const content = fs.readFileSync(paths.lockFile, "utf-8").trim();
+    let holderPid: unknown;
+    if (/^[1-9]\d*$/.test(content)) holderPid = Number(content);
+    else {
+      try {
+        const record: unknown = JSON.parse(content);
+        if (
+          record &&
+          typeof record === "object" &&
+          "pid" in record &&
+          "nonce" in record &&
+          typeof record.nonce === "string"
+        )
+          holderPid = record.pid;
+      } catch {
+        // An incomplete or unknown lock is not evidence that its owner exited.
+      }
     }
+    if (
+      typeof holderPid !== "number" ||
+      !Number.isSafeInteger(holderPid) ||
+      holderPid <= 0
+    ) {
+      throw new Error(
+        "Unknown Trellis maintenance lock; inspect it before retrying.",
+      );
+    }
+    if (pidAlive(holderPid)) {
+      throw new Error(
+        `Another Trellis maintenance operation is already in progress for this project (pid ${holderPid}).`,
+      );
+    }
+    const current = fs.lstatSync(paths.lockFile);
+    if (
+      current.ino !== stat.ino ||
+      current.dev !== stat.dev ||
+      fs.readFileSync(paths.lockFile, "utf-8").trim() !== content
+    ) {
+      throw new Error("Trellis maintenance lock changed during inspection.");
+    }
+    fs.unlinkSync(paths.lockFile);
   }
   throw new Error(
     "Unable to acquire the Trellis ablation-operation lock; retry the command.",
   );
 }
 
-function releaseProjectLock(paths: TransactionPaths): void {
+function releaseProjectLock(paths: TransactionPaths, lock: ProjectLock): void {
   try {
-    const holder = fs.readFileSync(paths.lockFile, "utf-8").trim();
-    if (holder === String(process.pid)) {
+    const stat = fs.lstatSync(paths.lockFile);
+    if (
+      stat.isFile() &&
+      !stat.isSymbolicLink() &&
+      stat.ino === lock.ino &&
+      stat.dev === lock.dev &&
+      fs.readFileSync(paths.lockFile, "utf-8") === lock.content
+    ) {
       fs.unlinkSync(paths.lockFile);
     }
   } catch {
@@ -660,16 +705,22 @@ function releaseProjectLock(paths: TransactionPaths): void {
   }
 }
 
-/** Serialize ablate/restore state and project mutations for one project. */
+/** Shared project maintenance boundary; asynchronous operations retain ownership. */
 export function withAblationProjectLock<T>(
   paths: TransactionPaths,
   operation: () => T,
 ): T {
-  acquireProjectLock(paths);
+  const lock = acquireProjectLock(paths);
+  let pending = false;
   try {
-    return operation();
+    const result = operation();
+    if (result instanceof Promise) {
+      pending = true;
+      return result.finally(() => releaseProjectLock(paths, lock)) as T;
+    }
+    return result;
   } finally {
-    releaseProjectLock(paths);
+    if (!pending) releaseProjectLock(paths, lock);
   }
 }
 
@@ -935,7 +986,7 @@ export function restoreAblationTransaction(
 ): void {
   const projectRoot = canonicalProjectRoot(transaction.state.projectRoot);
   const paths = getTransactionPaths(projectRoot, transaction.paths.stateRoot);
-  acquireProjectLock(paths);
+  const lock = acquireProjectLock(paths);
   try {
     const reloaded = loadAblationTransaction(projectRoot, paths.stateRoot);
     if (!reloaded) {
@@ -961,7 +1012,7 @@ export function restoreAblationTransaction(
     verifyRestoredState(transaction);
     if (options.deleteAfterRestore) deleteAblationTransaction(transaction);
   } finally {
-    releaseProjectLock(paths);
+    releaseProjectLock(paths, lock);
   }
 }
 

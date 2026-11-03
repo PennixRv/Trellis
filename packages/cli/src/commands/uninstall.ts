@@ -19,6 +19,10 @@
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import {
+  listAssetBackups,
+  withAssetMaintenance,
+} from "../utils/asset-backup.js";
 import path from "node:path";
 import readline from "node:readline";
 import chalk from "chalk";
@@ -160,141 +164,158 @@ function dirtyUninstallBypassEnabled(): boolean {
  * Entry point.
  */
 export async function uninstall(options: UninstallOptions = {}): Promise<void> {
-  // Refuse to run in $HOME — same reasoning as init. A manifest poisoned by
-  // a prior buggy init would otherwise unlink global platform runtime data
-  // (chat history, session JSONLs).
-  if (isCwdHomedir() && !homedirBypassEnabled()) {
-    console.error(chalk.red(homedirGuardMessage("uninstall")));
-    process.exit(1);
-  }
+  return withAssetMaintenance(
+    process.cwd(),
+    async () => {
+      // Refuse to run in $HOME — same reasoning as init. A manifest poisoned by
+      // a prior buggy init would otherwise unlink global platform runtime data
+      // (chat history, session JSONLs).
+      if (isCwdHomedir() && !homedirBypassEnabled()) {
+        console.error(chalk.red(homedirGuardMessage("uninstall")));
+        process.exit(1);
+      }
 
-  const cwd = process.cwd();
-  const trellisDir = path.join(cwd, DIR_NAMES.WORKFLOW);
+      const cwd = process.cwd();
+      const trellisDir = path.join(cwd, DIR_NAMES.WORKFLOW);
+      const backups = listAssetBackups(cwd);
+      if (backups.length)
+        console.log(
+          `Uninstall also removes ${backups.length} local asset backup objects (${backups.reduce((total, item) => total + item.bytes, 0)} bytes); use ablate for reversible removal.`,
+        );
 
-  // Pre-check 1: must have a `.trellis/` directory.
-  if (!fs.existsSync(trellisDir)) {
-    console.log(
-      chalk.gray(
-        "Trellis is not installed in this project (no .trellis/ directory found).",
-      ),
-    );
-    return;
-  }
+      // Pre-check 1: must have a `.trellis/` directory.
+      if (!fs.existsSync(trellisDir)) {
+        console.log(
+          chalk.gray(
+            "Trellis is not installed in this project (no .trellis/ directory found).",
+          ),
+        );
+        return;
+      }
 
-  // Pre-check 2: must have a manifest. Without it we cannot determine which
-  // platform files are trellis-owned vs user-owned.
-  const hashes = loadHashes(cwd);
-  if (Object.keys(hashes).length === 0) {
-    console.error(
-      chalk.red(
-        "Trellis directory found but manifest is missing — cannot determine which platform files to remove. " +
-          "You can manually delete .trellis/ if needed.",
-      ),
-    );
-    process.exit(1);
-  }
+      // Pre-check 2: must have a manifest. Without it we cannot determine which
+      // platform files are trellis-owned vs user-owned.
+      const hashes = loadHashes(cwd);
+      if (Object.keys(hashes).length === 0) {
+        console.error(
+          chalk.red(
+            "Trellis directory found but manifest is missing — cannot determine which platform files to remove. " +
+              "You can manually delete .trellis/ if needed.",
+          ),
+        );
+        process.exit(1);
+      }
 
-  // Self-heal poisoned manifests from buggy init versions: prune any manifest
-  // entry that no current configurator owns. Runs BEFORE buildPlan so the
-  // user-owned paths (.codex/sessions/, .claude/projects/, pre-existing
-  // AGENTS.md, etc.) never reach the deletion list. See PRD R3.
-  //
-  // Dry-run: still compute the pruned hashes (so the plan reflects post-prune
-  // reality) but pass `persist: false` so no disk write happens. The actual
-  // disk write defers to executePlan time, where we'd be rewriting the
-  // manifest only to delete the whole .trellis/ dir anyway — but the
-  // computation must remain to keep the rendered plan honest.
-  const configuredPlatforms = getConfiguredPlatforms(cwd);
-  const { pruned, hashes: prunedHashes } = pruneOrphanManifestKeys(
-    cwd,
-    [...configuredPlatforms],
-    hashes,
-    { persist: !options.dryRun },
-  );
-  if (pruned.length > 0) {
-    // Surface counts only — listing every poisoned entry would alarm users
-    // without giving them an actionable signal.
-    console.log(
-      chalk.gray(
-        `   Pruned ${pruned.length} orphan manifest entries (user-owned files trellis did not write).`,
-      ),
-    );
-  }
+      // Self-heal poisoned manifests from buggy init versions: prune any manifest
+      // entry that no current configurator owns. Runs BEFORE buildPlan so the
+      // user-owned paths (.codex/sessions/, .claude/projects/, pre-existing
+      // AGENTS.md, etc.) never reach the deletion list. See PRD R3.
+      //
+      // Dry-run: still compute the pruned hashes (so the plan reflects post-prune
+      // reality) but pass `persist: false` so no disk write happens. The actual
+      // disk write defers to executePlan time, where we'd be rewriting the
+      // manifest only to delete the whole .trellis/ dir anyway — but the
+      // computation must remain to keep the rendered plan honest.
+      const configuredPlatforms = getConfiguredPlatforms(cwd);
+      const { pruned, hashes: prunedHashes } = pruneOrphanManifestKeys(
+        cwd,
+        [...configuredPlatforms],
+        hashes,
+        { persist: !options.dryRun },
+      );
+      if (pruned.length > 0) {
+        // Surface counts only — listing every poisoned entry would alarm users
+        // without giving them an actionable signal.
+        console.log(
+          chalk.gray(
+            `   Pruned ${pruned.length} orphan manifest entries (user-owned files trellis did not write).`,
+          ),
+        );
+      }
 
-  const plan = buildManagedRemovalPlan(cwd, prunedHashes);
-  renderPlan(cwd, plan);
+      const plan = buildManagedRemovalPlan(cwd, prunedHashes);
+      renderPlan(cwd, plan);
 
-  // .trellis/ holds user-authored specs, task PRDs, and journals that have no
-  // backup here. Surface any uncommitted such files before deleting the tree,
-  // and — for scripted `--yes` runs where nobody reads the warning — fail
-  // closed unless explicitly overridden.
-  const uncommitted = collectUncommittedTrellisData(cwd);
-  if (uncommitted.length > 0) {
-    console.warn(
-      chalk.red.bold(
-        `\n⚠ ${uncommitted.length} uncommitted file(s) under .trellis/ (spec/tasks/workspace) ` +
-          `will be permanently deleted with no backup:`,
-      ),
-    );
-    for (const p of uncommitted.slice(0, 20)) {
-      console.warn(chalk.red(`    ${p}`));
-    }
-    if (uncommitted.length > 20) {
-      console.warn(chalk.red(`    … and ${uncommitted.length - 20} more`));
-    }
-    console.warn(
-      chalk.yellow("Commit or stash them first if you want to keep them.\n"),
-    );
-  }
+      // .trellis/ holds user-authored specs, task PRDs, and journals that have no
+      // backup here. Surface any uncommitted such files before deleting the tree,
+      // and — for scripted `--yes` runs where nobody reads the warning — fail
+      // closed unless explicitly overridden.
+      const uncommitted = collectUncommittedTrellisData(cwd);
+      if (uncommitted.length > 0) {
+        console.warn(
+          chalk.red.bold(
+            `\n⚠ ${uncommitted.length} uncommitted file(s) under .trellis/ (spec/tasks/workspace) ` +
+              `will be permanently deleted with no backup:`,
+          ),
+        );
+        for (const p of uncommitted.slice(0, 20)) {
+          console.warn(chalk.red(`    ${p}`));
+        }
+        if (uncommitted.length > 20) {
+          console.warn(chalk.red(`    … and ${uncommitted.length - 20} more`));
+        }
+        console.warn(
+          chalk.yellow(
+            "Commit or stash them first if you want to keep them.\n",
+          ),
+        );
+      }
 
-  if (options.dryRun) {
-    console.log(chalk.gray("Dry run — no files were modified."));
-    return;
-  }
+      if (options.dryRun) {
+        console.log(chalk.gray("Dry run — no files were modified."));
+        return;
+      }
 
-  if (uncommitted.length > 0 && options.yes && !dirtyUninstallBypassEnabled()) {
-    console.error(
-      chalk.red(
-        "Refusing to uninstall with --yes while .trellis/ has uncommitted user data " +
-          "(spec/tasks/workspace). Commit or stash it, re-run without --yes to confirm " +
-          "interactively, or set TRELLIS_ALLOW_DIRTY_UNINSTALL=1 to override.",
-      ),
-    );
-    process.exit(1);
-  }
+      if (
+        uncommitted.length > 0 &&
+        options.yes &&
+        !dirtyUninstallBypassEnabled()
+      ) {
+        console.error(
+          chalk.red(
+            "Refusing to uninstall with --yes while .trellis/ has uncommitted user data " +
+              "(spec/tasks/workspace). Commit or stash it, re-run without --yes to confirm " +
+              "interactively, or set TRELLIS_ALLOW_DIRTY_UNINSTALL=1 to override.",
+          ),
+        );
+        process.exit(1);
+      }
 
-  if (!options.yes) {
-    // Make sure stdin is in a usable state for the prompt; in scripted
-    // environments that closed stdin, inquirer would otherwise raise. We
-    // honor the same UX as `trellis update` (which also fails closed in
-    // that case).
-    if (!process.stdin.isTTY) {
-      console.error(
-        chalk.red(
-          "Refusing to prompt for confirmation in a non-interactive shell. " +
-            "Pass --yes/-y to confirm or --dry-run to preview.",
+      if (!options.yes) {
+        // Make sure stdin is in a usable state for the prompt; in scripted
+        // environments that closed stdin, inquirer would otherwise raise. We
+        // honor the same UX as `trellis update` (which also fails closed in
+        // that case).
+        if (!process.stdin.isTTY) {
+          console.error(
+            chalk.red(
+              "Refusing to prompt for confirmation in a non-interactive shell. " +
+                "Pass --yes/-y to confirm or --dry-run to preview.",
+            ),
+          );
+          // Try to release the readline ref if anything else opened stdin.
+          readline.createInterface({ input: process.stdin }).close();
+          process.exit(1);
+        }
+
+        const ok = await promptContinue();
+        if (!ok) {
+          console.log(chalk.yellow("Uninstall cancelled. No files modified."));
+          return;
+        }
+      }
+
+      const summary = executeManagedRemovalPlan(cwd, plan);
+
+      console.log();
+      console.log(
+        chalk.green(
+          `Uninstalled trellis: ${summary.deletedFiles} files deleted, ` +
+            `${summary.modifiedFiles} files modified, ` +
+            `${summary.deletedDirs} directories removed.`,
         ),
       );
-      // Try to release the readline ref if anything else opened stdin.
-      readline.createInterface({ input: process.stdin }).close();
-      process.exit(1);
-    }
-
-    const ok = await promptContinue();
-    if (!ok) {
-      console.log(chalk.yellow("Uninstall cancelled. No files modified."));
-      return;
-    }
-  }
-
-  const summary = executeManagedRemovalPlan(cwd, plan);
-
-  console.log();
-  console.log(
-    chalk.green(
-      `Uninstalled trellis: ${summary.deletedFiles} files deleted, ` +
-        `${summary.modifiedFiles} files modified, ` +
-        `${summary.deletedDirs} directories removed.`,
-    ),
+    },
+    options.dryRun,
   );
 }

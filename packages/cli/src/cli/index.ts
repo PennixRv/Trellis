@@ -15,6 +15,7 @@ import {
 } from "../commands/workflow.js";
 import { registerTeamworkCommand } from "../commands/teamwork/index.js";
 import { registerTaskProgressCommand } from "../commands/task-progress.js";
+import { registerBackupCommand } from "../commands/backup.js";
 import { DIR_NAMES } from "../constants/paths.js";
 import { PACKAGE_NAME, VERSION } from "../constants/version.js";
 import { compareVersions } from "../utils/compare-versions.js";
@@ -62,6 +63,7 @@ if (fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
 }
 
 const program = new Command();
+registerBackupCommand(program);
 
 program
   .name("trellis")

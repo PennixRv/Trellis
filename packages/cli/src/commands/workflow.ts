@@ -24,6 +24,7 @@
  */
 
 import fs from "node:fs";
+import { withAssetMaintenance } from "../utils/asset-backup.js";
 import path from "node:path";
 import chalk from "chalk";
 import inquirer from "inquirer";
@@ -448,60 +449,62 @@ export async function runCreateWorkflowCommand(
   options: CreateWorkflowOptions = {},
 ): Promise<void> {
   const cwd = process.cwd();
-  if (!fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
-    throw new WorkflowCommandError(
-      "No .trellis/ directory found. Run `trellis init` first.",
-    );
-  }
-  if (!WORKFLOW_ID_RE.test(id)) {
-    throw new WorkflowCommandError(
-      `Invalid workflow id "${id}". Workflow ids must match [A-Za-z0-9_-]+.`,
-    );
-  }
+  return withAssetMaintenance(cwd, async () => {
+    if (!fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
+      throw new WorkflowCommandError(
+        "No .trellis/ directory found. Run `trellis init` first.",
+      );
+    }
+    if (!WORKFLOW_ID_RE.test(id)) {
+      throw new WorkflowCommandError(
+        `Invalid workflow id "${id}". Workflow ids must match [A-Za-z0-9_-]+.`,
+      );
+    }
 
-  const destPath = workflowLibraryPath(cwd, id);
-  const destRel = `${WORKFLOWS_LIB_REL}/${id}.md`;
-  if (fs.existsSync(destPath)) {
-    throw new WorkflowCommandError(
-      `${destRel} already exists. Choose another workflow id or edit the existing file.`,
-    );
-  }
+    const destPath = workflowLibraryPath(cwd, id);
+    const destRel = `${WORKFLOWS_LIB_REL}/${id}.md`;
+    if (fs.existsSync(destPath)) {
+      throw new WorkflowCommandError(
+        `${destRel} already exists. Choose another workflow id or edit the existing file.`,
+      );
+    }
 
-  fs.mkdirSync(path.dirname(destPath), { recursive: true });
-  const native = await resolveWorkflowTemplate(NATIVE_WORKFLOW_ID);
-  writeFileAtomic(destPath, replacePythonCommandLiterals(native.content));
-  console.log(chalk.green(`  ✓ Created ${destRel} from the native workflow`));
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    const native = await resolveWorkflowTemplate(NATIVE_WORKFLOW_ID);
+    writeFileAtomic(destPath, replacePythonCommandLiterals(native.content));
+    console.log(chalk.green(`  ✓ Created ${destRel} from the native workflow`));
 
-  if (options.skipDefaults || !isInteractive()) return;
+    if (options.skipDefaults || !isInteractive()) return;
 
-  const defaults = await chooseWorkflowDefaults(id);
-  if (
-    defaults.projectDefault &&
-    !fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml"))
-  ) {
-    throw new WorkflowCommandError(
-      `Created ${destRel}, but cannot set the project default because ${DIR_NAMES.WORKFLOW}/config.yaml is missing.`,
-    );
-  }
-  if (
-    defaults.personalDefault &&
-    !fs.existsSync(path.join(cwd, PATHS.DEVELOPER_FILE))
-  ) {
-    throw new WorkflowCommandError(
-      `Created ${destRel}, but cannot set the personal default because ${PATHS.DEVELOPER_FILE} is missing. Run \`trellis init -u <name>\` first.`,
-    );
-  }
+    const defaults = await chooseWorkflowDefaults(id);
+    if (
+      defaults.projectDefault &&
+      !fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml"))
+    ) {
+      throw new WorkflowCommandError(
+        `Created ${destRel}, but cannot set the project default because ${DIR_NAMES.WORKFLOW}/config.yaml is missing.`,
+      );
+    }
+    if (
+      defaults.personalDefault &&
+      !fs.existsSync(path.join(cwd, PATHS.DEVELOPER_FILE))
+    ) {
+      throw new WorkflowCommandError(
+        `Created ${destRel}, but cannot set the personal default because ${PATHS.DEVELOPER_FILE} is missing. Run \`trellis init -u <name>\` first.`,
+      );
+    }
 
-  if (defaults.projectDefault) {
-    setProjectDefaultWorkflow(cwd, id);
-    console.log(
-      chalk.green(`  ✓ Set default_workflow: ${id} in .trellis/config.yaml`),
-    );
-  }
-  if (defaults.personalDefault) {
-    setPersonalDefaultWorkflow(cwd, id);
-    console.log(chalk.green(`  ✓ Set workflow=${id} in .trellis/.developer`));
-  }
+    if (defaults.projectDefault) {
+      setProjectDefaultWorkflow(cwd, id);
+      console.log(
+        chalk.green(`  ✓ Set default_workflow: ${id} in .trellis/config.yaml`),
+      );
+    }
+    if (defaults.personalDefault) {
+      setPersonalDefaultWorkflow(cwd, id);
+      console.log(chalk.green(`  ✓ Set workflow=${id} in .trellis/.developer`));
+    }
+  });
 }
 
 /**
@@ -519,78 +522,84 @@ export async function runWorkflowCommand(
   options: WorkflowCommandOptions,
 ): Promise<void> {
   const cwd = process.cwd();
-  if (!fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
-    throw new WorkflowCommandError(
-      "No .trellis/ directory found. Run `trellis init` first.",
-    );
-  }
+  return withAssetMaintenance(
+    cwd,
+    async () => {
+      if (!fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
+        throw new WorkflowCommandError(
+          "No .trellis/ directory found. Run `trellis init` first.",
+        );
+      }
 
-  // List mode — print and exit.
-  if (options.list) {
-    const { templates, errorMessage } = await listWorkflowTemplates({
-      source: options.workflowSource,
-    });
-    printListing(templates);
-    printLibraryListing(cwd);
-    if (errorMessage) {
-      console.log(chalk.yellow(`⚠ ${errorMessage}`));
-    }
-    return;
-  }
+      // List mode — print and exit.
+      if (options.list) {
+        const { templates, errorMessage } = await listWorkflowTemplates({
+          source: options.workflowSource,
+        });
+        printListing(templates);
+        printLibraryListing(cwd);
+        if (errorMessage) {
+          console.log(chalk.yellow(`⚠ ${errorMessage}`));
+        }
+        return;
+      }
 
-  // `--save <id>` populates the per-task variant library; it never composes
-  // with the active-workflow write modes.
-  if (options.save !== undefined) {
-    if (options.template || options.createNew) {
-      throw new WorkflowCommandError(
-        "--save cannot be combined with --template or --create-new.",
-      );
-    }
-    await saveWorkflowToLibrary(cwd, options.save, options);
-    return;
-  }
+      // `--save <id>` populates the per-task variant library; it never composes
+      // with the active-workflow write modes.
+      if (options.save !== undefined) {
+        if (options.template || options.createNew) {
+          throw new WorkflowCommandError(
+            "--save cannot be combined with --template or --create-new.",
+          );
+        }
+        await saveWorkflowToLibrary(cwd, options.save, options);
+        return;
+      }
 
-  // Resolve template id (non-interactive flag or interactive picker).
-  let templateId = options.template;
-  if (!templateId) {
-    if (!isInteractive()) {
-      throw new WorkflowCommandError(
-        "No --template specified and stdin is not a TTY. Pass --template <id> or run interactively.",
-      );
-    }
-    const { templates, errorMessage } = await listWorkflowTemplates({
-      source: options.workflowSource,
-    });
-    if (errorMessage) {
-      console.log(chalk.yellow(`⚠ ${errorMessage}`));
-    }
-    const picked = await chooseTemplateInteractively(templates);
-    if (!picked) {
-      throw new WorkflowCommandError("No workflow template available.");
-    }
-    templateId = picked;
-  }
+      // Resolve template id (non-interactive flag or interactive picker).
+      let templateId = options.template;
+      if (!templateId) {
+        if (!isInteractive()) {
+          throw new WorkflowCommandError(
+            "No --template specified and stdin is not a TTY. Pass --template <id> or run interactively.",
+          );
+        }
+        const { templates, errorMessage } = await listWorkflowTemplates({
+          source: options.workflowSource,
+        });
+        if (errorMessage) {
+          console.log(chalk.yellow(`⚠ ${errorMessage}`));
+        }
+        const picked = await chooseTemplateInteractively(templates);
+        if (!picked) {
+          throw new WorkflowCommandError("No workflow template available.");
+        }
+        templateId = picked;
+      }
 
-  // Resolve content.
-  let template: ResolvedWorkflowTemplate;
-  try {
-    template = await resolveWorkflowTemplate(templateId, {
-      source: options.workflowSource,
-    });
-  } catch (err) {
-    if (err instanceof WorkflowResolveError) {
-      throw new WorkflowCommandError(err.message);
-    }
-    throw err;
-  }
+      // Resolve content.
+      let template: ResolvedWorkflowTemplate;
+      try {
+        template = await resolveWorkflowTemplate(templateId, {
+          source: options.workflowSource,
+        });
+      } catch (err) {
+        if (err instanceof WorkflowResolveError) {
+          throw new WorkflowCommandError(err.message);
+        }
+        throw err;
+      }
 
-  await writeWorkflow(cwd, template, options);
+      await writeWorkflow(cwd, template, options);
 
-  // Best-effort warning: if the resolved workflow references
-  // `.trellis/agents/<name>.md` files that don't exist on disk, point the user
-  // at `trellis update` so `trellis teamwork spawn --agent <name>` doesn't fail
-  // mid-session. Non-blocking; never errors a successful write.
-  warnAboutMissingAgents(cwd, template.content);
+      // Best-effort warning: if the resolved workflow references
+      // `.trellis/agents/<name>.md` files that don't exist on disk, point the user
+      // at `trellis update` so `trellis teamwork spawn --agent <name>` doesn't fail
+      // mid-session. Non-blocking; never errors a successful write.
+      warnAboutMissingAgents(cwd, template.content);
+    },
+    options.list === true,
+  );
 }
 
 function warnAboutMissingAgents(cwd: string, workflowContent: string): void {

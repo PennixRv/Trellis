@@ -298,7 +298,7 @@ describe("runMem subcommand integration", () => {
 
   it("search: missing keyword exits non-zero via die()", () => {
     expect(() => runMem(["search"])).toThrow(/__exit__:2/);
-    expect(errs.join("\n")).toContain("usage: search <keyword>");
+    expect(errs.join("\n")).toContain("search requires 1 positional argument");
   });
 
   // ---------- context ----------

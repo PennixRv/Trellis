@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 /**
  * Write a file atomically: stream into a temp file in the same directory,
@@ -14,11 +15,17 @@ import path from "node:path";
 export function writeFileAtomic(
   filePath: string,
   data: string | Uint8Array,
+  mode?: number,
 ): void {
   const dir = path.dirname(filePath);
-  const tmp = path.join(dir, `.${path.basename(filePath)}.${process.pid}.tmp`);
+  const tmp = path.join(
+    dir,
+    `.${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`,
+  );
   try {
-    fs.writeFileSync(tmp, data);
+    fs.writeFileSync(tmp, data, { flag: "wx", mode });
+    if (mode !== undefined && process.platform !== "win32")
+      fs.chmodSync(tmp, mode);
     fs.renameSync(tmp, filePath);
   } catch (err) {
     try {

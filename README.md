@@ -71,18 +71,21 @@ See the [Quick Start](https://docs.trytrellis.app/start/install-and-first-task) 
 The workflow is simple:
 
 1. **Describe what you want** in natural language.
-2. **Brainstorm** with the AI one question at a time until the PRD is clear, then implementation begins.
+2. **Review the request and plan** with the AI. New requests enter `trellis-request-intake`, then the selected native business phases.
 3. **Let it run** — the AI calls Trellis Implement and auto-checks the result against specs, lint, type-check, and tests.
-4. **Type `/trellis:finish-work`** when the work is done or the session context fills up. Trellis archives the task and updates journals.
+4. **Type `/trellis:finish-work`** to record session progress. Task completion or cancellation follows accepted delivery closeout through the native task CLI.
 
 ## How It Works
 
-Trellis runs a 4-phase loop with auto-invoked skills and sub-agents:
+Trellis selects an ordered route through five business phases:
 
-1. **Plan** — `trellis-brainstorm` walks through requirements one question at a time and writes `prd.md`. Research-heavy items go to a `trellis-research` sub-agent. The result is curated specs + research files referenced from `implement.jsonl` / `check.jsonl`.
-2. **Implement** — a `trellis-implement` sub-agent writes code from the PRD with the curated context auto-injected, no git commit.
-3. **Verify** — a `trellis-check` sub-agent reviews the diff against specs and runs lint, type-check, and tests, self-fixing where it can.
-4. **Finish** — a final check runs, then `trellis-update-spec` promotes new learnings back into `.trellis/spec/` so the next session starts smarter.
+1. **Goal exploration and requirements** — clarify the real objective, scope, constraints, and success conditions.
+2. **Decision space construction and merging** — construct credible alternatives and identify evidence and consequential choices.
+3. **Solution design and convergence** — assemble and review the whole solution. Accepting the implementation contract and authorizing implementation are separate decisions.
+4. **Task implementation** — implement the authorized contract and verify behavior against project specs and relevant tests.
+5. **Delivery review and closeout** — assess delivery and remaining work, then complete or cancel through the native CLI. Tasks move to `completed/YYYY-MM/` or `cancelled/`; session journals remain separate.
+
+`trellis-start` initializes session context, `trellis-continue` resumes an existing task, and `trellis-request-intake` routes a new request. Exploration and plan convergence belong to the phase Skills. Native sub-agents are optional; Teamwork teammates contribute research, review, and verification under their role contract.
 
 ## Resources
 

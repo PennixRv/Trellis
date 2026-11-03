@@ -1,3 +1,15 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterAll } from "vitest";
+
+// Asset writers must never acquire maintenance state in the developer's home.
+const maintenanceRoot = fs.mkdtempSync(
+  path.join(os.tmpdir(), "trellis-test-maintenance-"),
+);
+process.env.TRELLIS_ABLATION_STATE_ROOT = maintenanceRoot;
+afterAll(() => fs.rmSync(maintenanceRoot, { recursive: true, force: true }));
+
 // Strip host-shell session env vars so the OpenCode / Trellis context
 // resolvers under test fall through to platform-input-derived keys
 // instead of picking up whatever the dev's terminal happens to export.

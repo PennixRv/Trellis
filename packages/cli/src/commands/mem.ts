@@ -44,25 +44,76 @@ export interface Argv {
 }
 
 export function parseArgv(argv: readonly string[]): Argv {
-  const cmd = argv[0] ?? "list";
+  const first = argv[0];
+  const cmd =
+    first === "-h" || first === "--help"
+      ? "help"
+      : first?.startsWith("-")
+        ? "list"
+        : (first ?? "list");
   const positional: string[] = [];
   const flags: Record<string, string | boolean> = {};
-  for (let i = 1; i < argv.length; i++) {
+  const booleans = new Set(["global", "json", "include-children", "help"]);
+  const common = [
+    "platform",
+    "since",
+    "until",
+    "cwd",
+    "global",
+    "limit",
+    "json",
+    "help",
+  ];
+  const specific: Record<string, string[]> = {
+    list: [],
+    projects: [],
+    search: ["include-children"],
+    extract: ["grep", "phase"],
+    context: ["grep", "turns", "around", "max-chars", "include-children"],
+    help: [],
+  };
+  if (!Object.hasOwn(specific, cmd))
+    die(`unknown command: ${cmd} (try 'help')`);
+  const allowed = new Set([...common, ...specific[cmd]]);
+  for (
+    let i = first?.startsWith("-") && cmd !== "help" ? 0 : 1;
+    i < argv.length;
+    i++
+  ) {
     const a = argv[i];
     if (a === undefined) continue;
-    if (a.startsWith("--")) {
-      const key = a.slice(2);
+    if (a.startsWith("-")) {
+      const key = a === "-h" ? "help" : a.slice(2);
+      if (!allowed.has(key))
+        die(`unknown or inapplicable flag for ${cmd}: ${a}`);
+      if (Object.hasOwn(flags, key)) die(`duplicate flag: ${a}`);
+      if (booleans.has(key)) {
+        flags[key] = true;
+        continue;
+      }
       const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("--")) {
+      if (
+        next !== undefined &&
+        !next.startsWith("--") &&
+        next !== "-h" &&
+        next.trim() !== ""
+      ) {
         flags[key] = next;
         i++;
       } else {
-        flags[key] = true;
+        die(`${a} requires a value`);
       }
     } else {
       positional.push(a);
     }
   }
+  const count =
+    cmd === "search" || cmd === "extract" || cmd === "context" ? 1 : 0;
+  if (
+    !flags.help &&
+    (cmd === "search" ? positional.length < 1 : positional.length !== count)
+  )
+    die(`${cmd} requires ${count} positional argument(s)`);
   return { cmd, positional, flags };
 }
 
@@ -179,7 +230,7 @@ function cmdList(argv: Argv): void {
 }
 
 function cmdSearch(argv: Argv): void {
-  const kw = argv.positional[0];
+  const kw = argv.positional.join(" ");
   if (!kw) die("usage: search <keyword>");
   const f = buildFilter(argv.flags);
   const includeChildren = argv.flags["include-children"] === true;

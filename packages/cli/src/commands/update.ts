@@ -35,6 +35,12 @@ import { compareVersions } from "../utils/compare-versions.js";
 import { toPosix } from "../utils/posix.js";
 import { setupProxy } from "../utils/proxy.js";
 import { emptyTaskJson } from "../utils/task-json.js";
+import {
+  assetBackupScope,
+  bindAssetUpdate,
+  createAssetBackup,
+  withAssetMaintenance,
+} from "../utils/asset-backup.js";
 
 // Import templates for comparison
 import {
@@ -54,7 +60,6 @@ import {
 } from "../templates/copilot/index.js";
 
 import {
-  ALL_MANAGED_DIRS,
   getConfiguredPlatforms,
   collectPlatformTemplates,
 } from "../configurators/index.js";
@@ -1287,38 +1292,6 @@ async function promptConflictResolution(
 }
 
 /**
- * Create a timestamped backup directory path
- */
-function createBackupDirPath(cwd: string): string {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  return path.join(cwd, DIR_NAMES.WORKFLOW, `.backup-${timestamp}`);
-}
-
-/**
- * Backup a single file to the backup directory
- */
-function backupFile(
-  cwd: string,
-  backupDir: string,
-  relativePath: string,
-): void {
-  const srcPath = path.join(cwd, relativePath);
-  if (!fs.existsSync(srcPath)) return;
-
-  const backupPath = path.join(backupDir, relativePath);
-  fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-  fs.copyFileSync(srcPath, backupPath);
-}
-
-/**
- * Directories to backup as complete snapshot (derived from platform registry)
- */
-const BACKUP_DIRS = ALL_MANAGED_DIRS;
-
-/** Root-level managed files to include in update backups. */
-const BACKUP_FILES = [FILE_NAMES.AGENTS] as const;
-
-/**
  * Patterns to exclude from backup (user data that shouldn't be backed up)
  */
 const BACKUP_EXCLUDE_PATTERNS = [
@@ -1329,6 +1302,8 @@ const BACKUP_EXCLUDE_PATTERNS = [
   "/spec/", // Spec files (user-customized content)
   "/backlog/", // Backlog data (user data)
   "/agent-traces/", // Agent traces (user data, legacy name)
+  "/session-handoffs/",
+  "/sessions/",
   // Platform-native worktree dirs — these are full sub-repos the CLI
   // spawns for parallel sessions. Backing them up on every update would
   // snapshot the entire nested working tree. Confirmed conventions:
@@ -1362,47 +1337,11 @@ export function shouldExcludeFromBackup(relativePath: string): boolean {
 }
 
 /**
- * Create complete snapshot backup of all managed directories
- * Backs up all managed platform/workflow directories entirely
- * (excluding user data like workspace/, tasks/, backlog/)
+ * Snapshot only positively owned assets and the current update scope.
  */
-function createFullBackup(cwd: string): string | null {
-  const backupDir = createBackupDirPath(cwd);
-  let hasFiles = false;
-
-  for (const dir of BACKUP_DIRS) {
-    const dirPath = path.join(cwd, dir);
-    if (!fs.existsSync(dirPath)) continue;
-
-    const files = collectAllFiles(dirPath, cwd);
-    for (const fullPath of files) {
-      const relativePath = path.relative(cwd, fullPath);
-
-      // Skip excluded paths
-      if (shouldExcludeFromBackup(relativePath)) continue;
-
-      // Create backup
-      if (!hasFiles) {
-        fs.mkdirSync(backupDir, { recursive: true });
-        hasFiles = true;
-      }
-      backupFile(cwd, backupDir, relativePath);
-    }
-  }
-
-  for (const relativePath of BACKUP_FILES) {
-    const fullPath = path.join(cwd, relativePath);
-    if (!fs.existsSync(fullPath)) continue;
-    if (shouldExcludeFromBackup(relativePath)) continue;
-
-    if (!hasFiles) {
-      fs.mkdirSync(backupDir, { recursive: true });
-      hasFiles = true;
-    }
-    backupFile(cwd, backupDir, relativePath);
-  }
-
-  return hasFiles ? backupDir : null;
+function createFullBackup(cwd: string, scope: Iterable<string>): string {
+  const backup = createAssetBackup(cwd, "update", assetBackupScope(cwd, scope));
+  return path.join(cwd, DIR_NAMES.WORKFLOW, backup.id);
 }
 
 /**
@@ -2152,855 +2091,929 @@ export function renameTracesToJournal(workspaceDir: string): {
  */
 export async function update(options: UpdateOptions): Promise<void> {
   const cwd = process.cwd();
-
-  // Check if Trellis is initialized
-  if (!fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
-    console.log(chalk.red("Error: Trellis not initialized in this directory."));
-    console.log(chalk.gray("Run 'trellis init' first."));
-    return;
-  }
-
-  console.log(chalk.cyan("\nTrellis Update"));
-  console.log(chalk.cyan("══════════════\n"));
-
-  // Set up proxy before any network calls (npm version check)
-  setupProxy();
-
-  // Get versions
-  const projectVersion = getInstalledVersion(cwd);
-  const cliVersion = VERSION;
-  const latestNpmVersion = await getLatestNpmVersion();
-
-  // Version comparison
-  const cliVsProject = compareVersions(cliVersion, projectVersion);
-  const cliVsNpm = latestNpmVersion
-    ? compareVersions(cliVersion, latestNpmVersion)
-    : 0;
-
-  // Display versions with context
-  console.log(`Project version: ${chalk.white(projectVersion)}`);
-  console.log(`CLI version:     ${chalk.white(cliVersion)}`);
-  if (latestNpmVersion) {
-    console.log(`Latest on npm:   ${chalk.white(latestNpmVersion)}`);
-  } else {
-    console.log(chalk.gray("Latest on npm:   (unable to fetch)"));
-  }
-  console.log("");
-
-  // Check if CLI is outdated compared to npm
-  if (cliVsNpm < 0 && latestNpmVersion) {
-    console.log(
-      chalk.yellow(
-        `⚠️  Your CLI (${cliVersion}) is behind npm (${latestNpmVersion}).`,
-      ),
-    );
-    console.log(chalk.yellow(`   Run: trellis upgrade\n`));
-  }
-
-  // Check for downgrade situation
-  if (cliVsProject < 0) {
-    console.log(
-      chalk.red(
-        `❌ Cannot update: CLI version (${cliVersion}) < project version (${projectVersion})`,
-      ),
-    );
-    console.log(chalk.red(`   This would DOWNGRADE your project!\n`));
-
-    if (!options.allowDowngrade) {
-      console.log(chalk.gray("Solutions:"));
-      console.log(chalk.gray(`  1. Update your CLI: trellis upgrade`));
-      console.log(
-        chalk.gray(`  2. Force downgrade: trellis update --allow-downgrade\n`),
-      );
-      return;
-    }
-
-    console.log(
-      chalk.yellow(
-        "⚠️  --allow-downgrade flag set. Proceeding with downgrade...\n",
-      ),
-    );
-  }
-
-  // Migration metadata is displayed at the end to prevent scrolling off screen
-
-  // Load template hashes for modification detection
-  let hashes = loadHashes(cwd);
-  const zcodeConfigured = getConfiguredPlatforms(cwd).has("zcode");
-  const isFirstHashTracking = Object.keys(hashes).length === 0;
-
-  // Handle unknown version - skip regular migrations but safe-file-delete still runs
-  const isUnknownVersion = projectVersion === "unknown";
-  if (isUnknownVersion) {
-    console.log(
-      chalk.yellow(
-        "⚠️  No version file found. Skipping migrations — run trellis init to fix.",
-      ),
-    );
-    console.log(chalk.gray("   Template updates will still be applied."));
-    console.log(
-      chalk.gray("   Safe file cleanup will still run (hash-verified).\n"),
-    );
-  }
-
-  // Detect legacy Codex (has .agents/skills/ tracked by Trellis but no .codex/)
-  // NOTE: this MUST happen before pruneOrphanManifestKeys below, since the
-  // detector reads the raw manifest looking for .agents/skills/ markers that
-  // the prune step would otherwise consider orphans (codex hasn't been added
-  // to configuredPlatforms yet at this point).
-  const codexUpgradeNeeded = needsCodexUpgrade(cwd);
-  if (codexUpgradeNeeded) {
-    console.log(
-      chalk.yellow(
-        "  Legacy Codex detected: .agents/skills/ tracked without .codex/ — will create .codex/ directory",
-      ),
-    );
-  }
-
-  // Self-heal poisoned manifests: prune entries that no current platform
-  // configurator owns. This silently removes user-owned paths that early
-  // buggy versions of `trellis init` over-hashed (e.g. .codex/sessions/*).
-  // Include codex in known-platforms when codexUpgradeNeeded so legacy Codex
-  // markers under .agents/skills/ survive into the upgrade flow.
-  {
-    const configuredPlatforms = new Set<AITool>(getConfiguredPlatforms(cwd));
-    if (codexUpgradeNeeded) configuredPlatforms.add("codex");
-    const prune = pruneOrphanManifestKeys(
-      cwd,
-      [...configuredPlatforms],
-      hashes,
-      { persist: !options.dryRun },
-    );
-    if (prune.pruned.length > 0) {
-      console.log(
-        chalk.gray(
-          `   Pruned ${prune.pruned.length} orphan manifest entries from .template-hashes.json`,
-        ),
-      );
-      hashes = prune.hashes;
-    }
-  }
-
-  // For breaking releases with recommendMigrate + --migrate, bypass update.skip
-  // across the board (safe-file-delete, new file writes, template updates).
-  // Why: honoring skip here leaves users forever half-migrated — old deprecated
-  // files persist under skip-protected paths, new commands like `continue.md`
-  // never land, and every future update re-flags the same mess. Rename
-  // migrations already ignore update.skip; this makes the rest consistent
-  // during a breaking upgrade. User customizations are still guarded by the
-  // per-file conflict prompt ("Modified by you") at write time.
-  const breakingBypass =
-    options.migrate === true &&
-    cliVsProject > 0 &&
-    projectVersion !== "unknown" &&
-    (() => {
-      const md = getMigrationMetadata(projectVersion, cliVersion);
-      return md.breaking && md.recommendMigrate;
-    })();
-
-  // Collect templates (used for both migration classification and change analysis)
-  const templates = await collectTemplateFiles(
+  return withAssetMaintenance(
     cwd,
-    codexUpgradeNeeded ? new Set<AITool>(["codex"]) : undefined,
-    breakingBypass,
-  );
-
-  // Load update.skip paths (used for both safe-file-delete and template collection)
-  const skipPaths = loadUpdateSkipPaths(cwd);
-
-  // Collect safe-file-delete items from ALL manifests (hash match is the safety net)
-  // This runs regardless of version — unknown version still gets safe cleanup
-  const allMigrations = getAllMigrations();
-  const safeFileDeletes = collectSafeFileDeletes(
-    allMigrations,
-    cwd,
-    skipPaths,
-    new Set(templates.keys()),
-    breakingBypass,
-  );
-  const hasSafeDeletes =
-    safeFileDeletes.filter((c) => c.action === "delete").length > 0;
-
-  // Check for pending regular migrations (skip if unknown version)
-  let pendingMigrations = isUnknownVersion
-    ? []
-    : getMigrationsForVersion(projectVersion, cliVersion);
-
-  // Also check for "orphaned" migrations - where source still exists but version says we shouldn't migrate
-  // This handles cases where version was updated but migrations weren't applied
-  const orphanedMigrations = allMigrations.filter((item) => {
-    // Only check rename and rename-dir migrations
-    if (item.type !== "rename" && item.type !== "rename-dir") return false;
-    if (!item.from || !item.to) return false;
-
-    const oldPath = path.join(cwd, item.from);
-    const newPath = path.join(cwd, item.to);
-
-    // Orphaned if: source exists AND target doesn't exist
-    // AND this migration isn't already in pendingMigrations
-    const sourceExists = fs.existsSync(oldPath);
-    const targetExists = fs.existsSync(newPath);
-    const alreadyPending = pendingMigrations.some(
-      (m) => m.from === item.from && m.to === item.to,
-    );
-
-    return sourceExists && !targetExists && !alreadyPending;
-  });
-
-  // Add orphaned migrations to pending (they need to be applied)
-  if (orphanedMigrations.length > 0) {
-    console.log(
-      chalk.yellow("⚠️  Detected incomplete migrations from previous updates:"),
-    );
-    for (const item of orphanedMigrations) {
-      console.log(chalk.yellow(`    ${item.from} → ${item.to}`));
-    }
-    console.log("");
-    pendingMigrations = [...pendingMigrations, ...orphanedMigrations];
-  }
-
-  const hasMigrations = pendingMigrations.length > 0;
-
-  // Classify migrations (stored for later backup creation)
-  let classifiedMigrations: ClassifiedMigrations | null = null;
-
-  if (hasMigrations) {
-    console.log(chalk.cyan("Analyzing migrations...\n"));
-
-    classifiedMigrations = classifyMigrations(
-      pendingMigrations,
-      cwd,
-      hashes,
-      templates,
-    );
-
-    printMigrationSummary(classifiedMigrations);
-
-    // Hard-stop: pending rename/delete work from a breaking release requires --migrate.
-    // Why: without --migrate, those entries are skipped and update()'s later path silently
-    // bumps the version stamp, leaving old paths orphaned next to new templates. Force
-    // explicit opt-in so the user can't half-migrate by accident.
-    const pendingMigrationCount =
-      classifiedMigrations.auto.length +
-      classifiedMigrations.confirm.length +
-      classifiedMigrations.conflict.length;
-
-    if (
-      pendingMigrationCount > 0 &&
-      !options.migrate &&
-      !options.dryRun &&
-      cliVsProject > 0 &&
-      projectVersion !== "unknown"
-    ) {
-      const gateMetadata = getMigrationMetadata(projectVersion, cliVersion);
-      if (gateMetadata.breaking && gateMetadata.recommendMigrate) {
+    async () => {
+      // Check if Trellis is initialized
+      if (!fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
         console.log(
-          chalk.bgRed.white.bold(" ✖ MIGRATION REQUIRED ") +
-            chalk.red(
-              ` Breaking changes between ${projectVersion} → ${cliVersion} require --migrate.`,
-            ),
+          chalk.red("Error: Trellis not initialized in this directory."),
         );
-        console.log("");
-        console.log(chalk.yellow(`  Run: trellis update --migrate`));
-        console.log("");
-        console.log(
-          chalk.gray(
-            "  Without --migrate, renamed/relocated files from breaking releases aren't moved,\n" +
-              "  leaving your project with stale paths alongside new templates.\n" +
-              "  Use --dry-run to preview what --migrate will do.",
-          ),
-        );
-        process.exit(1);
+        console.log(chalk.gray("Run 'trellis init' first."));
+        return;
       }
-    }
 
-    // Soft hint: non-breaking migrations or projects that chose not to set recommendMigrate
-    if (!options.migrate) {
-      const autoCount = classifiedMigrations.auto.length;
-      const confirmCount = classifiedMigrations.confirm.length;
+      console.log(chalk.cyan("\nTrellis Update"));
+      console.log(chalk.cyan("══════════════\n"));
 
-      if (autoCount > 0 || confirmCount > 0) {
+      // Set up proxy before any network calls (npm version check)
+      setupProxy();
+
+      // Get versions
+      const projectVersion = getInstalledVersion(cwd);
+      const cliVersion = VERSION;
+      const latestNpmVersion = await getLatestNpmVersion();
+
+      // Version comparison
+      const cliVsProject = compareVersions(cliVersion, projectVersion);
+      const cliVsNpm = latestNpmVersion
+        ? compareVersions(cliVersion, latestNpmVersion)
+        : 0;
+
+      // Display versions with context
+      console.log(`Project version: ${chalk.white(projectVersion)}`);
+      console.log(`CLI version:     ${chalk.white(cliVersion)}`);
+      if (latestNpmVersion) {
+        console.log(`Latest on npm:   ${chalk.white(latestNpmVersion)}`);
+      } else {
+        console.log(chalk.gray("Latest on npm:   (unable to fetch)"));
+      }
+      console.log("");
+
+      // Check if CLI is outdated compared to npm
+      if (cliVsNpm < 0 && latestNpmVersion) {
         console.log(
-          chalk.gray(
-            `Tip: Use --migrate to apply migrations (prompts for modified files).`,
+          chalk.yellow(
+            `⚠️  Your CLI (${cliVersion}) is behind npm (${latestNpmVersion}).`,
           ),
         );
-        if (confirmCount > 0) {
+        console.log(chalk.yellow(`   Run: trellis upgrade\n`));
+      }
+
+      // Check for downgrade situation
+      if (cliVsProject < 0) {
+        console.log(
+          chalk.red(
+            `❌ Cannot update: CLI version (${cliVersion}) < project version (${projectVersion})`,
+          ),
+        );
+        console.log(chalk.red(`   This would DOWNGRADE your project!\n`));
+
+        if (!options.allowDowngrade) {
+          console.log(chalk.gray("Solutions:"));
+          console.log(chalk.gray(`  1. Update your CLI: trellis upgrade`));
           console.log(
             chalk.gray(
-              `     Use --migrate -f to force all, or --migrate -s to skip modified.\n`,
+              `  2. Force downgrade: trellis update --allow-downgrade\n`,
             ),
           );
-        } else {
-          console.log("");
+          return;
+        }
+
+        console.log(
+          chalk.yellow(
+            "⚠️  --allow-downgrade flag set. Proceeding with downgrade...\n",
+          ),
+        );
+      }
+
+      // Migration metadata is displayed at the end to prevent scrolling off screen
+
+      // Load template hashes for modification detection
+      let hashes = loadHashes(cwd);
+      const zcodeConfigured = getConfiguredPlatforms(cwd).has("zcode");
+      const isFirstHashTracking = Object.keys(hashes).length === 0;
+
+      // Handle unknown version - skip regular migrations but safe-file-delete still runs
+      const isUnknownVersion = projectVersion === "unknown";
+      if (isUnknownVersion) {
+        console.log(
+          chalk.yellow(
+            "⚠️  No version file found. Skipping migrations — run trellis init to fix.",
+          ),
+        );
+        console.log(chalk.gray("   Template updates will still be applied."));
+        console.log(
+          chalk.gray("   Safe file cleanup will still run (hash-verified).\n"),
+        );
+      }
+
+      // Detect legacy Codex (has .agents/skills/ tracked by Trellis but no .codex/)
+      // NOTE: this MUST happen before pruneOrphanManifestKeys below, since the
+      // detector reads the raw manifest looking for .agents/skills/ markers that
+      // the prune step would otherwise consider orphans (codex hasn't been added
+      // to configuredPlatforms yet at this point).
+      const codexUpgradeNeeded = needsCodexUpgrade(cwd);
+      if (codexUpgradeNeeded) {
+        console.log(
+          chalk.yellow(
+            "  Legacy Codex detected: .agents/skills/ tracked without .codex/ — will create .codex/ directory",
+          ),
+        );
+      }
+
+      // Self-heal poisoned manifests: prune entries that no current platform
+      // configurator owns. This silently removes user-owned paths that early
+      // buggy versions of `trellis init` over-hashed (e.g. .codex/sessions/*).
+      // Include codex in known-platforms when codexUpgradeNeeded so legacy Codex
+      // markers under .agents/skills/ survive into the upgrade flow.
+      {
+        const configuredPlatforms = new Set<AITool>(
+          getConfiguredPlatforms(cwd),
+        );
+        if (codexUpgradeNeeded) configuredPlatforms.add("codex");
+        const prune = pruneOrphanManifestKeys(
+          cwd,
+          [...configuredPlatforms],
+          hashes,
+          { persist: !options.dryRun },
+        );
+        if (prune.pruned.length > 0) {
+          console.log(
+            chalk.gray(
+              `   Pruned ${prune.pruned.length} orphan manifest entries from .template-hashes.json`,
+            ),
+          );
+          hashes = prune.hashes;
         }
       }
-    }
-  }
 
-  // Print safe-file-delete summary (always shown, runs without --migrate)
-  if (safeFileDeletes.length > 0) {
-    printSafeFileDeleteSummary(safeFileDeletes);
-  }
+      // For breaking releases with recommendMigrate + --migrate, bypass update.skip
+      // across the board (safe-file-delete, new file writes, template updates).
+      // Why: honoring skip here leaves users forever half-migrated — old deprecated
+      // files persist under skip-protected paths, new commands like `continue.md`
+      // never land, and every future update re-flags the same mess. Rename
+      // migrations already ignore update.skip; this makes the rest consistent
+      // during a breaking upgrade. User customizations are still guarded by the
+      // per-file conflict prompt ("Modified by you") at write time.
+      const breakingBypass =
+        options.migrate === true &&
+        cliVsProject > 0 &&
+        projectVersion !== "unknown" &&
+        (() => {
+          const md = getMigrationMetadata(projectVersion, cliVersion);
+          return md.breaking && md.recommendMigrate;
+        })();
 
-  // Analyze changes (pass hashes for modification detection)
-  const changes = analyzeChanges(cwd, hashes, templates);
-  const unchangedFileHashRepairs = collectUnchangedFileHashRepairs(
-    changes,
-    hashes,
-  );
+      // Collect templates (used for both migration classification and change analysis)
+      const templates = await collectTemplateFiles(
+        cwd,
+        codexUpgradeNeeded ? new Set<AITool>(["codex"]) : undefined,
+        breakingBypass,
+      );
 
-  // Print summary
-  printChangeSummary(changes);
+      // Load update.skip paths (used for both safe-file-delete and template collection)
+      const skipPaths = loadUpdateSkipPaths(cwd);
 
-  // First-time hash tracking hint
-  if (isFirstHashTracking && changes.changedFiles.length > 0) {
-    console.log(chalk.cyan("ℹ️  First update with hash tracking enabled."));
-    console.log(
-      chalk.gray(
-        "   Changed files shown above may not be actual user modifications.",
-      ),
-    );
-    console.log(
-      chalk.gray(
-        "   After this update, hash tracking will accurately detect changes.\n",
-      ),
-    );
-  }
+      // Collect safe-file-delete items from ALL manifests (hash match is the safety net)
+      // This runs regardless of version — unknown version still gets safe cleanup
+      const allMigrations = getAllMigrations();
+      const safeFileDeletes = collectSafeFileDeletes(
+        allMigrations,
+        cwd,
+        skipPaths,
+        new Set(templates.keys()),
+        breakingBypass,
+      );
+      const hasSafeDeletes =
+        safeFileDeletes.filter((c) => c.action === "delete").length > 0;
 
-  // Ensure project-root .gitattributes carries the journal merge=union rule.
-  // Additive-only (see ensureGitattributes) — runs regardless of whether
-  // other template files changed, so it must sit before the "nothing to do"
-  // early-return below. Never touches disk in --dry-run.
-  if (!options.dryRun) {
-    ensureGitattributes(cwd);
-  }
+      // Check for pending regular migrations (skip if unknown version)
+      let pendingMigrations = isUnknownVersion
+        ? []
+        : getMigrationsForVersion(projectVersion, cliVersion);
 
-  // Check if there's anything to do
-  const isUpgrade = cliVsProject > 0;
-  const isDowngrade = cliVsProject < 0;
-  const isSameVersion = cliVsProject === 0;
+      // Also check for "orphaned" migrations - where source still exists but version says we shouldn't migrate
+      // This handles cases where version was updated but migrations weren't applied
+      const orphanedMigrations = allMigrations.filter((item) => {
+        // Only check rename and rename-dir migrations
+        if (item.type !== "rename" && item.type !== "rename-dir") return false;
+        if (!item.from || !item.to) return false;
 
-  // Check if we have pending migrations that need to be applied
-  const hasPendingMigrations =
-    options.migrate &&
-    classifiedMigrations &&
-    (classifiedMigrations.auto.length > 0 ||
-      classifiedMigrations.confirm.length > 0);
+        const oldPath = path.join(cwd, item.from);
+        const newPath = path.join(cwd, item.to);
 
-  if (
-    changes.newFiles.length === 0 &&
-    changes.autoUpdateFiles.length === 0 &&
-    changes.changedFiles.length === 0 &&
-    !hasPendingMigrations &&
-    !hasSafeDeletes
-  ) {
-    // The "already up to date" exit still has to repair the receipt: this is
-    // exactly the clean tree where every file is `unchanged`, so it is the run
-    // where a wrong entry would otherwise be skipped again.
-    if (!options.dryRun && unchangedFileHashRepairs.size > 0) {
-      updateHashes(cwd, unchangedFileHashRepairs);
-    }
+        // Orphaned if: source exists AND target doesn't exist
+        // AND this migration isn't already in pendingMigrations
+        const sourceExists = fs.existsSync(oldPath);
+        const targetExists = fs.existsSync(newPath);
+        const alreadyPending = pendingMigrations.some(
+          (m) => m.from === item.from && m.to === item.to,
+        );
 
-    if (isSameVersion) {
-      console.log(chalk.green("✓ Already up to date!"));
-    } else {
-      // Version changed but no file changes needed — still update the version stamp
-      updateVersionFile(cwd);
+        return sourceExists && !targetExists && !alreadyPending;
+      });
+
+      // Add orphaned migrations to pending (they need to be applied)
+      if (orphanedMigrations.length > 0) {
+        console.log(
+          chalk.yellow(
+            "⚠️  Detected incomplete migrations from previous updates:",
+          ),
+        );
+        for (const item of orphanedMigrations) {
+          console.log(chalk.yellow(`    ${item.from} → ${item.to}`));
+        }
+        console.log("");
+        pendingMigrations = [...pendingMigrations, ...orphanedMigrations];
+      }
+
+      const hasMigrations = pendingMigrations.length > 0;
+
+      // Classify migrations (stored for later backup creation)
+      let classifiedMigrations: ClassifiedMigrations | null = null;
+
+      if (hasMigrations) {
+        console.log(chalk.cyan("Analyzing migrations...\n"));
+
+        classifiedMigrations = classifyMigrations(
+          pendingMigrations,
+          cwd,
+          hashes,
+          templates,
+        );
+
+        printMigrationSummary(classifiedMigrations);
+
+        // Hard-stop: pending rename/delete work from a breaking release requires --migrate.
+        // Why: without --migrate, those entries are skipped and update()'s later path silently
+        // bumps the version stamp, leaving old paths orphaned next to new templates. Force
+        // explicit opt-in so the user can't half-migrate by accident.
+        const pendingMigrationCount =
+          classifiedMigrations.auto.length +
+          classifiedMigrations.confirm.length +
+          classifiedMigrations.conflict.length;
+
+        if (
+          pendingMigrationCount > 0 &&
+          !options.migrate &&
+          !options.dryRun &&
+          cliVsProject > 0 &&
+          projectVersion !== "unknown"
+        ) {
+          const gateMetadata = getMigrationMetadata(projectVersion, cliVersion);
+          if (gateMetadata.breaking && gateMetadata.recommendMigrate) {
+            console.log(
+              chalk.bgRed.white.bold(" ✖ MIGRATION REQUIRED ") +
+                chalk.red(
+                  ` Breaking changes between ${projectVersion} → ${cliVersion} require --migrate.`,
+                ),
+            );
+            console.log("");
+            console.log(chalk.yellow(`  Run: trellis update --migrate`));
+            console.log("");
+            console.log(
+              chalk.gray(
+                "  Without --migrate, renamed/relocated files from breaking releases aren't moved,\n" +
+                  "  leaving your project with stale paths alongside new templates.\n" +
+                  "  Use --dry-run to preview what --migrate will do.",
+              ),
+            );
+            process.exit(1);
+          }
+        }
+
+        // Soft hint: non-breaking migrations or projects that chose not to set recommendMigrate
+        if (!options.migrate) {
+          const autoCount = classifiedMigrations.auto.length;
+          const confirmCount = classifiedMigrations.confirm.length;
+
+          if (autoCount > 0 || confirmCount > 0) {
+            console.log(
+              chalk.gray(
+                `Tip: Use --migrate to apply migrations (prompts for modified files).`,
+              ),
+            );
+            if (confirmCount > 0) {
+              console.log(
+                chalk.gray(
+                  `     Use --migrate -f to force all, or --migrate -s to skip modified.\n`,
+                ),
+              );
+            } else {
+              console.log("");
+            }
+          }
+        }
+      }
+
+      // Print safe-file-delete summary (always shown, runs without --migrate)
+      if (safeFileDeletes.length > 0) {
+        printSafeFileDeleteSummary(safeFileDeletes);
+      }
+
+      // Analyze changes (pass hashes for modification detection)
+      const changes = analyzeChanges(cwd, hashes, templates);
+      const unchangedFileHashRepairs = collectUnchangedFileHashRepairs(
+        changes,
+        hashes,
+      );
+
+      // Print summary
+      printChangeSummary(changes);
+
+      // First-time hash tracking hint
+      if (isFirstHashTracking && changes.changedFiles.length > 0) {
+        console.log(chalk.cyan("ℹ️  First update with hash tracking enabled."));
+        console.log(
+          chalk.gray(
+            "   Changed files shown above may not be actual user modifications.",
+          ),
+        );
+        console.log(
+          chalk.gray(
+            "   After this update, hash tracking will accurately detect changes.\n",
+          ),
+        );
+      }
+
+      // Ensure project-root .gitattributes carries the journal merge=union rule.
+      // Additive-only (see ensureGitattributes) — runs regardless of whether
+      // other template files changed, so it must sit before the "nothing to do"
+      // early-return below. Never touches disk in --dry-run.
+      if (!options.dryRun) {
+        ensureGitattributes(cwd);
+      }
+
+      // Check if there's anything to do
+      const isUpgrade = cliVsProject > 0;
+      const isDowngrade = cliVsProject < 0;
+      const isSameVersion = cliVsProject === 0;
+
+      // Check if we have pending migrations that need to be applied
+      const hasPendingMigrations =
+        options.migrate &&
+        classifiedMigrations &&
+        (classifiedMigrations.auto.length > 0 ||
+          classifiedMigrations.confirm.length > 0);
+
+      if (
+        changes.newFiles.length === 0 &&
+        changes.autoUpdateFiles.length === 0 &&
+        changes.changedFiles.length === 0 &&
+        !hasPendingMigrations &&
+        !hasSafeDeletes
+      ) {
+        // The "already up to date" exit still has to repair the receipt: this is
+        // exactly the clean tree where every file is `unchanged`, so it is the run
+        // where a wrong entry would otherwise be skipped again.
+        if (!options.dryRun && unchangedFileHashRepairs.size > 0) {
+          updateHashes(cwd, unchangedFileHashRepairs);
+        }
+
+        if (isSameVersion) {
+          console.log(chalk.green("✓ Already up to date!"));
+        } else {
+          // Version changed but no file changes needed — still update the version stamp
+          updateVersionFile(cwd);
+          if (isUpgrade) {
+            console.log(
+              chalk.green(
+                `✓ No file changes needed for ${projectVersion} → ${cliVersion}`,
+              ),
+            );
+          } else if (isDowngrade) {
+            console.log(
+              chalk.green(
+                `✓ No file changes needed for ${projectVersion} → ${cliVersion} (downgrade)`,
+              ),
+            );
+          }
+        }
+        if (zcodeConfigured) printZcodeSetupHint();
+        return;
+      }
+
+      // Show what this operation will do
       if (isUpgrade) {
         console.log(
-          chalk.green(
-            `✓ No file changes needed for ${projectVersion} → ${cliVersion}`,
-          ),
+          chalk.green(`This will UPGRADE: ${projectVersion} → ${cliVersion}\n`),
         );
       } else if (isDowngrade) {
         console.log(
-          chalk.green(
-            `✓ No file changes needed for ${projectVersion} → ${cliVersion} (downgrade)`,
+          chalk.red(
+            `⚠️  This will DOWNGRADE: ${projectVersion} → ${cliVersion}\n`,
           ),
         );
       }
-    }
-    if (zcodeConfigured) printZcodeSetupHint();
-    return;
-  }
 
-  // Show what this operation will do
-  if (isUpgrade) {
-    console.log(
-      chalk.green(`This will UPGRADE: ${projectVersion} → ${cliVersion}\n`),
-    );
-  } else if (isDowngrade) {
-    console.log(
-      chalk.red(`⚠️  This will DOWNGRADE: ${projectVersion} → ${cliVersion}\n`),
-    );
-  }
-
-  // Show breaking change warning before confirm
-  if (cliVsProject > 0 && projectVersion !== "unknown") {
-    const preConfirmMetadata = getMigrationMetadata(projectVersion, cliVersion);
-    if (preConfirmMetadata.breaking) {
-      console.log(chalk.cyan("═".repeat(60)));
-      console.log(
-        chalk.bgRed.white.bold(" ⚠️  BREAKING CHANGES ") +
-          chalk.red.bold(" Review the changes above carefully!"),
-      );
-      if (preConfirmMetadata.changelog.length > 0) {
-        console.log("");
-        console.log(chalk.white(preConfirmMetadata.changelog[0]));
-      }
-      if (preConfirmMetadata.recommendMigrate && !options.migrate) {
-        console.log("");
-        console.log(
-          chalk.bgGreen.black.bold(" 💡 RECOMMENDED ") +
-            chalk.green.bold(" Run with --migrate to complete the migration"),
+      // Show breaking change warning before confirm
+      if (cliVsProject > 0 && projectVersion !== "unknown") {
+        const preConfirmMetadata = getMigrationMetadata(
+          projectVersion,
+          cliVersion,
         );
-      }
-      // Notice when update.skip is bypassed so user isn't surprised when
-      // skipPaths-protected files get cleaned up during this breaking upgrade.
-      if (breakingBypass && skipPaths.length > 0) {
-        const willBypass = safeFileDeletes.filter(
-          (c) =>
-            c.action === "delete" &&
-            skipPaths.some(
-              (skip) =>
-                c.item.from === skip ||
-                c.item.from.startsWith(skip.endsWith("/") ? skip : skip + "/"),
-            ),
-        );
-        if (willBypass.length > 0) {
+        if (preConfirmMetadata.breaking) {
+          console.log(chalk.cyan("═".repeat(60)));
+          console.log(
+            chalk.bgRed.white.bold(" ⚠️  BREAKING CHANGES ") +
+              chalk.red.bold(" Review the changes above carefully!"),
+          );
+          if (preConfirmMetadata.changelog.length > 0) {
+            console.log("");
+            console.log(chalk.white(preConfirmMetadata.changelog[0]));
+          }
+          if (preConfirmMetadata.recommendMigrate && !options.migrate) {
+            console.log("");
+            console.log(
+              chalk.bgGreen.black.bold(" 💡 RECOMMENDED ") +
+                chalk.green.bold(
+                  " Run with --migrate to complete the migration",
+                ),
+            );
+          }
+          // Notice when update.skip is bypassed so user isn't surprised when
+          // skipPaths-protected files get cleaned up during this breaking upgrade.
+          if (breakingBypass && skipPaths.length > 0) {
+            const willBypass = safeFileDeletes.filter(
+              (c) =>
+                c.action === "delete" &&
+                skipPaths.some(
+                  (skip) =>
+                    c.item.from === skip ||
+                    c.item.from.startsWith(
+                      skip.endsWith("/") ? skip : skip + "/",
+                    ),
+                ),
+            );
+            if (willBypass.length > 0) {
+              console.log("");
+              console.log(
+                chalk.bgYellow.black.bold(" ⚠ update.skip BYPASSED ") +
+                  chalk.yellow.bold(
+                    ` Breaking release — ${willBypass.length.toString()} file(s) under your update.skip paths will be cleaned up.`,
+                  ),
+              );
+              console.log(
+                chalk.gray(
+                  "  Hash-verified: only files matching known Trellis templates are deleted. Your local customizations (hash mismatch) are still preserved.",
+                ),
+              );
+            }
+          }
+          console.log(chalk.cyan("═".repeat(60)));
           console.log("");
+        }
+      }
+
+      // Dry run mode
+      if (options.dryRun) {
+        console.log(chalk.gray("[Dry run] No changes made."));
+        return;
+      }
+
+      // Batch-resolution flags are explicit consent for non-interactive runs.
+      // Prompting here breaks CI and `node ... update --force --migrate` smoke tests.
+      if (!options.force && !options.skipAll && !options.createNew) {
+        const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
+          {
+            type: "confirm",
+            name: "proceed",
+            message: "Proceed?",
+            default: true,
+          },
+        ]);
+
+        if (!proceed) {
+          console.log(chalk.yellow("Update cancelled."));
+          return;
+        }
+      }
+
+      const assetMigrations =
+        options.migrate && classifiedMigrations
+          ? [
+              ...classifiedMigrations.auto,
+              ...classifiedMigrations.confirm,
+              ...classifiedMigrations.conflict,
+            ]
+          : [];
+      const migrationScope = assetMigrations.flatMap((item) => {
+        if (item.type !== "rename-dir")
+          return [
+            item.from,
+            `${item.from}.backup`,
+            ...(item.to ? [item.to, `${item.to}.backup`] : []),
+          ];
+        const source = collectAllFiles(path.join(cwd, item.from), cwd).map(
+          (file) => toPosix(path.relative(cwd, file)),
+        );
+        const target = item.to;
+        return [
+          ...source,
+          ...(target
+            ? source.map((file) => `${target}${file.slice(item.from.length)}`)
+            : []),
+          ...(target
+            ? collectAllFiles(path.join(cwd, target), cwd).map((file) =>
+                toPosix(path.relative(cwd, file)),
+              )
+            : []),
+        ];
+      });
+      const backupDir = createFullBackup(cwd, [
+        ...templates.keys(),
+        ...changes.changedFiles.map((file) => `${file.relativePath}.new`),
+        ...migrationScope,
+        ...safeFileDeletes
+          .filter((item) => item.action === "delete")
+          .map((item) => item.item.from),
+      ]);
+
+      if (backupDir) {
+        console.log(
+          chalk.gray(`\nBackup created: ${path.relative(cwd, backupDir)}/`),
+        );
+      }
+
+      // Execute migrations if --migrate flag is set
+      if (options.migrate && classifiedMigrations) {
+        const migrationResult = await executeMigrations(
+          classifiedMigrations,
+          cwd,
+          {
+            force: options.force,
+            skipAll: options.skipAll,
+          },
+          templates,
+        );
+        printMigrationResult(migrationResult);
+
+        // Hardcoded: Rename traces-*.md to journal-*.md in workspace directories
+        // Why hardcoded: The migration system only supports fixed path renames, not pattern-based.
+        // traces-*.md files are in .trellis/workspace/{developer}/ with variable developer names
+        // and variable file numbers (traces-1.md, traces-2.md, etc.), so we can't enumerate them
+        // in the migration manifest. This is a one-time migration for the 0.2.0 naming redesign.
+        const workspaceDir = path.join(cwd, PATHS.WORKSPACE);
+        const { renamed: journalRenamed, skipped: journalSkipped } =
+          renameTracesToJournal(workspaceDir);
+        if (journalRenamed > 0) {
           console.log(
-            chalk.bgYellow.black.bold(" ⚠ update.skip BYPASSED ") +
-              chalk.yellow.bold(
-                ` Breaking release — ${willBypass.length.toString()} file(s) under your update.skip paths will be cleaned up.`,
-              ),
+            chalk.cyan(`Renamed ${journalRenamed} traces file(s) to journal`),
           );
-          console.log(
-            chalk.gray(
-              "  Hash-verified: only files matching known Trellis templates are deleted. Your local customizations (hash mismatch) are still preserved.",
+        }
+        for (const oldPath of journalSkipped) {
+          console.warn(
+            chalk.yellow(
+              `Kept ${path.relative(cwd, oldPath)}: its journal target already exists`,
             ),
           );
         }
       }
-      console.log(chalk.cyan("═".repeat(60)));
-      console.log("");
-    }
-  }
 
-  // Dry run mode
-  if (options.dryRun) {
-    console.log(chalk.gray("[Dry run] No changes made."));
-    return;
-  }
-
-  // Batch-resolution flags are explicit consent for non-interactive runs.
-  // Prompting here breaks CI and `node ... update --force --migrate` smoke tests.
-  if (!options.force && !options.skipAll && !options.createNew) {
-    const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
-      {
-        type: "confirm",
-        name: "proceed",
-        message: "Proceed?",
-        default: true,
-      },
-    ]);
-
-    if (!proceed) {
-      console.log(chalk.yellow("Update cancelled."));
-      return;
-    }
-  }
-
-  // Create complete backup of all managed platform/workflow directories
-  const backupDir = createFullBackup(cwd);
-
-  if (backupDir) {
-    console.log(
-      chalk.gray(`\nBackup created: ${path.relative(cwd, backupDir)}/`),
-    );
-  }
-
-  // Execute migrations if --migrate flag is set
-  if (options.migrate && classifiedMigrations) {
-    const migrationResult = await executeMigrations(
-      classifiedMigrations,
-      cwd,
-      {
-        force: options.force,
-        skipAll: options.skipAll,
-      },
-      templates,
-    );
-    printMigrationResult(migrationResult);
-
-    // Hardcoded: Rename traces-*.md to journal-*.md in workspace directories
-    // Why hardcoded: The migration system only supports fixed path renames, not pattern-based.
-    // traces-*.md files are in .trellis/workspace/{developer}/ with variable developer names
-    // and variable file numbers (traces-1.md, traces-2.md, etc.), so we can't enumerate them
-    // in the migration manifest. This is a one-time migration for the 0.2.0 naming redesign.
-    const workspaceDir = path.join(cwd, PATHS.WORKSPACE);
-    const { renamed: journalRenamed, skipped: journalSkipped } =
-      renameTracesToJournal(workspaceDir);
-    if (journalRenamed > 0) {
-      console.log(
-        chalk.cyan(`Renamed ${journalRenamed} traces file(s) to journal`),
-      );
-    }
-    for (const oldPath of journalSkipped) {
-      console.warn(
-        chalk.yellow(
-          `Kept ${path.relative(cwd, oldPath)}: its journal target already exists`,
-        ),
-      );
-    }
-  }
-
-  // Execute safe-file-delete (after backup, before template writes)
-  let safeDeleted = 0;
-  if (hasSafeDeletes) {
-    safeDeleted = executeSafeFileDeletes(safeFileDeletes, cwd);
-    if (safeDeleted > 0) {
-      console.log(
-        chalk.cyan(`\nCleaned up ${safeDeleted} deprecated command file(s)`),
-      );
-    }
-  }
-
-  // Track results
-  let added = 0;
-  let autoUpdated = 0;
-  let updated = 0;
-  let skipped = 0;
-  let createdNew = 0;
-
-  // Add new files
-  if (changes.newFiles.length > 0) {
-    console.log(chalk.blue("\nAdding new files..."));
-    for (const file of changes.newFiles) {
-      const dir = path.dirname(file.path);
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(file.path, file.newContent);
-
-      // Make scripts executable
-      if (
-        file.relativePath.endsWith(".sh") ||
-        file.relativePath.endsWith(".py")
-      ) {
-        fs.chmodSync(file.path, "755");
-      }
-
-      console.log(chalk.green(`  + ${file.relativePath}`));
-      added++;
-    }
-  }
-
-  // Auto-update files (template updated, user didn't modify)
-  if (changes.autoUpdateFiles.length > 0) {
-    console.log(chalk.blue("\nAuto-updating template files..."));
-    for (const file of changes.autoUpdateFiles) {
-      fs.writeFileSync(file.path, file.newContent);
-
-      // Make scripts executable
-      if (
-        file.relativePath.endsWith(".sh") ||
-        file.relativePath.endsWith(".py")
-      ) {
-        fs.chmodSync(file.path, "755");
-      }
-
-      console.log(chalk.cyan(`  ↑ ${file.relativePath}`));
-      autoUpdated++;
-    }
-  }
-
-  // Handle changed files
-  if (changes.changedFiles.length > 0) {
-    console.log(chalk.blue("\n--- Resolving conflicts ---\n"));
-
-    const applyToAll: { action: ConflictAction | null } = { action: null };
-
-    for (const file of changes.changedFiles) {
-      const action = await promptConflictResolution(file, options, applyToAll);
-
-      if (action === "overwrite") {
-        fs.writeFileSync(file.path, file.newContent);
-        if (
-          file.relativePath.endsWith(".sh") ||
-          file.relativePath.endsWith(".py")
-        ) {
-          fs.chmodSync(file.path, "755");
+      // Execute safe-file-delete (after backup, before template writes)
+      let safeDeleted = 0;
+      if (hasSafeDeletes) {
+        safeDeleted = executeSafeFileDeletes(safeFileDeletes, cwd);
+        if (safeDeleted > 0) {
+          console.log(
+            chalk.cyan(
+              `\nCleaned up ${safeDeleted} deprecated command file(s)`,
+            ),
+          );
         }
-        console.log(chalk.yellow(`  ✓ Overwritten: ${file.relativePath}`));
-        updated++;
-      } else if (action === "create-new") {
-        const newPath = file.path + ".new";
-        fs.writeFileSync(newPath, file.newContent);
-        console.log(chalk.blue(`  ✓ Created: ${file.relativePath}.new`));
-        createdNew++;
-      } else {
-        console.log(chalk.gray(`  ○ Skipped: ${file.relativePath}`));
-        skipped++;
       }
-    }
-  }
 
-  // Append additive config.yaml sections introduced between versions.
-  // Sentinel-gated, so users keep their customizations and re-running update
-  // on already-migrated files is a no-op. Skipped on unknown / downgrade.
-  let configSectionsAppended = 0;
-  if (cliVsProject > 0 && projectVersion !== "unknown") {
-    const sectionEntries = getConfigSectionsAddedBetween(
-      projectVersion,
-      cliVersion,
-    );
-    if (sectionEntries.length > 0) {
-      const { appended } = applyConfigSectionsAdded(
-        sectionEntries,
-        cwd,
-        templates,
-      );
-      configSectionsAppended = appended;
-    }
-  }
+      // Track results
+      let added = 0;
+      let autoUpdated = 0;
+      let updated = 0;
+      let skipped = 0;
+      let createdNew = 0;
 
-  // Update version file
-  updateVersionFile(cwd);
+      // Add new files
+      if (changes.newFiles.length > 0) {
+        console.log(chalk.blue("\nAdding new files..."));
+        for (const file of changes.newFiles) {
+          const dir = path.dirname(file.path);
+          fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(file.path, file.newContent);
 
-  // Update template hashes for new, auto-updated, and overwritten files
-  const filesToHash = new Map<string, string>(unchangedFileHashRepairs);
-  for (const file of changes.newFiles) {
-    filesToHash.set(file.relativePath, file.newContent);
-  }
-  // Auto-updated files always get new hash
-  for (const file of changes.autoUpdateFiles) {
-    filesToHash.set(file.relativePath, file.newContent);
-  }
-  // Only hash overwritten files (not skipped or .new copies)
-  for (const file of changes.changedFiles) {
-    const fullPath = path.join(cwd, file.relativePath);
-    if (fs.existsSync(fullPath)) {
-      const content = fs.readFileSync(fullPath, "utf-8");
-      if (content === file.newContent) {
+          // Make scripts executable
+          if (
+            file.relativePath.endsWith(".sh") ||
+            file.relativePath.endsWith(".py")
+          ) {
+            fs.chmodSync(file.path, "755");
+          }
+
+          console.log(chalk.green(`  + ${file.relativePath}`));
+          added++;
+        }
+      }
+
+      // Auto-update files (template updated, user didn't modify)
+      if (changes.autoUpdateFiles.length > 0) {
+        console.log(chalk.blue("\nAuto-updating template files..."));
+        for (const file of changes.autoUpdateFiles) {
+          fs.writeFileSync(file.path, file.newContent);
+
+          // Make scripts executable
+          if (
+            file.relativePath.endsWith(".sh") ||
+            file.relativePath.endsWith(".py")
+          ) {
+            fs.chmodSync(file.path, "755");
+          }
+
+          console.log(chalk.cyan(`  ↑ ${file.relativePath}`));
+          autoUpdated++;
+        }
+      }
+
+      // Handle changed files
+      if (changes.changedFiles.length > 0) {
+        console.log(chalk.blue("\n--- Resolving conflicts ---\n"));
+
+        const applyToAll: { action: ConflictAction | null } = { action: null };
+
+        for (const file of changes.changedFiles) {
+          const action = await promptConflictResolution(
+            file,
+            options,
+            applyToAll,
+          );
+
+          if (action === "overwrite") {
+            fs.writeFileSync(file.path, file.newContent);
+            if (
+              file.relativePath.endsWith(".sh") ||
+              file.relativePath.endsWith(".py")
+            ) {
+              fs.chmodSync(file.path, "755");
+            }
+            console.log(chalk.yellow(`  ✓ Overwritten: ${file.relativePath}`));
+            updated++;
+          } else if (action === "create-new") {
+            const newPath = file.path + ".new";
+            fs.writeFileSync(newPath, file.newContent);
+            console.log(chalk.blue(`  ✓ Created: ${file.relativePath}.new`));
+            createdNew++;
+          } else {
+            console.log(chalk.gray(`  ○ Skipped: ${file.relativePath}`));
+            skipped++;
+          }
+        }
+      }
+
+      // Append additive config.yaml sections introduced between versions.
+      // Sentinel-gated, so users keep their customizations and re-running update
+      // on already-migrated files is a no-op. Skipped on unknown / downgrade.
+      let configSectionsAppended = 0;
+      if (cliVsProject > 0 && projectVersion !== "unknown") {
+        const sectionEntries = getConfigSectionsAddedBetween(
+          projectVersion,
+          cliVersion,
+        );
+        if (sectionEntries.length > 0) {
+          const { appended } = applyConfigSectionsAdded(
+            sectionEntries,
+            cwd,
+            templates,
+          );
+          configSectionsAppended = appended;
+        }
+      }
+
+      // Update version file
+      updateVersionFile(cwd);
+
+      // Update template hashes for new, auto-updated, and overwritten files
+      const filesToHash = new Map<string, string>(unchangedFileHashRepairs);
+      for (const file of changes.newFiles) {
         filesToHash.set(file.relativePath, file.newContent);
       }
-    }
-  }
-  if (filesToHash.size > 0) {
-    updateHashes(cwd, filesToHash);
-  }
-
-  // Print summary
-  console.log(chalk.cyan("\n--- Summary ---\n"));
-  if (added > 0) {
-    console.log(`  Added: ${added} file(s)`);
-  }
-  if (autoUpdated > 0) {
-    console.log(`  Auto-updated: ${autoUpdated} file(s)`);
-  }
-  if (updated > 0) {
-    console.log(`  Updated: ${updated} file(s)`);
-  }
-  if (skipped > 0) {
-    console.log(`  Skipped: ${skipped} file(s)`);
-  }
-  if (createdNew > 0) {
-    console.log(`  Created .new copies: ${createdNew} file(s)`);
-  }
-  if (safeDeleted > 0) {
-    console.log(`  Cleaned up: ${safeDeleted} deprecated file(s)`);
-  }
-  if (configSectionsAppended > 0) {
-    console.log(`  Config sections added: ${configSectionsAppended}`);
-  }
-  if (backupDir) {
-    console.log(`  Backup: ${path.relative(cwd, backupDir)}/`);
-  }
-
-  const actionWord = isDowngrade ? "Downgrade" : "Update";
-  console.log(
-    chalk.green(
-      `\n✅ ${actionWord} complete! (${projectVersion} → ${cliVersion})`,
-    ),
-  );
-
-  if (createdNew > 0) {
-    console.log(
-      chalk.gray(
-        "\nTip: Review .new files and merge changes manually if needed.",
-      ),
-    );
-  }
-
-  // Create migration task if there are breaking changes with migration guides
-  if (cliVsProject > 0 && projectVersion !== "unknown") {
-    const metadata = getMigrationMetadata(projectVersion, cliVersion);
-
-    if (metadata.breaking && metadata.migrationGuides.length > 0) {
-      // Create task directory
-      const today = new Date();
-      const monthDay = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-      const taskSlug = `migrate-to-${cliVersion}`;
-      const taskDirName = `${monthDay}-${taskSlug}`;
-      const tasksDir = path.join(cwd, DIR_NAMES.WORKFLOW, DIR_NAMES.TASKS);
-      const taskDir = path.join(tasksDir, "planning", taskDirName);
-
-      // A prior migration task may have moved to another lifecycle directory.
-      const taskLocations = [
-        tasksDir,
-        ...["planning", "in_progress", "cancelled"].map((status) =>
-          path.join(tasksDir, status),
-        ),
-      ];
-      for (const status of ["completed", "archive"]) {
-        const statusDir = path.join(tasksDir, status);
-        if (!fs.existsSync(statusDir)) continue;
-        for (const month of fs.readdirSync(statusDir, {
-          withFileTypes: true,
-        })) {
-          if (
-            month.isDirectory() &&
-            /^\d{4}-(0[1-9]|1[0-2])$/.test(month.name)
-          ) {
-            taskLocations.push(path.join(statusDir, month.name));
+      // Auto-updated files always get new hash
+      for (const file of changes.autoUpdateFiles) {
+        filesToHash.set(file.relativePath, file.newContent);
+      }
+      // Only hash overwritten files (not skipped or .new copies)
+      for (const file of changes.changedFiles) {
+        const fullPath = path.join(cwd, file.relativePath);
+        if (fs.existsSync(fullPath)) {
+          const content = fs.readFileSync(fullPath, "utf-8");
+          if (content === file.newContent) {
+            filesToHash.set(file.relativePath, file.newContent);
           }
         }
       }
-      if (
-        !taskLocations.some((directory) =>
-          fs.existsSync(path.join(directory, taskDirName)),
-        )
-      ) {
-        fs.mkdirSync(taskDir, { recursive: true });
+      if (filesToHash.size > 0) {
+        updateHashes(cwd, filesToHash);
+      }
 
-        // Get current developer for assignee.
-        // `.developer` is a key=value file (written by init_developer.py):
-        //   name=<developer-name>
-        //   initialized_at=<iso8601>
-        // Reading it raw and .trim()-ing embeds the entire file contents
-        // (including the `name=` prefix and the `initialized_at` line) into
-        // the assignee field, producing bogus assignees like
-        // "name=suyuan\ninitialized_at=2026-04-07T23:41:21.978312" that
-        // later break session-start task rendering.
-        const developerFile = path.join(cwd, DIR_NAMES.WORKFLOW, ".developer");
-        let currentDeveloper = "unknown";
-        if (fs.existsSync(developerFile)) {
-          const raw = fs.readFileSync(developerFile, "utf-8");
-          const nameMatch = raw.match(/^\s*name\s*=\s*(.+?)\s*$/m);
-          if (nameMatch) {
-            currentDeveloper = nameMatch[1];
-          }
-        }
+      // Print summary
+      console.log(chalk.cyan("\n--- Summary ---\n"));
+      if (added > 0) {
+        console.log(`  Added: ${added} file(s)`);
+      }
+      if (autoUpdated > 0) {
+        console.log(`  Auto-updated: ${autoUpdated} file(s)`);
+      }
+      if (updated > 0) {
+        console.log(`  Updated: ${updated} file(s)`);
+      }
+      if (skipped > 0) {
+        console.log(`  Skipped: ${skipped} file(s)`);
+      }
+      if (createdNew > 0) {
+        console.log(`  Created .new copies: ${createdNew} file(s)`);
+      }
+      if (safeDeleted > 0) {
+        console.log(`  Cleaned up: ${safeDeleted} deprecated file(s)`);
+      }
+      if (configSectionsAppended > 0) {
+        console.log(`  Config sections added: ${configSectionsAppended}`);
+      }
+      if (backupDir) {
+        console.log(`  Backup: ${path.relative(cwd, backupDir)}/`);
+      }
 
-        // Build task.json — canonical 24-field shape via shared factory.
-        const taskTitle = `Migrate to v${cliVersion}`;
-        const todayStr = today.toISOString().split("T")[0];
-        const taskJson = emptyTaskJson({
-          id: taskSlug,
-          name: taskSlug,
-          title: taskTitle,
-          description: `Breaking change migration from v${projectVersion} to v${cliVersion}`,
-          status: "planning",
-          scope: "migration",
-          priority: "P1",
-          creator: "trellis-update",
-          assignee: currentDeveloper,
-          createdAt: todayStr,
-        });
+      const actionWord = isDowngrade ? "Downgrade" : "Update";
+      console.log(
+        chalk.green(
+          `\n✅ ${actionWord} complete! (${projectVersion} → ${cliVersion})`,
+        ),
+      );
 
-        // Write task.json
-        const taskJsonPath = path.join(taskDir, "task.json");
-        fs.writeFileSync(taskJsonPath, JSON.stringify(taskJson, null, 2));
-
-        // Build PRD content
-        let prdContent = `# Migration Task: Upgrade to v${cliVersion}\n\n`;
-        prdContent += `**Created**: ${todayStr}\n`;
-        prdContent += `**From Version**: ${projectVersion}\n`;
-        prdContent += `**To Version**: ${cliVersion}\n`;
-        prdContent += `**Assignee**: ${currentDeveloper}\n\n`;
-        prdContent += `## Status\n\n- [ ] Review migration guide\n- [ ] Update custom files\n- [ ] Run \`trellis update --migrate\`\n- [ ] Test workflows\n\n`;
-
-        for (const {
-          version,
-          guide,
-          aiInstructions,
-        } of metadata.migrationGuides) {
-          prdContent += `---\n\n## v${version} Migration Guide\n\n`;
-          prdContent += guide;
-          prdContent += "\n\n";
-
-          if (aiInstructions) {
-            prdContent += `### AI Assistant Instructions\n\n`;
-            prdContent += `When helping with this migration:\n\n`;
-            prdContent += aiInstructions;
-            prdContent += "\n\n";
-          }
-        }
-
-        // Write PRD
-        const prdPath = path.join(taskDir, "prd.md");
-        fs.writeFileSync(prdPath, prdContent);
-
-        console.log("");
-        console.log(chalk.bgCyan.black.bold(" 📋 MIGRATION TASK CREATED "));
-        console.log(
-          chalk.cyan(
-            `A task has been created to help you complete the migration:`,
-          ),
-        );
-        console.log(
-          chalk.white(
-            `   ${DIR_NAMES.WORKFLOW}/${DIR_NAMES.TASKS}/planning/${taskDirName}/`,
-          ),
-        );
-        console.log("");
+      if (createdNew > 0) {
         console.log(
           chalk.gray(
-            "Use AI to help: Ask Claude/Cursor to read the task and fix your custom files.",
+            "\nTip: Review .new files and merge changes manually if needed.",
           ),
         );
       }
-    }
-  }
 
-  if (zcodeConfigured) printZcodeSetupHint();
+      // Create migration task if there are breaking changes with migration guides
+      if (cliVsProject > 0 && projectVersion !== "unknown") {
+        const metadata = getMigrationMetadata(projectVersion, cliVersion);
 
-  // Display breaking change warnings at the very end (so they don't scroll off screen)
-  if (cliVsProject > 0 && projectVersion !== "unknown") {
-    const finalMetadata = getMigrationMetadata(projectVersion, cliVersion);
+        if (metadata.breaking && metadata.migrationGuides.length > 0) {
+          // Create task directory
+          const today = new Date();
+          const monthDay = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+          const taskSlug = `migrate-to-${cliVersion}`;
+          const taskDirName = `${monthDay}-${taskSlug}`;
+          const tasksDir = path.join(cwd, DIR_NAMES.WORKFLOW, DIR_NAMES.TASKS);
+          const taskDir = path.join(tasksDir, "planning", taskDirName);
 
-    if (finalMetadata.breaking || finalMetadata.changelog.length > 0) {
-      console.log("");
-      console.log(chalk.cyan("═".repeat(60)));
+          // A prior migration task may have moved to another lifecycle directory.
+          const taskLocations = [
+            tasksDir,
+            ...["planning", "in_progress", "cancelled"].map((status) =>
+              path.join(tasksDir, status),
+            ),
+          ];
+          for (const status of ["completed", "archive"]) {
+            const statusDir = path.join(tasksDir, status);
+            if (!fs.existsSync(statusDir)) continue;
+            for (const month of fs.readdirSync(statusDir, {
+              withFileTypes: true,
+            })) {
+              if (
+                month.isDirectory() &&
+                /^\d{4}-(0[1-9]|1[0-2])$/.test(month.name)
+              ) {
+                taskLocations.push(path.join(statusDir, month.name));
+              }
+            }
+          }
+          if (
+            !taskLocations.some((directory) =>
+              fs.existsSync(path.join(directory, taskDirName)),
+            )
+          ) {
+            fs.mkdirSync(taskDir, { recursive: true });
 
-      if (finalMetadata.breaking) {
-        console.log(
-          chalk.bgRed.white.bold(" ⚠️  BREAKING CHANGES ") +
-            chalk.red.bold(" This update contains breaking changes!"),
-        );
-        console.log("");
-      }
+            // Get current developer for assignee.
+            // `.developer` is a key=value file (written by init_developer.py):
+            //   name=<developer-name>
+            //   initialized_at=<iso8601>
+            // Reading it raw and .trim()-ing embeds the entire file contents
+            // (including the `name=` prefix and the `initialized_at` line) into
+            // the assignee field, producing bogus assignees like
+            // "name=suyuan\ninitialized_at=2026-04-07T23:41:21.978312" that
+            // later break session-start task rendering.
+            const developerFile = path.join(
+              cwd,
+              DIR_NAMES.WORKFLOW,
+              ".developer",
+            );
+            let currentDeveloper = "unknown";
+            if (fs.existsSync(developerFile)) {
+              const raw = fs.readFileSync(developerFile, "utf-8");
+              const nameMatch = raw.match(/^\s*name\s*=\s*(.+?)\s*$/m);
+              if (nameMatch) {
+                currentDeveloper = nameMatch[1];
+              }
+            }
 
-      if (finalMetadata.changelog.length > 0) {
-        console.log(chalk.cyan.bold("📋 What's Changed:"));
-        for (const entry of finalMetadata.changelog) {
-          console.log(chalk.white(`   ${entry}`));
+            // Build task.json — canonical 24-field shape via shared factory.
+            const taskTitle = `Migrate to v${cliVersion}`;
+            const todayStr = today.toISOString().split("T")[0];
+            const taskJson = emptyTaskJson({
+              id: taskSlug,
+              name: taskSlug,
+              title: taskTitle,
+              description: `Breaking change migration from v${projectVersion} to v${cliVersion}`,
+              status: "planning",
+              scope: "migration",
+              priority: "P1",
+              creator: "trellis-update",
+              assignee: currentDeveloper,
+              createdAt: todayStr,
+            });
+
+            // Write task.json
+            const taskJsonPath = path.join(taskDir, "task.json");
+            fs.writeFileSync(taskJsonPath, JSON.stringify(taskJson, null, 2));
+
+            // Build PRD content
+            let prdContent = `# Migration Task: Upgrade to v${cliVersion}\n\n`;
+            prdContent += `**Created**: ${todayStr}\n`;
+            prdContent += `**From Version**: ${projectVersion}\n`;
+            prdContent += `**To Version**: ${cliVersion}\n`;
+            prdContent += `**Assignee**: ${currentDeveloper}\n\n`;
+            prdContent += `## Status\n\n- [ ] Review migration guide\n- [ ] Update custom files\n- [ ] Run \`trellis update --migrate\`\n- [ ] Test workflows\n\n`;
+
+            for (const {
+              version,
+              guide,
+              aiInstructions,
+            } of metadata.migrationGuides) {
+              prdContent += `---\n\n## v${version} Migration Guide\n\n`;
+              prdContent += guide;
+              prdContent += "\n\n";
+
+              if (aiInstructions) {
+                prdContent += `### AI Assistant Instructions\n\n`;
+                prdContent += `When helping with this migration:\n\n`;
+                prdContent += aiInstructions;
+                prdContent += "\n\n";
+              }
+            }
+
+            // Write PRD
+            const prdPath = path.join(taskDir, "prd.md");
+            fs.writeFileSync(prdPath, prdContent);
+
+            console.log("");
+            console.log(chalk.bgCyan.black.bold(" 📋 MIGRATION TASK CREATED "));
+            console.log(
+              chalk.cyan(
+                `A task has been created to help you complete the migration:`,
+              ),
+            );
+            console.log(
+              chalk.white(
+                `   ${DIR_NAMES.WORKFLOW}/${DIR_NAMES.TASKS}/planning/${taskDirName}/`,
+              ),
+            );
+            console.log("");
+            console.log(
+              chalk.gray(
+                "Use AI to help: Ask Claude/Cursor to read the task and fix your custom files.",
+              ),
+            );
+          }
         }
-        console.log("");
       }
 
-      if (finalMetadata.recommendMigrate && !options.migrate) {
-        console.log(
-          chalk.bgGreen.black.bold(" 💡 RECOMMENDED ") +
-            chalk.green.bold(" Run with --migrate to complete the migration"),
-        );
-        console.log(
-          chalk.gray("   This will remove legacy files and apply all changes."),
-        );
-        console.log("");
-      }
+      bindAssetUpdate(cwd, path.basename(backupDir));
+      if (zcodeConfigured) printZcodeSetupHint();
 
-      console.log(chalk.cyan("═".repeat(60)));
-    }
-  }
+      // Display breaking change warnings at the very end (so they don't scroll off screen)
+      if (cliVsProject > 0 && projectVersion !== "unknown") {
+        const finalMetadata = getMigrationMetadata(projectVersion, cliVersion);
+
+        if (finalMetadata.breaking || finalMetadata.changelog.length > 0) {
+          console.log("");
+          console.log(chalk.cyan("═".repeat(60)));
+
+          if (finalMetadata.breaking) {
+            console.log(
+              chalk.bgRed.white.bold(" ⚠️  BREAKING CHANGES ") +
+                chalk.red.bold(" This update contains breaking changes!"),
+            );
+            console.log("");
+          }
+
+          if (finalMetadata.changelog.length > 0) {
+            console.log(chalk.cyan.bold("📋 What's Changed:"));
+            for (const entry of finalMetadata.changelog) {
+              console.log(chalk.white(`   ${entry}`));
+            }
+            console.log("");
+          }
+
+          if (finalMetadata.recommendMigrate && !options.migrate) {
+            console.log(
+              chalk.bgGreen.black.bold(" 💡 RECOMMENDED ") +
+                chalk.green.bold(
+                  " Run with --migrate to complete the migration",
+                ),
+            );
+            console.log(
+              chalk.gray(
+                "   This will remove legacy files and apply all changes.",
+              ),
+            );
+            console.log("");
+          }
+
+          console.log(chalk.cyan("═".repeat(60)));
+        }
+      }
+    },
+    options.dryRun,
+  );
 }

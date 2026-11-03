@@ -23,9 +23,9 @@ Apply code-spec depth when the change includes any of:
 - Database schema/migration change
 - Infra integration (storage, queue, cache, secrets, env wiring)
 
-### Mandatory Output (7 Sections)
+### Applicable Contract Coverage
 
-For triggered tasks, include all sections below:
+For triggered tasks, cover the applicable contracts below in the existing document structure. Reuse current coverage and link it where sufficient; do not require seven headings, artificial examples or empty sections for every small API change:
 1. Scope / Trigger
 2. Signatures (command/API/DB)
 3. Contracts (request/response/env)
@@ -138,7 +138,7 @@ If you added a new section or the code-spec status changed, update the category'
 
 ## Update Templates
 
-### Mandatory Template for Infra/Cross-Layer Work
+### Example Structure for Infra/Cross-Layer Work
 
 ```markdown
 ## Scenario: <name>
@@ -313,12 +313,10 @@ If you're unsure what to update, answer these prompts:
 Before finishing your code-spec update:
 
 - [ ] Is the content specific and actionable?
-- [ ] Did you include a code example?
+- [ ] Are examples included where they clarify a real contract or failure?
 - [ ] Did you explain WHY, not just WHAT?
 - [ ] Did you include executable signatures/contracts?
-- [ ] Did you include validation and error matrix?
-- [ ] Did you include Good/Base/Bad cases?
-- [ ] Did you include required tests with assertion points?
+- [ ] Are applicable validation, failure cases and verification assertions covered or linked?
 - [ ] Is it in the right code-spec file?
 - [ ] Does it duplicate existing content?
 - [ ] Would a new team member understand it?
