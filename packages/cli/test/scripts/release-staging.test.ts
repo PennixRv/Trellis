@@ -63,4 +63,36 @@ describe("release pre-commit staging", () => {
     expect(release).toContain('"refs/tags/v${version}"');
     expect(release).not.toContain('git push origin "HEAD:${branch}" --tags');
   });
+
+  it("publishes to the branch when an existing tag has the same name", () => {
+    const remote = path.join(tmp, "remote.git");
+    git(tmp, "init", "--bare", "-q", remote);
+    git(tmp, "config", "user.email", "test@example.com");
+    git(tmp, "config", "user.name", "test");
+    fs.writeFileSync(path.join(tmp, "README.md"), "first\n");
+    git(tmp, "add", "README.md");
+    git(tmp, "commit", "-qm", "first");
+    git(tmp, "branch", "-m", "v0.7.1");
+    git(tmp, "tag", "v0.7.1");
+    git(tmp, "remote", "add", "origin", remote);
+    git(tmp, "push", "-q", "origin", "HEAD:refs/heads/v0.7.1", "refs/tags/v0.7.1");
+    fs.writeFileSync(path.join(tmp, "README.md"), "release\n");
+    git(tmp, "commit", "-qam", "release");
+    git(tmp, "tag", "v0.7.1-beta.6");
+
+    const release = fs.readFileSync(RELEASE_SCRIPT, "utf-8");
+    const command = release.match(/run\(`(git push origin [^`]+)`\);/);
+    if (!command) throw new Error("release push command is missing");
+    const tokens = command[1]
+      .replaceAll("${branch}", "v0.7.1")
+      .replaceAll("${version}", "0.7.1-beta.6")
+      .match(/[^\s"]+/g);
+    if (!tokens) throw new Error("release push command is empty");
+    const [executable, ...args] = tokens;
+    const result = spawnSync(executable, args, { cwd: tmp, encoding: "utf-8" });
+    expect(result.status, result.stderr).toBe(0);
+    const head = git(tmp, "rev-parse", "HEAD");
+    expect(git(tmp, "--git-dir", remote, "rev-parse", "refs/heads/v0.7.1")).toBe(head);
+    expect(git(tmp, "--git-dir", remote, "rev-parse", "refs/tags/v0.7.1-beta.6")).toBe(head);
+  });
 });

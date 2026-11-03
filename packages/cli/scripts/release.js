@@ -179,10 +179,8 @@ function main() {
   run("git add package.json ../core/package.json");
   run(`git commit -m "${version}"`);
   run(`git tag "v${version}"`);
-  // Push HEAD to the branch we are actually on, by name. `HEAD` alone relies
-  // on the remote having a same-named branch, and a bare `main` pushes the
-  // local main ref regardless of where the release commit lives.
-  run(`git push origin "HEAD:${branch}" "refs/tags/v${version}"`);
+  // Fully qualify the target: release branches can share a name with a stable tag.
+  run(`git push origin "HEAD:refs/heads/${branch}" "refs/tags/v${version}"`);
   assertPushLanded(branch, `v${version}`);
 }
 

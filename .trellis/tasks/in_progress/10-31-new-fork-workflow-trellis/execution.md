@@ -104,3 +104,5 @@
 - 验证：Core 403 项通过、1 项跳过；CLI 全量 2129 项通过、2 项跳过；新增兼容修复后目录与阶段定向 32 项通过，目录 Python 专项共 13 项。TypeScript、ESLint、构建、精确 core 依赖打包检查通过；Python 0 错误、72 条告警。beta.6 manifest 连续性及双语文档导航门禁通过。
 - GitNexus detect-changes --scope all 已执行，报告 104 个变更符号、79 条受影响流程及 critical；CLI 即使 --limit 10000 仍截断展示，索引也未包含新增模块。该结果只作风险线索，完整源码调用方检查及真实回归补足布局、所有权和恢复边界，不声称图索引完整覆盖。
 - 发布候选为 0.7.1-beta.6；尚待提交、GitHub Actions 正式发布、Lifecycle 全局重装及根项目迁移。文档保留既有 codex/chinese-user-templates 分支，beta 新行为位于 beta/、zh/beta/，不覆盖稳定版说明。
+
+- 发布恢复：本地已生成 beta.6 后，原 release.js 用 HEAD:v0.7.1 推送，被远端同名分支与稳定 tag 的歧义拒绝。已核验远端 beta.6 tag 不存在，未公开发布；修复为 HEAD:refs/heads/${branch}，以真实 bare remote 和同名 tag/branch 回归覆盖。恢复沿当前 beta.6 继续，不再次递增版本；仅在远端 tag 仍不存在时更新本地候选 tag，再显式推送目标分支和该 tag。
