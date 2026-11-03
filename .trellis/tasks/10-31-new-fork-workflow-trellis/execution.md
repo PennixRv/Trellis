@@ -76,3 +76,12 @@
 - 核对新增的六组 GitNexus Skill：`.agents/skills/gitnexus-{cli,debugging,exploring,guide,impact-analysis,refactoring}/SKILL.md` 与 `.claude/skills/` 下对应文件逐字节一致；各 `name` 与目录 slug 对齐，未发现相对链接或缺失引用。
 - 使用当前项目忽略目录中的 GitNexus CLI 核对 Skill 所用 `analyze`、`impact`、`context`、`detect-changes` 命令选项；调用写法与当前 CLI 帮助一致。保留 GitNexus CLI/doctor 的只读验收结果，不把忽略的 `.gitnexus` 运行数据纳入提交。
 - 本次未改动 Trellis 源码函数；变更为任务证据与 Skill 文档。此前 Core/CLI 全量测试、typecheck、lint、build、release check 和 workflow 定向测试均通过；当前 owner task 原生验证与 `git diff --check` 通过。根侧组合验收待组件提交及 gitlink 固定后执行。
+
+## 2026-11-03：会话交接恢复进入正式源码
+
+- 用户明确要求将根项目临时恢复修复纳入 Trellis submodule 既有 `v0.7.1` 分支，并与 Pennix Skills handoff 适配器对齐；不创建分支或 worktree。此前 `32bf9498` 已加入 `session_source`，但没有任务指针时仍返回空值，已发布 0.7.1 也未包含该提交。
+- 本次补齐无绑定直接身份、带当前摘要的 sealed-source claim、不可变来源与可确认目标摘要分离，以及只读 `status --include-current` 和 consumed-target `reconcile`。恢复路径仍核对包、代次、身份和原路线，不执行包内待处理动作。临时实现的来源摘要重写参数不进入发布合同。
+- 补齐 `claiming` 只能由记录目标恢复的检查。模板和 dogfood 脚本同步修改；回归通过真实隔离仓库覆盖未绑定目标、源指针退休、中断恢复、旧目标拒绝和来源摘要保持。
+- 根侧负责发布及真实安装；用户将不可覆盖的 npm 0.7.1 改为 `0.7.1-*`，当前选定未使用的 `0.7.1-beta.0`。组件任务生命周期保持原状态，发布不代表父任务已验收。
+- 源码验收通过：Core 403 项通过、1 项跳过；CLI 2105 项通过、2 项跳过。构建、ESLint、TypeScript 检查通过，Python basedpyright 为 0 错误、68 条既有导出告警。打包前检确认双包版本一致且 CLI 精确依赖 core；真实构建 CLI 在临时目录初始化、更新预览无差异，两个交接脚本与模板逐字节一致。
+- GitNexus `impact` 与 `detect-changes --scope all` 已执行，后者将同名 `_load_owner` 关联到 727 个含明显重复且无关的执行流程；仅记录工具结果，不将其作为精确影响证明。实际调用、正常路径兼容与恢复边界以当前源码及真实 CLI 回归核验。发布与真实安装由根协调任务另录。

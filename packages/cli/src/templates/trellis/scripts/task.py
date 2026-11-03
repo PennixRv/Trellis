@@ -350,7 +350,7 @@ def cmd_current(args: argparse.Namespace) -> int:
             "source": active.source,
             "session_source": (
                 f"session:{active.context_key}"
-                if active.source_type == "session" and active.context_key
+                if active.context_key
                 else None
             ),
             "stale": active.stale,

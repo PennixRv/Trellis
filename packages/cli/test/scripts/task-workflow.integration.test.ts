@@ -1513,6 +1513,78 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     expect(secondStatus.status).toBe("absent");
   });
 
+  it("recovers a sealed source into an unbound direct session without changing its source digest", () => {
+    const current = runTaskAs(root, "target-session", "current", "--json");
+    expect(JSON.parse(current.stdout)).toMatchObject({
+      current_task: null,
+      session_source: "session:target-session",
+      source: "none",
+    });
+    execFileSync("git", ["init", "--quiet"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Trellis test"], { cwd: root });
+    runOkAs(root, "source-session", "start", TASK);
+    execFileSync("git", ["add", "."], { cwd: root });
+    execFileSync("git", ["commit", "--quiet", "-m", "fixture"], { cwd: root });
+    const taskPath = `.trellis/tasks/${TASK}`;
+    const taskBefore = fs.readFileSync(path.join(root, taskPath, "task.json"), "utf-8");
+    const sourceDigest = JSON.parse(runOkAs(root, "source-session", "continuity", "show")).source_digest as string;
+    const packageArgs = ["--task-id", TASK, "--task-path", taskPath, "--package-id", "sealed-package", "--package-digest", "a".repeat(64)];
+    const transfer = (session: string, action: string, generation: number, ...extra: string[]) => runTaskAs(
+      root, session, "transfer", action, ...packageArgs,
+      "--expected-generation", String(generation), "--explicit-user-request", ...extra,
+    );
+    expect(JSON.parse(transfer("source-session", "quiesce", 0).stdout).status).toBe("quiescing");
+    expect(JSON.parse(transfer("source-session", "seal", 1).stdout).status).toBe("sealed");
+    fs.writeFileSync(path.join(root, "authorized-repair.md"), "Explicitly reviewed local repair\n");
+    const inspected = JSON.parse(transfer("target-session", "status", 2, "--include-current").stdout);
+    const targetDigest = inspected.current_continuity_digest as string;
+    expect(inspected.current_projection.task).toMatchObject({ id: TASK, path: taskPath });
+    expect(inspected.continuity_digest).toBe(sourceDigest);
+    expect(JSON.parse(runTaskAs(root, "target-session", "current", "--json").stdout).current_task).toBeNull();
+    expect(targetDigest).not.toBe(sourceDigest);
+    expect(JSON.parse(transfer("target-session", "claim", 2).stdout).code).toBe("TASK_TRANSFER_STALE_CONTINUITY");
+    expect(JSON.parse(transfer("target-session", "claim", 2, "--expected-continuity-digest", sourceDigest).stdout).code).toBe("TASK_TRANSFER_STALE_CONTINUITY");
+    expect(JSON.parse(transfer("target-session", "claim", 1, "--expected-continuity-digest", targetDigest).stdout).code).toBe("TASK_TRANSFER_STALE_GENERATION");
+    expect(JSON.parse(transfer("source-session", "claim", 2, "--expected-continuity-digest", targetDigest).stdout).code).toBe("TASK_TRANSFER_WITHHELD");
+    const unauthorized = runTaskAs(root, "target-session", "transfer", "claim", ...packageArgs, "--expected-generation", "2", "--expected-continuity-digest", targetDigest);
+    expect(JSON.parse(unauthorized.stdout).code).toBe("TASK_TRANSFER_NOT_AUTHORIZED");
+
+    const sourcePointer = path.join(root, ".trellis", ".runtime", "sessions", "source-session.json");
+    const pointerBefore = fs.readFileSync(sourcePointer, "utf-8");
+    fs.writeFileSync(sourcePointer, "{ not json");
+    const interrupted = transfer("target-session", "claim", 2, "--expected-continuity-digest", targetDigest);
+    expect(JSON.parse(interrupted.stdout).code).toBe("TASK_TRANSFER_RECOVERY_REQUIRED");
+    expect(JSON.parse(transfer("other-session", "claim", 3).stdout).code).toBe("TASK_TRANSFER_WITHHELD");
+    const ownershipDir = path.join(root, ".trellis", ".runtime", "task-ownership");
+    const ownershipPath = path.join(ownershipDir, fs.readdirSync(ownershipDir).find((name) => name.endsWith(".json")) as string);
+    const recovering = JSON.parse(fs.readFileSync(ownershipPath, "utf-8"));
+    fs.writeFileSync(ownershipPath, JSON.stringify({ ...recovering, status: "claiming" }));
+    expect(JSON.parse(transfer("other-session", "claim", 3).stdout).code).toBe("TASK_TRANSFER_WITHHELD");
+    fs.writeFileSync(sourcePointer, pointerBefore);
+    const claimed = transfer("target-session", "claim", 3);
+    expect(claimed.status).toBe(0);
+    expect(JSON.parse(claimed.stdout)).toMatchObject({
+      status: "claimed", generation: 3, source_session_id: "source-session",
+      target_session_id: "target-session", continuity_digest: sourceDigest,
+      target_continuity_digest: targetDigest,
+    });
+    expect(JSON.parse(runTaskAs(root, "source-session", "current", "--json").stdout).current_task).toBeNull();
+    expect(JSON.parse(runOkAs(root, "target-session", "current", "--json")).current_task.dir).toBe(taskPath);
+    expect(runTaskAs(root, "target-session", "set-meta", TASK, "owner", "premature").status).toBe(1);
+    expect(JSON.parse(transfer("other-session", "consume", 3).stdout).code).toBe("TASK_TRANSFER_WITHHELD");
+    expect(JSON.parse(transfer("target-session", "consume", 3).stdout).status).toBe("consumed");
+    fs.appendFileSync(path.join(root, "authorized-repair.md"), "A later reviewed repair\n");
+    const reconciledDigest = JSON.parse(runOkAs(root, "target-session", "continuity", "show")).source_digest as string;
+    expect(JSON.parse(transfer("other-session", "reconcile", 4, "--expected-continuity-digest", reconciledDigest).stdout).code).toBe("TASK_TRANSFER_WITHHELD");
+    expect(JSON.parse(transfer("target-session", "reconcile", 4).stdout).code).toBe("TASK_TRANSFER_STALE_CONTINUITY");
+    expect(JSON.parse(transfer("target-session", "reconcile", 4, "--expected-continuity-digest", reconciledDigest).stdout)).toMatchObject({
+      status: "consumed", generation: 5, continuity_digest: sourceDigest,
+      target_continuity_digest: reconciledDigest,
+    });
+    expect(fs.readFileSync(path.join(root, taskPath, "task.json"), "utf-8")).toBe(taskBefore);
+  });
+
   it("captures fresh continuity and fences explicit ownership transfer by generation", () => {
     execFileSync("git", ["init", "--quiet"], { cwd: root });
     execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });

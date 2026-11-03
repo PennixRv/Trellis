@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.0",
+  "description": "修复直接会话身份与封存源交接恢复，保留不可变来源绑定。",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "无任务指针的直接会话可读取身份及当前投影；明确授权的目标可恢复封存源交接，并单独协调目标摘要。",
+  "migrations": [],
+  "notes": "无需迁移任务或归属记录；更新生成脚本后使用原生交接入口。"
+}
