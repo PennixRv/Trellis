@@ -210,7 +210,7 @@
     ".trellis/scripts/common/tasks.py": "06d672fffc7305cca520db62b2e87df331ee2e48af1b9087862fa6818be40b27",
     ".trellis/scripts/common/task_context.py": "5c39ddd87e0d069c006a22a995208343f7015d2966a47f0cefd172618f572556",
     ".trellis/scripts/common/task_workflow.py": "0023dbf5fe6023c317648bc02db8cdb6f982a9d2fb5ef32238285c049eee7f47",
-    ".trellis/scripts/common/task_continuity.py": "e8d295ab5c1d0c18171c7b33b91da03d0e0e2bcec02aff504620e44511e216c8",
+    ".trellis/scripts/common/task_continuity.py": "ad3ebaf1255e5da1055e01d836af34e04f2607b29510cd964cd8d3bba8291a9f",
     ".trellis/scripts/common/packages_context.py": "efe158d7c99c2268851d0216fbb08de22836e418a8dbeb73575b8cc249eed7b7",
     ".trellis/scripts/common/workflow_selection.py": "b136d6ae41aac95f4d5f425b641b62b7002f7cff2d26aa44b056cef9a2242753",
     ".trellis/scripts/common/trellis_config.py": "dbffc8c1287f0b6a0a5c4ab701609e08116fdaa0202efcd553ddc77992c675dc",

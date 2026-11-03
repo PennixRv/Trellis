@@ -385,17 +385,13 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                     if not PACKAGE_DIGEST_RE.fullmatch(args.expected_continuity_digest):
                         raise ContinuityError("TASK_TRANSFER_INVALID_INPUT", "expected continuity digest must be a SHA-256 digest")
                     if args.expected_continuity_digest != current_digest:
-                        raise ContinuityError("TASK_TRANSFER_STALE_CONTINUITY", "current task projection differs from the explicitly reconciled snapshot")
+                        raise ContinuityError("TASK_TRANSFER_STALE_CONTINUITY", "current task projection differs from the explicitly checked snapshot")
                 # Recovery acknowledges a live target snapshot without rebasing the source package.
-                reconciled_claim = (
+                recovered_claim = (
                     operation == "claim" and record["status"] == "sealed"
                     and args.expected_continuity_digest == current_digest
                 )
-                reconciled_target = (
-                    operation == "reconcile" and record["status"] == "consumed"
-                    and args.expected_continuity_digest == current_digest
-                )
-                if operation != "release" and current_digest != record.get("target_continuity_digest", record["continuity_digest"]) and not (reconciled_claim or reconciled_target):
+                if operation != "release" and current_digest != record.get("target_continuity_digest", record["continuity_digest"]) and not recovered_claim:
                     raise ContinuityError("TASK_TRANSFER_STALE_CONTINUITY", "task continuity changed during ownership transfer")
                 if operation != "release" and _route_snapshot(data) != record["route"]:
                     raise ContinuityError("TASK_TRANSFER_STALE_ROUTE", "task phase, route, input, or implementation authorization changed")
@@ -403,13 +399,10 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                 if operation in {"seal", "retire"}:
                     if context_key != record["source_session_id"] or current_path not in {record["task_path"], None}:
                         raise ContinuityError("TASK_TRANSFER_WITHHELD", "source session no longer owns the current task")
-                elif operation in {"claim", "consume", "reconcile"}:
+                elif operation in {"claim", "consume"}:
                     if context_key == record["source_session_id"]:
                         raise ContinuityError("TASK_TRANSFER_WITHHELD", "target must be a different direct session")
-                if operation == "reconcile":
-                    if not reconciled_target or context_key != record["target_session_id"] or current_path != record["task_path"]:
-                        raise ContinuityError("TASK_TRANSFER_WITHHELD", "only the consumed target may reconcile its explicitly pinned projection")
-                elif operation == "release":
+                if operation == "release":
                     if record["status"] not in {"quiescing", "sealed", "recovery_required"} or record["target_session_id"] is not None:
                         raise ContinuityError("TASK_TRANSFER_INVALID_TRANSITION", "ownership can be released only before target claim")
                     if context_key != record["source_session_id"] or current_path not in {None, record["task_path"]}:
@@ -422,9 +415,7 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                     path.unlink(missing_ok=True)
                     print(json.dumps({"status": "released", "generation": record["generation"], "task_id": task_id}, ensure_ascii=False, sort_keys=True))
                     return 0
-                if operation == "reconcile":
-                    record.update({"target_continuity_digest": current_digest, "generation": record["generation"] + 1})
-                elif operation == "seal" and record["status"] == "quiescing":
+                if operation == "seal" and record["status"] == "quiescing":
                     record.update({"status": "sealed", "generation": record["generation"] + 1})
                 elif operation == "retire" and record["status"] in {"sealed", "retiring", "recovery_required"}:
                     if record["status"] == "sealed":
@@ -440,14 +431,14 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                         write_json(path, record)
                         raise ContinuityError("TASK_TRANSFER_RECOVERY_REQUIRED", "source pointer remains after retirement")
                     record["status"] = "ready"
-                elif operation == "claim" and (record["status"] in {"ready", "claiming", "recovery_required", "claimed"} or reconciled_claim):
+                elif operation == "claim" and (record["status"] in {"ready", "claiming", "recovery_required", "claimed"} or recovered_claim):
                     if record["status"] in {"claiming", "recovery_required"} and record["target_session_id"] != context_key:
                         raise ContinuityError("TASK_TRANSFER_WITHHELD", "only the recorded target session can recover a claim")
                     if current_path not in {None, record["task_path"]}:
                         raise ContinuityError("TASK_TRANSFER_WITHHELD", "target session already has a current task")
                     if record["status"] in {"ready", "sealed"}:
                         record.update({"status": "claiming", "generation": record["generation"] + 1, "target_session_id": context_key})
-                        if reconciled_claim:
+                        if recovered_claim:
                             record["target_continuity_digest"] = current_digest
                         if not write_json(path, record):
                             raise ContinuityError("TASK_TRANSFER_WRITE_FAILED", "could not record target claim")
@@ -497,12 +488,12 @@ def add_continuity_commands(subparsers) -> None:
     capture.add_argument("--expected-source-digest", required=True, help="Current captured digest, or absent")
 
     transfer = subparsers.add_parser("transfer", help="Transfer task ownership between direct sessions")
-    transfer.add_argument("transfer_action", choices=("status", "quiesce", "seal", "retire", "claim", "consume", "release", "reconcile"))
+    transfer.add_argument("transfer_action", choices=("status", "quiesce", "seal", "retire", "claim", "consume", "release"))
     transfer.add_argument("--task-id", required=True)
     transfer.add_argument("--task-path", required=True)
     transfer.add_argument("--package-id", required=True)
     transfer.add_argument("--package-digest", required=True)
-    transfer.add_argument("--expected-continuity-digest", help="Expected live projection; required for sealed-source claim or consumed-target reconciliation")
+    transfer.add_argument("--expected-continuity-digest", help="Expected live projection for sealed-source claim recovery")
     transfer.add_argument("--expected-generation", type=int)
     transfer.add_argument("--include-current", action="store_true", help="Include the live task projection and its digest in transfer status")
     transfer.add_argument("--explicit-user-request", action="store_true")

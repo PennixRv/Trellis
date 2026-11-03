@@ -2333,39 +2333,16 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       path.join(root, "authorized-repair.md"),
       "A later reviewed repair\n",
     );
-    const reconciledDigest = JSON.parse(
-      runOkAs(root, "target-session", "continuity", "show"),
-    ).source_digest as string;
-    expect(
-      JSON.parse(
-        transfer(
-          "other-session",
-          "reconcile",
-          4,
-          "--expected-continuity-digest",
-          reconciledDigest,
-        ).stdout,
-      ).code,
-    ).toBe("TASK_TRANSFER_WITHHELD");
-    expect(
-      JSON.parse(transfer("target-session", "reconcile", 4).stdout).code,
-    ).toBe("TASK_TRANSFER_STALE_CONTINUITY");
-    expect(
-      JSON.parse(
-        transfer(
-          "target-session",
-          "reconcile",
-          4,
-          "--expected-continuity-digest",
-          reconciledDigest,
-        ).stdout,
-      ),
-    ).toMatchObject({
+    const afterConsume = JSON.parse(
+      transfer("target-session", "status", 4, "--include-current").stdout,
+    );
+    expect(afterConsume).toMatchObject({
       status: "consumed",
-      generation: 5,
+      generation: 4,
       continuity_digest: sourceDigest,
-      target_continuity_digest: reconciledDigest,
+      target_continuity_digest: targetDigest,
     });
+    expect(afterConsume.current_continuity_digest).not.toBe(targetDigest);
     expect(
       fs.readFileSync(path.join(root, taskPath, "task.json"), "utf-8"),
     ).toBe(taskBefore);
