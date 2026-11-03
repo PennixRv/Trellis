@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.11",
+  "description": "收敛 handoff ownership 为一次性交接",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "移除消费后 ownership reconcile 入口；consume 成功后 ownership generation 固定，普通任务修改、提交、阶段推进和交付收尾不再改写交接归属。保留 sealed-source 在 claim 前的 continuity digest 恢复核对，以及只读 transfer status --include-current。",
+  "migrations": [],
+  "notes": "No migration required. Existing consumed ownership records remain readable and are not rewritten."
+}
