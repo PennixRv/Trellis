@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
+import { readdirSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, readdirSync: vi.fn(actual.readdirSync) };
+});
 import {
   getTrellisTemplatePath,
   getClaudeTemplatePath,
@@ -11,6 +19,7 @@ import {
   readTemplate,
   readScript,
   readMarkdown,
+  copyTrellisDir,
 } from "../../src/templates/extract.js";
 
 // =============================================================================
@@ -108,4 +117,23 @@ describe("readMarkdown", () => {
     expect(typeof content).toBe("string");
     expect(content).toContain("#");
   });
+});
+
+it("does not copy Python runtime caches into a project", async () => {
+  const dest = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-extract-"));
+  const entries = vi
+    .mocked(readdirSync)
+    .mockReturnValueOnce([
+      "__pycache__",
+      "stale.pyc",
+      "stale.pyo",
+      "task.py",
+    ] as unknown as ReturnType<typeof fs.readdirSync>);
+  try {
+    await copyTrellisDir("scripts", dest);
+    expect(fs.readdirSync(dest)).toEqual(["task.py"]);
+  } finally {
+    entries.mockRestore();
+    fs.rmSync(dest, { recursive: true, force: true });
+  }
 });

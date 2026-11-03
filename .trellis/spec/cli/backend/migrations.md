@@ -235,12 +235,32 @@ Existing users may have poisoned manifests from older trellis versions. `pruneOr
 
 **Preserve set** (a key is kept iff one of):
 
-1. Starts with `.trellis/` (walk-managed)
+1. Starts with `.trellis/` (walk-managed), except missing files explicitly
+   retired by a `safe-file-delete` entry. Existing files retain their baseline
+   so modified-file detection still works.
 2. Path appears in `PLATFORM_FUNCTIONS[id].collectTemplates()` output for ANY configured platform
 3. Path appears in `from` or `to` of ANY migration manifest entry (across all `migrations/manifests/*.json`, not just pending) — must preserve so rename/delete migration logic still has a hash to compare against
 4. Path is `AGENTS.md` AND the file on disk contains `TRELLIS_BLOCK_START` + `TRELLIS_BLOCK_END` markers, OR the file is missing. Files lacking markers are treated as user-owned and pruned.
 
 `options.persist: false` for dry-run paths (e.g. `uninstall --dry-run`).
+`update --dry-run` must also pass this option before classifying migrations.
+
+### Retired generated assets
+
+Removing a template from the current registry does not remove installed copies.
+Retire generated roles, scripts, Skill entry points and their reference files
+with explicit `safe-file-delete` entries and known historical content hashes.
+This also covers ignored `.agents/skills/` files whose manifest keys an earlier
+update already pruned. Never infer ownership from the directory alone or delete
+unknown files recursively. Current template ownership still wins over historical
+deletions. Existing task records are protected data, not retired templates; asset
+cleanup must neither rewrite them nor initialize or advance their phase route.
+
+For explicitly retired Python scripts under `.trellis/scripts/`, include their
+exact CPython-tagged files in `__pycache__` in the same preview and deletion plan
+when the source is hash-matched or already absent. Preserve caches of modified
+scripts, unrelated filenames, symlinks and `update.skip` paths. Do not follow
+symlinked cache directories or scan task/history directories.
 
 #### Wrong vs Correct
 

@@ -399,6 +399,63 @@ function collectSafeFileDeletes(
     }
   }
 
+  for (const { item, action } of [...results]) {
+    if (
+      !item.from.startsWith(".trellis/scripts/") ||
+      !item.from.endsWith(".py") ||
+      !item.allowed_hashes?.length ||
+      (action !== "delete" &&
+        !(
+          action === "skip-missing" && !fs.existsSync(path.join(cwd, item.from))
+        ))
+    )
+      continue;
+    const cacheDir = path.join(path.dirname(item.from), "__pycache__");
+    try {
+      const fullCacheDir = path.join(cwd, cacheDir);
+      if (fs.lstatSync(fullCacheDir).isSymbolicLink()) continue;
+      if (fs.realpathSync(fullCacheDir) !== path.resolve(fullCacheDir))
+        continue;
+      for (const entry of fs.readdirSync(fullCacheDir, {
+        withFileTypes: true,
+      })) {
+        const parts = entry.name.split(".");
+        if (
+          !entry.isFile() ||
+          parts[0] !== path.basename(item.from, ".py") ||
+          !/^cpython-\d+$/.test(parts[1] ?? "") ||
+          !(
+            (parts.length === 3 && parts[2] === "pyc") ||
+            (parts.length === 4 &&
+              /^opt-[12]$/.test(parts[2] ?? "") &&
+              parts[3] === "pyc")
+          )
+        )
+          continue;
+        const from = toPosix(path.join(cacheDir, entry.name));
+        const skipped =
+          !bypassUpdateSkip &&
+          skipPaths.some((skip) =>
+            [item.from, from].some(
+              (file) =>
+                file === skip ||
+                file.startsWith(skip.endsWith("/") ? skip : skip + "/"),
+            ),
+          );
+        results.push({
+          item: {
+            type: "safe-file-delete",
+            from,
+            description: "Bytecode cache of a retired generated script",
+          },
+          action: skipped ? "skip-update-skip" : "delete",
+        });
+      }
+    } catch {
+      // Missing or unreadable caches are not cleanup candidates.
+    }
+  }
+
   return results;
 }
 
@@ -2212,6 +2269,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       cwd,
       [...configuredPlatforms],
       hashes,
+      { persist: !options.dryRun },
     );
     if (prune.pruned.length > 0) {
       console.log(

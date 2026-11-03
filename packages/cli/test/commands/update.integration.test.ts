@@ -199,6 +199,122 @@ describe("update() integration", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  it("removes retired workflow assets without migrating old tasks", async () => {
+    await init({ yes: true, force: true, codex: true });
+    const fixtures = new URL("../fixtures/retired-workflow/", import.meta.url);
+    const retired = {
+      ".trellis/agents/subnode-profiles.json": fs.readFileSync(
+        new URL("subnode-profiles.json", fixtures),
+        "utf-8",
+      ),
+      ".agents/skills/trellis-research-record/SKILL.md": fs.readFileSync(
+        new URL("research-record.md", fixtures),
+        "utf-8",
+      ),
+    };
+    for (const [file, content] of Object.entries(retired)) {
+      writeProjectFile(file, content);
+    }
+    const hashes = readHashesV2(hashFilePath());
+    const missing = ".trellis/agents/subnode.env";
+    hashes[missing] = "retired-env";
+    hashes[".trellis/agents/subnode-profiles.json"] = computeHash(
+      retired[".trellis/agents/subnode-profiles.json"],
+    );
+    writeHashesV2(hashFilePath(), hashes);
+    const oldTask = ".trellis/tasks/old-task/task.json";
+    const taskContent =
+      '{"status":"in_progress","current_phase":3,"next_action":["keep"]}\n';
+    writeProjectFile(oldTask, taskContent);
+    writeProjectFile(
+      ".trellis/agents/check.md",
+      "user-modified retired role\n",
+    );
+    writeProjectFile(".agents/skills/user-note/SKILL.md", "user skill\n");
+
+    const beforeDryRun = readProjectFile(".trellis/.template-hashes.json");
+    await update({ dryRun: true });
+    expect(readProjectFile(".trellis/.template-hashes.json")).toBe(
+      beforeDryRun,
+    );
+    for (const file of Object.keys(retired)) {
+      expect(fs.existsSync(projectFile(file))).toBe(true);
+    }
+
+    await update({ skipAll: true });
+    for (const file of Object.keys(retired)) {
+      expect(fs.existsSync(projectFile(file))).toBe(false);
+      expect(readHashesV2(hashFilePath())).not.toHaveProperty(file);
+    }
+    expect(readHashesV2(hashFilePath())).not.toHaveProperty(missing);
+    expect(readProjectFile(oldTask)).toBe(taskContent);
+    expect(readProjectFile(".trellis/agents/check.md")).toBe(
+      "user-modified retired role\n",
+    );
+    expect(readProjectFile(".agents/skills/user-note/SKILL.md")).toBe(
+      "user skill\n",
+    );
+    const backups = fs
+      .readdirSync(projectFile(".trellis"))
+      .filter((name) => name.startsWith(".backup-"));
+    await update({ skipAll: true });
+    expect(
+      fs
+        .readdirSync(projectFile(".trellis"))
+        .filter((name) => name.startsWith(".backup-")),
+    ).toEqual(backups);
+    expect(readProjectFile(oldTask)).toBe(taskContent);
+  });
+
+  it("cleans retired Python caches while protecting modified scripts, skips and symlinks", async () => {
+    await init({ yes: true, force: true, codex: true });
+    const cache = ".trellis/scripts/common/__pycache__/";
+    const obsolete = [
+      "task_planning.cpython-314.pyc",
+      "task_planning.cpython-314.opt-1.pyc",
+      "task_planning.cpython-314.opt-2.pyc",
+    ];
+    const preserved = [
+      "paths.cpython-314.pyc",
+      "task_planning_notes.cpython-314.pyc",
+      "task_planning.unknown.pyc",
+      "task_migration.cpython-314.pyc",
+    ];
+    for (const file of [...obsolete, ...preserved]) {
+      writeProjectFile(cache + file, "cached bytecode");
+    }
+    writeProjectFile(
+      ".trellis/scripts/common/task_migration.py",
+      "user script",
+    );
+    writeProjectFile("user-data.txt", "user data");
+    const link = cache + "task_planning.cpython-313.pyc";
+    fs.symlinkSync(projectFile("user-data.txt"), projectFile(link));
+    const skipped = cache + obsolete[2];
+    const config = readProjectFile(".trellis/config.yaml");
+    writeProjectFile(
+      ".trellis/config.yaml",
+      config + `\nupdate:\n  skip:\n    - ${skipped}\n`,
+    );
+
+    await update({ dryRun: true });
+    for (const file of obsolete) {
+      expect(fs.existsSync(projectFile(cache + file))).toBe(true);
+    }
+    await update({ skipAll: true });
+    for (const file of obsolete.slice(0, 2)) {
+      expect(fs.existsSync(projectFile(cache + file))).toBe(false);
+    }
+    for (const file of [...preserved, obsolete[2]]) {
+      expect(readProjectFile(cache + file)).toBe("cached bytecode");
+    }
+    expect(fs.lstatSync(projectFile(link)).isSymbolicLink()).toBe(true);
+    expect(readProjectFile("user-data.txt")).toBe("user data");
+    expect(readProjectFile(".trellis/scripts/common/task_migration.py")).toBe(
+      "user script",
+    );
+  });
+
   it("#1 same version update is a true no-op (zero file changes, no backup)", async () => {
     await setupProject();
 
@@ -459,16 +575,21 @@ describe("update() integration", () => {
     expect(classified.conflict).toHaveLength(0);
     expect(classified.auto).toHaveLength(1);
 
-    await executeMigrations(classified, tmpDir, { force: true, skipAll: false }, currentTemplates);
+    await executeMigrations(
+      classified,
+      tmpDir,
+      { force: true, skipAll: false },
+      currentTemplates,
+    );
 
     // No duplicate/leftover `.pi/skills/` directory should survive.
     expect(fs.existsSync(projectFile(".pi/skills"))).toBe(false);
 
     // `.agents/skills/` must end up with the correct, current, neutral
     // content — not the stale Pi-flavored bytes from the deleted legacy dir.
-    expect(
-      readProjectFile(".agents/skills/trellis-update-spec/SKILL.md"),
-    ).toBe(neutralContent);
+    expect(readProjectFile(".agents/skills/trellis-update-spec/SKILL.md")).toBe(
+      neutralContent,
+    );
   });
 
   it("#2 dry run makes no file changes even when changes exist", async () => {

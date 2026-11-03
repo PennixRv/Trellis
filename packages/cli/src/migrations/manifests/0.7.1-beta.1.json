@@ -1,0 +1,186 @@
+{
+  "version": "0.7.1-beta.1",
+  "description": "Remove retired Channel, subnode and planning workflow assets",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Hash-verified cleanup removes retired generated roles, helpers and skills without migrating existing tasks.",
+  "migrations": [
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/agents/check.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "edb4f57361407249a53bf5998ebf91c40d2b969e826a2c5e1b4e813a08bcb175"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/agents/implement.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "66e25ad046c94869442834bc3cdfbd5a9a7412d3ff54561d64d2886552c27e87"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/agents/subnode.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "e3cbcbb9cafcd931d0725c91e97955469f23ba64db92eee10c66d465ce2896d5"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/agents/subnode-profiles.json",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "b862bd997cb8874ae0e167ca47abcd315840e6a6102373c3e516e969f14ee8a2"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/scripts/subnode_artifact.py",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "35a9f0476f2e719cb82716fabcb38c0bc4004e76e8d7b63bd3ebffdb62d3aac2"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/scripts/workspace_note.py",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "2159a1445ff80e63e2e81d1589445d18710ae81bd54d1e6fd1a9b9b1ee629081"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/scripts/common/context_projection.py",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "a1699dad6a35c5d8b53110be40d2d5da60b1b561290f83141348f9845497301f"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/scripts/common/continuation_record.py",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "17e7d7198052a3214adf0240efdeb474538e1c670f79d03ee292af6c7b5f02b5"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/scripts/common/ownership_record.py",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "023f30f568e2a0acccb84f2626d4f996b1f08e1ffd651a7caebf139e18a75254"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/scripts/common/task_migration.py",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "386af968f10ff76dc223637d36b179354924a4e0ffcf6f077eaee67ed086f7c6"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".trellis/scripts/common/task_planning.py",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "7893ba09bbdcdec99d3cb987463d9e14d4d962ba460f03e2c717d9f4fc26dd89"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-channel/SKILL.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "a6f602aa5c0e57ec0638bc9c99bfcf7c9a3608b0b3364ac4782dfe91e4351f64"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-channel/references/command-reference.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "35c3e0c7e11660ac0e25ae8debb727d5439a35f71b79eef4a3982ad5c9836229"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-channel/references/forum.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "9ab0491262aeb1db34d42aa065115689a41b7becea093de2c4ec12a8d8a3deda"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-channel/references/multi-target-dispatch.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "7f74841c6dedc58ccfd7de946c9ffc789ca11ef7b95c8cd516e1f78c26c15140"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-channel/references/progress-debugging.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "78f9771b281056fc9ed17ca889404caab66afb4b89d624bb6346f5e82a06b52a"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-channel/references/subnode-work.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "ba900fcb3d7054bcdb65bbeefa1731e9c73c8f6d95d7d6c2832b0d94e8c5f95f"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-channel/references/workers.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "4785c3ec1a19c078b05ea6f47610e020b3dc6e0b4aeac3cf4ae81c41ab1d5e26"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-channel/references/workflows.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "cf083518eb81331f64908388694d6b887b640a59c1bf064d369f9efef81c92b9"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-idea-to-closed-plan/SKILL.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "9ab419254b3815ada79ae961aee3e73cbbacc9d3eeb085042ff97d94a6654cd2"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/local-architecture/multi-agent-channel.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "af7d5fc2ee374f66f71da90a5770ced217c3a8459537ec4e08d57cd64f91cb72"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-research-record/SKILL.md",
+      "description": "Retired generated asset; current native workflow no longer provides this file",
+      "allowed_hashes": [
+        "f433da1e9fe6f5003a2c4330a72b2998433b91e4b73d4d2c22622a620ad0966a"
+      ]
+    }
+  ],
+  "notes": "Run trellis update without --migrate. Modified files remain protected; old task records and handoff history are not migrated."
+}

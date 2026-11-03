@@ -14,7 +14,8 @@
  * self-correct on the next routine command.
  *
  * Rules:
- *   - `.trellis/*` entries are ALWAYS kept. `trellis uninstall` removes
+ *   - `.trellis/*` entries are kept unless an explicitly retired file is missing.
+ *     `trellis uninstall` removes
  *     `.trellis/` wholesale via `fs.rmSync(..., { recursive: true })`, so
  *     manifest accuracy there doesn't affect uninstall data-loss. `update`
  *     also relies on these entries to detect user-modified workflow files.
@@ -128,16 +129,23 @@ export function pruneOrphanManifestKeys(
 ): PruneResult {
   const persist = options.persist ?? true;
   const known = buildKnownKeys(configuredPlatforms);
+  const retired = new Set(
+    getAllMigrations()
+      .filter((migration) => migration.type === "safe-file-delete")
+      .map((migration) => toPosix(migration.from)),
+  );
   const pruned: string[] = [];
   const kept: TemplateHashes = {};
 
   for (const [rawKey, value] of Object.entries(hashes)) {
     const key = toPosix(rawKey);
-    // Always preserve .trellis/ entries — they're for the workflow tree
-    // which uninstall removes wholesale and which update needs for
-    // modified-file detection.
+    // Missing retired files no longer need a modified-file baseline.
     if (key.startsWith(".trellis/") || key === ".trellis") {
-      kept[key] = value;
+      if (retired.has(key) && !fs.existsSync(path.join(cwd, key))) {
+        pruned.push(key);
+      } else {
+        kept[key] = value;
+      }
       continue;
     }
     if (key === FILE_NAMES.AGENTS) {

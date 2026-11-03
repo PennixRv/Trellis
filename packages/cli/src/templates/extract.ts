@@ -124,6 +124,12 @@ async function copyDirRecursive(
   ensureDir(dest);
 
   for (const entry of fs.readdirSync(src)) {
+    if (
+      entry === "__pycache__" ||
+      [".pyc", ".pyo"].includes(path.extname(entry))
+    ) {
+      continue;
+    }
     const srcPath = path.join(src, entry);
     const destPath = path.join(dest, entry);
     const stat = fs.statSync(srcPath);

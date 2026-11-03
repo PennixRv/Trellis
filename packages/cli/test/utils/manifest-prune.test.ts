@@ -36,7 +36,11 @@ describe("pruneOrphanManifestKeys", () => {
     };
     saveHashes(tmpDir, hashes);
 
-    const { pruned, hashes: kept } = pruneOrphanManifestKeys(tmpDir, [], hashes);
+    const { pruned, hashes: kept } = pruneOrphanManifestKeys(
+      tmpDir,
+      [],
+      hashes,
+    );
 
     expect(pruned).toEqual([]);
     expect(kept).toEqual(hashes);
@@ -60,6 +64,32 @@ describe("pruneOrphanManifestKeys", () => {
         ".opencode/runtime-cache.db",
       ].sort(),
     );
+  });
+
+  it("prunes only missing retired workflow hashes and keeps existing baselines", () => {
+    const retired = ".trellis/agents/subnode.env";
+    const existing = ".trellis/agents/subnode.md";
+    fs.mkdirSync(path.join(tmpDir, ".trellis/agents"));
+    fs.writeFileSync(path.join(tmpDir, existing), "local role");
+    const hashes = {
+      [retired]: "old-env",
+      [existing]: "old-role",
+      ".trellis/workflow.md": "workflow",
+    };
+    saveHashes(tmpDir, hashes);
+
+    const { pruned, hashes: kept } = pruneOrphanManifestKeys(
+      tmpDir,
+      [],
+      hashes,
+    );
+
+    expect(pruned).toEqual([retired]);
+    expect(kept).toEqual({
+      [existing]: "old-role",
+      ".trellis/workflow.md": "workflow",
+    });
+    expect(loadHashes(tmpDir)).toEqual(kept);
   });
 
   it("keeps entries that any configured platform's collectTemplates owns", () => {
