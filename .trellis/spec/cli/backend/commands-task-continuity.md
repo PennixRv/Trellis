@@ -65,6 +65,16 @@ Ownership errors are `TASK_TRANSFER_ABSENT`, `TASK_TRANSFER_ACTIVE`, `TASK_TRANS
 
 ## Integration boundary
 
+Implementation authorization stores `contract_ref`, the SHA-256
+`contract_revision` produced by the phase artifact digest algorithm,
+`approval_ref`, and `task_route_revision`. Starting implementation, accepting
+phase results, and closing the task recheck the authorized contract and all
+accepted artifacts. A changed contract requires review and fresh authorization,
+including routes that omit the design phase. `task start` keeps its pointer
+selection behavior but warns and withholds implementation state changes when
+the contract is stale. Delivery acceptance does not terminate a task: return or
+route can invalidate the affected results before explicit completion.
+
 `pennix-session-handoff` may call these commands as an optional adapter. Its package readiness, source lifecycle receipt, target admission, and retention archive remain separate from Trellis phase and task status. The adapter must not write task pointers or Trellis runtime records itself.
 
 ## 恢复路径的校验与验收

@@ -115,7 +115,7 @@ function resolveSpawn(sessionId: string, opts: SpawnOptions): ResolvedSpawn {
 
 /**
  * Compose the teammate's system prompt: Trellis Teamwork protocol prefix
- * (placeholder) + agent body (if any).
+ * + agent body (if any).
  *
  * NOTE: protocol prefix lives in the system prompt — NOT in any user
  * message. The teammate stays inbox-idle after spawn; the first message
@@ -128,10 +128,13 @@ function buildSystemPrompt(
   context: string,
 ): string {
   const protocol = [
-    "[TRELLIS TEAMWORK PROTOCOL — placeholder]",
+    "[TRELLIS TEAMWORK PROTOCOL]",
     `You are teammate "${safeIdentifier(workerName)}" participating in the Teamwork Session "${safeIdentifier(sessionId)}".`,
     "Other teammates (humans and AIs) may also participate in this Teamwork Session.",
     "Messages addressed to you arrive as ordinary user turns.",
+    "Your role is bounded research, review, verification, evidence, and advice. Do not implement product code or change product source, tests, protected configuration, task state, or Git state.",
+    "Return findings, evidence, limitations, and blockers to the coordinator in the assigned result format. Write only explicitly assigned result artifacts; the coordinator owns acceptance.",
+    "Do not create teammates, delegate through provider-native tools, create tasks, or retry yourself.",
     "End each substantive reply clearly so the Teamwork Session can route a `done` event.",
     "",
     "Sections that follow (`AGENT ROLE`, `CONTEXT FILES`) are reference",

@@ -64,6 +64,22 @@ describe("task phase identifiers", () => {
     };
 
     expect(parseTaskWorkflowState(state)).toEqual(state);
+    const admission = {
+      task_route_revision: "1",
+      dependencies: ["provider-transport"],
+      admission_state: "ready",
+      evidence_refs: ["runtime-receipt.json"],
+    };
+    expect(parseTaskWorkflowState({ ...state, route_dependency_admission: admission }))
+      .toMatchObject({ route_dependency_admission: admission });
+    for (const invalid of [
+      { ...admission, admission_state: "available" },
+      { ...admission, dependencies: ["provider-transport", "provider-transport"] },
+      { ...admission, evidence_refs: [" "] },
+    ]) {
+      expect(() => parseTaskWorkflowState({ ...state, route_dependency_admission: invalid }))
+        .toThrow(/route_dependency_admission is invalid/);
+    }
     const analysisRouteWithImplementation = {
       ...state,
       task_kind: "analysis",
@@ -98,6 +114,7 @@ describe("task phase identifiers", () => {
     ).toThrow(/end with Delivery Review and On-Site Closeout Phase/);
     const authorization = {
       contract_ref: "design.md",
+      contract_revision: artifactRevision,
       approval_ref: "user-message:implementation-approved",
       task_route_revision: "1",
     };
@@ -108,6 +125,12 @@ describe("task phase identifiers", () => {
       parseTaskWorkflowState({
         ...state,
         implementation_authorization: { ...authorization, contract_ref: " " },
+      }),
+    ).toThrow(/implementation_authorization is invalid/);
+    expect(() =>
+      parseTaskWorkflowState({
+        ...state,
+        implementation_authorization: { ...authorization, contract_revision: undefined },
       }),
     ).toThrow(/implementation_authorization is invalid/);
     expect(() =>

@@ -18,8 +18,6 @@ import { buildTeammateLaunchSpec } from "../../src/commands/teamwork/teammate-la
 const host = {
   foregroundWait: true,
   protectedArtifactWrites: true,
-  protectedTargetsReadOnly: true,
-  gitStateReadOnly: true,
   attemptArtifactWrites: true,
   nativeDelegationDisabled: true,
   implicitMemoryDisabled: true,
@@ -80,8 +78,6 @@ describe("teammate adapter contract", () => {
       assertTeammateHostCapability("codex", {
         foregroundWait: false,
         protectedArtifactWrites: true,
-        protectedTargetsReadOnly: true,
-        gitStateReadOnly: true,
         attemptArtifactWrites: true,
         nativeDelegationDisabled: true,
         implicitMemoryDisabled: true,
@@ -95,8 +91,6 @@ describe("teammate adapter contract", () => {
       assertTeammateHostCapability("dsh", {
         foregroundWait: true,
         protectedArtifactWrites: true,
-        protectedTargetsReadOnly: true,
-        gitStateReadOnly: true,
         attemptArtifactWrites: true,
         nativeDelegationDisabled: true,
         implicitMemoryDisabled: true,
@@ -122,6 +116,27 @@ describe("teammate adapter contract", () => {
     ).toThrow(/capability proof/);
   });
 
+  it("uses role policy for source and Git writes without claiming host isolation", () => {
+    const cwd = project();
+    try {
+      const roleOnlyHost = {
+        ...host,
+        protectedTargetsReadOnly: false,
+        gitStateReadOnly: false,
+      };
+      const profile = resolveTeammateProfile({ cwd, provider: "codex" });
+      const launch = buildTeammateLaunchSpec({ cwd, profile, host: roleOnlyHost });
+      expect(launch.capability.writePolicy).toMatchObject({
+        protectedTargets: "read-only",
+        gitState: "read-only",
+      });
+      expect(launch.capability.hostProof).not.toHaveProperty("protectedTargetsReadOnly");
+      expect(launch.capability.hostProof).not.toHaveProperty("gitStateReadOnly");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("freezes injected role, context, profile and host capability digests", () => {
     const cwd = project();
     const profile = resolveTeammateProfile({
@@ -145,7 +160,6 @@ describe("teammate adapter contract", () => {
       protectedTargets: [".trellis/config.yaml", "src"],
       hostProof: {
         verifiedHostCap: 2,
-        gitStateReadOnly: true,
         implicitMemoryDisabled: true,
       },
     });

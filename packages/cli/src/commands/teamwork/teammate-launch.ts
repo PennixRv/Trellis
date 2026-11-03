@@ -11,6 +11,7 @@ import {
 } from "./teammate-adapters.js";
 import type { ResolvedTeammateProfile } from "./profiles.js";
 
+/** Role obligations frozen with the launch, not filesystem or Git isolation. */
 export interface TeammateWritePolicy {
   protectedTargets: "read-only";
   gitState: "read-only";
@@ -32,8 +33,6 @@ export interface TeammateCapabilitySnapshot {
   hostProof: {
     foregroundWait: true;
     protectedArtifactWrites: true;
-    protectedTargetsReadOnly: true;
-    gitStateReadOnly: true;
     attemptArtifactWrites: true;
     nativeDelegationDisabled: true;
     implicitMemoryDisabled: true;
@@ -194,8 +193,6 @@ export function buildTeammateLaunchSpec(input: {
     hostProof: {
       foregroundWait: true as const,
       protectedArtifactWrites: true as const,
-      protectedTargetsReadOnly: true as const,
-      gitStateReadOnly: true as const,
       attemptArtifactWrites: true as const,
       nativeDelegationDisabled: true as const,
       implicitMemoryDisabled: true as const,

@@ -285,8 +285,6 @@ function createRelatedPlan(
 const host = {
   foregroundWait: true,
   protectedArtifactWrites: true,
-  protectedTargetsReadOnly: true,
-  gitStateReadOnly: true,
   attemptArtifactWrites: true,
   nativeDelegationDisabled: true,
   implicitMemoryDisabled: true,

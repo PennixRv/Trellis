@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.4",
+  "description": "Repair template baselines, phase freshness, and teammate role contracts",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Template tracking excludes runtime state, session handoff bundles, and Python bytecode while preserving managed spec baselines. Phase transitions recheck accepted artifacts and authorized contract content, invalidate affected skip decisions, and allow unfinished delivery reviews to reopen. Teammate source/Git boundaries use role policy, and report examples include frozen revisions. The public batch entry remains unavailable. Includes beta.2 and beta.3 asset fixes; existing task records are unchanged.",
+  "migrations": [],
+  "notes": "Run trellis update to repair the template manifest and refresh current assets. Local workflow/config/spec baselines remain protected. No task migration or unverified batch adapter is enabled."
+}

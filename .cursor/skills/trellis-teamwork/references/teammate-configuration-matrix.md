@@ -18,12 +18,17 @@ profile. Supported provider adapters are Codex app-server, DSH ACP, Copilot
 ACP, and Claude Code CLI when their host contracts are available. A provider
 name alone does not prove that its host is installed or verified.
 
-The host capability proof covers only the boundaries required by the selected
-plan: foreground waiting, protected artifact writes, read-only protected
-targets and Git state, disabled native or recursive delegation, isolated
-context, supported transport, and a positive capacity. The CLI refuses a
-dispatch when the selected host cannot prove those properties. It does not
-invent an execution profile or silently change the frozen values.
+The coordinator's host capability proof covers foreground waiting, protected
+artifact writes, attempt artifact output, disabled native delegation, isolated
+context, supported transport, and a positive capacity. Source and Git write
+boundaries are role obligations recorded in `writePolicy`; they do not require
+filesystem or Git permission isolation. Available tools do not authorize a
+teammate to implement product code. The coordinator rejects an incomplete
+runtime proof without silently changing the frozen execution values.
+
+The public `trellis teamwork batch` entry currently refuses dispatch before
+coordination state is written. It does not discover or connect a host adapter;
+interactive `spawn` and `run` do not establish a verified batch adapter.
 
 The bundled role card is `.trellis/agents/teammate.md`. It is provider-neutral
 and limits a teammate to the frozen context and current attempt artifacts. A

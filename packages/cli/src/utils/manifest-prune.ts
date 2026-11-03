@@ -14,7 +14,9 @@
  * self-correct on the next routine command.
  *
  * Rules:
- *   - `.trellis/*` entries are kept unless an explicitly retired file is missing.
+ *   - `.trellis/*` entries are kept unless excluded from template tracking
+ *     (user data, runtime state, caches) or an explicitly retired file is missing.
+ *     Existing registry-managed spec baselines are retained.
  *     `trellis uninstall` removes
  *     `.trellis/` wholesale via `fs.rmSync(..., { recursive: true })`, so
  *     manifest accuracy there doesn't affect uninstall data-loss. `update`
@@ -38,7 +40,7 @@ import path from "node:path";
 import { collectPlatformTemplates } from "../configurators/index.js";
 import { FILE_NAMES } from "../constants/paths.js";
 import { getAllMigrations } from "../migrations/index.js";
-import { saveHashes } from "./template-hash.js";
+import { isRuntimeHashPath, saveHashes, shouldExcludeFromHash } from "./template-hash.js";
 import { toPosix } from "./posix.js";
 import { TRELLIS_BLOCK_END, TRELLIS_BLOCK_START } from "./managed-paths.js";
 import type { AITool } from "../types/ai-tools.js";
@@ -141,7 +143,11 @@ export function pruneOrphanManifestKeys(
     const key = toPosix(rawKey);
     // Missing retired files no longer need a modified-file baseline.
     if (key.startsWith(".trellis/") || key === ".trellis") {
-      if (retired.has(key) && !fs.existsSync(path.join(cwd, key))) {
+      if (
+        isRuntimeHashPath(key) ||
+        (shouldExcludeFromHash(key) && !key.startsWith(".trellis/spec/")) ||
+        (retired.has(key) && !fs.existsSync(path.join(cwd, key)))
+      ) {
         pruned.push(key);
       } else {
         kept[key] = value;

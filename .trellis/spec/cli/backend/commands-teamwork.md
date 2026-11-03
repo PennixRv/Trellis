@@ -36,6 +36,13 @@ The hidden `__supervisor` command is an internal child-process entry point. `__p
 
 Provider names, launch capabilities, and option validation come from `adapters/`, `teammate-adapters.ts`, `teammate-config.ts`, and `teammate-launch.ts`; do not duplicate their registries here. `run` and `spawn` use the interactive process runtime. The managed batch path has a separate host-capability contract and must remain closed until a verified host adapter is integrated.
 
+Product-source and Git write boundaries are teammate role obligations, frozen
+in the launch `writePolicy`. They do not require host permission isolation, and
+the capability snapshot must not claim technical read-only enforcement. Every
+interactive teammate receives these role and result requirements even when
+`--agent` is omitted. Host proof still covers actual runtime capabilities such
+as waiting, artifact output, context isolation, transport, and capacity.
+
 ## Core and CLI boundary
 
 `@mindfoldhq/trellis-core/teamwork` owns:

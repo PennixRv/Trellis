@@ -19,6 +19,41 @@ import {
 
 const sourceDigest = "a".repeat(64);
 
+it("accepts a report authored from the bundled teammate role example", () => {
+  const role = fs.readFileSync(path.resolve(__dirname, "../../src/templates/trellis/agents/teammate.md"), "utf8");
+  const example = /```json\s*([\s\S]*?)```/.exec(role)?.[1];
+  if (!example) throw new Error("bundled teammate role must include a JSON report example");
+  const report = JSON.parse(example);
+  const assigned = {
+    task_id: "task-1",
+    batch_id: "batch-1",
+    assignment_id: "work-1",
+    attempt_id: "attempt-1",
+    teammate_id: "teammate-1",
+    plan_hash: "b".repeat(64),
+    phase_id: "decision_space_construction_and_merging",
+    task_route_revision: "2",
+    input_revision: "3",
+    source_digest: sourceDigest,
+  };
+  for (const [key, value] of Object.entries(assigned)) {
+    if (key in report) report[key] = value;
+  }
+  report.evidence = [{ id: "finding-1", locator: "src/contract.ts", summary: "The assigned contract is consistent." }];
+  const identity = {
+    taskId: assigned.task_id,
+    batchId: assigned.batch_id,
+    assignmentId: assigned.assignment_id,
+    attemptId: assigned.attempt_id,
+    teammateId: assigned.teammate_id,
+    planHash: assigned.plan_hash,
+    phaseId: assigned.phase_id,
+    taskRouteRevision: assigned.task_route_revision,
+    inputRevision: assigned.input_revision,
+  };
+  expect(validateTeammateReport(report, identity, sourceDigest).status).toBe("complete");
+});
+
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-artifact-test-"));
   const deadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();

@@ -276,8 +276,17 @@ const EXCLUDE_FROM_HASH = [
 /**
  * Check if a path should be excluded from hash tracking
  */
+export function isRuntimeHashPath(relativePath: string): boolean {
+  const normalizedPath = toPosix(relativePath);
+  return (
+    /(^|\/)(?:\.runtime|__pycache__|session-handoffs)(\/|$)/.test(normalizedPath) ||
+    normalizedPath.endsWith(".pyc")
+  );
+}
+
 export function shouldExcludeFromHash(relativePath: string): boolean {
   const normalizedPath = toPosix(relativePath);
+  if (isRuntimeHashPath(normalizedPath)) return true;
   for (const pattern of EXCLUDE_FROM_HASH) {
     if (normalizedPath.includes(pattern)) {
       return true;

@@ -145,6 +145,7 @@ def implementation_start_ready(data: dict, task_dir: Path) -> bool:
     ):
         return False
     _require_current_requirements_confirmation(task_dir, state)
+    _require_current_accepted_artifacts(task_dir, state)
     if PHASE_IDS[2] not in phase_ids:
         skip_records = state.get("skip_records")
         skipped_design = skip_records.get(PHASE_IDS[2]) if isinstance(skip_records, dict) else None
@@ -280,6 +281,7 @@ def _invalidate_from(state: dict, first_phase: str, keep_first: bool = False) ->
     for phase_id in state["phase_ids"]:
         if PHASE_IDS.index(phase_id) < first_index:
             continue
+        state["skip_records"].pop(phase_id, None)
         record = state["phases"][phase_id]
         if keep_first and phase_id == first_phase:
             record["status"] = "active"
@@ -325,6 +327,24 @@ def _artifact_digest(task_dir: Path, refs: list[str]) -> str:
         digest.update(content)
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def _require_current_accepted_artifacts(task_dir: Path, state: dict) -> None:
+    for phase_id in state["phase_ids"]:
+        record = state["phases"][phase_id]
+        if record.get("status") != "accepted":
+            continue
+        refs = record.get("artifact_refs")
+        if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
+            raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", f"accepted artifact references are invalid: {phase_id}")
+        if _artifact_digest(task_dir, refs) != record.get("artifact_revision"):
+            raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", f"accepted artifacts changed for {phase_id}; return to the affected phase and review the current candidate again")
+    authorization = state.get("implementation_authorization")
+    if authorization is not None:
+        if not isinstance(authorization, dict) or not isinstance(authorization.get("contract_ref"), str):
+            raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "implementation authorization has no contract reference")
+        if _artifact_digest(task_dir, [authorization["contract_ref"]]) != authorization.get("contract_revision"):
+            raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "implementation contract changed after authorization; review and authorize its current content before continuing")
 
 
 def _validate_route(value: str | None) -> list[str]:
@@ -427,14 +447,20 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         raise TaskWorkflowError("TASK_PHASE_TASK_TERMINAL", f"task is already {data['status']}")
 
     _expected_route(state, args.expected_route_revision)
-    if action == "route" and state.get("current_phase_id") is None:
-        raise TaskWorkflowError("TASK_PHASE_INCOMPLETE", "completed phases cannot be rerouted")
-    current, record = _phase(state)
+    reviewed_delivery = (
+        state.get("current_phase_id") is None
+        and action in {"return", "route"}
+        and state["phases"].get(PHASE_IDS[4], {}).get("status") == "accepted"
+    )
+    if reviewed_delivery:
+        current, record = PHASE_IDS[4], state["phases"][PHASE_IDS[4]]
+    else:
+        current, record = _phase(state)
     returning_to_requirements = action == "return" and args.target_phase == PHASE_IDS[0]
     rerouting_to_requirements = action == "route" and args.target_phase == PHASE_IDS[0]
     if current != PHASE_IDS[0] and not returning_to_requirements and not rerouting_to_requirements:
         _require_current_requirements_confirmation(task_dir, state)
-    if action not in {"show", "resume", "route", "authorize", "admission"} and record.get("status") != "active":
+    if action not in {"show", "resume", "route", "authorize", "admission"} and record.get("status") != "active" and not reviewed_delivery:
         raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "only the active phase can be changed")
 
     if action == "artifact":
@@ -481,6 +507,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         state["skip_records"][current] = {"reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
         _advance(state, current)
     elif action == "accept":
+        _require_current_accepted_artifacts(task_dir, state)
         artifact_revision = _required_text(args.artifact_revision, "--artifact-revision")
         current_revision = _artifact_digest(task_dir, record["artifact_refs"])
         if artifact_revision != record["artifact_revision"] or current_revision != record["artifact_revision"]:
@@ -532,7 +559,10 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
             _advance(state, current)
     elif action == "return":
         target = _required_text(args.target_phase, "--target-phase")
-        if target not in state["phase_ids"] or state["phase_ids"].index(target) >= state["phase_ids"].index(current):
+        if target not in state["phase_ids"] or (
+            state["phase_ids"].index(target) >= state["phase_ids"].index(current)
+            and not (reviewed_delivery and target == current)
+        ):
             raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "return target must be an earlier phase in the current route")
         reason = _required_text(args.reason, "--reason")
         evidence = _refs(args.evidence_ref, "--evidence-ref", required=True)
@@ -564,7 +594,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
             and phases == [PHASE_IDS[0], PHASE_IDS[4]]
             and bool(evidence)
         )
-        if not changed and not classification_changed and target == current:
+        if not changed and not classification_changed and target == current and not reviewed_delivery:
             raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "the updated route and target are unchanged")
         earliest_change = min((PHASE_IDS.index(phase) for phase in changed), default=PHASE_IDS.index(target))
         if target not in PHASE_ID_SET or (PHASE_IDS.index(target) > earliest_change and not withdrawal_route):
@@ -604,7 +634,11 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         for phase_id, phase_record in state["phases"].items():
             if phase_id not in old_phases:
                 phase_record["input_revision"] = state["input_revision"]
-        state["skip_records"] = {}
+        state["skip_records"] = {
+            phase_id: {**skip, "task_route_revision": state["task_route_revision"]}
+            for phase_id, skip in state["skip_records"].items()
+            if phase_id in phases and state["phases"][phase_id].get("status") == "skipped"
+        }
         for phase_id in omitted:
             state["skip_records"][phase_id] = {"reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
         if withdrawal_route and state["phases"][PHASE_IDS[0]].get("status") != "accepted":
@@ -647,7 +681,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
                 raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "Solution Design and Convergence Phase implementation contract changed after acceptance; refresh and accept the current artifact before authorization")
         elif contract_ref not in state.get("skip_records", {}).get(PHASE_IDS[2], {}).get("evidence_refs", []):
             raise TaskWorkflowError("TASK_PHASE_CONTRACT_NOT_ACCEPTED", "when Solution Design and Convergence Phase is omitted, the implementation contract must be among its route evidence")
-        state["implementation_authorization"] = {"contract_ref": contract_ref, "approval_ref": approval_ref, "task_route_revision": state["task_route_revision"]}
+        state["implementation_authorization"] = {"contract_ref": contract_ref, "contract_revision": _artifact_digest(task_dir, [contract_ref]), "approval_ref": approval_ref, "task_route_revision": state["task_route_revision"]}
         if current == PHASE_IDS[2]:
             _advance(state, current)
     else:
@@ -939,6 +973,7 @@ def cmd_cancel_task(args: argparse.Namespace) -> int:
             readiness_error = task_closeout_readiness(data, "cancelled")
             if readiness_error:
                 raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", readiness_error)
+            _require_current_accepted_artifacts(task_dir, _state(meta))
             _validate_child_dispositions(task_dir, data, "cancelled", None, from_acceptance=True)
             _assert_delegated_resources_closed(task_dir, data)
             meta["task_cancellation"] = {
@@ -1068,9 +1103,7 @@ def cmd_complete_task(args: argparse.Namespace) -> int:
             disposition = state.get("closeout_disposition")
             if disposition not in {"delivery_ready", "no_go"}:
                 raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", "Delivery Review and On-Site Closeout Phase must accept delivery_ready or no_go before complete")
-            closeout = state["phases"][PHASE_IDS[4]]
-            if _artifact_digest(task_dir, closeout.get("artifact_refs", [])) != closeout.get("artifact_revision"):
-                raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "Delivery Review and On-Site Closeout Phase artifacts changed after acceptance; review the current delivery candidate again")
+            _require_current_accepted_artifacts(task_dir, state)
             readiness_error = task_closeout_readiness(data, disposition)
             if readiness_error:
                 raise TaskWorkflowError("TASK_PHASE_CLOSEOUT_REQUIRED", readiness_error)

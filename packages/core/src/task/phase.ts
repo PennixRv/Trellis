@@ -71,8 +71,15 @@ export interface TaskWorkflowState {
   current_phase_id: TaskPhaseId | null;
   input_revision: string;
   phases: Partial<Record<TaskPhaseId, TaskPhaseRecord>>;
+  route_dependency_admission?: {
+    task_route_revision: string;
+    dependencies: string[];
+    admission_state: "ready" | "missing" | "stale" | "incompatible" | "blocked";
+    evidence_refs: string[];
+  } | null;
   implementation_authorization: {
     contract_ref: string;
+    contract_revision: string;
     approval_ref: string;
     task_route_revision: string;
   } | null;
@@ -186,12 +193,31 @@ export function parseTaskWorkflowState(value: unknown): TaskWorkflowState {
       throw new Error(`task_workflow.skip_records.${phaseId} is invalid`);
     }
   }
+  if (state.route_dependency_admission != null) {
+    const admission = state.route_dependency_admission;
+    if (
+      !isRecord(admission) ||
+      !isRevision(admission.task_route_revision) ||
+      !isStringArray(admission.dependencies) ||
+      admission.dependencies.length === 0 ||
+      admission.dependencies.some((ref) => !ref.trim()) ||
+      new Set(admission.dependencies).size !== admission.dependencies.length ||
+      !["ready", "missing", "stale", "incompatible", "blocked"].includes(String(admission.admission_state)) ||
+      !isStringArray(admission.evidence_refs) ||
+      admission.evidence_refs.some((ref) => !ref.trim()) ||
+      new Set(admission.evidence_refs).size !== admission.evidence_refs.length
+    ) {
+      throw new Error("task_workflow.route_dependency_admission is invalid");
+    }
+  }
   if (state.implementation_authorization !== null) {
     const authorization = state.implementation_authorization;
     if (
       !isRecord(authorization) ||
       typeof authorization.contract_ref !== "string" ||
       !authorization.contract_ref.trim() ||
+      typeof authorization.contract_revision !== "string" ||
+      !/^[a-f0-9]{64}$/i.test(authorization.contract_revision) ||
       typeof authorization.approval_ref !== "string" ||
       !authorization.approval_ref.trim() ||
       authorization.task_route_revision !== state.task_route_revision

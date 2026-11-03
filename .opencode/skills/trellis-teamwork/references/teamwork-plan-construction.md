@@ -39,15 +39,19 @@ specs, and the generic teammate role card. Freeze the input revision and route
 revision after the coordinator has selected the scope. If those values change,
 construct a new plan rather than mixing results from different task inputs.
 
-The public dispatch entry point is:
+The reserved managed-batch entry point is:
 
 ```bash
 trellis teamwork batch <plan-path>
 ```
 
-The command validates the plan, then the coordinator owns dispatch, waiting,
-report acceptance, and the terminal receipt. The coordinating agent does not
-manually refill slots or create a second retry loop.
+The current CLI unconditionally refuses this command before writing
+coordination state: a verified runtime adapter has not been connected to the
+coordinator. It does not discover an adapter or start the batch. The shared
+coordinator and its plan/report contracts exist and are tested separately.
+Do not present `run` or `spawn` as a substitute for managed batch execution.
+When connected, the coordinator owns dispatch, waiting, report acceptance,
+and the terminal receipt; the coordinating agent must not add a second retry loop.
 
 ## Teamwork Session and forum commands
 

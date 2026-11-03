@@ -37,8 +37,11 @@ trellis teamwork context list <session> --scope global --thread <thread>
 
 | User intent | Read |
 |---|---|
+| `general`: bounded research, review, or verification assignments | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
+| Advisor: one bounded consultation | `references/coordination-modes.md` |
+| `committee`: parallel assessment by two or three distinct lenses | `references/coordination-modes.md` |
 | “和 codex/claude 讨论一下”, “brainstorm with another agent” | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
-| “派一个 implement/check agent”, “让 agent review”, “spawn a worker” | `references/teamwork-plan-construction.md`, then `references/teammate-processes.md` |
+| “派 teammate 做研究或验证”, “让 agent review”, “spawn a worker” | `references/teamwork-plan-construction.md`, then `references/teammate-processes.md` |
 | “开 issue 区 / topic 群 / changelog / board”, “make a forum” | `references/teamwork-plan-construction.md` |
 | “看看这个 thread”, “inspect a thread” | `references/teamwork-plan-construction.md` |
 | “Teamwork 卡住了 / 没输出 / progress 被截断”, “teammate stalled” | `references/teammate-processes.md` |
@@ -46,6 +49,8 @@ trellis teamwork context list <session> --scope global --thread <thread>
 
 ## Core Rules
 
+- Teammates provide research, review, verification, evidence, and advice under a role contract; they do not implement product code. Coding tools or provider permission modes do not grant that role authority. Return results in the assigned format and let the coordinator review them.
+- `general`, `advisor`, and `committee` are coordination modes, independent from `run`, batch execution, and forum sessions. The current `batch` CLI is reserved and refuses dispatch; see the plan reference for the current boundary.
 - New forum Teamwork Sessions use `--type forum`. A `thread` is one item inside a forum Teamwork Session.
 - Use `--context-file` / `--context-raw` and `trellis teamwork context add/delete/list`.
 - Use `--stdin` or `--text-file` for long messages. Do not put long mixed Chinese/English text in the positional shell argument.

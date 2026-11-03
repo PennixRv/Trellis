@@ -28,11 +28,12 @@ describe("pruneOrphanManifestKeys", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("preserves every .trellis/* entry regardless of platform-collect output", () => {
+  it("preserves .trellis template baselines regardless of platform-collect output", () => {
     const hashes = {
       ".trellis/workflow.md": "h1",
       ".trellis/scripts/task.py": "h2",
       ".trellis/config.yaml": "h3",
+      ".trellis/spec/backend/index.md": "registry-baseline",
     };
     saveHashes(tmpDir, hashes);
 
@@ -44,6 +45,38 @@ describe("pruneOrphanManifestKeys", () => {
 
     expect(pruned).toEqual([]);
     expect(kept).toEqual(hashes);
+  });
+
+  it("untracks excluded user data and caches without removing their files", () => {
+    const excluded = [
+      ".trellis/.runtime/sessions/current.json",
+      ".trellis/session-handoffs/example/session-handoff.json",
+      ".trellis/scripts/__pycache__/task.cpython-312.pyc",
+      ".trellis/scripts/task.pyc",
+      ".trellis/tasks/old/task.json",
+      ".trellis/spec/__pycache__/helper.pyc",
+    ];
+    const hashes = { ".trellis/config.yaml": "original-template" };
+    for (const key of excluded) {
+      const file = path.join(tmpDir, key);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, "user data");
+    }
+    const poisoned = {
+      ...hashes,
+      ...Object.fromEntries(excluded.map((key) => [key, "runtime-hash"])),
+    };
+    saveHashes(tmpDir, poisoned);
+
+    const preview = pruneOrphanManifestKeys(tmpDir, [], poisoned, { persist: false });
+    expect(preview.pruned).toEqual(excluded);
+    expect(loadHashes(tmpDir)).toEqual(poisoned);
+    const result = pruneOrphanManifestKeys(tmpDir, [], poisoned);
+    expect(result.hashes).toEqual(hashes);
+    expect(loadHashes(tmpDir)).toEqual(hashes);
+    for (const key of excluded) {
+      expect(fs.readFileSync(path.join(tmpDir, key), "utf-8")).toBe("user data");
+    }
   });
 
   it("prunes platform-dir entries no current configurator owns", () => {

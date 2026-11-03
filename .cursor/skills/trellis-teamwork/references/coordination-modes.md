@@ -22,7 +22,9 @@ change the task or phase by itself.
 Use committee coordination when one question benefits from parallel distinct
 lenses. The plan contains two or three assignments in one evaluation group.
 All members share the assignment contract and use distinct lenses. They return
-independent evidence; the coordinator compares the reports after they finish.
+independently authored reports; the coordinator compares them after they finish.
+Members may cite the same authoritative sources. Distinct lenses do not
+guarantee independent evidence or require different providers, models, or profiles.
 
 Committee members do not debate with one another, run a consensus loop, or use
 a directional counter relationship. If a question does not need independent

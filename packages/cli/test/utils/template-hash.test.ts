@@ -540,6 +540,27 @@ describe("initializeHashes", () => {
     expect(count).toBe(0);
   });
 
+  it("does not manage runtime state or Python bytecode on first init", () => {
+    const paths = [
+      ".trellis/.runtime/sessions/current.json",
+      ".trellis/session-handoffs/example/session-handoff.json",
+      ".trellis/scripts/__pycache__/task.cpython-312.pyc",
+      ".trellis/scripts/task.pyc",
+    ];
+    for (const relativePath of paths) {
+      const file = path.join(tmpDir, relativePath);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, "user runtime data");
+    }
+
+    expect(initializeHashes(tmpDir)).toBe(0);
+    expect(loadHashes(tmpDir)).toEqual({});
+    for (const relativePath of paths) {
+      expect(fs.readFileSync(path.join(tmpDir, relativePath), "utf-8"))
+        .toBe("user runtime data");
+    }
+  });
+
   it("collectFiles returns POSIX-normalized paths (no backslashes)", () => {
     // Even on Windows where path.join uses `\`, our collected paths must
     // be POSIX so they can be used as cross-platform hash keys.

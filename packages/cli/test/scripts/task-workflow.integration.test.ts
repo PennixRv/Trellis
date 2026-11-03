@@ -113,6 +113,7 @@ interface TaskWorkflowState {
   >;
   implementation_authorization: {
     contract_ref: string;
+    contract_revision: string;
     approval_ref: string;
     task_route_revision: string;
   } | null;
@@ -1110,6 +1111,122 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     runOk(root, "start", TASK);
 
     expect(JSON.parse(fs.readFileSync(taskPath, "utf-8")).status).toBe("in_progress");
+  });
+
+  it("discards invalidated skip decisions when returning to requirements", () => {
+    prepareImplementationContract(root);
+    authorizeImplementation(root, "design.md");
+    runOk(root, "phase", "return", TASK, "--expected-route-revision", "1",
+      "--target-phase", GOAL_EXPLORATION_AND_REQUIREMENTS,
+      "--reason", "The requirements changed", "--evidence-ref", "user-message:change");
+
+    const state = readState(root);
+    expect(state.skip_records[DECISION_SPACE_CONSTRUCTION_AND_MERGING]).toBeUndefined();
+    expect(parseTaskWorkflowState(state)).toEqual(state);
+  });
+
+  it.each(["start", "accept"])("rejects %s when an authorized contract changes on a route without design", (action) => {
+    const contractPath = path.join(root, ".trellis", "tasks", TASK, "contract.md");
+    fs.writeFileSync(contractPath, "# Authorized scope\n");
+    runOk(root, "phase", "init", TASK, "--task-kind", "implementation",
+      "--complexity", "simple", "--project-context", "existing",
+      "--phase-ids", [GOAL_EXPLORATION_AND_REQUIREMENTS, TASK_IMPLEMENTATION, DELIVERY_REVIEW_AND_CLOSEOUT].join(","),
+      "--route-reason", "The supplied contract resolves design",
+      "--route-evidence-ref", "contract.md");
+    accept(root, GOAL_EXPLORATION_AND_REQUIREMENTS, "accepted", ["--evidence-ref", "user-message:requirements-approved"]);
+    authorizeImplementation(root, "contract.md");
+    expect(parseTaskWorkflowState(readState(root))).toEqual(readState(root));
+    fs.writeFileSync(contractPath, "# Changed scope without new approval\n");
+    const revision = setArtifact(root, TASK_IMPLEMENTATION);
+    const taskPath = path.join(root, ".trellis", "tasks", TASK, "task.json");
+    const before = fs.readFileSync(taskPath, "utf-8");
+    const result = action === "start" ? runTask(root, "start", TASK) :
+      runTask(root, "phase", "accept", TASK, "--expected-route-revision", "1",
+        "--artifact-revision", revision, "--result-ref", "prd.md",
+        "--outcome-kind", "implemented", "--evidence-ref", "prd.md");
+    expect(result.status).toBe(action === "start" ? 0 : 1);
+    expect(result.stderr).toContain("TASK_PHASE_STALE_ARTIFACT");
+    if (action === "start") {
+      expect(result.stderr).toContain("Implementation start withheld");
+    }
+    expect(fs.readFileSync(taskPath, "utf-8")).toBe(before);
+  });
+
+  it("rejects implementation acceptance when its accepted design changes", () => {
+    const designPath = prepareImplementationContract(root);
+    authorizeImplementation(root, "design.md");
+    fs.writeFileSync(designPath, "# Changed implementation scope\n");
+    const revision = setArtifact(root, TASK_IMPLEMENTATION);
+    const taskPath = path.join(root, ".trellis", "tasks", TASK, "task.json");
+    const before = fs.readFileSync(taskPath, "utf-8");
+    const result = runTask(root, "phase", "accept", TASK,
+      "--expected-route-revision", "1", "--artifact-revision", revision,
+      "--result-ref", "prd.md", "--outcome-kind", "implemented", "--evidence-ref", "prd.md");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("TASK_PHASE_STALE_ARTIFACT");
+    expect(fs.readFileSync(taskPath, "utf-8")).toBe(before);
+  });
+
+  it.each([
+    ["return", TASK_IMPLEMENTATION],
+    ["route", TASK_IMPLEMENTATION],
+    ["return", DELIVERY_REVIEW_AND_CLOSEOUT],
+    ["route", DELIVERY_REVIEW_AND_CLOSEOUT],
+  ])("allows %s to %s after delivery acceptance until task completion", (action, target) => {
+    prepareImplementationContract(root);
+    authorizeImplementation(root, "design.md");
+    accept(root, TASK_IMPLEMENTATION, "implemented");
+    accept(root, DELIVERY_REVIEW_AND_CLOSEOUT, "delivery_ready", ["--closeout-disposition", "delivery_ready"]);
+
+    runOk(root, "phase", action, TASK, "--expected-route-revision", "1",
+      "--target-phase", target, "--reason", "Review found a defect",
+      "--evidence-ref", "user-message:defect",
+      ...(action === "route" ? ["--phase-ids", readState(root).phase_ids.join(",")] : []));
+
+    const state = readState(root);
+    expect(state.current_phase_id).toBe(target);
+    expect(state.implementation_authorization).toBeNull();
+    expect(state.phases[DELIVERY_REVIEW_AND_CLOSEOUT].acceptance).toBeNull();
+    expect(parseTaskWorkflowState(state)).toEqual(state);
+    expect(runTask(root, "complete", TASK).status).toBe(1);
+  });
+
+  it("rejects completion when an accepted implementation artifact changes after review", () => {
+    prepareImplementationContract(root);
+    authorizeImplementation(root, "design.md");
+    const implementationPath = path.join(root, ".trellis", "tasks", TASK, "implementation.md");
+    fs.writeFileSync(implementationPath, "# Verified implementation\n");
+    accept(root, TASK_IMPLEMENTATION, "implemented", [], "implementation.md");
+    accept(root, DELIVERY_REVIEW_AND_CLOSEOUT, "delivery_ready", ["--closeout-disposition", "delivery_ready"]);
+    fs.writeFileSync(implementationPath, "# Changed implementation candidate\n");
+    const taskPath = path.join(root, ".trellis", "tasks", TASK, "task.json");
+    const before = fs.readFileSync(taskPath, "utf-8");
+
+    const result = runTask(root, "complete", TASK);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("TASK_PHASE_STALE_ARTIFACT");
+    expect(fs.readFileSync(taskPath, "utf-8")).toBe(before);
+  });
+
+  it("rejects cancellation when the accepted cancellation review changes", () => {
+    prepareImplementationContract(root);
+    runOk(root, "phase", "route", TASK, "--expected-route-revision", "1",
+      "--phase-ids", [GOAL_EXPLORATION_AND_REQUIREMENTS, DELIVERY_REVIEW_AND_CLOSEOUT].join(","),
+      "--target-phase", DELIVERY_REVIEW_AND_CLOSEOUT, "--reason", "User withdrew the task",
+      "--evidence-ref", "user-message:withdrawn");
+    const reviewPath = path.join(root, ".trellis", "tasks", TASK, "review.md");
+    fs.writeFileSync(reviewPath, "# Cancellation review\n");
+    accept(root, DELIVERY_REVIEW_AND_CLOSEOUT, "cancelled", ["--closeout-disposition", "cancelled"], "review.md");
+    fs.writeFileSync(reviewPath, "# Resource disposal is now uncertain\n");
+    const taskPath = path.join(root, ".trellis", "tasks", TASK, "task.json");
+    const before = fs.readFileSync(taskPath, "utf-8");
+
+    const result = runTask(root, "cancel", TASK, "--reason", "User withdrew the task",
+      "--evidence-ref", "user-message:withdrawn");
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("TASK_PHASE_STALE_ARTIFACT");
+    expect(fs.readFileSync(taskPath, "utf-8")).toBe(before);
   });
 
   it("invalidates Goal Exploration and Requirements Confirmation Phase when its bound artifact changes", () => {

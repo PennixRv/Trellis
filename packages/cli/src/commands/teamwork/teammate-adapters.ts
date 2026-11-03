@@ -79,8 +79,6 @@ export function listTeammateProviders(): TeammateProvider[] {
 export interface TeammateHostCapabilities {
   foregroundWait: boolean;
   protectedArtifactWrites: boolean;
-  protectedTargetsReadOnly: boolean;
-  gitStateReadOnly: boolean;
   attemptArtifactWrites: boolean;
   nativeDelegationDisabled: boolean;
   implicitMemoryDisabled: boolean;
@@ -98,8 +96,6 @@ export function assertTeammateHostCapability(
   if (
     host.foregroundWait !== true ||
     host.protectedArtifactWrites !== true ||
-    host.protectedTargetsReadOnly !== true ||
-    host.gitStateReadOnly !== true ||
     host.attemptArtifactWrites !== true ||
     host.nativeDelegationDisabled !== true ||
     host.implicitMemoryDisabled !== true
