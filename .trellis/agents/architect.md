@@ -149,7 +149,7 @@ Use this map when orienting:
 | Area | Typical files | Review focus |
 |---|---|---|
 | CLI commands | `packages/cli/src/commands/**` | CLI UX, exit codes, stdout/stderr contract, cwd/env behavior |
-| Channel runtime | `packages/cli/src/commands/channel/**` | event schema, project buckets, worker lifecycle, adapter protocol |
+| Teamwork runtime | `packages/cli/src/commands/teamwork/**` | event schema, project buckets, teammate lifecycle, adapter protocol |
 | Init/update templates | `packages/cli/src/templates/**`, `dist/templates/**` | generated file parity, platform-specific paths, hashes |
 | Migrations | `packages/cli/src/migrations/**`, `packages/cli/scripts/create-manifest.js` | manifest validation, rename/delete safety, migration guide content |
 | Task scripts | `.trellis/scripts/**`, template copies | Python compatibility, task lifecycle, context injection |

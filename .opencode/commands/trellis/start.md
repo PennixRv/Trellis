@@ -1,59 +1,30 @@
 # Start Session
 
-Initialize a Trellis-managed development session. This platform has no session-start hook, so manually load the equivalent compact context by following these steps.
+Load the current Trellis context and continue from the task record's current phase.
 
----
+## Load context
 
-## Step 1: Current state
-Identity, git status, current task, active tasks, journal location.
+    python3 ./.trellis/scripts/get_context.py
+    python3 ./.trellis/scripts/get_context.py --mode phase
+    python3 ./.trellis/scripts/get_context.py --mode packages
 
-```bash
-python3 ./.trellis/scripts/get_context.py
-```
+Read the applicable spec indexes before editing code. The active phase breadcrumb names the phase Skill and its workflow.md.
 
-If this output includes a line beginning `Trellis update available:`, copy the full line verbatim when summarizing session context. Do not shorten operational command hints.
+## Route the current request
 
-## Step 2: Workflow overview
-Compact Phase Index, request triage rules, planning artifact contract, and the step-detail command.
+- No active Trellis task: use the taskless route when the request is clear, low-risk, reversible, authorized, and immediately verifiable. Otherwise create the task with the user's consent and load `trellis-goal-exploration-and-requirements`.
+- Task with no initialized route: inspect its current requirements, choose the applicable ordered phases with evidence for omissions, then initialize the route through task.py phase init.
+- Goal Exploration and Requirements Confirmation Phase: load `trellis-goal-exploration-and-requirements`. Do not leave until the user confirms the current requirements artifact revision.
+- Decision Space Construction and Consolidation Phase: load `trellis-decision-space-construction-and-merging`.
+- Solution Design and Convergence Phase: load `trellis-solution-design-and-convergence`. An accepted implementation contract still requires separate implementation authorization.
+- Task Implementation and Test Verification Phase: load `trellis-task-implementation` and the target repository's applicable specs.
+- Delivery Review and On-Site Closeout Phase: load `trellis-delivery-review-and-closeout`.
 
-```bash
-python3 ./.trellis/scripts/get_context.py --mode phase
-```
+Task lifecycle status does not replace the business phase route. Use Trellis CLI to inspect or change task and phase state.
 
-Full guide in `.trellis/workflow.md` (read on demand).
+## Spec context
 
-## Step 3: Guideline indexes
-Discover packages + spec layers, then read each relevant index file.
+    python3 ./.trellis/scripts/get_context.py --mode packages
+    cat .trellis/spec/guides/index.md
 
-```bash
-python3 ./.trellis/scripts/get_context.py --mode packages
-cat .trellis/spec/guides/index.md
-cat .trellis/spec/<package>/<layer>/index.md   # for each relevant layer
-```
-
-Index files list the specific guideline docs to read when you actually start coding.
-
-## Step 4: Decide next action
-From Step 1 you know the current task and status. Check the task directory:
-
-- **Active task status `planning` + no `prd.md`** → Phase 1.1. Load the `trellis-brainstorm` skill.
-- **Active task status `planning` + `prd.md` exists** → stay in Phase 1. Lightweight tasks can be PRD-only; complex tasks need `design.md` + `implement.md`. Load the relevant Phase 1 step detail before `task.py start`.
-- **Active task status `in_progress`** → Phase 2 step 2.1. Load the step detail:
-  ```bash
-  python3 ./.trellis/scripts/get_context.py --mode phase --step 2.1 --platform opencode
-  ```
-- **No active task** → classify first. For simple conversation / small task, ask only whether this turn should create a Trellis task. For complex work, ask whether you may create a Trellis task and enter planning. If the user says no, skip Trellis for this session.
-
----
-
-## Skill routing (quick reference)
-
-| User intent | Skill |
-|---|---|
-| New feature / unclear requirements | `trellis-brainstorm` |
-| About to write code | `trellis-before-dev` |
-| Done coding / quality check | `trellis-check` |
-| Stuck / fixed same bug multiple times | `trellis-break-loop` |
-| Learned something worth capturing | `trellis-update-spec` |
-
-Full rules + anti-rationalization table in `.trellis/workflow.md`.
+Read the package and layer indexes relevant to the requested changes, then follow their references.

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "architecture": { "reasoning_effort": "high" },
+    "review": { "reasoning_effort": "high" },
+    "research": { "reasoning_effort": "medium" },
+    "verification": { "reasoning_effort": "high" }
+  }
+}

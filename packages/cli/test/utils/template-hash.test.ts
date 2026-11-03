@@ -457,6 +457,56 @@ describe("initializeHashes", () => {
     expect(hashes).not.toHaveProperty("AGENTS.md");
   });
 
+  it("preserves existing .trellis hashes when merging a platform", () => {
+    fs.mkdirSync(path.join(tmpDir, ".trellis", "scripts"), {
+      recursive: true,
+    });
+    fs.mkdirSync(path.join(tmpDir, ".agents", "skills", "example"), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(tmpDir, ".trellis", "config.yaml"),
+      "packages:\n  app:\n    path: app\n",
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, ".trellis", "workflow.md"),
+      "# Project workflow\n",
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, ".trellis", "scripts", "local.py"),
+      "print('local')\n",
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, ".agents", "skills", "example", "SKILL.md"),
+      "# New platform skill\n",
+    );
+    saveHashes(tmpDir, {
+      ".trellis/config.yaml": computeHash("# template config\n"),
+      ".trellis/workflow.md": computeHash("# template workflow\n"),
+    });
+
+    initializeHashes(tmpDir, {
+      trackedPaths: new Set([".agents/skills/example/SKILL.md"]),
+      merge: true,
+    });
+
+    const hashes = loadHashes(tmpDir);
+    expect(hashes[".trellis/config.yaml"]).toBe(
+      computeHash("# template config\n"),
+    );
+    expect(hashes[".trellis/workflow.md"]).toBe(
+      computeHash("# template workflow\n"),
+    );
+    expect(isTemplateModified(tmpDir, ".trellis/config.yaml", hashes)).toBe(
+      true,
+    );
+    expect(isTemplateModified(tmpDir, ".trellis/workflow.md", hashes)).toBe(
+      true,
+    );
+    expect(hashes).not.toHaveProperty(".trellis/scripts/local.py");
+    expect(hashes).toHaveProperty(".agents/skills/example/SKILL.md");
+  });
+
   it("excludes workspace and tasks directories", () => {
     fs.mkdirSync(path.join(tmpDir, ".trellis", "workspace"), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, ".trellis", "workspace", "data.md"), "user data");

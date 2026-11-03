@@ -7,11 +7,11 @@ description: Use Trellis Teamwork for live multi-agent collaboration, Teamwork S
 
 `trellis teamwork` is the local multi-agent collaboration runtime. A
 Teamwork Session is the persistent chat or forum object used by the runtime;
-it is independent from the Trellis task lifecycle and its five task phases.
+it is independent from the Trellis task lifecycle and does not own business-phase progress.
 Use Teamwork when agents need a durable event log, a bounded teammate
 assignment, a one-shot consultation, or a forum discussion.
 
-Typical user signals: "和 codex/claude 讨论", "brainstorm with another agent", "派一个 teammate 做 review", "open a Teamwork forum", "look at this thread", "Teamwork 卡住了 / 没输出", "progress was truncated", "how do I use trellis teamwork".
+Typical user signals: “和 codex/claude 讨论”, “brainstorm with another agent”, “派一个 teammate 做 review”, “open a Teamwork forum”, “look at this thread”, “Teamwork 卡住了 / 没输出”, “progress was truncated”, “how do I use trellis teamwork”.
 
 This skill is an index. Load only the reference file for the current job — do not preload all of them.
 
@@ -37,12 +37,12 @@ trellis teamwork context list <session> --scope global --thread <thread>
 
 | User intent | Read |
 |---|---|
-| "和 codex/claude 讨论一下", "brainstorm with another agent" | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
-| "派一个 implement/check agent", "让 agent review", "spawn a worker" | `references/teamwork-plan-construction.md`, then `references/teammate-processes.md` |
-| "开 issue 区 / topic 群 / changelog / board", "make a forum" | `references/teamwork-plan-construction.md` |
-| "看看这个 thread", "inspect a thread" | `references/teamwork-plan-construction.md` |
-| "Teamwork 卡住了 / 没输出 / progress 被截断", "teammate stalled" | `references/teammate-processes.md` |
-| "具体命令怎么写", "what flags does X take" | `references/teamwork-plan-construction.md` |
+| “和 codex/claude 讨论一下”, “brainstorm with another agent” | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
+| “派一个 implement/check agent”, “让 agent review”, “spawn a worker” | `references/teamwork-plan-construction.md`, then `references/teammate-processes.md` |
+| “开 issue 区 / topic 群 / changelog / board”, “make a forum” | `references/teamwork-plan-construction.md` |
+| “看看这个 thread”, “inspect a thread” | `references/teamwork-plan-construction.md` |
+| “Teamwork 卡住了 / 没输出 / progress 被截断”, “teammate stalled” | `references/teammate-processes.md` |
+| “具体命令怎么写”, “what flags does X take” | `references/teamwork-plan-construction.md` |
 
 ## Core Rules
 
@@ -55,7 +55,7 @@ trellis teamwork context list <session> --scope global --thread <thread>
 - For brainstorm, do multiple pressure-test rounds. One answer plus one confirmation is review, not brainstorm.
 - **Dispatcher wait pattern**: use `--kind done` / `--kind turn_finished` (Trellis-emitted system events), not a user `--tag` as the completion signal. Tags are labels, not runtime completion events.
 - Teamwork Sessions are event-sourced. Do not parse `events.jsonl` first; use `forum`, `thread`, `messages --thread`, and `context list`.
-- `@mindfoldhq/trellis-core` owns reusable Teamwork Session/thread state, event append, sequence allocation, context/title projection, reducers, and task helpers. The CLI owns flags, terminal rendering, prompts, teammate lifecycle, and process exits.
+- `@pennixrv/trellis-core` owns reusable Teamwork Session/thread state, event append, sequence allocation, context/title projection, reducers, and task helpers. The CLI owns flags, terminal rendering, prompts, teammate lifecycle, and process exits.
 - Teamwork plan construction belongs to the current phase coordinator. Teamwork validates and executes a frozen plan; it does not select the task phase, change task status, or create a second task state machine.
 - The native host-created `subagent` remains separate from a Teamwork teammate.
 

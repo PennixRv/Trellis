@@ -1,33 +1,38 @@
 # Bundled Skills
 
-"Bundled skills" are multi-file built-in skills shipped inside the Trellis CLI npm package. Unlike marketplace skills (which a user installs separately into their own `.claude/skills/` or other platform skill root), bundled skills are written automatically into every supported platform's skill root by `trellis init` and kept in sync by `trellis update`. They are part of Trellis itself, not third-party content.
+"Bundled skills" are Trellis CLI-owned skills shipped inside the CLI npm package. Unlike marketplace skills (which a user installs separately into their own `.claude/skills/` or other platform skill root), bundled skills are written automatically into supported platform skill roots by `trellis init` and managed by `trellis update`. They are part of Trellis itself, not third-party content.
 
-A bundled skill is a directory under `packages/cli/src/templates/common/bundled-skills/<skill>/` that already contains its own `SKILL.md` (with YAML frontmatter) plus optional `references/`, assets, or other supporting files. Trellis copies the whole directory tree as-is into each platform's skill root, so references stay lazy-loadable instead of being flattened into one oversized `SKILL.md`.
+A bundled skill is a directory under `packages/cli/src/templates/common/bundled-skills/<skill>/` that contains its own `SKILL.md` (with YAML frontmatter) and may include `references/`, assets, or other supporting files. Trellis copies the complete directory tree into each platform's skill root, resolving supported placeholders per platform so references stay lazy-loadable instead of being flattened into one oversized `SKILL.md`.
 
 ## What Counts As Bundled (vs. Adjacent Concepts)
 
 | Source path | Type | How it ships |
-| --- | --- | --- |
+| --------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `templates/common/bundled-skills/<name>/` | Bundled skill (multi-file) | Whole directory copied to every platform skill root |
 | `templates/common/skills/<name>.md` | Single-file workflow skill | Wrapped with frontmatter, written as `<root>/<name>/SKILL.md` |
 | `templates/common/commands/<name>.md` | Slash command / prompt | Written to each platform's command directory (`.claude/commands/trellis/`, `.cursor/commands/trellis-*.md`, `.gemini/commands/trellis/*.toml`, etc.) |
 | `templates/<platform>/skills/` | Platform-specific skill | Written only into that platform's directory (e.g. `.codex/skills/`) |
 | User skills under `.claude/skills/<my-skill>/` etc. | Marketplace or user-authored | Not managed by Trellis at all |
 
-The Trellis CLI never touches anything that is not produced by one of its own template loaders. Anything a user drops into a platform skill root by hand is left alone.
+Only paths emitted by Trellis template loaders are managed by Trellis. Other files in a platform skill root are outside those write paths.
 
-## Current Bundled Skills (v0.6.0)
+## Current Bundled Skills
 
 The set is discovered at runtime by listing directories under `templates/common/bundled-skills/`:
 
 | Skill | Purpose |
-| --- | --- |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trellis-goal-exploration-and-requirements` | Clarifies a task's goal, scope, success conditions, constraints, evidence, and user confirmation. |
+| `trellis-decision-space-construction-and-merging` | Organizes substantive decisions, options, evidence, dependencies, and decision trees. |
+| `trellis-solution-design-and-convergence` | Resolves user decisions, plan completeness, external precedents, and the implementation contract. |
+| `trellis-task-implementation` | Advances the authorized implementation contract through work packages, verification, integration, and blocker handling. |
+| `trellis-delivery-review-and-closeout` | Reviews the delivery candidate, unresolved items, acceptance conditions, and resource disposition. |
 | `trellis-meta` | This skill. Explains the local Trellis architecture and customization entry points to an AI working inside a user project. |
 | `trellis-session-insight` | Wraps the `trellis mem` CLI so an AI knows when and how to reach into past Claude Code / Codex / Pi Agent conversation logs. |
 | `trellis-spec-bootstrap` | Platform-neutral workflow for creating or refreshing `.trellis/spec/` from the real codebase (with optional GitNexus / ABCoder integration). |
-| `trellis-channel` | Capability skill teaching an AI when to reach for `trellis channel` for multi-agent collaboration, forum/thread persistent boards, and dispatcher-wait patterns. |
+| `trellis-teamwork`        | Capability skill teaching an AI when to reach for `trellis teamwork` for multi-agent collaboration, forum/thread persistent boards, and dispatcher-wait patterns. |
 
-The list is discovered at runtime, so adding a new directory under `bundled-skills/` is the only step required to register a new skill (see "Adding a New Bundled Skill" below).
+This inventory reflects the directories currently in the source tree. The CLI discovers them at runtime, so adding a directory under `bundled-skills/` makes it available to the shared loader (see "Adding a New Bundled Skill" below).
 
 ## Where Bundled Skills Land Per Platform
 
@@ -36,7 +41,7 @@ A platform's whole file set — commands, workflow skills, agents, hooks, bundle
 All 21 platforms receive the full bundled-skill set:
 
 | Platform | Bundled skill root |
-| --- | --- |
+| ----------- | ---------------------------- |
 | Claude Code | `.claude/skills/<skill>/` |
 | Cursor | `.cursor/skills/<skill>/` |
 | OpenCode | `.opencode/skills/<skill>/` |
@@ -63,7 +68,7 @@ Codex, Gemini CLI, Pi and Kimi share the `.agents/skills/` root (the upstream Ag
 
 One description, two consumers:
 
-1. `trellis init` → `configurePlatform(platformId, cwd)` → `writeTemplateMap(cwd, collect<Platform>Templates())`. For 18 of the 21 platforms the registry entry in `configurators/index.ts` is literally `fromTemplates(collect<Platform>Templates)`, which *is* that composition. Claude Code, Codex and ZCode spell out a `configure` of their own, each for work a `Map<path, content>` cannot express (an opt-in `--with-statusline` flag, an intentionally empty `.codex/skills/` directory, a one-shot console notice) — none of them restates the file list.
+1. `trellis init` → `configurePlatform(platformId, cwd)` → `writeTemplateMap(cwd, collect<Platform>Templates())`. For 18 of the 21 platforms the registry entry in `configurators/index.ts` is literally `fromTemplates(collect<Platform>Templates)`, which _is_ that composition. Claude Code, Codex and ZCode spell out a `configure` of their own, each for work a `Map<path, content>` cannot express (an opt-in `--with-statusline` flag, an intentionally empty `.codex/skills/` directory, a one-shot console notice) — none of them restates the file list.
 2. `trellis update` → `collectPlatformTemplates(platformId)` (in `configurators/index.ts`) → the same map, used to detect drift and to populate `.trellis/.template-hashes.json`.
 
 Because both consumers read the one description, init and update cannot disagree about which files a bundled skill produces.
@@ -114,9 +119,8 @@ The shape and dispatch wiring are already generic, so adding a skill requires on
 4. **No dispatch wiring is required.** `listDirectories("bundled-skills")` discovers the new directory automatically, so all platforms receive it on the next `trellis init` or `trellis update`.
 
 5. **Verify the distribution path** before shipping. Skipping any of these steps has historically caused features to be documented as bundled while the published npm tarball was missing the files:
-
    - Source files exist on the branch being tagged.
-   - `pnpm --filter @mindfoldhq/trellis build` copies the asset into `dist/templates/common/bundled-skills/<skill>/`.
+   - `pnpm --filter @pennixrv/trellis build` copies the asset into `dist/templates/common/bundled-skills/<skill>/`.
    - `npm pack --dry-run --json` includes the expected `dist/**` paths.
    - In a fresh temp project, `trellis init` writes `.claude/skills/<skill>/SKILL.md`, `.agents/skills/<skill>/SKILL.md`, `.zcode/skills/<skill>/SKILL.md`, etc.
    - `.trellis/.template-hashes.json` lists the generated files.

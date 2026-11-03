@@ -7,7 +7,7 @@ This directory is for local AI working in a user project where Trellis was insta
 | User wording | Read first |
 | --- | --- |
 | "Change the Trellis flow / phases / next prompt" | `change-workflow.md` |
-| "Change task creation, status, archive, or hooks" | `change-task-lifecycle.md` |
+| "Change task creation, lifecycle, phase state, or hooks" | `change-task-lifecycle.md` |
 | "AI did not read context / change injected content" | `change-context-loading.md` |
 | "A platform hook is not behaving as expected" | `change-hooks.md` |
 | "Change implement/check/research agent behavior" | `change-agents.md` |
@@ -38,7 +38,7 @@ This directory is for local AI working in a user project where Trellis was insta
 ## Things Not To Do By Default
 
 - Do not edit the global npm install directory.
-- Do not edit `node_modules/@mindfoldhq/trellis`.
+- Do not edit `node_modules/@pennixrv/trellis`.
 - Do not assume the user has the Trellis GitHub repository.
 - Do not overwrite local files already modified by the user with default templates.
 - Do not put team project rules into public `trellis-meta`; project rules belong in `.trellis/spec/` or a local skill.

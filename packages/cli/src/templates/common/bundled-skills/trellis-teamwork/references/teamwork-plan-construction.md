@@ -54,7 +54,8 @@ manually refill slots or create a second retry loop.
 Create and inspect the durable runtime object with the native CLI:
 
 ```bash
-trellis teamwork create <name> --type chat|forum
+trellis teamwork create <name> --type chat|forum \
+  --task .trellis/tasks/<task> --description "bounded discussion"
 trellis teamwork list [--scope project|global] [--all]
 trellis teamwork messages <name> [--raw]
 trellis teamwork wait <name> --as <agent> --kind done,turn_finished
@@ -63,10 +64,45 @@ trellis teamwork thread <name> <thread-key>
 trellis teamwork context list <name> [--thread <thread-key>]
 ```
 
-Use `--context-file` and `--context-raw` for durable context. Use `--stdin` or
-`--text-file` for long message bodies. `--kind` selects runtime event kinds;
-it is not a user-defined tag. Read forum summaries and thread projections
-through the CLI before inspecting raw event storage.
+Use `--scope global` only for a deliberately shared board; the default project
+scope is isolated by the current project bucket. `create` also accepts
+`--labels`, `--cwd`, `--by`, `--force`, `--context-file`, `--context-raw`, and
+`--ephemeral`. Ephemeral sessions are hidden from `list` unless `--all` is
+passed and are intended for short-lived coordination.
+
+For a forum, append structured thread events with `opened`, `comment`,
+`status`, or `summary` and inspect the reduced board or event timeline:
+
+```bash
+trellis teamwork post <session> opened --as main --thread design \
+  --title "Design question" --description "What needs evidence?"
+trellis teamwork post <session> comment --as reviewer --thread design \
+  --stdin
+trellis teamwork post <session> status --as main --thread design --status open
+trellis teamwork post <session> summary --as main --thread design \
+  --summary "Evidence collected"
+trellis teamwork forum <session> --status open
+trellis teamwork thread <session> design
+trellis teamwork thread rename <session> design architecture --as main
+```
+
+`post` can also replace labels or assignees and attach thread context with
+`--context-file` / `--context-raw`. Session-level context uses
+`teamwork context add|delete|list`; context deletion appends a durable
+projection event rather than rewriting the event log. Use `title set` and
+`title clear` for the display title.
+
+Use `--stdin` or `--text-file` for long message and thread bodies. `messages`
+supports `--raw`, `--follow`, `--last`, `--since`, `--kind`, `--from`, `--to`,
+`--thread`, `--action`, and `--no-progress`. `--kind` selects runtime event
+kinds; it is not a user-defined tag. Read forum summaries and thread
+projections through the CLI before inspecting raw event storage.
+
+Remove settled runtime state deliberately. `rm <name>` stops live teammates
+before deleting one session. `prune` is a dry-run by default and supports one
+of `--ephemeral`, `--empty`, `--idle <duration>`, or `--all`, plus `--keep`;
+pass `--yes` to perform the deletion. Never use session cleanup as a task
+archive operation.
 
 ## Result handling
 

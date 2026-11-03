@@ -71,12 +71,9 @@ function getTaskStatus(ctx, platformInput = null) {
   const taskStatus = taskData.status || "unknown"
 
   if (taskStatus === "completed") {
-    return `Status: COMPLETED\nTask: ${taskTitle}\nNext-Action: Run /trellis:finish-work. If the working tree is dirty, return to Phase 3.4 first.`
+    return `Status: COMPLETED\nTask: ${taskTitle}\nNext-Action: Start another task or end the session; finish-work only records the session journal.`
   }
 
-  const hasPrd = existsSync(join(taskDir, "prd.md"))
-  const hasDesign = existsSync(join(taskDir, "design.md"))
-  const hasImplementPlan = existsSync(join(taskDir, "implement.md"))
   const artifactNames = ["prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl"]
   const present = artifactNames.filter(name => existsSync(join(taskDir, name)))
   if (existsSync(join(taskDir, "research"))) present.push("research/")
@@ -87,24 +84,13 @@ function getTaskStatus(ctx, platformInput = null) {
     (!existsSync(implementJsonl) || hasCuratedJsonlEntry(implementJsonl)) &&
     (!existsSync(checkJsonl) || hasCuratedJsonlEntry(checkJsonl))
 
-  if (taskStatus === "planning" && !hasPrd) {
-    return `Status: PLANNING\nTask: ${taskTitle}\nPresent: ${presentLine}\nNext-Action: Load trellis-brainstorm and write prd.md. Stay in planning.`
-  }
-
   if (taskStatus === "planning") {
-    const missingComplex = []
-    if (!hasDesign) missingComplex.push("design.md")
-    if (!hasImplementPlan) missingComplex.push("implement.md")
-    const nextBits = []
-    if (missingComplex.length > 0) {
-      nextBits.push(
-        `Lightweight task can request start review with PRD-only; complex task must add ${missingComplex.join(", ")} before start`,
-      )
-    } else {
-      nextBits.push("Planning artifacts are present; ask for review before `task.py start`")
-    }
+    const nextBits = [
+      "Follow the current per-turn workflow-state; task lifecycle status and artifact presence do not identify the business phase",
+      "If no phase route is initialized, load `trellis-goal-exploration-and-requirements` and confirm the requirements baseline before initializing the route",
+    ]
     if (!jsonlReady) {
-      nextBits.push("curate `implement.jsonl` and `check.jsonl` before sub-agent mode start")
+      nextBits.push("curate task context manifests only when a dispatched agent needs them")
     }
     return `Status: PLANNING\nTask: ${taskTitle}\nPresent: ${presentLine}\nNext-Action: ${nextBits.join("; ")}. Do not enter implementation until the user confirms start.`
   }
@@ -112,7 +98,7 @@ function getTaskStatus(ctx, platformInput = null) {
   return (
     `Status: ${String(taskStatus).toUpperCase()}\nTask: ${taskTitle}\n` +
     `Present: ${presentLine}\n` +
-    "Next-Action: Follow the matching per-turn workflow-state. " +
+    "Next-Action: Follow the matching per-turn workflow-state; task lifecycle status does not identify the business phase. " +
     "Implementation/check context order is jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if present`."
   )
 }
@@ -393,8 +379,8 @@ Trellis compact SessionStart context. Use it to orient the session; load details
   if (workflowContent) {
     const allLines = workflowContent.split("\n")
     const overviewLines = [
-      "# Development Workflow - Session Summary",
-      "Full guide: .trellis/workflow.md. Step detail: `python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>`.",
+      "# 工作流会话摘要",
+      "完整说明：.trellis/workflow.md。阶段详情：读取当前阶段提示指定的 Skill。",
       "",
     ]
 
@@ -402,9 +388,18 @@ Trellis compact SessionStart context. Use it to orient the session; load details
     let rangeEnd = allLines.length
     for (let i = 0; i < allLines.length; i++) {
       const stripped = allLines[i].trim()
-      if (rangeStart === -1 && stripped === "## Phase Index") {
+      const heading = stripped.replace(/^#{2,3}\s+/, "")
+      const isPhaseHeading =
+        /^#{2,3}\s+/.test(stripped) &&
+        ["目标探索与需求核对阶段", "Goal Exploration and Requirements Confirmation Phase"].some(
+          (title) =>
+            heading === title ||
+            heading.endsWith(`：${title}`) ||
+            heading.endsWith(`: ${title}`),
+        )
+      if (rangeStart === -1 && ["## 阶段索引", "## Phase Index"].includes(stripped)) {
         rangeStart = i
-      } else if (rangeStart !== -1 && stripped === "## Phase 1: Plan") {
+      } else if (rangeStart !== -1 && isPhaseHeading) {
         rangeEnd = i
         break
       }

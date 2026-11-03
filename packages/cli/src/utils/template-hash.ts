@@ -348,10 +348,10 @@ export interface InitializeHashesOptions {
  * where a blind directory walk of `.codex/` / `.claude/` swept up
  * user-owned runtime data (chat history, session JSONLs).
  *
- * `.trellis/` is still walked recursively (with `EXCLUDE_FROM_HASH`) because
- * uninstall removes `.trellis/` wholesale via `rm -rf` regardless of manifest
- * content — accuracy there doesn't affect data-loss, only `trellis update`
- * 3-way-merge fidelity (preserved by the existing walk).
+ * On first init, `.trellis/` is walked recursively (with
+ * `EXCLUDE_FROM_HASH`) to seed update tracking. Re-init merges only the
+ * platform paths written in that run, preserving existing workflow/config
+ * hashes so local edits remain visible to `trellis update`.
  *
  * @returns Number of files hashed in the final manifest.
  */
@@ -380,18 +380,18 @@ export function initializeHashes(
     }
   }
 
-  // .trellis/ workflow tree: still walked recursively. Accuracy here is for
-  // `trellis update`'s 3-way merge of workflow.md / config.yaml / scripts;
-  // uninstall removes .trellis/ wholesale so it does not matter for the
-  // data-loss bug this contract addresses.
-  const files = collectFiles(cwd, ".trellis");
-  for (const relativePath of files) {
-    const fullPath = path.join(cwd, relativePath);
-    try {
-      const content = fs.readFileSync(fullPath, "utf-8");
-      hashes[relativePath] = computeHash(content);
-    } catch {
-      // Skip files that can't be read (binary, etc.)
+  // Re-init only adds platform files. Re-walking `.trellis/` would bless
+  // customized workflow/config content and let the next update overwrite it.
+  if (!merge) {
+    const files = collectFiles(cwd, ".trellis");
+    for (const relativePath of files) {
+      const fullPath = path.join(cwd, relativePath);
+      try {
+        const content = fs.readFileSync(fullPath, "utf-8");
+        hashes[relativePath] = computeHash(content);
+      } catch {
+        // Skip files that can't be read (binary, etc.)
+      }
     }
   }
 

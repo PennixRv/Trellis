@@ -1,55 +1,21 @@
 ---
-description: Resume work on the current task at the right workflow phase
+description: "Resume work on the current task at the correct phase."
 ---
 
-Resume work on the current task — pick up at the right phase/step in `.trellis/workflow.md`.
+Resume from the active Trellis task and its current phase. The task record and phase route are authoritative; do not infer the phase from artifact presence or session history.
 
-## Step 1: Load Current Context
+## Load current context
 
-```bash
-python3 ./.trellis/scripts/get_context.py
-```
+    python3 ./.trellis/scripts/get_context.py
 
-Confirms: current task, git state, recent commits.
+## Read the phase route
 
-## Step 2: Load the Phase Index
+    python3 ./.trellis/scripts/get_context.py --mode phase
 
-```bash
-python3 ./.trellis/scripts/get_context.py --mode phase
-```
+Follow the active phase breadcrumb to the matching bundled phase Skill and its workflow.md. Use the task CLI to inspect or change phase state. A resume does not itself accept an artifact, grant authorization, or move the task.
 
-Shows the Phase Index (Plan / Execute / Finish) with routing + skill mapping.
+Task lifecycle status and business phase are separate. A planning task may remain in Goal Exploration and Requirements Confirmation Phase, Decision Space Construction and Consolidation Phase, or Solution Design and Convergence Phase. `in_progress` marks authorized Task Implementation and Test Verification Phase; `completed` and `cancelled` are terminal lifecycle states. Delivery Review and On-Site Closeout Phase remains explicit.
 
-## Step 3: Decide Where You Are
+## Phase operations
 
-`get_context.py` shows the active task's `status` field. Route by `status` + artifact presence:
-
-- `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
-- `status=planning` + `prd.md` exists + `implement.jsonl` not curated (empty, or only a legacy `_example` placeholder row) → **1.3**
-- `status=planning` + `prd.md` + curated `implement.jsonl` → **1.4** (run `task.py start` to enter Phase 2)
-- `status=in_progress` + implementation not started → **2.1**
-- `status=in_progress` + implementation done, not yet checked → **2.2**
-- `status=in_progress` + check passed → **3.1**
-- `status=completed` (rare; usually archived immediately) → archive flow
-
-Phase rules (full detail in `.trellis/workflow.md`):
-
-1. Run steps **in order** within a phase — `[required]` steps must not be skipped
-2. `[once]` steps are already done if the output exists (e.g., `prd.md` for 1.1; `implement.jsonl` with curated entries for 1.3) — skip them
-3. You may go back to an earlier phase if discoveries require it
-
-## Step 4: Load the Specific Step
-
-Once you know which step to resume at:
-
-```bash
-python3 ./.trellis/scripts/get_context.py --mode phase --step <X.X> --platform omp
-```
-
-Follow the loaded instructions. After each `[required]` step completes, move to the next.
-
----
-
-## Reference
-
-Full workflow, skill routing table, and the DO-NOT-skip table live in `.trellis/workflow.md`. This command is only an entry point — the canonical guidance is there.
+Use the native task CLI for phase artifact revisions, acceptance, evidence-backed skips, waiting, blocking, resuming, returning to an earlier phase, route changes, implementation authorization, completion, and cancellation. Read task.py help for current arguments. Do not create a second status record or use formal session handoff to resume task work.

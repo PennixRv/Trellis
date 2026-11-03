@@ -59,7 +59,7 @@ function isInsideRoot(root: string, candidate: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Trusted context roots (mirrors packages/cli/src/commands/channel/context-trust.ts;
+// Trusted context roots (mirrors packages/cli/src/commands/teamwork/context-trust.ts;
 // standalone copy since templates don't import from the CLI package).
 // ---------------------------------------------------------------------------
 
@@ -69,7 +69,7 @@ function stripTrustValue(s: string): string {
    return s.trim().replace(/\s*#.*$/, "").trim().replace(/^['"]|['"]$/g, "");
 }
 
-function parseChannelTrustSection(content: string): { trustedDirs: string[]; autoTrustSymlinks?: boolean } {
+function parseTeamworkTrustSection(content: string): { trustedDirs: string[]; autoTrustSymlinks?: boolean } {
    const lines = content.split("\n");
    const trustedDirs: string[] = [];
    let autoTrustSymlinks: boolean | undefined;
@@ -115,7 +115,7 @@ function parseChannelTrustSection(content: string): { trustedDirs: string[]; aut
          const val = stripTrustValue(boolMatch[1]!).toLowerCase();
          if (val === "false") autoTrustSymlinks = false;
          else if (val === "true") autoTrustSymlinks = true;
-         else process.stderr.write(`[channel] channel.auto_trust_trellis_symlinks: invalid value '${val}', ignoring\n`);
+         else process.stderr.write(`[teamwork] teamwork.auto_trust_trellis_symlinks: invalid value '${val}', ignoring\n`);
          continue;
       }
    }
@@ -128,7 +128,7 @@ function resolveTrustedRoots(projectRoot: string): string[] {
    let config: { trustedDirs: string[]; autoTrustSymlinks?: boolean } = { trustedDirs: [] };
    if (existsSync(configPath)) {
       try {
-         config = parseChannelTrustSection(readFileSync(configPath, "utf-8"));
+         config = parseTeamworkTrustSection(readFileSync(configPath, "utf-8"));
       } catch {
          // ignore
       }
@@ -202,9 +202,9 @@ function displayProjectPath(projectRoot: string, filePath: string, taskDir?: str
 function resolveActiveTaskStatus(
    projectRoot: string,
    contextKey: string | null,
-): { status: string; taskDir: string | null; taskTitle: string | null } {
+): { status: string; phaseStatus: string | null; taskDir: string | null; taskTitle: string | null } {
    const sessionsDir = join(projectRoot, ".trellis", ".runtime", "sessions");
-   if (!existsSync(sessionsDir)) return { status: "no_task", taskDir: null, taskTitle: null };
+   if (!existsSync(sessionsDir)) return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
 
    // --- 通过 context key 解析 session 文件 ---
    let sessionFilePath: string | null = null;
@@ -214,7 +214,7 @@ function resolveActiveTaskStatus(
       if (existsSync(candidate)) {
          sessionFilePath = candidate;
       } else {
-         return { status: "no_task", taskDir: null, taskTitle: null };
+         return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
       }
    } else {
       // No identity: use single-session fallback only when there is exactly one session file.
@@ -222,12 +222,12 @@ function resolveActiveTaskStatus(
       try {
          sessionFiles = readdirSync(sessionsDir).filter((f) => f.endsWith(".json"));
       } catch {
-         return { status: "no_task", taskDir: null, taskTitle: null };
+         return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
       }
       if (sessionFiles.length === 1) {
          sessionFilePath = join(sessionsDir, sessionFiles[0]);
       } else {
-         return { status: "no_task", taskDir: null, taskTitle: null };
+         return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
       }
    }
 
@@ -236,12 +236,12 @@ function resolveActiveTaskStatus(
    try {
       sessionData = JSON.parse(readFileSync(sessionFilePath, "utf-8"));
    } catch {
-      return { status: "no_task", taskDir: null, taskTitle: null };
+      return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
    }
 
    const currentTask = sessionData.current_task;
    if (typeof currentTask !== "string" || !currentTask)
-      return { status: "no_task", taskDir: null, taskTitle: null };
+      return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
 
    // Same jail the jsonl-referenced files already go through below. `task.py`
    // now refuses to store a ref that leaves the project, but a session file
@@ -249,19 +249,30 @@ function resolveActiveTaskStatus(
    // rewrite session files — so a poisoned pointer outlives the upgrade that
    // closed the writer.
    const taskDir = resolveProjectFile(projectRoot, currentTask, resolveTrustedRoots(projectRoot));
-   if (!taskDir) return { status: "no_task", taskDir: null, taskTitle: null };
+   if (!taskDir) return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
    const taskJsonPath = join(taskDir, "task.json");
-   if (!existsSync(taskJsonPath)) return { status: "no_task", taskDir: null, taskTitle: null };
+   if (!existsSync(taskJsonPath)) return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
 
    let taskData: Record<string, unknown>;
    try {
       taskData = JSON.parse(readFileSync(taskJsonPath, "utf-8"));
    } catch {
-      return { status: "no_task", taskDir: null, taskTitle: null };
+      return { status: "no_task", phaseStatus: null, taskDir: null, taskTitle: null };
    }
 
+   const taskMeta = taskData.meta;
+   const phaseWorkflow = taskMeta && typeof taskMeta === "object" && !Array.isArray(taskMeta)
+      ? (taskMeta as Record<string, unknown>).task_workflow as Record<string, unknown> | undefined
+      : undefined;
+   const route = phaseWorkflow?.phase_ids;
+   const phaseId = phaseWorkflow?.current_phase_id || (Array.isArray(route) ? route[route.length - 1] : undefined);
+   const phaseMap = phaseWorkflow?.phases;
+   const phase = typeof phaseId === "string" && phaseMap && typeof phaseMap === "object" && !Array.isArray(phaseMap)
+      ? (phaseMap as Record<string, Record<string, unknown>>)[phaseId]
+      : null;
    return {
-      status: typeof taskData.status === "string" ? taskData.status : "planning",
+      status: typeof phaseId === "string" && phase ? phaseId : (typeof taskData.status === "string" ? taskData.status : "planning"),
+      phaseStatus: typeof phase?.status === "string" ? phase.status : null,
       taskDir,
       taskTitle: typeof taskData.title === "string" ? taskData.title : null,
    };
@@ -818,7 +829,7 @@ class TurnContextCache {
          return { workflowMsg: this.workflowMsg };
       }
 
-      const { status } = resolveActiveTaskStatus(projectRoot, contextKey);
+      const { status, phaseStatus } = resolveActiveTaskStatus(projectRoot, contextKey);
 
       const workflowPath = join(projectRoot, ".trellis", "workflow.md");
       let workflowMd = "";
@@ -839,7 +850,7 @@ class TurnContextCache {
       // When skip keyword is present, skip workflow state injection this turn
       this.workflowMsg = this.skipThisTurn
          ? ""
-         : `<workflow-state>\n${workflowBody}\n</workflow-state>\n\n<session-overview>\n${SESSION_OVERVIEW_TEXT}\n</session-overview>`;
+         : `<workflow-state>\n${phaseStatus ? `Phase: ${status} (${phaseStatus})\n` : ""}${workflowBody}\n</workflow-state>\n\n<session-overview>\n${SESSION_OVERVIEW_TEXT}\n</session-overview>`;
 
       this.key = cacheKey;
       this.timestamp = now;

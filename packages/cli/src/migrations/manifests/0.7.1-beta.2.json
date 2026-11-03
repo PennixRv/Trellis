@@ -1,0 +1,522 @@
+{
+  "version": "0.7.1-beta.2",
+  "description": "Remove retired Channel skills from remaining project platforms",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Hash-verified retired Channel cleanup also covers Claude, Cursor, OpenCode and Pi project assets.",
+  "migrations": [
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-channel/SKILL.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "ff84801c511a736da018b4b1149348ebc9a16b7fc18d905ec10cfa7acbf269a3"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-channel/references/progress-debugging.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "93b021fd8d5d3d4ee54952c40424ab91ca57c2ab8032bfbfc3b5c5e22f1464cd"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-channel/references/workflows.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "0782d602efde6e94a7d7d7950fd605eedc9a1f5a523908284e76b628fd618fd4"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-channel/references/forum.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "407db39e8ebde47cea8637e3069bdb3d76ba42b43ed1d08ba97a56f26dbcfcb4"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-channel/references/command-reference.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "c4df3d940d89814310bfdaded20e84dd1d6b96786f6772688de7a123338d3c8e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-channel/references/workers.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "d4481b2858bca82050cb8d131916da8a2ccc3857f199cdb9ced8bb41d592e2a7"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/local-architecture/multi-agent-channel.md",
+      "description": "Retired Channel reference; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "56e5070474aeca872e2d70c46feea5aaafecd3d3ec052c3f7b1877358dca62e9"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-channel/SKILL.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "ff84801c511a736da018b4b1149348ebc9a16b7fc18d905ec10cfa7acbf269a3"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-channel/references/progress-debugging.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "93b021fd8d5d3d4ee54952c40424ab91ca57c2ab8032bfbfc3b5c5e22f1464cd"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-channel/references/workflows.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "0782d602efde6e94a7d7d7950fd605eedc9a1f5a523908284e76b628fd618fd4"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-channel/references/forum.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "407db39e8ebde47cea8637e3069bdb3d76ba42b43ed1d08ba97a56f26dbcfcb4"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-channel/references/command-reference.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "c4df3d940d89814310bfdaded20e84dd1d6b96786f6772688de7a123338d3c8e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-channel/references/workers.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "d4481b2858bca82050cb8d131916da8a2ccc3857f199cdb9ced8bb41d592e2a7"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-meta/references/local-architecture/multi-agent-channel.md",
+      "description": "Retired Channel reference; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "56e5070474aeca872e2d70c46feea5aaafecd3d3ec052c3f7b1877358dca62e9"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-channel/SKILL.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "ff84801c511a736da018b4b1149348ebc9a16b7fc18d905ec10cfa7acbf269a3"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-channel/references/progress-debugging.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "93b021fd8d5d3d4ee54952c40424ab91ca57c2ab8032bfbfc3b5c5e22f1464cd"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-channel/references/workflows.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "0782d602efde6e94a7d7d7950fd605eedc9a1f5a523908284e76b628fd618fd4"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-channel/references/forum.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "407db39e8ebde47cea8637e3069bdb3d76ba42b43ed1d08ba97a56f26dbcfcb4"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-channel/references/command-reference.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "c4df3d940d89814310bfdaded20e84dd1d6b96786f6772688de7a123338d3c8e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-channel/references/workers.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "d4481b2858bca82050cb8d131916da8a2ccc3857f199cdb9ced8bb41d592e2a7"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-meta/references/local-architecture/multi-agent-channel.md",
+      "description": "Retired Channel reference; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "56e5070474aeca872e2d70c46feea5aaafecd3d3ec052c3f7b1877358dca62e9"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".pi/skills/trellis-channel/SKILL.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "ff84801c511a736da018b4b1149348ebc9a16b7fc18d905ec10cfa7acbf269a3"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".pi/skills/trellis-channel/references/progress-debugging.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "93b021fd8d5d3d4ee54952c40424ab91ca57c2ab8032bfbfc3b5c5e22f1464cd"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".pi/skills/trellis-channel/references/workflows.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "0782d602efde6e94a7d7d7950fd605eedc9a1f5a523908284e76b628fd618fd4"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".pi/skills/trellis-channel/references/forum.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "407db39e8ebde47cea8637e3069bdb3d76ba42b43ed1d08ba97a56f26dbcfcb4"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".pi/skills/trellis-channel/references/command-reference.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "c4df3d940d89814310bfdaded20e84dd1d6b96786f6772688de7a123338d3c8e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".pi/skills/trellis-channel/references/workers.md",
+      "description": "Retired Channel skill; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "d4481b2858bca82050cb8d131916da8a2ccc3857f199cdb9ced8bb41d592e2a7"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".pi/skills/trellis-meta/references/local-architecture/multi-agent-channel.md",
+      "description": "Retired Channel reference; current native workflow provides Teamwork",
+      "allowed_hashes": [
+        "56e5070474aeca872e2d70c46feea5aaafecd3d3ec052c3f7b1877358dca62e9"
+      ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-before-dev/SKILL.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "859894f2e8258cbfa142d710363433761c54984c69f7ed7bd44512fb4eb165cd"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-brainstorm/SKILL.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "4e8e61dcd4ff51606bf4b14797d86199cb2b8a5f98a7708a1d52492e29963e2a"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-break-loop/SKILL.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "f5a93699832f29dee443b53c135a7459519b371f689af191d15c29e8ee5c7bde"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-check/SKILL.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "b21ff04b7680ebacb8c5ecbc48a22d627eb13e2b47fceb78c8ced0b43b60b282"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/SKILL.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "ee7bcfd0023def62688339c4b63c50f2fbeea12a34eb89e8bb63a992b58cb168"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/add-project-local-conventions.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "86009ccb5d0373f399582da0bc570c4e5c6053c3c764857424ff93384f0e04e5"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/change-agents.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "3eef0d9b9cf875f121c1a38afb8eee6d3cd3894127db601ae5a7760fa5b61575"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/change-context-loading.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "350d319dc1ab99609ddbf52cf8c06c71bd97ba1a29ce2eac8b97d0bb192938bf"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/change-hooks.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "91892f2cff53ae003736007e95172945acabf48b2fc889bd627cd2406ce449c4"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/change-skills-or-commands.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "a6994e2418cdf5bcad10b4236b02741179ae794bc4fdd811a64f443293b69268"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/change-spec-structure.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "31eccaad7097d96e66a45c1b4caea1ba4f2e54b7814184c3ebf82c87dafc4841"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/change-task-lifecycle.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "60ff9efb93604b87a461a4af30322d76750402a51e40f31531a7ff88d309996d"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/change-workflow.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "43fa780a2ca580de121b10893d49b99f978873deebbf45008c466e5ac6651519"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/customize-local/overview.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "ce8f09e9f93ce9a48500763fb3a4db2b3908a5fbf4f985ab71dacebb404cf8f4"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/local-architecture/bundled-skills.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "bac739b042d7a12dae5d14d85cbc312e56ca03f571d2ba7a25b20641ddaefc3f"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/local-architecture/context-injection.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "b1ebaac467bf0195e2a21f2f8492a8b7c91ff3e0f9312f853468cda0255df1c7"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/local-architecture/generated-files.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "ca4211b43aff79cf263c83255f557994386723d10da344c0c4e1ec211c7fcd37"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/local-architecture/overview.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "50638fd9eaaba2e0edf2f2a84d920578d5b2fb7934031b174e417d3dc510b2a6"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/local-architecture/spec-system.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "b8d8a6a0888b44a232c8f50161b9e20e903cf621ad7be4021715ab6fab226f47"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/local-architecture/task-system.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "b154568e74f1c738a51633df9f2503f416b3afa5f309325224422162e0b707e4"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/local-architecture/workflow.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "cfcdc6e4468a5d9c816e929fcca01640cd41cfdaaa4824118b40a8e460c927b6"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/local-architecture/workspace-memory.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "e6427b46aba744563c2444b30df4043cd856561b7709ec2dece26095416421fd"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/platform-files/agents.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "b806b1f0de6dfc74720014aee15ede767a58925b2b3b964f2e557ed39a65bbc0"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/platform-files/hooks-and-settings.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "cb7c1c7dd976004e4981181ab9462f8eedc4e9c014721419bd666d6608f4dd72"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/platform-files/overview.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "7bc24f5ffefe082f373562bbba715cce9e761a76f6b59ce341d4dc679971a587"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/platform-files/platform-map.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "300ddd5fcd07121a6ed1539d1e38e726f6b1e895eb0ee0b9b93b7597589b7e67"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-meta/references/platform-files/skills-and-commands.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "5732bb0a7d384a91abd0c103372f3865e0b186e75185f35e0e91b00a6b6bf5a3"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-session-insight/SKILL.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "c9e58477f71987750f025ee967ca6663ccbbede8a352506bc2f4232a356deb12"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-session-insight/references/cli-quick-reference.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "3f2dd664868f4b7f90b4800868bb34eaf8ed81246d1adaf5f4da34d1387765e3"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-session-insight/references/triggering-patterns.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "121ecd23be83d1567e8ce15c366a81073d7a2b1d3ad616fce235c07ca1f1cc20"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-spec-bootstrap/SKILL.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "97bfa68c06cebb558eb4464bc1b81f7d2d56040d75baa8de1ee5ad90cca0196a"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-spec-bootstrap/references/mcp-setup.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "df542fc8f279edd38046d26a7c8151804b708f57b24d4aa2733cea587a88c65e"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-spec-bootstrap/references/repository-analysis.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "0dae98d774f6e34559b9f3442888ac43e3a8af110c37cbefc49ce256986858b6"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-spec-bootstrap/references/spec-task-planning.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "ef493d028c3b0807a8a534bb71fb92a68129f273db763ad27ceb464a522e799d"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-spec-bootstrap/references/spec-writing.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "e9800fe9ed4a4cd87062ea1829cf2caa8d170ec15e141678a6a30e74c497f47d"
+        ]
+    },
+    {
+        "type": "safe-file-delete",
+        "from": ".pi/skills/trellis-update-spec/SKILL.md",
+        "description": "Retired Pi duplicate skill path; current Pi writes shared skills under .agents/skills",
+        "allowed_hashes": [
+            "cef32aec88db973a0a0272cf18b91d4585fe6ed6625e3de06851a5d3402f65d6"
+        ]
+    }
+  ],
+  "notes": "Run trellis update without --migrate. Existing task records, customized workflows and modified files remain protected."
+}

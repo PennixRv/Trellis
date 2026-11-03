@@ -1,101 +1,44 @@
 # Local Task System
 
-The Trellis task system is stored entirely under `.trellis/tasks/` in the user project. Each task is a directory containing requirements, context, research, state, and relationship information.
+Tasks live under .trellis/tasks/. A task record keeps its artifacts and history in place after completion or cancellation; Trellis does not move tasks into an archive.
 
-## Task Directory Structure
+## Task records
 
-```text
-.trellis/tasks/
-├── 04-28-example-task/
-│   ├── task.json
-│   ├── prd.md
-│   ├── info.md
-│   ├── implement.jsonl
-│   ├── check.jsonl
-│   └── research/
-└── archive/
-    └── 2026-04/
-```
+Each task directory may contain task.json, prd.md, design.md, implement.md, research/, and context manifests. Use only the artifacts needed by the task.
 
-| File | Purpose |
-| --- | --- |
-| `task.json` | Task metadata: status, assignee, priority, branch, parent/child tasks, and similar fields. |
-| `prd.md` | Requirements document; the most important business context during implementation. |
-| `info.md` | Optional technical design. |
-| `implement.jsonl` | List of spec/research files the implement agent must read first. |
-| `check.jsonl` | List of spec/research files the check agent must read first. |
-| `research/` | Research artifacts. Complex findings should not live only in chat. |
+task.json records identity, lifecycle status, ownership, and parent/child relationships. The Trellis CLI task workflow record stores the ordered phase route, current phase, revisions, evidence, acceptance, and authorization. Do not edit lifecycle or phase status by hand.
 
-## `task.json`
+## Parent and child tasks
 
-`task.json` records task status and metadata. Common fields:
+A parent groups related deliverables and records cross-task acceptance. Each child has its own task record and lifecycle. Record dependencies explicitly in task artifacts; tree position does not imply execution order.
 
-| Field | Meaning |
-| --- | --- |
-| `id` / `name` / `title` | Task identity and title. |
-| `status` | Status such as `planning`, `in_progress`, `review`, or `completed`. |
-| `priority` | `P0`, `P1`, `P2`, `P3`. |
-| `creator` / `assignee` | Creator and assignee. |
-| `package` | Target package in a monorepo; may be empty. |
-| `branch` / `base_branch` | Working branch and PR target branch. |
-| `children` / `parent` | Parent/child task relationships. |
-| `commit` / `pr_url` | Commit and PR information after completion. |
-| `meta` | Extension fields. |
+## Active task context
 
-The AI should not treat phase numbers as task status. Task progress is mainly determined by `status`, `prd.md`, whether JSONL context is configured, and the phase descriptions in `workflow.md`.
+The active task pointer is scoped to an AI session under .trellis/.runtime/sessions/. Use task.py current to inspect it, task.py start to attach a task to the current session, and task.py finish to clear the current session pointer. Do not create a shared global pointer.
 
-## Active Task
+## Native task operations
 
-The user sees a "current task," but Trellis stores active task state per session.
+    python3 ./.trellis/scripts/task.py create "<title>" --description "<summary>" [--parent <task>]
+    python3 ./.trellis/scripts/task.py phase show <task>
+    python3 ./.trellis/scripts/task.py validate <task>
+    python3 ./.trellis/scripts/task.py start <task>
+    python3 ./.trellis/scripts/task.py complete <task>
+    python3 ./.trellis/scripts/task.py cancel <task> --reason "<reason>" --evidence-ref <reference>
 
-```text
-.trellis/.runtime/sessions/<context-key>.json
-```
+Use phase operations through task.py phase for artifact revisions, acceptance, evidence-backed skips, waits, blocks, resume, return, route, and authorization. Consult task.py help for current arguments. Completion and cancellation occur only after Delivery Review and On-Site Closeout Phase.
 
-`task.py start` writes the task path into the runtime session file for the current session. `task.py current --source` shows the current task and where it came from. Different AI windows can point to different tasks without overwriting each other.
+The read-only trellis task progress command summarizes planning, in_progress, and completed lifecycle records. It does not change task state.
 
-If the platform or shell environment has no stable session identity, `task.py start` may be unable to set the active task. The AI should read the error, inspect the platform hook/session environment, and not fall back to a shared global pointer.
+## Context manifests
 
-## JSONL Context
+implement.jsonl and check.jsonl identify relevant spec and research files for agents that consume those manifests. They do not replace the task's planning artifacts. Keep entries curated and remove placeholder rows rejected by task.py validate.
 
-`implement.jsonl` and `check.jsonl` are context manifests for sub-agents to read first.
-
-Format:
-
-```jsonl
-{"file": ".trellis/spec/cli/backend/index.md", "reason": "Backend conventions"}
-{"file": ".trellis/tasks/04-28-example/research/api.md", "reason": "API research"}
-```
-
-Rules:
-
-- Include spec and research files.
-- Do not include code files that are about to be modified.
-- Do not treat temporary conclusions in chat as the only context.
-- Rows without a `file` field are skipped by readers. Legacy `{"_example": ...}` placeholder rows are rejected by `task.py validate` — delete them.
-
-## Common Commands
-
-```bash
-python3 ./.trellis/scripts/task.py create "<title>" --description "<one-line summary>" --slug <slug>
-python3 ./.trellis/scripts/task.py start <task>
-python3 ./.trellis/scripts/task.py current --source
-python3 ./.trellis/scripts/task.py add-context <task> implement <file> <reason>
-python3 ./.trellis/scripts/task.py validate <task>
-python3 ./.trellis/scripts/task.py finish
-python3 ./.trellis/scripts/task.py archive <task>
-```
-
-When modifying the task system, the AI should prefer script commands to maintain structure. Edit JSON/Markdown directly only when scripts do not cover the need.
-
-## Local Customization Points
+## Local customization points
 
 | Need | Edit location |
 | --- | --- |
-| Change the default task template | `.trellis/scripts/common/task_store.py` and task creation instructions. |
-| Change status semantics | `.trellis/workflow.md`, workflow-state hook logic, and task usage conventions. |
-| Add task lifecycle actions | `hooks.after_*` in `.trellis/config.yaml`. |
-| Change context rules | Phase 1.3 in `.trellis/workflow.md` and related platform agent/hook instructions. |
-| Change archive policy | `.trellis/scripts/common/task_store.py` / `task_utils.py`. |
-
-These are local files in the user project. Do not default to editing Trellis CLI source code unless the user wants to contribute upstream.
+| Change task fields or creation | .trellis/scripts/common/task_store.py |
+| Change task lookup or parsing | .trellis/scripts/common/task_utils.py |
+| Change lifecycle and phase contracts | .trellis/scripts/common/task_workflow.py and Core task model |
+| Change active session task behavior | .trellis/scripts/common/active_task.py and host integration |
+| Change task guidance | .trellis/workflow.md and the applicable phase Skill |

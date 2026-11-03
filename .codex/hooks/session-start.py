@@ -258,13 +258,9 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
     if task_status == "completed":
         return (
             f"Status: COMPLETED\nTask: {task_title}\n"
-            f"Next: Archive with `python3 ./.trellis/scripts/task.py archive {task_dir.name}` "
-            "or start a new task."
+            "Next: Start another task or end the session; finish-work only records the session journal."
         )
 
-    has_prd = (task_dir / "prd.md").is_file()
-    has_design = (task_dir / "design.md").is_file()
-    has_implement = (task_dir / "implement.md").is_file()
     present = [
         name
         for name in ("prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl")
@@ -272,20 +268,18 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
     ]
     present_line = ", ".join(present) if present else "none"
 
-    if not has_prd:
-        return (
-            f"Status: PLANNING\nTask: {task_title}\nPresent: {present_line}\n"
-            "Next: Load trellis-brainstorm and write prd.md. Stay in planning."
-        )
-
     if task_status == "planning":
-        if has_design and has_implement:
-            next_action = "Review planning artifacts with the user before `task.py start`."
-        else:
-            next_action = (
-                "Lightweight task can ask for start review with PRD-only; "
-                "complex task must add design.md and implement.md before `task.py start`."
-            )
+        next_action = (
+            "Follow the current per-turn workflow-state. Task lifecycle status and artifact presence "
+            "do not identify the business phase. If no phase route is initialized, load "
+            "`trellis-goal-exploration-and-requirements` and confirm the requirements baseline "
+            "before initializing the route."
+        )
+        if any(
+            path.is_file() and not _has_curated_jsonl_entry(path)
+            for path in (task_dir / "implement.jsonl", task_dir / "check.jsonl")
+        ):
+            next_action += " Curate task context manifests only when a dispatched agent needs them."
         return (
             f"Status: PLANNING\nTask: {task_title}\nPresent: {present_line}\n"
             f"Next: {next_action}"
@@ -293,8 +287,9 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
 
     return (
         f"Status: {task_status.upper()}\nTask: {task_title}\nPresent: {present_line}\n"
-        "Next: Follow the matching per-turn workflow-state. Context order is jsonl entries, "
-        "prd.md, design.md if present, implement.md if present."
+        "Next: Follow the matching per-turn workflow-state; task lifecycle status does not "
+        "identify the business phase. Context order is jsonl entries, `prd.md`, `design.md` "
+        "if present, `implement.md` if present."
     )
 
 
@@ -425,14 +420,23 @@ def _extract_range(content: str, start_header: str, end_header: str) -> str:
     lines = content.splitlines()
     start: "int | None" = None
     end: int = len(lines)
-    start_match = f"## {start_header}"
-    end_match = f"## {end_header}"
+    start_matches = {f"## {start_header}", "## 阶段索引", "## Phase Index"}
+    end_matches = {
+        f"## {end_header}",
+        f"### {end_header}",
+    }
+    phase_titles = ("目标探索与需求核对阶段", "Goal Exploration and Requirements Confirmation Phase")
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if start is None and stripped == start_match:
+        if start is None and stripped in start_matches:
             start = i
             continue
-        if start is not None and stripped == end_match:
+        heading = stripped.lstrip("#").strip()
+        is_phase_heading = stripped.startswith(("## ", "### ")) and any(
+            heading == title or heading.endswith((f"：{title}", f": {title}"))
+            for title in phase_titles
+        )
+        if start is not None and (stripped in end_matches or is_phase_heading):
             end = i
             break
     if start is None:
@@ -480,11 +484,11 @@ def _build_workflow_toc(workflow_path: Path) -> str:
 
     out_lines = [
         "# Development Workflow - Session Summary",
-        "Full guide: .trellis/workflow.md. Step detail: `python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>`.",
+        "Full guide: .trellis/workflow.md. Phase detail: load the Skill named in the active phase breadcrumb.",
         "",
     ]
 
-    phases = _extract_range(content, "Phase Index", "Phase 1: Plan")
+    phases = _extract_range(content, "阶段索引", "目标探索与需求核对阶段")
     if phases:
         out_lines.append(_strip_breadcrumb_tag_blocks(phases).rstrip())
 

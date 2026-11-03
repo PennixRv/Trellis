@@ -7,7 +7,7 @@ This directory is for local AI working in a user project where Trellis was insta
 | User wording | Read first |
 | --- | --- |
 | "Change the Trellis flow / phases / next prompt" | `change-workflow.md` |
-| "Change task creation, status, archive, or hooks" | `change-task-lifecycle.md` |
+| "Change task creation, lifecycle, phase state, or hooks" | `change-task-lifecycle.md` |
 | "AI did not read context / change injected content" | `change-context-loading.md` |
 | "A platform hook is not behaving as expected" | `change-hooks.md` |
 | "Change implement/check/research agent behavior" | `change-agents.md` |
@@ -17,7 +17,7 @@ This directory is for local AI working in a user project where Trellis was insta
 
 ## General Operation Order
 
-1. **Confirm platform and directories**: inspect which directories exist, such as `.claude/`, `.codex/`, `.cursor/`.
+1. **Confirm platform and directories**: inspect which directories exist, such as `.claude/`, `.codex/`, `.cursor/`, `.zcode/`.
 2. **Confirm the current active task**: run `python3 ./.trellis/scripts/task.py current --source`.
 3. **Read the local source of truth**: prefer `.trellis/workflow.md`, `.trellis/config.yaml`, and relevant platform files.
 4. **Modify narrowly**: edit only files related to the user's request.
@@ -32,13 +32,13 @@ This directory is for local AI working in a user project where Trellis was insta
 | Task material | `.trellis/tasks/<task>/` |
 | Project specs | `.trellis/spec/` |
 | Runtime scripts | `.trellis/scripts/` |
-| Platform integration | `.claude/`, `.codex/`, `.cursor/`, `.opencode/`, and similar directories |
+| Platform integration | `.claude/`, `.codex/`, `.cursor/`, `.opencode/`, `.zcode/`, and similar directories |
 | Shared skill | `.agents/skills/` |
 
 ## Things Not To Do By Default
 
 - Do not edit the global npm install directory.
-- Do not edit `node_modules/@mindfoldhq/trellis`.
+- Do not edit `node_modules/@pennixrv/trellis`.
 - Do not assume the user has the Trellis GitHub repository.
 - Do not overwrite local files already modified by the user with default templates.
 - Do not put team project rules into public `trellis-meta`; project rules belong in `.trellis/spec/` or a local skill.

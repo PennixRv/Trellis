@@ -65,7 +65,7 @@ This command lists packages and spec layers for the current project. Use this ou
 
 ## How Specs Enter Tasks
 
-Before a task enters implementation, Phase 1.3 should write relevant specs into `implement.jsonl` / `check.jsonl`:
+Before a task enters implementation, planning may write relevant specs into `implement.jsonl` / `check.jsonl` when the task needs spec or research context beyond the task artifacts:
 
 ```jsonl
 {"file": ".trellis/spec/cli/backend/index.md", "reason": "CLI backend conventions"}
@@ -95,7 +95,7 @@ When the AI learns a new rule during implementation or debugging, it should upda
 | Change monorepo spec mapping | `packages` / `default_package` / `spec_scope` in `.trellis/config.yaml`. |
 | Change which specs AI reads before implementation | The task's `implement.jsonl`. |
 | Change which specs AI reads during checking | The task's `check.jsonl`. |
-| Change when specs should be updated | Phase 3.3 in `.trellis/workflow.md` and the `trellis-update-spec` skill. |
+| Change when specs should be updated | Solution Design and Convergence Phase guidance in `.trellis/workflow.md` and the `trellis-update-spec` skill. |
 
 ## Boundaries
 
