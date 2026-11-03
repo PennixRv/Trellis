@@ -172,3 +172,35 @@ load-bearing (blocks `/work/ws-evil` matching trusted `/work/ws`). The OMP
 template carries a standalone verbatim copy of the parser/resolver; changes
 must be mirrored there. Do not relax to lexical checks — realpath containment
 is the defense from the 2026-07-10 audit (#409 family).
+
+## Asset snapshots and shared maintenance
+
+`utils/asset-backup.ts` owns project-local `backup` snapshots; it is separate
+from the external ablation transaction. Use the positive template baseline
+plus actual planned file changes, never recursive project backup. Exclude
+tasks, specs, workspace, session/handoff history, runtime, credentials, caches,
+dependencies, and worktrees. Resolve canonical project identity and reject
+every symlink component. Publish private snapshots only after payload and
+manifest verification; record snapshot completion separately from update success.
+
+Restore validates strict schema, project identity, scope, hashes, modes,
+unexpected payload files, and exact task layout/phase runtime compatibility.
+Require a current preview digest and explicit execution; modified files stay
+conflicts unless separately reviewed with replacement. Preserve mixed
+AGENTS.md user text. Save a recovery snapshot and durable restoring record
+before writes; resume only against recorded current/desired fingerprints.
+Retain unresolved operations and their recovery snapshots during cleanup.
+
+Cleanup defaults to preview and at least three complete snapshots. Full
+cleanup and recognized legacy sidecars require explicit options. Unknown,
+malformed, incomplete, symlink, or directory sidecars remain protected;
+report per-object failures and content bytes without claiming physical block
+reclamation. Legacy discovery is not permission to restore incompatible data.
+
+All asset writers use the existing project maintenance lock, held through
+asynchronous settlement. Read-only previews stay available. Only a positively
+identified dead process allows stale-lock recovery; malformed, live, and
+replaced locks must remain. Release checks the owned inode and nonce. Atomic
+file replacement uses exclusive unique sibling temporaries with final modes
+set before rename. See asset-backup, maintenance-lock, atomic-write, and real
+update integration tests for failure and recovery contracts.

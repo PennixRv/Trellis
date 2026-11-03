@@ -1150,7 +1150,11 @@ subpath surface — the CLI must not deep-import them.
 | `shortDate`, `shortPath`                                     | terminal formatting — tested directly        |
 
 The CLI wrapper composes the core API, renders results, maps warnings to
-stderr, emits the OpenCode-unavailable notice, and owns exit codes.
+stderr, and owns exit codes. OpenCode SQLite retrieval is supported. Argument
+parsing rejects unknown, duplicate, missing-value, and command-inapplicable
+flags with exit code 2; unsupported `--task` must not silently broaden a query.
+Search joins all positional query words. Historical extract phase values
+`brainstorm|implement|all` describe create/start boundaries, not business phases.
 
 ---
 
