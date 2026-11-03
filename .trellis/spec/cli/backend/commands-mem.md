@@ -915,6 +915,11 @@ dropped before this loop.
 
 ### `readJsonl` chunked streaming + `0x7b` fast-reject
 
+UTF-8 解码必须在连续块之间复用 `StringDecoder`，并在正常 EOF 时 flush；
+不能逐块使用 `Buffer.toString`，否则中文或 emoji 跨越 256 KiB 边界时会损坏。
+提前返回 `"stop"` 时不 flush 或继续读取。`test/mem/jsonl.test.ts` 覆盖多字节拆分、
+无尾换行、损坏行跳过与提前停止。
+
 `core/mem/internal/jsonl.ts:readJsonl` is the canonical JSONL reader for every
 platform adapter. It is **not** `fs.readFileSync` + `data.split("\n")` — that pattern
 allocated the entire file (tens of MB on long Claude sessions) as one string

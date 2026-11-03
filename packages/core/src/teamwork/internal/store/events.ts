@@ -2,6 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 
 import { withLock } from "./lock.js";
+import { redactDiagnostic } from "./diagnostics.js";
 import {
   sessionDir,
   eventsPath,
@@ -502,11 +503,16 @@ export async function appendEvent(
 
     const lastSeq = await reconcileSeq(jsonl, sidecar);
     const event = {
-      ...partial,
+      ...(partial.kind === "error" || partial.kind === "progress"
+        ? redactDiagnostic(partial)
+        : partial),
       seq: lastSeq + 1,
       ts: partial.ts ?? new Date().toISOString(),
     } as TeamworkEvent;
-    await fsp.appendFile(jsonl, JSON.stringify(event) + "\n", "utf-8");
+    await fsp.appendFile(jsonl, JSON.stringify(event) + "\n", {
+      encoding: "utf-8",
+      mode: 0o600,
+    });
     await writeSidecar(sidecar, event.seq);
     return event;
   });

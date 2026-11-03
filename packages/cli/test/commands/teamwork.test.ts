@@ -666,7 +666,10 @@ describe("Teamwork teammate stdout pump", () => {
     const stdout = new PassThrough();
     const order: string[] = [];
     const adapter = {
-      parseLine: vi.fn(() => ({ events: [] })),
+      parseLine: vi.fn((line: string) => {
+        order.push(`parsed:${line}`);
+        return { events: [] };
+      }),
     };
     const stdoutDrained = startStdoutPump({
       sessionId: "inherited-output",
@@ -716,8 +719,8 @@ describe("Teamwork teammate stdout pump", () => {
 
     expect(order).toEqual([
       "timeout",
-      "line:captured-line",
-      "line:captured-tail",
+      "parsed:captured-line",
+      "parsed:captured-tail",
       "finalize",
       "cleanup",
       "exit",
@@ -808,7 +811,7 @@ describe("Teamwork teammate stdout pump", () => {
     releaseLines(true);
     await finalized;
 
-    expect(logged).toEqual(["first\n", "final-without-newline\n"]);
+    expect(logged).toEqual([]);
     expect(adapter.parseLine.mock.calls.map(([line]) => line)).toEqual([
       "first",
       "final-without-newline",

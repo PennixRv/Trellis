@@ -2357,3 +2357,18 @@ Note this is _only_ about `{{…}}` placeholders. The separate `python3` → `py
 | #71                           | Qoder            | Skills (like Codex/Kiro)                       | Skills with YAML frontmatter; Trae was dropped (IDE-only, no deterministic invocation trigger) |
 | feat/v0.5.0-beta              | All platforms (13 at the time; 21 today) | Unified template architecture | Common templates + shared hooks + `createTemplateReader()` factory                    |
 | `04-21-bootstrap-onboard-gap` | n/a              | Three-branch init dispatch + joiner onboarding | `.developer` file as per-checkout signal; documents the `handleReinit` two-point wiring        |
+
+## SessionStart 输入与任务错误投影
+
+共享 Hook、Codex 和 Copilot 的 SessionStart 接受空输入、无效 JSON 和非字符串
+`cwd`，以当前目录作为缺省值，沿祖先寻找最近的 `.trellis`。项目不存在或没有原生
+active-task 模块时安全返回，不输出伪造的项目上下文。最近的未完成初始化目录不能
+借用外层项目。
+
+已绑定任务的 `task.json` 缺失、不可读、不是对象或没有四种合法生命周期状态之一时，
+输出 `Status: TASK_ERROR` 与 `status=task_error`；不得回退为可继续实施的未知状态，
+也不得自动清除指针或创建替代任务。无任务时交给 request-intake 按当前授权与
+taskless 合同路由，不由 Hook 重复要求用户批准已经授权的工作。
+
+`test/scripts/session-start.integration.test.ts` 以真实隔离项目验证三个 writer 的
+非项目输入、子目录启动与任务记录错误；平台分发测试仍须共同通过。

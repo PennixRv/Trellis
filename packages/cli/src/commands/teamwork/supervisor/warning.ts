@@ -90,9 +90,8 @@ export function scheduleSupervisorTimeoutWarning(
           },
           args.project,
         );
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.write(`[supervisor] warning append failed: ${msg}\n`);
+      } catch {
+        log.write("[supervisor] warning append failed\n");
       }
     })();
   };

@@ -18,7 +18,7 @@ import { teamworkSessionRm } from "./rm.js";
 import { teamworkSessionSend } from "./send.js";
 import { teamworkSessionSpawn } from "./spawn.js";
 import { sessionDir, eventsPath } from "./store/paths.js";
-import type { TeamworkEvent } from "./store/events.js";
+import { readLastSeq, type TeamworkEvent } from "./store/events.js";
 import { watchEvents } from "./store/watch.js";
 
 export interface RunOptions {
@@ -52,6 +52,8 @@ export async function teamworkSessionRun(opts: RunOptions): Promise<void> {
   let workerName: string | null = null;
   let succeeded = false;
   try {
+    // A provider can finish or fail before spawn returns.
+    const sinceSeq = await readLastSeq(name);
     const spawned = await teamworkSessionSpawn(name, {
       agent: opts.agent,
       provider: opts.provider,
@@ -72,7 +74,7 @@ export async function teamworkSessionRun(opts: RunOptions): Promise<void> {
       stdin: opts.stdin,
     });
 
-    await waitForDone(name, workerName, timeoutMs);
+    await waitForDone(name, workerName, timeoutMs, sinceSeq);
     await printFinalMessage(name, workerName);
     succeeded = true;
   } finally {
@@ -101,6 +103,7 @@ async function waitForDone(
   sessionId: string,
   workerName: string,
   timeoutMs: number,
+  sinceSeq: number,
 ): Promise<void> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), timeoutMs);
@@ -111,7 +114,7 @@ async function waitForDone(
         self: "main",
         from: [workerName],
       },
-      { signal: abort.signal },
+      { signal: abort.signal, sinceSeq },
     )) {
       if (ev.kind === "done") return;
       if (ev.kind === "error") {

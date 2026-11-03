@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.12",
+  "description": "按 v2 设计与上游、旧 fork 补全交接和运行时健壮性",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "恢复 Teamwork 身份核验、孤儿保护、并发清理和诊断脱敏，修复 run 提前终态、mem UTF-8 分块和 SessionStart 错误投影；支持 consumed owner 使用新包正式再次交接，普通工作及旧包保持封存。",
+  "migrations": [],
+  "notes": "No task or handoff history migration required. Run the native update to refresh managed scripts and hooks; unverifiable live processes remain protected."
+}

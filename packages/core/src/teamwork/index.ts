@@ -1,4 +1,5 @@
 // Public Teamwork API surface.
+export { redactDiagnostic } from "./internal/store/diagnostics.js";
 
 export type {
   TeamworkSessionScope,

@@ -2348,6 +2348,159 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     ).toBe(taskBefore);
   });
 
+  it("allows a consumed target to hand the task to a new session with a new package", () => {
+    execFileSync("git", ["init", "--quiet"], { cwd: root });
+    execFileSync("git", ["add", "."], { cwd: root });
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=Test",
+        "commit",
+        "--quiet",
+        "-m",
+        "fixture",
+      ],
+      { cwd: root },
+    );
+    const taskArgs = [
+      "--task-id",
+      TASK,
+      "--task-path",
+      `.trellis/tasks/in_progress/${TASK}`,
+    ];
+    const packageArgs = (id: string) => [
+      "--package-id",
+      id,
+      "--package-digest",
+      "a".repeat(64),
+    ];
+    const transfer = (
+      session: string,
+      action: string,
+      id: string,
+      generation: number,
+    ) =>
+      runTaskAs(
+        root,
+        session,
+        "transfer",
+        action,
+        ...taskArgs,
+        ...packageArgs(id),
+        "--expected-generation",
+        String(generation),
+        "--explicit-user-request",
+      );
+    const step = (
+      session: string,
+      action: string,
+      id: string,
+      generation: number,
+    ) => {
+      const result = transfer(session, action, id, generation);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      return JSON.parse(result.stdout);
+    };
+    runOkAs(root, "source-session", "start", TASK);
+    step("source-session", "quiesce", "first-package", 0);
+    step("source-session", "seal", "first-package", 1);
+    step("source-session", "retire", "first-package", 2);
+    step("target-session", "claim", "first-package", 3);
+    expect(step("target-session", "consume", "first-package", 4)).toMatchObject(
+      { status: "consumed", generation: 5 },
+    );
+
+    runOkAs(root, "target-session", "set-meta", TASK, "continued_work", "true");
+    const status = () =>
+      JSON.parse(
+        runOkAs(
+          root,
+          "target-session",
+          "transfer",
+          "status",
+          ...taskArgs,
+          "--include-current",
+        ),
+      );
+    expect(status()).toMatchObject({
+      status: "consumed",
+      generation: 5,
+      target_session_id: "target-session",
+    });
+    expect(
+      transfer("target-session", "quiesce", "second-package", 0).stdout,
+    ).toContain("TASK_TRANSFER_STALE_GENERATION");
+    expect(
+      transfer("target-session", "quiesce", "first-package", 5).stdout,
+    ).toContain("TASK_TRANSFER_STALE_PACKAGE");
+    expect(
+      transfer("source-session", "quiesce", "second-package", 5).status,
+    ).toBe(1);
+    const unauthorized = runTaskAs(
+      root,
+      "target-session",
+      "transfer",
+      "quiesce",
+      ...taskArgs,
+      ...packageArgs("second-package"),
+      "--expected-generation",
+      "5",
+    );
+    expect(unauthorized.stdout).toContain("TASK_TRANSFER_NOT_AUTHORIZED");
+    expect(status().generation).toBe(5);
+
+    expect(
+      step("target-session", "quiesce", "second-package", 5),
+    ).toMatchObject({
+      status: "quiescing",
+      generation: 6,
+      source_session_id: "target-session",
+      target_session_id: null,
+    });
+    const oldPackage = runTaskAs(
+      root,
+      "target-session",
+      "transfer",
+      "status",
+      ...taskArgs,
+      ...packageArgs("first-package"),
+    );
+    expect(oldPackage.stdout).toContain("TASK_TRANSFER_STALE_PACKAGE");
+    expect(runTaskAs(root, "source-session", "start", TASK).status).toBe(1);
+    step("target-session", "seal", "second-package", 6);
+    step("target-session", "retire", "second-package", 7);
+    step("third-session", "claim", "second-package", 8);
+    expect(step("third-session", "consume", "second-package", 9)).toMatchObject(
+      {
+        status: "consumed",
+        generation: 10,
+        target_session_id: "third-session",
+      },
+    );
+    expect(
+      runTaskAs(root, "target-session", "set-meta", TASK, "old_owner", "true")
+        .status,
+    ).toBe(1);
+    runOkAs(root, "third-session", "set-meta", TASK, "new_owner", "true");
+    expect(status().generation).toBe(10);
+    for (const action of ["status", "quiesce"]) {
+      const missingDigest = runTaskAs(
+        root,
+        "third-session",
+        "transfer",
+        action,
+        ...taskArgs,
+        "--package-id",
+        "third-package",
+      );
+      expect(missingDigest.status).toBe(1);
+      expect(missingDigest.stdout).toContain("TASK_TRANSFER_INVALID_INPUT");
+    }
+  });
+
   it("captures fresh continuity and fences explicit ownership transfer by generation", () => {
     execFileSync("git", ["init", "--quiet"], { cwd: root });
     execFileSync("git", ["config", "user.email", "test@example.com"], {

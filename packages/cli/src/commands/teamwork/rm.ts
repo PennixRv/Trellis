@@ -8,12 +8,16 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
+import { teamworkSessionKill } from "./kill.js";
+import { withLock } from "./store/lock.js";
 
 import {
   sessionDir,
   teamworkRoot,
   currentProjectKey,
   eventsPath,
+  lockPath,
   listProjects,
   projectDir,
   resolveExistingTeamworkSession,
@@ -43,8 +47,35 @@ export async function teamworkSessionRm(
   if (!fs.existsSync(dir)) {
     throw new Error(`Teamwork session '${name}' not found at ${dir}`);
   }
-  await killLiveWorkers(dir);
-  fs.rmSync(dir, { recursive: true, force: true });
+  await withLock(
+    path.join(projectDir(project), ".worker-guard.lock"),
+    async () => {
+      const teammates = new Set(
+        fs
+          .readdirSync(dir)
+          .flatMap((name) =>
+            name.endsWith(".worker-pid")
+              ? [name.slice(0, -11)]
+              : name.endsWith(".pid")
+                ? [name.slice(0, -4)]
+                : [],
+          ),
+      );
+      for (const teammate of teammates) {
+        await teamworkSessionKill(name, { as: teammate, project });
+      }
+      if (
+        fs
+          .readdirSync(dir)
+          .some((entry) => /\.(spawnlock|reservation|config)$/.test(entry))
+      ) {
+        throw new Error(
+          "Pending teammate launch; session recovery files preserved",
+        );
+      }
+      fs.rmSync(dir, { recursive: true, force: true });
+    },
+  );
   if (!opts.force) {
     console.log(`Removed Teamwork session '${name}'`);
   }
@@ -91,6 +122,7 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
     project: string;
     reason: string;
     lastTs?: string;
+    eventsDigest: string;
   }[] = [];
 
   const projects =
@@ -118,37 +150,31 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
       } catch {
         continue;
       }
-      // Skip Teamwork Sessions that still have a live teammate.
+      // Preserve live, pending, or unreadable runtime evidence.
       if (hasLiveWorker(chDir)) continue;
 
       const eventsFile = eventsPath(name, project);
       let totalEvents = 0;
       let lastTs: string | undefined;
       let ephemeralFlag = false;
+      let eventsDigest: string;
       try {
         const text = fs.readFileSync(eventsFile, "utf-8");
+        eventsDigest = createHash("sha256").update(text).digest("hex");
         const lines = text.split("\n").filter((l) => l.trim());
         totalEvents = lines.length;
-        // First event is `create`; read `ephemeral` from it.
-        const first = lines[0];
-        if (first) {
-          try {
-            ephemeralFlag =
-              (JSON.parse(first) as { ephemeral?: boolean }).ephemeral === true;
-          } catch {
-            // ignore
-          }
-        }
-        const last = lines[lines.length - 1];
-        if (last) {
-          try {
-            lastTs = (JSON.parse(last) as { ts?: string }).ts;
-          } catch {
-            // ignore
-          }
-        }
+        const events = lines.map(
+          (line) =>
+            JSON.parse(line) as { ephemeral?: boolean; ts?: string } | null,
+        );
+        if (events.some((event) => !event || typeof event !== "object"))
+          continue;
+        ephemeralFlag = events[0]?.ephemeral === true;
+        lastTs = events.at(-1)?.ts;
+        if (typeof lastTs !== "string" || Number.isNaN(Date.parse(lastTs)))
+          continue;
       } catch {
-        // missing or unreadable events.jsonl — count as empty
+        continue;
       }
 
       let reason: string | null = null;
@@ -162,7 +188,8 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
         const age = Date.now() - Date.parse(lastTs);
         if (age >= opts.idleMs) reason = `idle ${Math.round(age / 60_000)}m`;
       }
-      if (reason) candidates.push({ name, project, reason, lastTs });
+      if (reason)
+        candidates.push({ name, project, reason, lastTs, eventsDigest });
     }
   }
 
@@ -191,65 +218,62 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
     return;
   }
 
+  let removed = 0;
   for (const c of candidates) {
     try {
-      await teamworkSessionRm(c.name, { force: true, project: c.project });
+      await withLock(
+        path.join(projectDir(c.project), ".worker-guard.lock"),
+        () =>
+          withLock(lockPath(c.name, c.project), () => {
+            const directory = sessionDir(c.name, c.project);
+            if (hasLiveWorker(directory)) return;
+            // Do not remove a session that changed after the preview.
+            const current = fs.readFileSync(
+              eventsPath(c.name, c.project),
+              "utf-8",
+            );
+            if (
+              createHash("sha256").update(current).digest("hex") !==
+              c.eventsDigest
+            )
+              return;
+            fs.rmSync(directory, { recursive: true, force: true });
+            removed++;
+          }),
+      );
     } catch (err) {
       console.error(
         `  failed to remove ${c.name}: ${err instanceof Error ? err.message : err}`,
       );
     }
   }
-  console.log(`\nRemoved ${candidates.length} Teamwork session(s)`);
+  console.log(`\nRemoved ${removed}/${candidates.length} Teamwork session(s)`);
 }
 
 function hasLiveWorker(dir: string): boolean {
   try {
     for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith(".pid")) continue;
+      if (
+        f.endsWith(".spawnlock") ||
+        f.endsWith(".reservation") ||
+        f.endsWith(".config")
+      )
+        return true;
+      if (!f.endsWith(".pid") && !f.endsWith(".worker-pid")) continue;
       const pid = Number(fs.readFileSync(path.join(dir, f), "utf-8").trim());
-      if (pid && pidAlive(pid)) return true;
+      if (!Number.isSafeInteger(pid) || pid <= 0 || pidAlive(pid)) return true;
     }
   } catch {
-    // ignore
+    return true;
   }
   return false;
-}
-
-async function killLiveWorkers(dir: string): Promise<void> {
-  let entries: string[];
-  try {
-    entries = fs.readdirSync(dir);
-  } catch {
-    return;
-  }
-  for (const f of entries) {
-    if (!f.endsWith(".pid")) continue;
-    const pid = Number(fs.readFileSync(path.join(dir, f), "utf-8").trim());
-    if (pid && pidAlive(pid)) {
-      try {
-        process.kill(pid, "SIGTERM");
-        const deadline = Date.now() + 1500;
-        while (pidAlive(pid) && Date.now() < deadline) {
-          await sleep(50);
-        }
-        if (pidAlive(pid)) process.kill(pid, "SIGKILL");
-      } catch {
-        // already dead
-      }
-    }
-  }
 }
 
 function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }

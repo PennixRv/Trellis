@@ -8,7 +8,7 @@ paths:
 
 # `trellis teamwork` and Core Teamwork
 
-This spec records the current runtime contracts for `packages/cli/src/commands/teamwork/` and `packages/core/src/teamwork/`. The Core package owns reusable event, projection, storage, and coordination behavior. The CLI owns command parsing, provider adapters, process supervision, and terminal output. Keep the Core public surface in `packages/core/src/teamwork/index.ts` and the package subpath `@mindfoldhq/trellis-core/teamwork` aligned.
+This spec records the current runtime contracts for `packages/cli/src/commands/teamwork/` and `packages/core/src/teamwork/`. The Core package owns reusable event, projection, storage, and coordination behavior. The CLI owns command parsing, provider adapters, process supervision, and terminal output. Keep the Core public surface in `packages/core/src/teamwork/index.ts` and the package subpath `@pennixrv/trellis-core/teamwork` aligned.
 
 ## Command surface
 
@@ -45,7 +45,7 @@ as waiting, artifact output, context isolation, transport, and capacity.
 
 ## Core and CLI boundary
 
-`@mindfoldhq/trellis-core/teamwork` owns:
+`@pennixrv/trellis-core/teamwork` owns:
 
 - Teamwork Session and event types, parsers, filters, inbox and delivery policy.
 - Event append/read/watch APIs, thread and metadata projections, worker state, and coordination projections/transitions.
@@ -78,6 +78,21 @@ Append and sequence allocation are serialized by the session lock. The `.seq` si
 - `run` is a one-shot convenience wrapper around session creation, spawn, prompt delivery, wait, result display, and cleanup. It does not replace a managed task plan.
 
 Do not make terminal status depend only on a provider process exiting: adapters may emit terminal events, while the supervisor reconciles missing terminal facts and records exit details. Preserve this ordering when changing adapters or shutdown handling.
+
+### 清理与诊断边界
+
+`kill` 在每次向 supervisor 发信号前核验命令身份；PID 必须为正安全整数。
+supervisor 已退出而子进程仍存活时，只有 Linux birth identity 与保存的
+`worker-identity` 一致才终止孤儿进程。身份缺失、宿主不支持核验、权限错误或进程
+未退出时拒绝清理并保留恢复文件。`rm` 复用该路径，并与 spawn 共用项目锁；
+`prune` 保留启动中、存活、不可读或损坏的现场，在锁内复查事件全文摘要与运行态，
+只报告实际删除数量。身份无法核验时不能用 `--force` 绕过。
+
+`run` 在 spawn 前读取事件序号，并从该序号等待结果，不能漏掉启动期间的终态。
+Core 在写入 `error`、`progress` 事件前脱敏已知凭据格式；CLI 渲染历史诊断时同样
+脱敏。消息正文保持协议语义。supervisor 日志不保存启动参数、原始 stdout 或 stderr，
+只保存必要的诊断和 stderr 字节数；配置与新建诊断文件使用私有权限。脱敏不保证
+识别任意秘密，调用方仍不得将凭据写入消息、结果或诊断。
 
 ## Managed batch coordination
 

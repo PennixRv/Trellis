@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
 import chalk from "chalk";
+import { redactDiagnostic } from "@pennixrv/trellis-core/teamwork";
 
 import {
   parseTeamworkEventKind,
@@ -111,6 +112,7 @@ export async function teamworkSessionMessages(
 }
 
 function printEvent(ev: TeamworkEvent, raw: boolean): void {
+  if (ev.kind === "error" || ev.kind === "progress") ev = redactDiagnostic(ev);
   if (raw) {
     console.log(JSON.stringify(ev));
     return;

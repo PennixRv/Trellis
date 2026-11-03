@@ -280,7 +280,6 @@ export function startStdoutPump(args: {
     child.stdout,
     async (line: string) => {
       if (processLines && !(await processLines)) return;
-      log.write(line + "\n");
       const result = adapter.parseLine(line, adapterCtx);
       await applyParseResult(
         sessionId,
@@ -292,7 +291,9 @@ export function startStdoutPump(args: {
       );
     },
     async (err) => {
-      log.write(`[supervisor] stdout line handler failed: ${err.message}\n`);
+      log.write(
+        "[supervisor] stdout line handler failed (detail in sanitized error event)\n",
+      );
       await appendEvent(sessionId, {
         kind: "error",
         by: `supervisor:${workerName}`,

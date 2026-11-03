@@ -156,3 +156,18 @@
 - 本仓保护基线 1488 份 task/spec/workspace/handoff 文件仅本 execution.md 追加，其他逐字节相同，无新增、删除或移动；251 项任务分布为 1/15/232/3，当前原生实施阶段和会话归属保持，migrate-layout 预览为空。根仓保护基线、369 项任务及 consumed 来源绑定亦核验，详细证据归父任务。
 - 原生 verify 核验本次更新完整快照后，按用户明确全清授权最后删除本仓 17 份快照、8611 个文件、68,800,751 字节，backup list 回读为空，无保护或失败对象。工作区六处合计删除 41 份快照、13,151 个文件、2,980,377,388 字节；不删除源任务或交接历史，不升级额外四仓的项目资产。
 - 根侧 offline 11 项、runner 自测 11 项、独立 handoff 三模块通过；安装组件 match/keep。仅提交本仓生成资产及本记录，源码保持既有分支，父任务固定最终 gitlink。本 owner task 继续 in_progress；没有把本轮交付等同于长期总任务关闭。全部宿主运行、Mintlify 页面渲染与未修改旧文档全站格式仍按父记录说明其验证边界。
+
+## 2026-11-04：按 v2 设计与两条基线复审
+
+- 基线为上游 beta4 `be9e19b2`、旧 fork `24451826`、本轮起点 beta.11 `47379465`；
+  源码仅在既有 `v0.7.1` 修改。完整能力处置表归根侧父任务 audit-and-closure 的
+  2026-11-04 条目，不恢复 subnode／Channel／counterOf／旧 planning 等退休语义。
+- 补回遗漏的 Teamwork 进程身份及孤儿清理保护、prune 共锁与复查、诊断脱敏、
+  run 启动前序号屏障、mem UTF-8 流解码、三个 SessionStart 的安全输入和错误投影。
+- 原生 ownership 支持 consumed 目标在新明确交接授权下以新包和当前代数再次转出；
+  旧包及来源摘要封存，普通任务修改不更新代数。开发规范及 Pennix handoff Skill
+  同步，不恢复 reconcile。专项回归已覆盖两次转移、拒绝路径和普通修改后只读查询。
+- 全量检查、生成资产同步和本轮正式交付证据待追加；不提前把局部通过记为整体完成。
+- 候选验证完成：Core 24 文件、411 项通过／1 项条件跳过；CLI 101 文件、2214 项通过／2 项条件跳过。ESLint、TypeScript、构建通过，basedpyright 为 0 errors／72 项既有 warnings。先前并行运行 typecheck 的 Core clean 与测试产生一次模块缺失；构建稳定后串行重跑全量通过，未将该失败归为产品问题。
+- handoff 原生专项 32 项及适配器三模块通过；其中主模块 29 项。Teamwork 清理新增 9 项、run 2 项、Core 诊断 2 项、JSONL 6 项、SessionStart 6 项，覆盖新锁等待、身份拒绝及错误输入。六平台隔离 init 后 update 预览无差异；npm pack 清单核验 CLI 983 文件及 Core 241 文件，相关分发资产均存在，packed CLI 精确依赖核验通过。
+- 本仓和根仓通过原生 updater 同步脚本与 Hook，保留各自明确的专用配置。GitNexus detect-changes 为 29 文件、47 符号、30 流程及 critical 影响，索引限制沿父记录保留；当前调用方和全量回归补核。双语发布说明、663 文件文档 lint、共享导航、修改文件格式与目标 beta.12 清单连续性通过。正式发布、真实重装及最终备份全清仍待本次交付回执。

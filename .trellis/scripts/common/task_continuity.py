@@ -313,6 +313,10 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
     root = get_repo_root()
     operation = args.transfer_action
     try:
+        package_bound = args.package_id is not None or args.package_digest is not None
+        if operation != "status" or package_bound:
+            if not isinstance(args.package_id, str) or not PACKAGE_ID_RE.fullmatch(args.package_id) or not isinstance(args.package_digest, str) or not PACKAGE_DIGEST_RE.fullmatch(args.package_digest):
+                raise ContinuityError("TASK_TRANSFER_INVALID_INPUT", "session package identity and SHA-256 digest are required")
         task_dir = resolve_task_dir(args.task_path, root)
         if task_dir is None or not is_within_tasks_dir(task_dir, root):
             raise ContinuityError("TASK_TRANSFER_WITHHELD", "task path is unavailable or unsafe")
@@ -328,8 +332,10 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
         path = _ownership_path(root, task_path)
         with _record_lock(path):
             record = _load_owner(path)
+            if record and (record["task_id"] != task_id or record["task_path"] != task_path):
+                raise ContinuityError("TASK_TRANSFER_WITHHELD", "ownership record does not match the requested task")
             if operation == "status":
-                if record and (record["package_id"] != args.package_id or record["package_digest"] != args.package_digest):
+                if record and package_bound and (record["package_id"] != args.package_id or record["package_digest"] != args.package_digest):
                     raise ContinuityError("TASK_TRANSFER_STALE_PACKAGE", "session package identity or digest changed")
                 result = record or {"status": "absent", "generation": 0, "task_id": task_id}
                 if args.include_current:
@@ -342,8 +348,6 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
             if args.expected_generation is None or args.expected_generation < 0:
                 raise ContinuityError("TASK_TRANSFER_INVALID_INPUT", "a non-negative expected generation is required")
             if operation == "quiesce":
-                if not PACKAGE_ID_RE.fullmatch(args.package_id) or not PACKAGE_DIGEST_RE.fullmatch(args.package_digest):
-                    raise ContinuityError("TASK_TRANSFER_INVALID_INPUT", "session package identity or SHA-256 digest is invalid")
                 context_key, current_path = _direct_pointer(root, task_path)
                 if current_path is None:
                     raise ContinuityError("TASK_TRANSFER_WITHHELD", "source session has no current task")
@@ -360,13 +364,18 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                         result = record
                         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
                         return 0
-                    raise ContinuityError("TASK_TRANSFER_STALE_GENERATION", "task already has an ownership record")
-                if args.expected_generation != 0:
+                    if record["status"] != "consumed" or record["generation"] != args.expected_generation:
+                        raise ContinuityError("TASK_TRANSFER_STALE_GENERATION", "task already has an ownership record at a different state or generation")
+                    if record["target_session_id"] != context_key:
+                        raise ContinuityError("TASK_TRANSFER_WITHHELD", "only the consumed target can start another handoff")
+                    if record["package_id"] == args.package_id:
+                        raise ContinuityError("TASK_TRANSFER_STALE_PACKAGE", "another handoff requires a new session package")
+                elif args.expected_generation != 0:
                     raise ContinuityError("TASK_TRANSFER_STALE_GENERATION", "initial ownership generation must be 0")
                 record = {
                     "schema_version": 1, "task_id": task_id, "task_path": task_path,
                     "package_id": args.package_id, "package_digest": args.package_digest,
-                    "generation": 1, "status": "quiescing", "source_session_id": context_key,
+                    "generation": args.expected_generation + 1, "status": "quiescing", "source_session_id": context_key,
                     "target_session_id": None, "continuity_digest": continuity_digest,
                     "route": _route_snapshot(data),
                 }
@@ -491,8 +500,8 @@ def add_continuity_commands(subparsers) -> None:
     transfer.add_argument("transfer_action", choices=("status", "quiesce", "seal", "retire", "claim", "consume", "release"))
     transfer.add_argument("--task-id", required=True)
     transfer.add_argument("--task-path", required=True)
-    transfer.add_argument("--package-id", required=True)
-    transfer.add_argument("--package-digest", required=True)
+    transfer.add_argument("--package-id", help="Required with --package-digest for mutations or package-bound status")
+    transfer.add_argument("--package-digest", help="Required with --package-id for mutations or package-bound status")
     transfer.add_argument("--expected-continuity-digest", help="Expected live projection for sealed-source claim recovery")
     transfer.add_argument("--expected-generation", type=int)
     transfer.add_argument("--include-current", action="store_true", help="Include the live task projection and its digest in transfer status")

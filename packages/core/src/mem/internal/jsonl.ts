@@ -11,6 +11,7 @@
  */
 
 import * as fs from "node:fs";
+import { StringDecoder } from "node:string_decoder";
 
 const CHUNK = 256 * 1024;
 const OPEN_BRACE = 0x7b; // '{'
@@ -37,13 +38,14 @@ export function readJsonl<T>(file: string, onLine: (obj: T) => unknown): void {
     return;
   }
   const buf = Buffer.alloc(CHUNK);
+  const decoder = new StringDecoder("utf8");
   let leftover = "";
   try {
     let stop = false;
     while (!stop) {
       const n = fs.readSync(fd, buf, 0, CHUNK, null);
       if (n === 0) break;
-      const chunk = leftover + buf.toString("utf8", 0, n);
+      const chunk = leftover + decoder.write(buf.subarray(0, n));
       let from = 0;
       while (true) {
         const nl = chunk.indexOf("\n", from);
@@ -67,6 +69,7 @@ export function readJsonl<T>(file: string, onLine: (obj: T) => unknown): void {
         }
       }
     }
+    if (!stop) leftover += decoder.end();
     if (!stop && leftover) {
       // File ended without a trailing newline — process the last partial line.
       const line = leftover;
