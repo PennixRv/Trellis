@@ -123,3 +123,10 @@
 - 通过 pennix update trellis-cli --version 0.7.1-beta.7 真实安装，原生回执 changed，归档 SHA-256 为 7ca6147c9539ac33bc8e9a5ba7026b3614f4022f97d03015dbd68040285579f9。安装 CLI 及其精确 Core 依赖均为 beta.7。两仓先原生 dry-run，再以 --skip-all 保留专有配置并更新版本记录。
 - beta.7 更新前后，源码仓 1421 个任务及交接文件全部哈希一致，根仓除两份明确修订的设计/实施计划外 3532 个文件全部一致，没有额外任务。两仓 migrate-layout 均返回空 moves/changed_files。最终任务分布保持：源码仓 251 项（1/15/232/3），根仓 369 项（0/2/366/1），依次为 planning/in_progress/completed/cancelled。
 - 本增量已经完成源码、发布、真实安装及目录迁移；根父任务继续固定最终 gitlink 并补录最终组合验收。源码 owner task 仍按原授权保持 in_progress，不把目录治理完成等同于全部跨组件任务关闭。
+
+## 2026-11-03：两仓活动资产审查与旧参考目录清理
+
+- 用户要求检查根仓及本源码仓的 Trellis 资产，并清理确定的旧版本残留。根仓当前平台模板全部匹配，Codex 禁用原生 agents 的配置为用户明确事实，继续保留。本源码仓的六个平台模板匹配，但 OpenCode package.json 缺失、package-lock.json 仍锁定旧依赖；通过原生 configurePlatform 的 skip 模式仅恢复该模板，再由 npm 更新锁文件。
+- 追溯发现 46 份旧 trellis-meta 参考文档及 13 份 SKILL.md.backup 没有被当前模板摘要覆盖。旧参考目录已由 local-architecture、platform-files、customize-local 承接，当前入口无入链；副本来自旧自更新提交 54d27d76。自定义 Skill、GitNexus 文件及源码维护命令仍有独立用途，不列为退役资产。
+- 修改范围为 beta.8 的逐文件哈希删除清单、真实 updater 回归与两个历史夹具、迁移规范及双语发布说明；不修改删除算法或新增清理命令。清单只含核验过的 59 条路径，依赖锁文件由 npm 维护，任务、交接历史与回滚备份不进入删除范围。
+- GitNexus getAllMigrations impact 报告 6 个受影响符号，涉及 update、manifest-prune 及卸载调用链，风险 HIGH；索引落后 10 个提交，结合当前源码确认本轮仅增加清单数据，不改变这些接口。更新、清单与 hash 裁剪定向回归 100 项通过，覆盖旧文件清理、当前文档和修改版保护、原任务不变及重复更新幂等。待完成 beta.8 正式发布、真实安装和两仓最终对齐验收。

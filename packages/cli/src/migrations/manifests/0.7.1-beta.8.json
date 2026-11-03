@@ -1,0 +1,481 @@
+{
+  "version": "0.7.1-beta.8",
+  "description": "清理旧版 trellis-meta 参考文档及 Skill 自更新副本",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "通过已知内容哈希删除旧版 trellis-meta 参考目录及 SKILL.md.backup；保留当前模板、用户修改、定制 Skill、任务与交接历史。",
+  "migrations": [
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/claude-code/agents.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "da02074b37ae3cbe860b5aa73fed757da8a2ebb93d85a920864abfbe05722289"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/claude-code/hooks.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "46606f1f989020f61d6905c343b8a38662cc4b31eb1e320fa21178a85e267c58"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/claude-code/multi-session.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "d833802ce519cab4df8df31cf3fd9d004030678122c4af47ca035f577ed01795"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/claude-code/overview.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "7e0637d9ad54c28a86285c887033f7f5de52d52f11d37a49759925c526d3f14c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/claude-code/ralph-loop.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "96fcc89fdd2ad32fc6da70a1fc49a61cfc0728b23f80c20868c9f534a94a70f2"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/claude-code/scripts.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "2587bacdf242aca426b171f8c9604ab54ff429b010145707400ecd4512776e43"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/claude-code/worktree-config.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "7a2a0188bc7aa296e60894ea32cf68cd62adf6bfb0c66e27127cb6ecf9ecb808"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/core/files.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "d92d7619c307274b218851e0d0982cd2b03f7956a0d0bb561a8c34c413baca4a"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/core/overview.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "c41dfc8eec141b664a4e1512bfb62c7a17850e1a116db19b777a2dcd6ee82c7e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/core/scripts.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "3987c052ec83d7e635a945f6640c0820d3cab7b52eb2b912ecb4ff963828b35f"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/core/specs.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "0cd795e7d33cb7880be873722d68113ec1786b689cb40a444ba98f5f09caeb99"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/core/tasks.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "0a11fc018f59d435be9712a3b81fc2177631c3beabd4cd2119aa10755aa51f70"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/core/workspace.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "79524054ac8774bc6ef4d846d172766b0d8444c664ab804b7ced15240fbf6bc3"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/how-to-modify/add-agent.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "17b3363ac6f3850023632c7908c59032052cbe7d235fc7a87077d0226b86b247"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/how-to-modify/add-command.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "64291cdbc5fd887bfbcf5adf88a4288666fd39d4ec2324cc70bf789390a8a046"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/how-to-modify/add-phase.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "e367f41be8d1c348e132e9b9ee4afbe4a4b6831204f327f377a695470b2b64d7"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/how-to-modify/add-spec.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "8088b21197c95086ccd90e799dba730a75d83d861c66b5cd183d70bf46e7ea3e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/how-to-modify/change-verify.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "d83ec239e34ed44999475a4bd003ce957912fded89498fcae1529fcf9c3ab403"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/how-to-modify/modify-hook.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "2fdf5f4247bce1e16a4bdcbdf278ebec897af164e21df01739e073a2655c33db"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/how-to-modify/overview.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "0781ac0d4830f41aae122bb5b821f27bc654e6f59bb8946c9c5443d1861017b9"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/meta/platform-compatibility.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "e838f218610203345208d24f119474d604aa91b91ab777de3469bc48c889306e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/meta/self-iteration-guide.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "1ec5c399436bbcc474991f405d80d7018a402ee019ee836278d3116782af41ca"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".agents/skills/trellis-meta/references/meta/trellis-local-template.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "9be44d63dc84ddcc2e11367315c15209ed59a752814a6db2c58ec740a8a8b743"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-before-dev/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "dd926596f3139c12d42469fb5147ac90724e3a7baca5591384f4f4bbdd530b54"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-break-loop/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "3aa6a415fc82e1d6456555d3270ba86643f7170c3fee9395ac7f6eab4db35e64"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-check/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "8b0d20b425b6030d13ac5aa0c876c5ec97cf7aca9b050f574f07f281ad25bd06"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/claude-code/agents.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "da02074b37ae3cbe860b5aa73fed757da8a2ebb93d85a920864abfbe05722289"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/claude-code/hooks.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "46606f1f989020f61d6905c343b8a38662cc4b31eb1e320fa21178a85e267c58"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/claude-code/multi-session.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "d833802ce519cab4df8df31cf3fd9d004030678122c4af47ca035f577ed01795"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/claude-code/overview.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "7e0637d9ad54c28a86285c887033f7f5de52d52f11d37a49759925c526d3f14c"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/claude-code/ralph-loop.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "96fcc89fdd2ad32fc6da70a1fc49a61cfc0728b23f80c20868c9f534a94a70f2"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/claude-code/scripts.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "2587bacdf242aca426b171f8c9604ab54ff429b010145707400ecd4512776e43"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/claude-code/worktree-config.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "7a2a0188bc7aa296e60894ea32cf68cd62adf6bfb0c66e27127cb6ecf9ecb808"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/core/files.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "d92d7619c307274b218851e0d0982cd2b03f7956a0d0bb561a8c34c413baca4a"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/core/overview.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "c41dfc8eec141b664a4e1512bfb62c7a17850e1a116db19b777a2dcd6ee82c7e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/core/scripts.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "3987c052ec83d7e635a945f6640c0820d3cab7b52eb2b912ecb4ff963828b35f"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/core/specs.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "0cd795e7d33cb7880be873722d68113ec1786b689cb40a444ba98f5f09caeb99"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/core/tasks.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "f9ae761248394b1f94fd1f8fc68616907aad56606384eed2a7c3be584082376d"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/core/workspace.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "79524054ac8774bc6ef4d846d172766b0d8444c664ab804b7ced15240fbf6bc3"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/how-to-modify/add-agent.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "17b3363ac6f3850023632c7908c59032052cbe7d235fc7a87077d0226b86b247"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/how-to-modify/add-command.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "64291cdbc5fd887bfbcf5adf88a4288666fd39d4ec2324cc70bf789390a8a046"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/how-to-modify/add-phase.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "e367f41be8d1c348e132e9b9ee4afbe4a4b6831204f327f377a695470b2b64d7"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/how-to-modify/add-spec.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "8088b21197c95086ccd90e799dba730a75d83d861c66b5cd183d70bf46e7ea3e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/how-to-modify/change-verify.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "d83ec239e34ed44999475a4bd003ce957912fded89498fcae1529fcf9c3ab403"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/how-to-modify/modify-hook.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "2fdf5f4247bce1e16a4bdcbdf278ebec897af164e21df01739e073a2655c33db"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/how-to-modify/overview.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "0781ac0d4830f41aae122bb5b821f27bc654e6f59bb8946c9c5443d1861017b9"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/meta/platform-compatibility.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "e838f218610203345208d24f119474d604aa91b91ab777de3469bc48c889306e"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/meta/self-iteration-guide.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "1ec5c399436bbcc474991f405d80d7018a402ee019ee836278d3116782af41ca"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-meta/references/meta/trellis-local-template.md",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "9be44d63dc84ddcc2e11367315c15209ed59a752814a6db2c58ec740a8a8b743"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".claude/skills/trellis-update-spec/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "ff4d5a0405a763e61936f5b9df175fd25ea20ec5c20fa999855020ab78a919b6"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-before-dev/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "e4f916891aada521fc09240ace9a7184a8138108655b2f187adecdafd5232c00"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-brainstorm/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "1be4e39dd7051d63d9e9a3a4695abcbc875f71cb1d3f568533923816a40b4ba2"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-break-loop/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "748becb6cf311b3cf55a105ca0ae17bc0dfa4a35146bfcc637c49bf98856d436"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-check/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "650bb0f76de638a536afeb702a53f320145804a1336af43160d9b263eac11f31"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".cursor/skills/trellis-update-spec/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "714ce498567304c679d4b541e13cc670ce1cfc34c2abeb6d7e7d0f7196a52eff"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-before-dev/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "e4f916891aada521fc09240ace9a7184a8138108655b2f187adecdafd5232c00"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-break-loop/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "744ee2f76038154624c9469eea5c8e2e03d3550a2be2c4479eb45d3954b70ff7"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-check/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "650bb0f76de638a536afeb702a53f320145804a1336af43160d9b263eac11f31"
+      ]
+    },
+    {
+      "type": "safe-file-delete",
+      "from": ".opencode/skills/trellis-update-spec/SKILL.md.backup",
+      "description": "Superseded generated reference or Skill sidecar; current templates provide the active content",
+      "allowed_hashes": [
+        "f391bd6ed9c1ceae9ea53348c4b6f883bb73dd64f76ce8277b7fcab3465385f9"
+      ]
+    }
+  ]
+}

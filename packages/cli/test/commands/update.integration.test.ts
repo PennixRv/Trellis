@@ -253,6 +253,14 @@ describe("update() integration", () => {
         new URL("research-record.md", fixtures),
         "utf-8",
       ),
+      ".agents/skills/trellis-meta/references/core/overview.md": fs.readFileSync(
+        new URL("meta-core-overview.md", fixtures),
+        "utf-8",
+      ),
+      ".claude/skills/trellis-before-dev/SKILL.md.backup": fs.readFileSync(
+        new URL("before-dev.backup.md", fixtures),
+        "utf-8",
+      ),
     };
     for (const [file, content] of Object.entries(retired)) {
       writeProjectFile(file, content);
@@ -273,6 +281,12 @@ describe("update() integration", () => {
       "user-modified retired role\n",
     );
     writeProjectFile(".agents/skills/user-note/SKILL.md", "user skill\n");
+    const modifiedReference =
+      ".claude/skills/trellis-meta/references/core/overview.md";
+    writeProjectFile(modifiedReference, "user-modified reference\n");
+    const currentReference =
+      ".agents/skills/trellis-meta/references/local-architecture/overview.md";
+    const currentContent = readProjectFile(currentReference);
 
     const beforeDryRun = readProjectFile(".trellis/.template-hashes.json");
     await update({ dryRun: true });
@@ -296,6 +310,8 @@ describe("update() integration", () => {
     expect(readProjectFile(".agents/skills/user-note/SKILL.md")).toBe(
       "user skill\n",
     );
+    expect(readProjectFile(modifiedReference)).toBe("user-modified reference\n");
+    expect(readProjectFile(currentReference)).toBe(currentContent);
     const backups = fs
       .readdirSync(projectFile(".trellis"))
       .filter((name) => name.startsWith(".backup-"));
