@@ -9,7 +9,7 @@ Often the user does not need to change Trellis mechanics; they need local AI to 
 | Rules code must follow | `.trellis/spec/<layer>/` |
 | Cross-layer thinking methods | `.trellis/spec/guides/` |
 | AI capability for a project-specific flow | Platform-local skill |
-| One-off task material | `.trellis/tasks/<task>/` |
+| One-off task material | `.trellis/tasks/<task-dir>/` |
 | Session summary | `.trellis/workspace/<developer>/journal-N.md` |
 
 ## Create A Project-Local Skill

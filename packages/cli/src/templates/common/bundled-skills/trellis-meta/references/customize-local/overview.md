@@ -29,7 +29,7 @@ This directory is for local AI working in a user project where Trellis was insta
 | --- | --- |
 | Workflow | `.trellis/workflow.md` |
 | Project configuration | `.trellis/config.yaml` |
-| Task material | `.trellis/tasks/<task>/` |
+| Task material | `.trellis/tasks/<task-dir>/` |
 | Project specs | `.trellis/spec/` |
 | Runtime scripts | `.trellis/scripts/` |
 | Platform integration | `.claude/`, `.codex/`, `.cursor/`, `.opencode/`, `.zcode/`, and similar directories |

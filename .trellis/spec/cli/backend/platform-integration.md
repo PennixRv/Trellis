@@ -1257,7 +1257,7 @@ Sub-agents on class-2 platforms run as **separate sessions** with their own sess
 2. **`task.py current --source`** — secondary. Resolves via the session-scoped runtime store. Returns `Source: session:<key>` on a precise match, or `Source: session-fallback:<key>` when the runtime contains exactly one session file (single-window inference; see `_resolve_single_session_fallback` in `active_task.py`). Returns nothing when ≥2 session files exist — refuses to guess across windows so 04-21's multi-session isolation contract holds.
 3. **Ask the user** — terminal fallback when both above yield nothing.
 
-When changing the prelude, the dispatch protocol, or the `session-fallback` semantics, all three layers must stay aligned. `regression.test.ts > [issue-225]` and `regression.test.ts > [session-fallback]` are the contract tests; `templates/trellis.test.ts > [issue-225]` asserts the workflow.md breadcrumb still carries the protocol. Manual e2e runbook lives in the historical task `.trellis/tasks/<archive>/05-04-fix-codex-subagent-missing-active-task/manual-verify.md`.
+When changing the prelude, the dispatch protocol, or the `session-fallback` semantics, all three layers must stay aligned. `regression.test.ts > [issue-225]` and `regression.test.ts > [session-fallback]` are the contract tests; `templates/trellis.test.ts > [issue-225]` asserts the workflow.md breadcrumb still carries the protocol. Manual e2e runbook lives in the historical task `.trellis/tasks/completed/2026-05/05-04-fix-codex-subagent-missing-active-task/manual-verify.md`.
 
 ### Class-3 — Extension-backed (2 platforms)
 
@@ -1399,7 +1399,7 @@ Extension-backed platforms must not call `collectSharedHooks()` for their config
 
 Historical reliability audit (per-platform evidence, GitHub issues, Cursor
 staff confirmations, Claude Code canary test) lives in the archived task:
-`.trellis/tasks/archive/2026-04/04-17-subagent-hook-reliability-audit/research/platform-hook-audit.md`
+`.trellis/tasks/completed/2026-04/04-17-subagent-hook-reliability-audit/research/platform-hook-audit.md`
 
 ---
 
@@ -1445,7 +1445,7 @@ Optional `type: "directory"` is supported for directory entries. Consumers ignor
 | Non-entry detection       | Every jsonl consumer                            | Row without a `file` key is treated as non-entry and skipped.                      |
 | Empty-file tolerance      | hook / prelude / plugin readers                 | Missing or empty jsonl is tolerated; task artifacts still load.                    |
 | Context order             | hook / prelude / Pi extension / OpenCode plugin | jsonl entries → `prd.md` → `design.md` if present → `implement.md` if present.     |
-| Archived self-references  | `task_context.py` validation                    | Preserve JSONL bytes. For an archived task, remap only exact `.trellis/tasks/<same-task-name>/...` references into that archive copy. Other paths retain repo-root resolution. |
+| Task relocation references | `task_move.py` / `task_context.py` | 显式迁移与生命周期移动原子改写 JSONL 的真实路径前缀；验证不按 basename 隐式回退。当前任务的 self-reference 不能包含 .. 或经符号链接逃逸。 |
 
 ### Validation & Error Matrix
 
@@ -1454,9 +1454,9 @@ Optional `type: "directory"` is supported for directory entries. Consumers ignor
 | `implement.jsonl` is empty (freshly created)           | `cmd_validate` reports 0 errors; `cmd_list_context` prints "(no curated entries yet)"                 | Exit 0                  |
 | `implement.jsonl` holds a legacy `{"_example": …}` row                     | `cmd_validate` prints "Placeholder \`\_example\` row …" with file, line, and remediation            | Exit 1                  |
 | `implement.jsonl` entry points at non-existent file    | `cmd_validate` prints "File not found: …" per row                                                     | Exit 1                  |
-| Archived self-reference exists in the archive copy     | Resolve inside `.trellis/tasks/archive/<year-month>/<same-task-name>/`; do not rewrite the manifest        | Exit 0                  |
-| Archived self-reference is absent from the archive copy | Report it missing even if an active task with the same name has recreated the path                         | Exit 1                  |
-| Archived self-reference traverses or follows a symlink outside the archive | Reject it as missing; never fall back to the historical active-task path                    | Exit 1                  |
+| 已迁移任务的 self-reference | 使用 JSONL 中迁移后的显式路径；不回退到同名活动任务。 | Exit 0 when present |
+| 缺失或逃逸的 self-reference | 报告缺失；不追踪 .. 或逃出任务目录的符号链接。 | Exit 1 |
+| 缺失或逃逸的 self-reference | 报告缺失；不追踪 .. 或逃出任务目录的符号链接。 | Exit 1 |
 | Lightweight task has only `prd.md`                     | Valid planning state; SessionStart / continue can ask for start review                                | No error                |
 | Complex task is missing `design.md` or `implement.md`  | Stay in planning; ask user to complete missing planning artifacts                                     | Hook / command guidance |
 | Sub-agent platform detected, but jsonl is missing      | Context readers fall back to task artifacts and warn where applicable                                 | No create failure       |
@@ -1464,10 +1464,10 @@ Optional `type: "directory"` is supported for directory entries. Consumers ignor
 ### Good / Base / Bad Cases
 
 - **Good**: complex task has `prd.md`, `design.md`, `implement.md`, and curated jsonl manifests. Context consumers load jsonl entries first, then all three artifacts.
-- **Good (archived)**: a moved task keeps its JSONL byte-for-byte; validation binds exact historical self-references to files or directories inside its archive copy while unrelated repository paths still resolve from the repository root.
+- **Good (completed)**: 原生移动同步 JSONL 路径，普通正文和二进制资料保持原样；不根据同名任务猜测旧路径。
 - **Base**: lightweight task has only `prd.md`. SessionStart / continue treats this as a valid planning state and may ask for start review.
 - **Bad**: complex task has only `prd.md` plus seed-only jsonl. SessionStart / continue must keep the task in planning; it must not treat jsonl file existence as implementation readiness.
-- **Bad (archived)**: validation resolves a historical self-reference through a recreated active task, or accepts `..` / a symlink that escapes the archived task directory.
+- **Bad (completed)**: self-reference 通过同名活动任务、`..` 或符号链接逃逸。
 
 ### Wrong vs Correct
 
@@ -1498,18 +1498,14 @@ def planning_next_action(task_dir: Path, is_complex: bool, inline_mode: bool) ->
 
 The route depends on task intent, artifact presence, and execution mode. Missing optional artifacts are skipped for lightweight tasks, but complex tasks cannot enter implementation until their planning artifacts are complete.
 
-For archived validation, resolving every JSONL path as `repo_root / file_path`
-is wrong because a preserved self-reference points at the task's former active
-location. Resolve only the exact same-task prefix against the archived task
-directory, require its canonical target to stay within that directory, and
-leave every unrelated path on normal repository-root resolution.
+迁移是显式写操作；验证只解析真实路径并校验任务 self-reference 的 containment，不暗中重绑旧路径。
 
 ### Tests Required
 
 - **Create behavior**: `task.py create` creates default `prd.md` and empty jsonl only on sub-agent-capable platforms, and prints the curation instructions to the console.
 - **Consumer tolerance**: `inject-subagent-context.py` skips rows without a `file` key and still injects task artifacts.
-- **Validate placeholder**: `task.py validate` passes for empty jsonl and fails with a remediation message for a legacy `{"_example": …}` row, in both active and archived tasks.
-- **Validate archive binding**: cover archived self files and directories, unrelated paths, a missing archive copy with a recreated active task, traversal, symlink escape, and unchanged active-task behavior.
+- **Validate placeholder**: `task.py validate` passes for empty jsonl and fails with a remediation message for a legacy `{"_example": …}` row, in every status directory.
+- **Validate relocated context**: cover files, directories, unrelated paths, missing references, traversal and symlink escape in completed and active tasks.
 - **List-context empty**: `task.py list-context` prints "(no curated entries yet)" for an uncurated jsonl.
 - **Artifact gates**: workflow-state, SessionStart, and continue distinguish PRD-only lightweight tasks from complex tasks that still need `design.md` / `implement.md`.
 
@@ -2046,7 +2042,7 @@ For agent-capable platforms, do NOT edit code in the main session; dispatch `tre
 [/workflow-state:in_progress]
 ```
 
-STATUS matches `task.json.status`. Built-in: `planning` / `in_progress` / `completed`. Custom statuses (including hyphenated like `in-review`) are recognized — STATUS regex is `[A-Za-z0-9_-]+`.
+STATUS matches `task.json.status`. Lifecycle values: `planning` / `in_progress` / `completed` / `cancelled`. Marker names may also identify phases or pseudo states; their parser regex `[A-Za-z0-9_-]+` does not add lifecycle statuses.
 
 ### Fallback Strategy (hook never crashes)
 
@@ -2116,18 +2112,11 @@ The hook uses `find_trellis_root()` to walk up from CWD until it finds `.trellis
 
 ZCode hook commands must also make the script path itself CWD-robust. Use the ZCode project-root placeholder in `.zcode/config.json`, for example `{{PYTHON_CMD}} "${ZCODE_PROJECT_DIR}/.zcode/hooks/inject-workflow-state.py"`, rather than `{{PYTHON_CMD}} .zcode/hooks/inject-workflow-state.py`. The Python hook's `find_trellis_root()` only runs after Python opens the script; a cwd-relative command can fail before the hook starts if ZCode launches from a nested directory such as `.github/docs/...`.
 
-### Why No State Machine / No Extra `task.json` Fields
+### 生命周期、阶段与目录各司其职
 
-After first-principles analysis (historical task:
-`.trellis/tasks/archive/2026-04/04-17-workflow-enforcement-v2/prd.md`), we
-dropped the original design's `current_phase` string / `phase_history` /
-`checkpoints` / 7 new `task.py` commands / skill tail blocks. The core insight:
-**workflow.md Phase 1.0/1.1/... is documentation layering, not runtime state**.
-The existing `task.json.status` (`planning` / `in_progress` / `completed`) is
-sufficient to express task lifecycle; sub-phase position is inferred by the AI
-from conversation history + git state.
+四种 task status 表达生命周期；`meta.task_workflow` 通过原生 phase 命令记录有序阶段路线、当前阶段、revision、接受及独立实施授权。workflow.md 是流程和提示正文来源，不能取代阶段事实。阶段完成不等于 task 完成，正式会话交接不构成阶段或状态。
 
-This keeps state minimal, avoids the "task.json drifts from filesystem reality" class of bugs, and is trivially customizable — users modify one markdown file, not Python/TypeScript.
+状态目录由 task_layout.py 有界枚举，task_move.py 原子投影；旧平铺与 archive 仅能经显式 migrate-layout 转换。布局不能成为第二份状态事实，也不能从路径推断历史授权。
 
 ---
 

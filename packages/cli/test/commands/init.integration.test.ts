@@ -1215,7 +1215,12 @@ describe("init() integration", () => {
 
     await init({ yes: true, user: "dev" });
 
-    const taskDir = path.join(tmpDir, PATHS.TASKS, "00-bootstrap-guidelines");
+    const taskDir = path.join(
+      tmpDir,
+      PATHS.TASKS,
+      "planning",
+      "00-bootstrap-guidelines",
+    );
     expect(fs.existsSync(taskDir)).toBe(true);
 
     const taskJson = JSON.parse(

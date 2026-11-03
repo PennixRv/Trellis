@@ -59,7 +59,7 @@ Create and inspect the durable runtime object with the native CLI:
 
 ```bash
 trellis teamwork create <name> --type chat|forum \
-  --task .trellis/tasks/<task> --description "bounded discussion"
+  --task .trellis/tasks/<task-dir> --description "bounded discussion"
 trellis teamwork list [--scope project|global] [--all]
 trellis teamwork messages <name> [--raw]
 trellis teamwork wait <name> --as <agent> --kind done,turn_finished

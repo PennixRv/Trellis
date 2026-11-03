@@ -19,6 +19,7 @@ from pathlib import Path
 from .io import describe_json_read_failure, read_json_checked
 from .paths import FILE_TASK_JSON
 from .types import TaskInfo
+from .task_layout import iter_task_dirs, task_status_dir
 
 
 def load_task(task_dir: Path) -> TaskInfo | None:
@@ -72,14 +73,14 @@ def iter_active_tasks(tasks_dir: Path) -> Iterator[TaskInfo]:
     Yields:
         TaskInfo for each valid task.
     """
-    if not tasks_dir.is_dir():
-        return
+    from .task_move import require_settled_layout
 
-    for d in sorted(tasks_dir.iterdir()):
-        if not d.is_dir():
-            continue
+    require_settled_layout(tasks_dir.parent.parent)
+    for d in iter_task_dirs(tasks_dir):
         info = load_task(d)
         if info is not None:
+            if info.status != task_status_dir(d, tasks_dir):
+                print(f"[WARN] Task status/directory mismatch: {d}", file=sys.stderr)
             yield info
 
 

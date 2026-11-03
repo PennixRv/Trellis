@@ -344,34 +344,18 @@ def resolve_task_ref(task_ref: str, repo_root: Path | None = None) -> Path | Non
     else:
         candidate = root / DIR_WORKFLOW / DIR_TASKS / path_obj
 
-    # resolve() collapses `..` and follows symlinks, so a task directory that
-    # links outside the repo is refused too. Both sides are resolved because
-    # repo_root itself may sit behind a symlink (/tmp on macOS does).
+    from .task_layout import task_status_dir
+    from .task_move import require_settled_layout
+
     try:
-        resolved = candidate.resolve()
-        workflow_real = (root / DIR_WORKFLOW).resolve()
-    except OSError:
+        require_settled_layout(root)
+        tasks = root / DIR_WORKFLOW / DIR_TASKS
+        if task_status_dir(candidate, tasks) is None:
+            return None
+        relative = candidate.resolve().relative_to(tasks.resolve())
+        return tasks / relative
+    except (ValueError, OSError, RuntimeError):
         return None
-
-    try:
-        resolved.relative_to(root)
-        return resolved
-    except ValueError:
-        pass
-
-    # `.trellis` may itself be a symlink into a store outside the repo (#567).
-    # The workflow dir's own real location is then a second legitimate
-    # containment base: a ref through that link never left the workflow tree.
-    # A ref that escapes BOTH bases (traversal, absolute path elsewhere, a
-    # task dir symlinked out of the tree) is still refused.
-    try:
-        rel = resolved.relative_to(workflow_real)
-    except ValueError:
-        return None
-
-    # Map back to the in-repo (lexical) form so callers store the same
-    # repo-relative ref as in the non-symlinked layout.
-    return root / DIR_WORKFLOW / rel
 
 
 def get_current_task(

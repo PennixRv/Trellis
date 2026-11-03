@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .paths import get_repo_root, get_tasks_dir
+from .task_layout import iter_task_dirs, task_status_dir
 
 if TYPE_CHECKING:
     import subprocess
@@ -28,20 +29,14 @@ if TYPE_CHECKING:
 def is_within_tasks_dir(task_dir_abs: Path, repo_root: Path | None = None) -> bool:
     """Check that a resolved task directory really is a task under the tasks dir.
 
-    A real task lives directly at ``.trellis/tasks/<name>``. This returns True
-    only when ``task_dir_abs`` is an immediate child of the tasks directory.
-
-    The task must be a direct child of the tasks directory, not the directory
-    itself or a nested path.
+    A real task occupies one prescribed status directory, never nested content.
     """
     if repo_root is None:
         repo_root = get_repo_root()
     try:
-        resolved = task_dir_abs.resolve()
-        tasks_resolved = get_tasks_dir(repo_root).resolve()
+        return task_status_dir(task_dir_abs, get_tasks_dir(repo_root)) is not None
     except (OSError, RuntimeError):
         return False
-    return resolved.parent == tasks_resolved and resolved.name != "archive"
 
 
 # =============================================================================
@@ -74,22 +69,19 @@ def find_task_by_name(task_name: str, tasks_dir: Path) -> Path | None:
         print(f"Error: invalid task name: {task_name}", file=sys.stderr)
         return None
 
-    # Try exact match first
-    exact_match = tasks_dir / task_name
-    if exact_match.is_dir():
-        return exact_match
-
-    # Try suffix match (e.g., "my-task" matches "01-21-my-task")
-    matches = sorted(
-        d for d in tasks_dir.iterdir()
-        if d.is_dir() and d.name.endswith(f"-{task_name}")
-    )
+    try:
+        candidates = list(iter_task_dirs(tasks_dir))
+    except (ValueError, OSError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return None
+    exact = [d for d in candidates if d.name == task_name]
+    matches = exact or [d for d in candidates if d.name.endswith(f"-{task_name}")]
     if len(matches) == 1:
         return matches[0]
     if matches:
         print(f"Error: ambiguous task name '{task_name}' matches:", file=sys.stderr)
         for match in matches:
-            print(f"  - {match.name}", file=sys.stderr)
+            print(f"  - {match.relative_to(tasks_dir)}", file=sys.stderr)
         print("Pass the full task directory name.", file=sys.stderr)
 
     return None
@@ -126,6 +118,14 @@ def resolve_task_dir(target_dir: str, repo_root: Path) -> Path | None:
     """
     if not target_dir:
         print("Error: task directory is required", file=sys.stderr)
+        return None
+
+    from .task_move import require_settled_layout
+
+    try:
+        require_settled_layout(repo_root)
+    except ValueError as error:
+        print(f"Error: {error}", file=sys.stderr)
         return None
 
     normalized = target_dir.replace("\\", "/")
@@ -173,6 +173,10 @@ def resolve_task_dir(target_dir: str, repo_root: Path) -> Path | None:
             f"Error: refusing to use '{target_dir}': {resolved} is outside {tasks_resolved}",
             file=sys.stderr,
         )
+        return None
+
+    if not is_within_tasks_dir(candidate, repo_root):
+        print(f"Error: invalid task layout: {target_dir}; run task.py migrate-layout for old tasks", file=sys.stderr)
         return None
 
     # Hand back the path spelled through the repo's own tasks dir rather than

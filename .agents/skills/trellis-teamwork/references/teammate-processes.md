@@ -26,8 +26,8 @@ interactive discussion:
 ```bash
 trellis teamwork run [name]
 trellis teamwork spawn <name> --agent teammate --provider <provider> \
-  --as reviewer --file .trellis/tasks/<task>/prd.md \
-  --jsonl .trellis/tasks/<task>/research.jsonl
+  --as reviewer --file .trellis/tasks/<task-dir>/prd.md \
+  --jsonl .trellis/tasks/<task-dir>/research.jsonl
 trellis teamwork send <name> --as <agent> --stdin
 trellis teamwork wait <name> --as <agent> --kind done,turn_finished
 trellis teamwork interrupt <name> --as <agent> --to <teammate> --stdin

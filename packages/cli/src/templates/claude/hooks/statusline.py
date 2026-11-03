@@ -136,14 +136,19 @@ def _get_current_task_for_input(trellis_dir: Path, cc_data: dict) -> dict | None
 
 
 def _count_active_tasks(trellis_dir: Path) -> int:
-    """Count non-archived task directories with valid task.json."""
+    """Count planning and in_progress tasks using the native bounded reader."""
     tasks_dir = trellis_dir / "tasks"
     if not tasks_dir.is_dir():
         return 0
     count = 0
-    for d in tasks_dir.iterdir():
-        if d.is_dir() and d.name != "archive" and (d / "task.json").is_file():
-            count += 1
+    scripts_dir = trellis_dir / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from common.tasks import iter_active_tasks  # type: ignore[import-not-found]
+    try:
+        count = sum(1 for task in iter_active_tasks(tasks_dir) if task.status in {"planning", "in_progress"})
+    except (ValueError, OSError):
+        return 0
     return count
 
 

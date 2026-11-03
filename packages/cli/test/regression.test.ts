@@ -307,7 +307,13 @@ ${separator}
     createWorkspaceIndex(options?.headerMode ?? "current5");
 
     if (options?.taskBranch || options?.taskBaseBranch) {
-      const taskDir = path.join(tmpDir, ".trellis", "tasks", "issue-106");
+      const taskDir = path.join(
+        tmpDir,
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+      );
       fs.mkdirSync(taskDir, { recursive: true });
       fs.mkdirSync(path.join(tmpDir, ".trellis", ".runtime", "sessions"), {
         recursive: true,
@@ -316,7 +322,7 @@ ${separator}
         path.join(tmpDir, ".trellis", ".runtime", "sessions", "session-a.json"),
         JSON.stringify(
           {
-            current_task: ".trellis/tasks/issue-106",
+            current_task: ".trellis/tasks/in_progress/issue-106",
             platform: "test",
           },
           null,
@@ -586,7 +592,16 @@ describe("regression: resolve_task_dir containment chokepoint", () => {
   }
 
   function taskDir(...segments: string[]): string {
-    return path.join(tmpDir, ".trellis", "tasks", ...segments);
+    if (!segments.length) return path.join(tmpDir, ".trellis", "tasks");
+    if (segments[0] === "archive")
+      return path.join(
+        tmpDir,
+        ".trellis",
+        "tasks",
+        "completed",
+        ...segments.slice(1),
+      );
+    return path.join(tmpDir, ".trellis", "tasks", "in_progress", ...segments);
   }
 
   function makeTask(name: string): void {
@@ -666,7 +681,7 @@ describe("regression: resolve_task_dir containment chokepoint", () => {
 
     const r = runTask("set-meta", "08-09-symlinked", "pwned", "yes");
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain("refusing to use");
+    expect(r.stderr).toMatch(/refusing to use|[Ss]ymlink/);
     expect(JSON.parse(fs.readFileSync(outsideJson, "utf-8")).meta).toEqual({});
   });
 
@@ -683,8 +698,10 @@ describe("regression: resolve_task_dir containment chokepoint", () => {
     expect(r.stderr).toContain("--slug must be a plain name");
     expect(fs.existsSync(path.join(tmpDir, ".trellis", "escaped"))).toBe(false);
     expect(
-      fs.readdirSync(path.join(tmpDir, ".trellis", "tasks")).sort(),
-    ).toEqual(["08-09-real", "archive"]);
+      fs
+        .readdirSync(path.join(tmpDir, ".trellis", "tasks", "in_progress"))
+        .sort(),
+    ).toEqual(["08-09-real"]);
   });
 
   it("[audit] add-context rejects a traversal JSONL filename", () => {
@@ -692,7 +709,7 @@ describe("regression: resolve_task_dir containment chokepoint", () => {
       "add-context",
       "08-09-real",
       "../../../evil-ctx",
-      ".trellis/tasks/08-09-real/task.json",
+      ".trellis/tasks/in_progress/08-09-real/task.json",
     );
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toContain("must be a plain name");
@@ -707,7 +724,7 @@ describe("regression: resolve_task_dir containment chokepoint", () => {
       "add-context",
       "..",
       "implement",
-      ".trellis/tasks/08-09-real/task.json",
+      ".trellis/tasks/in_progress/08-09-real/task.json",
     );
     expect(r.status).not.toBe(0);
     expect(r.stderr).toContain("invalid task name");
@@ -745,12 +762,17 @@ describe("regression: resolve_task_dir containment chokepoint", () => {
 
     expect(runTask("set-meta", "08-09-real", "by-name", "1").status).toBe(0);
     expect(
-      runTask("set-meta", ".trellis/tasks/08-09-real", "by-path", "2").status,
+      runTask(
+        "set-meta",
+        ".trellis/tasks/in_progress/08-09-real",
+        "by-path",
+        "2",
+      ).status,
     ).toBe(0);
     expect(
       runTask(
         "set-meta",
-        ".trellis/tasks/archive/2026-07/08-09-old",
+        ".trellis/tasks/completed/2026-07/08-09-old",
         "archived",
         "3",
       ).status,
@@ -797,7 +819,16 @@ describe("regression: task lifecycle overwrite and collision safety", () => {
   }
 
   function taskDir(...segments: string[]): string {
-    return path.join(tmpDir, ".trellis", "tasks", ...segments);
+    if (!segments.length) return path.join(tmpDir, ".trellis", "tasks");
+    if (segments[0] === "archive")
+      return path.join(
+        tmpDir,
+        ".trellis",
+        "tasks",
+        "completed",
+        ...segments.slice(1),
+      );
+    return path.join(tmpDir, ".trellis", "tasks", "planning", ...segments);
   }
 
   function readTaskJson(...segments: string[]): Record<string, unknown> {
@@ -920,7 +951,7 @@ describe("regression: task lifecycle overwrite and collision safety", () => {
     expect(r.stderr).toContain("Parent task not resolved");
     expect(r.stderr).toContain("No task was created");
     expect(fs.readdirSync(path.join(tmpDir, ".trellis", "tasks"))).toEqual([
-      "archive",
+      "completed",
     ]);
   });
 
@@ -1097,7 +1128,16 @@ describe("regression: JSON read/write failure reporting", () => {
   }
 
   function taskDir(...segments: string[]): string {
-    return path.join(tmpDir, ".trellis", "tasks", ...segments);
+    if (!segments.length) return path.join(tmpDir, ".trellis", "tasks");
+    if (segments[0] === "archive")
+      return path.join(
+        tmpDir,
+        ".trellis",
+        "tasks",
+        "completed",
+        ...segments.slice(1),
+      );
+    return path.join(tmpDir, ".trellis", "tasks", "planning", ...segments);
   }
 
   function taskJsonPath(name: string): string {
@@ -1170,7 +1210,10 @@ describe("regression: JSON read/write failure reporting", () => {
       ]).status,
     ).toBe(0);
     const name = `${datePrefix}-latin`;
-    fs.writeFileSync(taskJsonPath(name), Buffer.from([0x7b, 0x22, 0xff, 0x22, 0x7d]));
+    fs.writeFileSync(
+      taskJsonPath(name),
+      Buffer.from([0x7b, 0x22, 0xff, 0x22, 0x7d]),
+    );
 
     const r = runTask(["set-meta", name, "k", "v"]);
     expect(r.status).not.toBe(0);
@@ -1404,7 +1447,7 @@ describe("regression: JSON read/write failure reporting", () => {
     >;
     expect(Object.keys(healthyPayload).sort()).toEqual([
       "current_task",
-        "session_source",
+      "session_source",
       "source",
       "stale",
     ]);
@@ -1476,7 +1519,9 @@ describe("regression: JSON read/write failure reporting", () => {
       const session = JSON.parse(fs.readFileSync(sessionFile, "utf-8")) as {
         current_task: string;
       };
-      expect(session.current_task).toBe(`.trellis/tasks/${datePrefix}-one`);
+      expect(session.current_task).toBe(
+        `.trellis/tasks/planning/${datePrefix}-one`,
+      );
     },
   );
 });
@@ -1502,9 +1547,12 @@ describe("regression: is_within_tasks_dir archive boundary (issue #428)", () => 
       path.join(tmpDir, ".trellis", "tasks", "archive", "2026-07", "old-task"),
       { recursive: true },
     );
-    fs.mkdirSync(path.join(tmpDir, ".trellis", "tasks", "live-task"), {
-      recursive: true,
-    });
+    fs.mkdirSync(
+      path.join(tmpDir, ".trellis", "tasks", "in_progress", "live-task"),
+      {
+        recursive: true,
+      },
+    );
     fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
   });
 
@@ -1527,7 +1575,7 @@ print(json.dumps({
     "archived_child": is_within_tasks_dir(root / ".trellis" / "tasks" / "archive" / "2026-07" / "old-task", root),
     "tasks_root": is_within_tasks_dir(root / ".trellis" / "tasks", root),
     "external_path": is_within_tasks_dir(root / "src", root),
-    "direct_child": is_within_tasks_dir(root / ".trellis" / "tasks" / "live-task", root),
+    "direct_child": is_within_tasks_dir(root / ".trellis" / "tasks" / "in_progress" / "live-task", root),
 }))
 `;
     const result = spawnSync(pythonCmd, ["-c", probe], {
@@ -2682,7 +2730,7 @@ describe("regression: current-task path normalization", () => {
       "# Guides\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "task.json"),
       JSON.stringify(
         {
           title: "Issue 106 task",
@@ -2694,11 +2742,17 @@ describe("regression: current-task path normalization", () => {
       ),
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "prd.md"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "prd.md"),
       "# PRD\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "implement.jsonl"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+        "implement.jsonl",
+      ),
       '{"file":"src/example.ts","reason":"runtime regression"}\n',
     );
   }
@@ -2759,7 +2813,7 @@ describe("regression: current-task path normalization", () => {
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis\\\\tasks\\\\issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis\\\\tasks\\\\in_progress\\\\issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -2776,9 +2830,9 @@ describe("regression: current-task path normalization", () => {
     expect(fs.existsSync(path.join(tmpDir, ".trellis", ".current-task"))).toBe(
       false,
     );
-    expect(fs.existsSync(path.join(tmpDir, ".trellis", ".runtime"))).toBe(
-      false,
-    );
+    expect(
+      fs.existsSync(path.join(tmpDir, ".trellis", ".runtime", "sessions")),
+    ).toBe(false);
 
     // task.json.status remains in_progress (was already in_progress; degraded
     // mode preserves the existing status when not planning)
@@ -2786,6 +2840,7 @@ describe("regression: current-task path normalization", () => {
       tmpDir,
       ".trellis",
       "tasks",
+      "in_progress",
       "issue-106",
       "task.json",
     );
@@ -2800,6 +2855,7 @@ describe("regression: current-task path normalization", () => {
       tmpDir,
       ".trellis",
       "tasks",
+      "in_progress",
       "issue-106",
       "task.json",
     );
@@ -2809,7 +2865,7 @@ describe("regression: current-task path normalization", () => {
 
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis\\\\tasks\\\\issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis\\\\tasks\\\\in_progress\\\\issue-106")}`,
       { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
     );
 
@@ -2823,7 +2879,7 @@ describe("regression: current-task path normalization", () => {
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis\\\\tasks\\\\issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis\\\\tasks\\\\in_progress\\\\issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -2843,7 +2899,7 @@ describe("regression: current-task path normalization", () => {
     const context = JSON.parse(fs.readFileSync(contextPath, "utf-8")) as {
       current_task: string;
     };
-    expect(context.current_task).toBe(".trellis/tasks/issue-106");
+    expect(context.current_task).toBe(".trellis/tasks/in_progress/issue-106");
     expect(fs.existsSync(path.join(tmpDir, ".trellis", ".current-task"))).toBe(
       false,
     );
@@ -2861,7 +2917,7 @@ describe("regression: current-task path normalization", () => {
     );
 
     execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -2910,7 +2966,7 @@ describe("regression: current-task path normalization", () => {
 
     // Resolve the new task directory (MM-DD-r7-auto)
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("r7-auto"));
     expect(taskDir).toBeDefined();
 
@@ -2925,7 +2981,7 @@ describe("regression: current-task path normalization", () => {
     const context = JSON.parse(fs.readFileSync(contextPath, "utf-8")) as {
       current_task: string;
     };
-    expect(context.current_task).toBe(`.trellis/tasks/${taskDir}`);
+    expect(context.current_task).toBe(`.trellis/tasks/planning/${taskDir}`);
   });
 
   it("[issue-397] task.py create stores the trimmed description and reports session activation", () => {
@@ -2962,12 +3018,19 @@ describe("regression: current-task path normalization", () => {
     expect(result.stderr).toContain("Source: session:issue-397-session");
 
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("described"));
     expect(taskDir).toBeDefined();
     const taskJson = JSON.parse(
       fs.readFileSync(
-        path.join(tmpDir, ".trellis", "tasks", taskDir as string, "task.json"),
+        path.join(
+          tmpDir,
+          ".trellis",
+          "tasks",
+          "planning",
+          taskDir as string,
+          "task.json",
+        ),
         "utf-8",
       ),
     ) as { description: string };
@@ -2981,7 +3044,10 @@ describe("regression: current-task path normalization", () => {
       "name=test-dev\ninitialized_at=2026-03-27T00:00:00\n",
     );
     writeProjectFile(path.join(".trellis", "workflow.md"), "# Workflow\n");
-    writeSessionContext("batch-session", ".trellis/tasks/existing-task");
+    writeSessionContext(
+      "batch-session",
+      ".trellis/tasks/in_progress/existing-task",
+    );
 
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const result = spawnSync(
@@ -3019,15 +3085,24 @@ describe("regression: current-task path normalization", () => {
         "utf-8",
       ),
     ) as { current_task: string };
-    expect(context.current_task).toBe(".trellis/tasks/existing-task");
+    expect(context.current_task).toBe(
+      ".trellis/tasks/in_progress/existing-task",
+    );
 
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("batch-backlog"));
     expect(taskDir).toBeDefined();
     const taskJson = JSON.parse(
       fs.readFileSync(
-        path.join(tmpDir, ".trellis", "tasks", taskDir as string, "task.json"),
+        path.join(
+          tmpDir,
+          ".trellis",
+          "tasks",
+          "planning",
+          taskDir as string,
+          "task.json",
+        ),
         "utf-8",
       ),
     ) as { description: string };
@@ -3053,7 +3128,7 @@ describe("regression: current-task path normalization", () => {
     );
 
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("r7-cli"));
     expect(taskDir).toBeDefined();
 
@@ -3066,7 +3141,7 @@ describe("regression: current-task path normalization", () => {
 
   it("[workflow-state-r7] task.py create then task.py start is idempotent without implementation authorization", () => {
     // Creating or selecting a task sets session context; only an accepted and
-     // authorized Task Implementation and Test Verification Phase route may change planning to in_progress.
+    // authorized Task Implementation and Test Verification Phase route may change planning to in_progress.
     writeTrellisScripts();
     writeProjectFile(
       path.join(".trellis", ".developer"),
@@ -3085,16 +3160,22 @@ describe("regression: current-task path normalization", () => {
     );
 
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("r7-idem"));
     expect(taskDir).toBeDefined();
-    const relTaskDir = path.posix.join(".trellis", "tasks", taskDir as string);
+    const relTaskDir = path.posix.join(
+      ".trellis",
+      "tasks",
+      "planning",
+      taskDir as string,
+    );
 
     // Status should be planning after create.
     const taskJsonPath = path.join(
       tmpDir,
       ".trellis",
       "tasks",
+      "planning",
       taskDir as string,
       "task.json",
     );
@@ -3172,7 +3253,7 @@ describe("regression: current-task path normalization", () => {
 
     expect(result.status).toBe(0);
     expect(result.stderr).toContain("normalized to");
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
+    const tasksDir = path.join(tmpDir, ".trellis", "tasks", "planning");
     expect(
       fs.existsSync(path.join(tasksDir, `${todayPrefix}-example-task`)),
     ).toBe(true);
@@ -3214,7 +3295,7 @@ describe("regression: current-task path normalization", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("date prefix");
     expect(result.stderr).toContain("--slug example-task");
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
+    const tasksDir = path.join(tmpDir, ".trellis", "tasks", "planning");
     const created = fs.existsSync(tasksDir) ? fs.readdirSync(tasksDir) : [];
     expect(created.filter((d) => d.endsWith("example-task"))).toEqual([]);
   });
@@ -3254,6 +3335,7 @@ describe("regression: current-task path normalization", () => {
           tmpDir,
           ".trellis",
           "tasks",
+          "planning",
           `${todayPrefix}-13-45-example-task`,
         ),
       ),
@@ -3271,7 +3353,7 @@ describe("regression: current-task path normalization", () => {
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3290,7 +3372,7 @@ describe("regression: current-task path normalization", () => {
     const context = JSON.parse(fs.readFileSync(contextPath, "utf-8")) as {
       current_task: string;
     };
-    expect(context.current_task).toBe(".trellis/tasks/issue-106");
+    expect(context.current_task).toBe(".trellis/tasks/in_progress/issue-106");
   });
 
   it("[zcode-session-key] hook input and shell env resolve the same runtime key", () => {
@@ -3455,7 +3537,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3477,7 +3559,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3496,7 +3578,7 @@ print(json.dumps({
     const context = JSON.parse(fs.readFileSync(contextPath, "utf-8")) as {
       current_task: string;
     };
-    expect(context.current_task).toBe(".trellis/tasks/issue-106");
+    expect(context.current_task).toBe(".trellis/tasks/in_progress/issue-106");
   });
 
   it("[session-current-task] task.py start uses DeepSeek Harness DSH_SESSION_ID", () => {
@@ -3504,7 +3586,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3523,7 +3605,7 @@ print(json.dumps({
     const context = JSON.parse(fs.readFileSync(contextPath, "utf-8")) as {
       current_task: string;
     };
-    expect(context.current_task).toBe(".trellis/tasks/issue-106");
+    expect(context.current_task).toBe(".trellis/tasks/in_progress/issue-106");
   });
 
   it("[session-current-task] DSH_SESSION_ID outranks an inherited outer Codex identity", () => {
@@ -3531,7 +3613,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3547,9 +3629,9 @@ print(json.dumps({
     expect(fs.existsSync(path.join(sessionsDir, "dsh_inner-dsh.json"))).toBe(
       true,
     );
-    expect(fs.existsSync(path.join(sessionsDir, "codex_outer-codex.json"))).toBe(
-      false,
-    );
+    expect(
+      fs.existsSync(path.join(sessionsDir, "codex_outer-codex.json")),
+    ).toBe(false);
   });
 
   it("[session-current-task] managed DSH context outranks an inherited outer Trellis override", () => {
@@ -3557,7 +3639,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3571,9 +3653,9 @@ print(json.dumps({
 
     expect(output).toContain("Source: session:dsh_inner-session");
     const sessionsDir = path.join(tmpDir, ".trellis", ".runtime", "sessions");
-    expect(fs.existsSync(path.join(sessionsDir, "dsh_inner-session.json"))).toBe(
-      true,
-    );
+    expect(
+      fs.existsSync(path.join(sessionsDir, "dsh_inner-session.json")),
+    ).toBe(true);
     expect(
       fs.existsSync(path.join(sessionsDir, "claude_outer-session.json")),
     ).toBe(false);
@@ -3584,7 +3666,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3598,9 +3680,9 @@ print(json.dumps({
 
     expect(output).toContain("Source: session:dsh_inner-session");
     const sessionsDir = path.join(tmpDir, ".trellis", ".runtime", "sessions");
-    expect(fs.existsSync(path.join(sessionsDir, "dsh_inner-session.json"))).toBe(
-      true,
-    );
+    expect(
+      fs.existsSync(path.join(sessionsDir, "dsh_inner-session.json")),
+    ).toBe(true);
     expect(
       fs.existsSync(path.join(sessionsDir, "claude_outer-session.json")),
     ).toBe(false);
@@ -3611,7 +3693,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3645,7 +3727,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3670,7 +3752,7 @@ print(json.dumps({
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -3691,7 +3773,7 @@ print(json.dumps({
         "utf-8",
       ),
     ) as { current_task: string };
-    expect(context.current_task).toBe(".trellis/tasks/issue-106");
+    expect(context.current_task).toBe(".trellis/tasks/in_progress/issue-106");
   });
 
   // ==========================================================================
@@ -3979,7 +4061,7 @@ print(json.dumps({
 
   it("[session-current-task] task.py finish ignores legacy .current-task when no session task is set", () => {
     setupTaskRepo();
-    writeLegacyCurrentTask(".trellis/tasks/issue-106");
+    writeLegacyCurrentTask(".trellis/tasks/in_progress/issue-106");
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     const output = execSync(
@@ -3999,7 +4081,7 @@ print(json.dumps({
 
   it("[session-current-task] task.py current ignores legacy .current-task without context key", () => {
     setupTaskRepo();
-    writeLegacyCurrentTask(".trellis/tasks/issue-106");
+    writeLegacyCurrentTask(".trellis/tasks/in_progress/issue-106");
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     let output = "";
@@ -4028,11 +4110,14 @@ print(json.dumps({
 
   it("[session-current-task] stale session task does not fall back to legacy .current-task", () => {
     setupTaskRepo();
-    writeLegacyCurrentTask(".trellis/tasks/issue-106");
+    writeLegacyCurrentTask(".trellis/tasks/in_progress/issue-106");
     writeProjectFile(
       path.join(".trellis", ".runtime", "sessions", "session-b.json"),
       JSON.stringify(
-        { current_task: ".trellis/tasks/missing-task", platform: "test" },
+        {
+          current_task: ".trellis/tasks/in_progress/missing-task",
+          platform: "test",
+        },
         null,
         2,
       ),
@@ -4048,7 +4133,9 @@ print(json.dumps({
       },
     );
 
-    expect(output).toContain("Current task: .trellis/tasks/missing-task");
+    expect(output).toContain(
+      "Current task: .trellis/tasks/in_progress/missing-task",
+    );
     expect(output).toContain("Source: session:session-b");
     expect(output).toContain("State: stale");
     expect(output).not.toContain("issue-106");
@@ -4056,9 +4143,15 @@ print(json.dumps({
 
   it("[session-current-task] Claude statusline uses session-scoped task when session_id is present", () => {
     setupTaskRepo();
-    writeLegacyCurrentTask(".trellis/tasks/issue-106");
+    writeLegacyCurrentTask(".trellis/tasks/in_progress/issue-106");
     writeProjectFile(
-      path.join(".trellis", "tasks", "session-task", "task.json"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "session-task",
+        "task.json",
+      ),
       JSON.stringify(
         {
           title: "Session scoped task",
@@ -4073,7 +4166,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "claude_status-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/session-task",
+          current_task: ".trellis/tasks/in_progress/session-task",
           platform: "claude",
         },
         null,
@@ -4119,7 +4212,7 @@ print(json.dumps({
 
   it("[session-current-task] Claude statusline ignores legacy .current-task without session context", () => {
     setupTaskRepo();
-    writeLegacyCurrentTask(".trellis/tasks/issue-106");
+    writeLegacyCurrentTask(".trellis/tasks/in_progress/issue-106");
     writeProjectFile(
       path.join(".claude", "hooks", "statusline.py"),
       getStatuslineHook(),
@@ -4235,8 +4328,14 @@ print(json.dumps({
 
   it("[session-current-task] Python session-start hooks resolve session backslash refs without stale pointer", () => {
     setupTaskRepo();
-    writeSessionContext("claude_session-a", ".trellis\\tasks\\issue-106");
-    writeSessionContext("codex_session-a", ".trellis\\tasks\\issue-106");
+    writeSessionContext(
+      "claude_session-a",
+      ".trellis\\tasks\\in_progress\\issue-106",
+    );
+    writeSessionContext(
+      "codex_session-a",
+      ".trellis\\tasks\\in_progress\\issue-106",
+    );
 
     writeProjectFile(
       path.join(".claude", "hooks", "session-start.py"),
@@ -4653,7 +4752,7 @@ print(json.dumps({
         conversation_id: "cursor-shell-a",
         generation_id: "gen-a",
         cwd: tmpDir,
-        command: `${pythonCmd} ./.trellis/scripts/task.py start .trellis/tasks/issue-106 && ${pythonCmd} ./.trellis/scripts/task.py current --source && echo '${unicodeProbe}'`,
+        command: `${pythonCmd} ./.trellis/scripts/task.py start .trellis/tasks/in_progress/issue-106 && ${pythonCmd} ./.trellis/scripts/task.py current --source && echo '${unicodeProbe}'`,
         hook_event_name: "beforeShellExecution",
       }),
     );
@@ -4675,7 +4774,7 @@ print(json.dumps({
     expect(ticket.command).toContain(unicodeProbe);
 
     const startOutput = execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -4692,7 +4791,9 @@ print(json.dumps({
         env: sessionEnv(),
       },
     );
-    expect(currentOutput).toContain("Current task: .trellis/tasks/issue-106");
+    expect(currentOutput).toContain(
+      "Current task: .trellis/tasks/in_progress/issue-106",
+    );
     expect(currentOutput).toContain("Source: session:cursor_cursor-shell-a");
 
     const contextPath = path.join(
@@ -4706,7 +4807,7 @@ print(json.dumps({
       current_task: string;
       platform: string;
     };
-    expect(context.current_task).toBe(".trellis/tasks/issue-106");
+    expect(context.current_task).toBe(".trellis/tasks/in_progress/issue-106");
     expect(context.platform).toBe("cursor");
   });
 
@@ -4800,7 +4901,7 @@ print(json.dumps({
         );
 
         const sessionId = `e2e-${platform}`;
-        const command = `${pythonCmd} ./.trellis/scripts/task.py start .trellis/tasks/issue-106`;
+        const command = `${pythonCmd} ./.trellis/scripts/task.py start .trellis/tasks/in_progress/issue-106`;
         const payload = isShellExecutionEvent
           ? { session_id: sessionId, cwd: tmpDir, command }
           : {
@@ -4842,7 +4943,7 @@ print(json.dumps({
         expect(ticket.context_key).toBeTruthy();
 
         const startOutput = execSync(
-          `${pythonCmd} ${JSON.stringify(path.join(tmpDir, ".trellis", "scripts", "task.py"))} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+          `${pythonCmd} ${JSON.stringify(path.join(tmpDir, ".trellis", "scripts", "task.py"))} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
           { cwd: tmpDir, encoding: "utf-8", env: hookEnv() },
         );
         expect(startOutput).toContain(`Source: session:${ticket.context_key}`);
@@ -4862,7 +4963,10 @@ print(json.dumps({
         // the platform's own hook can only find the task by computing exactly
         // the same context key the ticket carried. That agreement is the whole
         // point: a ticket keyed differently writes a file no hook ever reads.
-        writeSessionContext("decoy_other_window", ".trellis/tasks/issue-106");
+        writeSessionContext(
+          "decoy_other_window",
+          ".trellis/tasks/in_progress/issue-106",
+        );
 
         // Whichever context hook this platform ships. The per-turn breadcrumb
         // names the task directory; session-start names its title.
@@ -4901,7 +5005,7 @@ print(json.dumps({
       const files = templatesFor(platform);
       const hookPath = requireInstallPath(files, SHELL_HOOK, platform);
       writeSharedHook(hookPath, SHELL_HOOK);
-      const command = `${pythonCmd} ./.trellis/scripts/task.py start .trellis/tasks/issue-106`;
+      const command = `${pythonCmd} ./.trellis/scripts/task.py start .trellis/tasks/in_progress/issue-106`;
 
       // Two windows, same repo, same subcommand, both tickets fresh.
       for (const sessionId of ["window-a", "window-b"]) {
@@ -4927,7 +5031,7 @@ print(json.dumps({
       ).toHaveLength(2);
 
       const startOutput = execSync(
-        `${pythonCmd} ${JSON.stringify(path.join(tmpDir, ".trellis", "scripts", "task.py"))} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+        `${pythonCmd} ${JSON.stringify(path.join(tmpDir, ".trellis", "scripts", "task.py"))} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
         { cwd: tmpDir, encoding: "utf-8", env: hookEnv() },
       );
       // Degraded, never a guess: two candidate keys means neither wins.
@@ -5003,9 +5107,9 @@ print(json.dumps({
           platform: "cursor",
           context_key: "cursor_legacy-window",
           cwd: tmpDir,
-          command: "task.py start .trellis/tasks/issue-106",
+          command: "task.py start .trellis/tasks/in_progress/issue-106",
           subcommands: [
-            { name: "start", task_ref: ".trellis/tasks/issue-106" },
+            { name: "start", task_ref: ".trellis/tasks/in_progress/issue-106" },
           ],
           created_at_epoch: now,
           expires_at_epoch: now + 30,
@@ -5013,7 +5117,7 @@ print(json.dumps({
       );
 
       const startOutput = execSync(
-        `${pythonCmd} ${JSON.stringify(path.join(tmpDir, ".trellis", "scripts", "task.py"))} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+        `${pythonCmd} ${JSON.stringify(path.join(tmpDir, ".trellis", "scripts", "task.py"))} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
         { cwd: tmpDir, encoding: "utf-8", env: hookEnv() },
       );
       expect(startOutput).toContain("Source: session:cursor_legacy-window");
@@ -5037,7 +5141,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "cursor_parent-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/issue-106",
+          current_task: ".trellis/tasks/in_progress/issue-106",
           current_run: null,
           platform: "cursor",
         },
@@ -5075,7 +5179,7 @@ print(json.dumps({
 
     expect(parsed.permission).toBe("allow");
     expect(prompt).toContain(
-      "=== .trellis/tasks/issue-106/prd.md (Requirements) ===",
+      "=== .trellis/tasks/in_progress/issue-106/prd.md (Requirements) ===",
     );
     expect(prompt).toContain(unicodePrompt);
     expect(parsed.hookSpecificOutput?.updatedInput?.prompt).toBe(prompt);
@@ -5100,7 +5204,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "codebuddy_parent-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/issue-106",
+          current_task: ".trellis/tasks/in_progress/issue-106",
           current_run: null,
           platform: "codebuddy",
         },
@@ -5114,14 +5218,14 @@ print(json.dumps({
     // files use the same session id on purpose — that is what the real host
     // produces, and it is why the collision is invisible without a decoy.
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-999", "prd.md"),
+      path.join(".trellis", "tasks", "in_progress", "issue-999", "prd.md"),
       "# Wrong task\n\nTOKEN_WRONG_TASK_MUST_NOT_APPEAR\n",
     );
     writeProjectFile(
       path.join(".trellis", ".runtime", "sessions", "claude_parent-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/issue-999",
+          current_task: ".trellis/tasks/in_progress/issue-999",
           current_run: null,
           platform: "claude",
         },
@@ -5130,8 +5234,7 @@ print(json.dumps({
       ),
     );
 
-    const unicodePrompt =
-      "检查测试质量。\n第二行 TOKEN_CODEBUDDY_HOOK_TEST";
+    const unicodePrompt = "检查测试质量。\n第二行 TOKEN_CODEBUDDY_HOOK_TEST";
     const hookOutput = runPython(
       path.join(".codebuddy", "hooks", "inject-subagent-context.py"),
       JSON.stringify({
@@ -5160,7 +5263,7 @@ print(json.dumps({
 
     expect(parsed.permission).toBe("allow");
     expect(prompt).toContain(
-      "=== .trellis/tasks/issue-106/prd.md (Requirements) ===",
+      "=== .trellis/tasks/in_progress/issue-106/prd.md (Requirements) ===",
     );
     expect(prompt).not.toContain("TOKEN_WRONG_TASK_MUST_NOT_APPEAR");
     expect(prompt).toContain(unicodePrompt);
@@ -5184,7 +5287,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "cursor_parent-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/issue-106",
+          current_task: ".trellis/tasks/in_progress/issue-106",
           current_run: null,
           platform: "cursor",
         },
@@ -5215,19 +5318,34 @@ print(json.dumps({
     setupTaskRepo();
     writeProjectFile(path.join(".git", "HEAD"), "ref: refs/heads/main\n");
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "implement.jsonl"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+        "implement.jsonl",
+      ),
       '{"file":"src/implement-context.md","reason":"implement contract"}\n',
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "design.md"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "design.md"),
       "TOKEN_CODEX_DESIGN\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "implement.md"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+        "implement.md",
+      ),
       "TOKEN_CODEX_PLAN\n",
     );
     writeProjectFile("src/implement-context.md", "TOKEN_CODEX_IMPLEMENT\n");
-    writeSessionContext("codex_parent-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_parent-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const injectSubagentContextScript = getSharedHookScripts().find(
       (hook) => hook.name === "inject-subagent-context.py",
     )?.content;
@@ -5261,7 +5379,9 @@ print(json.dumps({
     expect(context).toContain("<!-- trellis-hook-injected -->");
     expect(context).toContain("Trellis Native Implement Subagent");
     expect(context).toContain("`trellis-implement` role");
-    expect(context).toContain("Active task: .trellis/tasks/issue-106");
+    expect(context).toContain(
+      "Active task: .trellis/tasks/in_progress/issue-106",
+    );
     expect(context).toContain("TOKEN_CODEX_IMPLEMENT");
     expect(context).toContain("TOKEN_CODEX_DESIGN");
     expect(context).toContain("TOKEN_CODEX_PLAN");
@@ -5271,28 +5391,43 @@ print(json.dumps({
     setupTaskRepo();
     writeProjectFile(path.join(".git", "HEAD"), "ref: refs/heads/main\n");
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "implement.jsonl"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+        "implement.jsonl",
+      ),
       '{"file":"src/implement-order.md","reason":"implement ordering"}\n',
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "check.jsonl"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "check.jsonl"),
       '{"file":"src/check-order.md","reason":"check ordering"}\n',
     );
     writeProjectFile("src/implement-order.md", "TOKEN_IMPLEMENT_ORDER\n");
     writeProjectFile("src/check-order.md", "TOKEN_CHECK_ORDER\n");
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "prd.md"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "prd.md"),
       "TOKEN_PRD_ORDER\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "design.md"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "design.md"),
       "TOKEN_DESIGN_ORDER\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "implement.md"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+        "implement.md",
+      ),
       "TOKEN_PLAN_ORDER\n",
     );
-    writeSessionContext("codex_parent-order", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_parent-order",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const injectSubagentContextScript = getSharedHookScripts().find(
       (hook) => hook.name === "inject-subagent-context.py",
     )?.content;
@@ -5340,16 +5475,25 @@ print(json.dumps({
     setupTaskRepo();
     writeProjectFile(path.join(".git", "HEAD"), "ref: refs/heads/main\n");
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "implement.jsonl"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+        "implement.jsonl",
+      ),
       '{"file":"src/implement-private.md","reason":"must stay isolated"}\n',
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "check.jsonl"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "check.jsonl"),
       '{"file":"src/check-private.md","reason":"must stay isolated"}\n',
     );
     writeProjectFile("src/implement-private.md", "TOKEN_IMPLEMENT_PRIVATE\n");
     writeProjectFile("src/check-private.md", "TOKEN_CHECK_PRIVATE\n");
-    writeSessionContext("codex_research-parent", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_research-parent",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const injectSubagentContextScript = getSharedHookScripts().find(
       (hook) => hook.name === "inject-subagent-context.py",
     )?.content;
@@ -5376,7 +5520,9 @@ print(json.dumps({
     };
     const context = parsed.hookSpecificOutput.additionalContext;
 
-    expect(context).toContain("Active task: .trellis/tasks/issue-106");
+    expect(context).toContain(
+      "Active task: .trellis/tasks/in_progress/issue-106",
+    );
     expect(context).toContain("Project Spec Directory Structure");
     expect(context).not.toContain("TOKEN_IMPLEMENT_PRIVATE");
     expect(context).not.toContain("TOKEN_CHECK_PRIVATE");
@@ -5387,7 +5533,10 @@ print(json.dumps({
   it("[codex-native-subagents] unknown or malformed parents never borrow a sole session task", () => {
     setupTaskRepo();
     writeProjectFile(path.join(".git", "HEAD"), "ref: refs/heads/main\n");
-    writeSessionContext("codex_unrelated", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_unrelated",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const injectSubagentContextScript = getSharedHookScripts().find(
       (hook) => hook.name === "inject-subagent-context.py",
     )?.content;
@@ -5418,25 +5567,43 @@ print(json.dumps({
     setupTaskRepo();
     writeProjectFile(path.join(".git", "HEAD"), "ref: refs/heads/main\n");
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "implement.jsonl"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+        "implement.jsonl",
+      ),
       '{"file":"src/session-a.md","reason":"session A only"}\n',
     );
     writeProjectFile("src/session-a.md", "TOKEN_CODEX_SESSION_A\n");
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-107", "task.json"),
+      path.join(".trellis", "tasks", "in_progress", "issue-107", "task.json"),
       JSON.stringify({ title: "Issue 107", status: "in_progress" }, null, 2),
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-107", "prd.md"),
+      path.join(".trellis", "tasks", "in_progress", "issue-107", "prd.md"),
       "TOKEN_CODEX_PRD_B\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-107", "implement.jsonl"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-107",
+        "implement.jsonl",
+      ),
       '{"file":"src/session-b.md","reason":"session B only"}\n',
     );
     writeProjectFile("src/session-b.md", "TOKEN_CODEX_SESSION_B\n");
-    writeSessionContext("codex_parent-a", ".trellis/tasks/issue-106");
-    writeSessionContext("codex_parent-b", ".trellis/tasks/issue-107");
+    writeSessionContext(
+      "codex_parent-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
+    writeSessionContext(
+      "codex_parent-b",
+      ".trellis/tasks/in_progress/issue-107",
+    );
     const injectSubagentContextScript = getSharedHookScripts().find(
       (hook) => hook.name === "inject-subagent-context.py",
     )?.content;
@@ -5484,7 +5651,10 @@ print(json.dumps({
   it("[codex-native-subagents] non-Trellis SubagentStart agents stay silent", () => {
     setupTaskRepo();
     writeProjectFile(path.join(".git", "HEAD"), "ref: refs/heads/main\n");
-    writeSessionContext("codex_parent-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_parent-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const injectSubagentContextScript = getSharedHookScripts().find(
       (hook) => hook.name === "inject-subagent-context.py",
     )?.content;
@@ -5512,10 +5682,10 @@ print(json.dumps({
 
   it("[session-current-task] Cursor hook uses conversation_id when transcript_path is null", () => {
     setupTaskRepo();
-    writeLegacyCurrentTask(".trellis/tasks/issue-106");
+    writeLegacyCurrentTask(".trellis/tasks/in_progress/issue-106");
     writeWorkflowStateHook();
     writeProjectFile(
-      path.join(".trellis", "tasks", "cursor-task", "task.json"),
+      path.join(".trellis", "tasks", "in_progress", "cursor-task", "task.json"),
       JSON.stringify(
         {
           id: "cursor-task",
@@ -5530,7 +5700,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "cursor_cursor-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/cursor-task",
+          current_task: ".trellis/tasks/in_progress/cursor-task",
           platform: "cursor",
         },
         null,
@@ -5562,9 +5732,15 @@ print(json.dumps({
 
   it("[session-current-task] OpenCode resolver ignores legacy .current-task and uses plugin sessionID", () => {
     setupTaskRepo();
-    writeLegacyCurrentTask(".trellis/tasks/issue-106");
+    writeLegacyCurrentTask(".trellis/tasks/in_progress/issue-106");
     writeProjectFile(
-      path.join(".trellis", "tasks", "opencode-task", "task.json"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "opencode-task",
+        "task.json",
+      ),
       JSON.stringify(
         {
           title: "OpenCode task",
@@ -5578,7 +5754,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "opencode_oc-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/opencode-task",
+          current_task: ".trellis/tasks/in_progress/opencode-task",
           platform: "opencode",
         },
         null,
@@ -5592,7 +5768,7 @@ print(json.dumps({
     // `_resolve_single_session_fallback` — with exactly one session file
     // present, the resolver picks it up (NOT the legacy file).
     const none = ctx.getActiveTask();
-    expect(none.taskPath).toBe(".trellis/tasks/opencode-task");
+    expect(none.taskPath).toBe(".trellis/tasks/in_progress/opencode-task");
     expect(none.source).toBe("session-fallback:opencode_oc-a");
     expect(none.stale).toBe(false);
 
@@ -5600,7 +5776,7 @@ print(json.dumps({
       sessionID: "oc-a",
     });
 
-    expect(active.taskPath).toBe(".trellis/tasks/opencode-task");
+    expect(active.taskPath).toBe(".trellis/tasks/in_progress/opencode-task");
     expect(active.source).toBe("session:opencode_oc-a");
     expect(active.stale).toBe(false);
   });
@@ -5614,7 +5790,13 @@ print(json.dumps({
     // hijacked the resolver rather than helping it.
     setupTaskRepo();
     writeProjectFile(
-      path.join(".trellis", "tasks", "opencode-run-task", "task.json"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "opencode-run-task",
+        "task.json",
+      ),
       JSON.stringify(
         {
           title: "OpenCode run task",
@@ -5629,7 +5811,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "opencode_run-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/opencode-run-task",
+          current_task: ".trellis/tasks/in_progress/opencode-run-task",
           platform: "opencode",
         },
         null,
@@ -5640,7 +5822,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "opencode_oc-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/issue-106",
+          current_task: ".trellis/tasks/in_progress/issue-106",
           platform: "opencode",
         },
         null,
@@ -5656,7 +5838,7 @@ print(json.dumps({
       });
 
       expect(active.source).toBe("session:opencode_oc-a");
-      expect(active.taskPath).toBe(".trellis/tasks/issue-106");
+      expect(active.taskPath).toBe(".trellis/tasks/in_progress/issue-106");
       expect(active.stale).toBe(false);
     } finally {
       if (previous === undefined) {
@@ -5840,7 +6022,10 @@ print(json.dumps({
 
   it("[workflow-v2] shared session-start summarizes in-progress context without auto-dispatch approval", () => {
     setupTaskRepo();
-    writeSessionContext("claude_session-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "claude_session-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
 
     writeProjectFile(
       path.join(".claude", "hooks", "session-start.py"),
@@ -5864,7 +6049,10 @@ print(json.dumps({
 
   it("[trellis-hooks-env] runtime: shared hooks emit no additionalContext when TRELLIS_HOOKS=0", () => {
     setupTaskRepo();
-    writeSessionContext("claude_session-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "claude_session-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
 
     const claudeSession = expectTemplateContent(
       claudeSessionStart,
@@ -5922,7 +6110,10 @@ print(json.dumps({
 
   it("[session-current-task] OpenCode context layer normalizes backslash refs for downstream plugins", () => {
     setupTaskRepo();
-    writeSessionContext("opencode_oc-a", ".trellis\\tasks\\issue-106");
+    writeSessionContext(
+      "opencode_oc-a",
+      ".trellis\\tasks\\in_progress\\issue-106",
+    );
 
     const ctx = new TrellisContext(tmpDir) as TrellisContext & {
       getCurrentTask: (platformInput?: object | null) => string | null;
@@ -5930,10 +6121,10 @@ print(json.dumps({
     };
 
     expect(ctx.getCurrentTask({ sessionID: "oc-a" })).toBe(
-      ".trellis/tasks/issue-106",
+      ".trellis/tasks/in_progress/issue-106",
     );
-    expect(ctx.resolveTaskDir(".trellis\\tasks\\issue-106")).toBe(
-      path.join(tmpDir, ".trellis", "tasks", "issue-106"),
+    expect(ctx.resolveTaskDir(".trellis\\tasks\\in_progress\\issue-106")).toBe(
+      path.join(tmpDir, ".trellis", "tasks", "in_progress", "issue-106"),
     );
   });
 
@@ -5969,7 +6160,10 @@ print(json.dumps({
 
   it("[session-fallback] main CLI does not borrow a sole unrelated session", () => {
     setupTaskRepo();
-    writeSessionContext("codex_session_parent", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_session_parent",
+      ".trellis/tasks/in_progress/issue-106",
+    );
 
     const { output, status } = runTaskCurrent();
     expect(status).toBe(1);
@@ -5989,12 +6183,18 @@ print(json.dumps({
 
   it("[session-fallback] multiple session files — refuses to guess, returns none", () => {
     setupTaskRepo();
-    writeSessionContext("codex_session_a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_session_a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeProjectFile(
-      path.join(".trellis", "tasks", "other-task", "task.json"),
+      path.join(".trellis", "tasks", "in_progress", "other-task", "task.json"),
       JSON.stringify({ title: "other", status: "in_progress" }, null, 2),
     );
-    writeSessionContext("codex_session_b", ".trellis/tasks/other-task");
+    writeSessionContext(
+      "codex_session_b",
+      ".trellis/tasks/in_progress/other-task",
+    );
 
     const { output, status } = runTaskCurrent();
     expect(status).toBe(1);
@@ -6004,13 +6204,18 @@ print(json.dumps({
 
   it("[session-fallback] explicit context-key match takes precedence over fallback", () => {
     setupTaskRepo();
-    writeSessionContext("codex_session_explicit", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_session_explicit",
+      ".trellis/tasks/in_progress/issue-106",
+    );
 
     const { output, status } = runTaskCurrent({
       TRELLIS_CONTEXT_ID: "codex_session_explicit",
     });
     expect(status).toBe(0);
-    expect(output).toContain("Current task: .trellis/tasks/issue-106");
+    expect(output).toContain(
+      "Current task: .trellis/tasks/in_progress/issue-106",
+    );
     // Source should be "session:" (precise match), not "session-fallback:"
     expect(output).toContain("Source: session:codex_session_explicit");
     expect(output).not.toContain("session-fallback");
@@ -6018,8 +6223,11 @@ print(json.dumps({
 
   it("[issue #469] finish removes only the exact matched session file", () => {
     setupTaskRepo();
-    writeSessionContext("codex_exact", ".trellis/tasks/issue-106");
-    writeSessionContext("codex_thread_sibling", ".trellis/tasks/issue-106");
+    writeSessionContext("codex_exact", ".trellis/tasks/in_progress/issue-106");
+    writeSessionContext(
+      "codex_thread_sibling",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const sessionsDir = path.join(tmpDir, ".trellis", ".runtime", "sessions");
 
@@ -6043,7 +6251,10 @@ print(json.dumps({
 
   it("[issue #469] finish preserves a sole unmatched session file", () => {
     setupTaskRepo();
-    writeSessionContext("codex_previous-thread", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_previous-thread",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const fallbackPath = path.join(
       tmpDir,
@@ -6074,8 +6285,14 @@ print(json.dumps({
 
   it("[issue #469] finish deletes nothing when fallback resolution is ambiguous", () => {
     setupTaskRepo();
-    writeSessionContext("codex_thread_a", ".trellis/tasks/issue-106");
-    writeSessionContext("codex_thread_b", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_thread_a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
+    writeSessionContext(
+      "codex_thread_b",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const sessionsDir = path.join(tmpDir, ".trellis", ".runtime", "sessions");
 
@@ -6103,7 +6320,7 @@ print(json.dumps({
       path.join(".trellis", ".runtime", "sessions", "codex_malformed.json"),
       "{",
     );
-    writeSessionContext("codex_other", ".trellis/tasks/issue-106");
+    writeSessionContext("codex_other", ".trellis/tasks/in_progress/issue-106");
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const sessionsDir = path.join(tmpDir, ".trellis", ".runtime", "sessions");
 
@@ -6170,6 +6387,7 @@ print(json.dumps({
       tmpDir,
       ".trellis",
       "tasks",
+      "in_progress",
       "issue-106",
       "task.json",
     );
@@ -6200,7 +6418,10 @@ print(json.dumps({
 
   it("[workflow-state] missing/empty workflow.md degrades to generic line (post-R5: no fallback dict)", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     // overwrite workflow.md with empty content (no tag blocks). After
     // v0.5.0-rc.0 the fallback dict was removed — the hook now degrades
@@ -6226,7 +6447,10 @@ print(json.dumps({
 
   it("[workflow-state] in_progress tag in workflow.md mentions Phase 3.4 commit (R1 invariant)", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     // Write a workflow.md containing only the in_progress tag with the
     // canonical Phase 3.4 commit reminder. This guards against future
@@ -6247,7 +6471,10 @@ print(json.dumps({
 
   it("[workflow-state] workflow.md tag overrides hardcoded fallback", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     writeWorkflowMd(
       "[workflow-state:in_progress]\nCUSTOM BODY from workflow.md\n[/workflow-state:in_progress]\n",
@@ -6295,7 +6522,10 @@ print(json.dumps({
 
   it("[workflow-state] custom status with hyphen matches via regex", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     setStatus("in-review");
     writeWorkflowMd(
@@ -6315,7 +6545,10 @@ print(json.dumps({
 
   it("[workflow-state] unknown status with no tag emits generic fallback, not silent", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     setStatus("weirdstate");
     writeWorkflowMd("# no matching tags\n");
@@ -6335,7 +6568,10 @@ print(json.dumps({
 
   it("[workflow-state] CWD drift: hook finds .trellis/ when invoked from subdirectory", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     // Create a subdirectory and invoke hook with that CWD
     const subDir = path.join(tmpDir, "packages", "cli");
@@ -6361,7 +6597,7 @@ print(json.dumps({
         "No active task. Load `trellis-brainstorm` skill to start.\n" +
         "[/workflow-state:no_task]\n",
     );
-    writeLegacyCurrentTask(".trellis/tasks/issue-106");
+    writeLegacyCurrentTask(".trellis/tasks/in_progress/issue-106");
     writeWorkflowStateHook();
     // Legacy repo-global state must not suppress the session no_task breadcrumb.
     const output = runInjectWorkflowState();
@@ -6379,7 +6615,10 @@ print(json.dumps({
 
   it("reports task_error when task.json is malformed", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     writeWorkflowMd(
       "[workflow-state:no_task]\n" +
@@ -6390,7 +6629,7 @@ print(json.dumps({
         "[/workflow-state:task_error]\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "task.json"),
       "{not-json\n",
     );
 
@@ -6400,19 +6639,24 @@ print(json.dumps({
     };
     const context = parsed.hookSpecificOutput.additionalContext;
     expect(context).toContain("Task: issue-106 (task_error)");
-    expect(context).toContain("Repair the active task record before continuing.");
+    expect(context).toContain(
+      "Repair the active task record before continuing.",
+    );
     expect(context).not.toContain("Status: no_task");
   });
 
   it("reports task_error when task.json has no usable status", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     writeWorkflowMd(
       "[workflow-state:no_task]\nNo active task.\n[/workflow-state:no_task]\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "task.json"),
       JSON.stringify({ title: "Missing status" }),
     );
 
@@ -6428,13 +6672,16 @@ print(json.dumps({
 
   it("reports task_error when task.json is not an object", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     writeWorkflowStateHook();
     writeWorkflowMd(
       "[workflow-state:task_error]\nRepair the active task record before continuing.\n[/workflow-state:task_error]\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "task.json"),
       "[]",
     );
 
@@ -6444,7 +6691,9 @@ print(json.dumps({
     };
     const context = parsed.hookSpecificOutput.additionalContext;
     expect(context).toContain("Task: issue-106 (task_error)");
-    expect(context).toContain("Repair the active task record before continuing.");
+    expect(context).toContain(
+      "Repair the active task record before continuing.",
+    );
     expect(context).not.toContain("Status: no_task");
   });
 
@@ -6581,7 +6830,7 @@ print(json.dumps({
       { cwd: tmpDir, encoding: "utf-8" },
     );
     // Locate the newly created task dir
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
+    const tasksDir = path.join(tmpDir, ".trellis", "tasks", "planning");
     const newDirs = fs
       .readdirSync(tasksDir)
       .filter((d) => d.includes("dummy-task"));
@@ -6607,7 +6856,7 @@ print(json.dumps({
       `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "plain task" --description "regression fixture" --slug plain-task --assignee test-dev`,
       { cwd: tmpDir, encoding: "utf-8" },
     );
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
+    const tasksDir = path.join(tmpDir, ".trellis", "tasks", "planning");
     const newDirs = fs
       .readdirSync(tasksDir)
       .filter((d) => d.includes("plain-task"));
@@ -6627,7 +6876,7 @@ print(json.dumps({
       { cwd: tmpDir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
     );
     expect(output).toBeDefined();
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
+    const tasksDir = path.join(tmpDir, ".trellis", "tasks", "planning");
     const newDirs = fs
       .readdirSync(tasksDir)
       .filter((d) => d.includes("seeded-task"));
@@ -6677,7 +6926,7 @@ print(json.dumps({
       { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
     );
 
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
+    const tasksDir = path.join(tmpDir, ".trellis", "tasks", "planning");
     const taskName = fs
       .readdirSync(tasksDir)
       .find((name) => name.includes("grok-task"));
@@ -6700,7 +6949,7 @@ print(json.dumps({
       { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
     );
 
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
+    const tasksDir = path.join(tmpDir, ".trellis", "tasks", "planning");
     const taskName = fs
       .readdirSync(tasksDir)
       .find((name) => name.includes("kimi-task"));
@@ -6727,7 +6976,7 @@ print(json.dumps({
       },
     );
 
-    const tasksDir = path.join(tmpDir, ".trellis", "tasks");
+    const tasksDir = path.join(tmpDir, ".trellis", "tasks", "planning");
     const taskName = fs
       .readdirSync(tasksDir)
       .find((name) => name.includes("dsh-task"));
@@ -6756,8 +7005,9 @@ print(json.dumps({
       tmpDir,
       ".trellis",
       "tasks",
+      "planning",
       fs
-        .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+        .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
         .find((d) => d.includes("codex-inline-task")) as string,
     );
     expect(fs.existsSync(path.join(taskDir, "implement.jsonl"))).toBe(false);
@@ -6781,8 +7031,9 @@ print(json.dumps({
       tmpDir,
       ".trellis",
       "tasks",
+      "planning",
       fs
-        .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+        .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
         .find((d) => d.includes("codex-subagent-task")) as string,
     );
     for (const jsonlName of ["implement.jsonl", "check.jsonl"]) {
@@ -6799,7 +7050,7 @@ print(json.dumps({
     let stderr = "";
     try {
       execSync(
-        `${pythonCmd} ${JSON.stringify(taskScriptPath)} init-context .trellis/tasks/issue-106 fullstack`,
+        `${pythonCmd} ${JSON.stringify(taskScriptPath)} init-context .trellis/tasks/in_progress/issue-106 fullstack`,
         { cwd: tmpDir, encoding: "utf-8" },
       );
     } catch (err) {
@@ -6862,10 +7113,15 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("seed-only-task"));
     expect(taskDir).toBeDefined();
-    const relTaskDir = path.posix.join(".trellis", "tasks", taskDir as string);
+    const relTaskDir = path.posix.join(
+      ".trellis",
+      "tasks",
+      "planning",
+      taskDir as string,
+    );
 
     const result = spawnSync(
       pythonCmd,
@@ -6873,7 +7129,9 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("no context entries; manifests are optional");
+    expect(result.stdout).toContain(
+      "no context entries; manifests are optional",
+    );
   });
 
   describe("[validation-preflight] task.py validate vs PR preflight contract", () => {
@@ -6891,7 +7149,13 @@ print(len(entries))
       checkContent: string,
     ): ReturnType<typeof spawnSync> {
       setupTaskRepo();
-      const taskDir = path.join(tmpDir, ".trellis", "tasks", "issue-106");
+      const taskDir = path.join(
+        tmpDir,
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+      );
       fs.writeFileSync(
         path.join(taskDir, "implement.jsonl"),
         implementContent,
@@ -6902,10 +7166,15 @@ print(len(entries))
         checkContent,
         "utf-8",
       );
-      const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
+      const taskScriptPath = path.join(
+        tmpDir,
+        ".trellis",
+        "scripts",
+        "task.py",
+      );
       return spawnSync(
         pythonCmd,
-        [taskScriptPath, "validate", ".trellis/tasks/issue-106"],
+        [taskScriptPath, "validate", ".trellis/tasks/in_progress/issue-106"],
         { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
       );
     }
@@ -6913,47 +7182,61 @@ print(len(entries))
     it("rejects a placeholder-only implement.jsonl with file, line, and remediation", () => {
       const result = validateWith(placeholderRow, curatedRow);
       expect(result.status).toBe(1);
-      expect(result.stdout).toContain("implement.jsonl:1: Placeholder `_example` row");
       expect(result.stdout).toContain(
-        '{"file": "<path>", "reason": "<why>"}',
+        "implement.jsonl:1: Placeholder `_example` row",
       );
+      expect(result.stdout).toContain('{"file": "<path>", "reason": "<why>"}');
       expect(result.stdout).toContain("Validation failed (1 errors)");
     });
 
     it("rejects a placeholder row in check.jsonl too", () => {
       const result = validateWith(curatedRow, placeholderRow);
       expect(result.status).toBe(1);
-      expect(result.stdout).toContain("check.jsonl:1: Placeholder `_example` row");
+      expect(result.stdout).toContain(
+        "check.jsonl:1: Placeholder `_example` row",
+      );
     });
 
     it("rejects a placeholder row that sits alongside curated entries", () => {
-      const result = validateWith(
-        `${placeholderRow}${curatedRow}`,
-        curatedRow,
-      );
+      const result = validateWith(`${placeholderRow}${curatedRow}`, curatedRow);
       expect(result.status).toBe(1);
-      expect(result.stdout).toContain("implement.jsonl:1: Placeholder `_example` row");
+      expect(result.stdout).toContain(
+        "implement.jsonl:1: Placeholder `_example` row",
+      );
       expect(result.stdout).toContain("Validation failed (1 errors)");
     });
 
     it("accepts empty manifests when there are no invalid entries", () => {
       const result = validateWith("", "");
       expect(result.status).toBe(0);
-      expect(result.stdout.match(/no context entries; manifests are optional/g)).toHaveLength(2);
+      expect(
+        result.stdout.match(/no context entries; manifests are optional/g),
+      ).toHaveLength(2);
       expect(result.stdout).toContain("All validations passed");
     });
 
     it("passes for curated entries pointing at real files", () => {
       setupTaskRepo();
-      const taskDir = path.join(tmpDir, ".trellis", "tasks", "issue-106");
+      const taskDir = path.join(
+        tmpDir,
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+      );
       const curated =
         '{"file":".trellis/spec/guides/index.md","reason":"guideline"}\n';
       fs.writeFileSync(path.join(taskDir, "implement.jsonl"), curated, "utf-8");
       fs.writeFileSync(path.join(taskDir, "check.jsonl"), curated, "utf-8");
-      const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
+      const taskScriptPath = path.join(
+        tmpDir,
+        ".trellis",
+        "scripts",
+        "task.py",
+      );
       const result = spawnSync(
         pythonCmd,
-        [taskScriptPath, "validate", ".trellis/tasks/issue-106"],
+        [taskScriptPath, "validate", ".trellis/tasks/in_progress/issue-106"],
         { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
       );
       expect(result.status).toBe(0);
@@ -6969,7 +7252,10 @@ print(len(entries))
     it("reports a non-object row instead of crashing on it", () => {
       // Valid JSON, wrong shape — the row must be an error with a line
       // number, not an AttributeError traceback out of `data.get`.
-      const result = validateWith('"just a string"\n[1, 2]\nnull\n', curatedRow);
+      const result = validateWith(
+        '"just a string"\n[1, 2]\nnull\n',
+        curatedRow,
+      );
       expect(result.status).toBe(1);
       expect(result.stderr).not.toContain("Traceback");
       for (const line of [1, 2, 3]) {
@@ -6984,17 +7270,32 @@ print(len(entries))
       // Same wrong-shape rows as the validate case above — list-context is a
       // read-only listing, so it skips them and still lists curated entries.
       setupTaskRepo();
-      const taskDir = path.join(tmpDir, ".trellis", "tasks", "issue-106");
+      const taskDir = path.join(
+        tmpDir,
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+      );
       fs.writeFileSync(
         path.join(taskDir, "implement.jsonl"),
         '"just a string"\n[1, 2]\nnull\n{"file":".trellis/spec/guides/index.md","reason":"guideline"}\n',
         "utf-8",
       );
       fs.writeFileSync(path.join(taskDir, "check.jsonl"), "", "utf-8");
-      const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
+      const taskScriptPath = path.join(
+        tmpDir,
+        ".trellis",
+        "scripts",
+        "task.py",
+      );
       const result = spawnSync(
         pythonCmd,
-        [taskScriptPath, "list-context", ".trellis/tasks/issue-106"],
+        [
+          taskScriptPath,
+          "list-context",
+          ".trellis/tasks/in_progress/issue-106",
+        ],
         { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
       );
       expect(result.status).toBe(0);
@@ -7008,7 +7309,7 @@ print(len(entries))
         tmpDir,
         ".trellis",
         "tasks",
-        "archive",
+        "completed",
         "2026-07",
         "07-01-archived-task",
       );
@@ -7023,30 +7324,43 @@ print(len(entries))
         "utf-8",
       );
       fs.writeFileSync(path.join(archivedDir, "check.jsonl"), "", "utf-8");
-      const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
+      const taskScriptPath = path.join(
+        tmpDir,
+        ".trellis",
+        "scripts",
+        "task.py",
+      );
       const result = spawnSync(
         pythonCmd,
         [
           taskScriptPath,
           "validate",
-          ".trellis/tasks/archive/2026-07/07-01-archived-task",
+          ".trellis/tasks/completed/2026-07/07-01-archived-task",
         ],
         { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
       );
       expect(result.status).toBe(1);
-      expect(result.stdout).toContain("implement.jsonl:1: Placeholder `_example` row");
+      expect(result.stdout).toContain(
+        "implement.jsonl:1: Placeholder `_example` row",
+      );
     });
   });
 
   it("task.py start accepts seeded empty context manifests", () => {
     setupTaskRepo();
-    const taskDir = path.join(tmpDir, ".trellis", "tasks", "issue-106");
+    const taskDir = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      "in_progress",
+      "issue-106",
+    );
     fs.writeFileSync(path.join(taskDir, "implement.jsonl"), "", "utf-8");
     fs.writeFileSync(path.join(taskDir, "check.jsonl"), "", "utf-8");
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const result = spawnSync(
       pythonCmd,
-      [taskScriptPath, "start", ".trellis/tasks/issue-106"],
+      [taskScriptPath, "start", ".trellis/tasks/in_progress/issue-106"],
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -7066,10 +7380,15 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("seed-list-task"));
     expect(taskDir).toBeDefined();
-    const relTaskDir = path.posix.join(".trellis", "tasks", taskDir as string);
+    const relTaskDir = path.posix.join(
+      ".trellis",
+      "tasks",
+      "planning",
+      taskDir as string,
+    );
 
     const result = execSync(
       `${pythonCmd} ${JSON.stringify(taskScriptPath)} list-context ${relTaskDir}`,
@@ -7312,7 +7631,9 @@ print(len(entries))
     expect(output).toContain("## 阶段索引");
     expect(output).toContain("目标探索与需求核对阶段");
     expect(output).toContain("交付审查与现场收尾阶段");
-    expect(output).not.toContain("#### 1.1 Establish the requirements baseline");
+    expect(output).not.toContain(
+      "#### 1.1 Establish the requirements baseline",
+    );
   });
 
   it("[workflow-v2] --mode phase returns the same compact stage index on Codex", () => {
@@ -7460,7 +7781,9 @@ print(len(entries))
     expect(workflowBlock).toContain("## 阶段索引");
     expect(workflowBlock).toContain("目标探索与需求核对阶段");
     expect(workflowBlock).toContain("交付审查与现场收尾阶段");
-    expect(workflowBlock).not.toContain("#### 1.1 Establish the requirements baseline");
+    expect(workflowBlock).not.toContain(
+      "#### 1.1 Establish the requirements baseline",
+    );
     // Breadcrumb tag BLOCKS (matched opening + closing pair) excluded — they're
     // consumed by inject-workflow-state.py. Inline `[workflow-state:planning]`
     // mentions in narrative prose are fine; only complete blocks are stripped.
@@ -7532,7 +7855,7 @@ print(len(entries))
       path.join(".trellis", ".runtime", "sessions", "claude_phase-a.json"),
       JSON.stringify(
         {
-          current_task: ".trellis/tasks/issue-106",
+          current_task: ".trellis/tasks/in_progress/issue-106",
           platform: "claude",
         },
         null,
@@ -7540,7 +7863,7 @@ print(len(entries))
       ),
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "task.json"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "task.json"),
       JSON.stringify(
         {
           id: "issue-106",
@@ -7553,11 +7876,17 @@ print(len(entries))
       ),
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "prd.md"),
+      path.join(".trellis", "tasks", "in_progress", "issue-106", "prd.md"),
       "# PRD\n",
     );
     writeProjectFile(
-      path.join(".trellis", "tasks", "issue-106", "implement.jsonl"),
+      path.join(
+        ".trellis",
+        "tasks",
+        "in_progress",
+        "issue-106",
+        "implement.jsonl",
+      ),
       '{"file":"src/example.ts","reason":"spec"}\n',
     );
     writeProjectFile(
@@ -7583,7 +7912,14 @@ print(len(entries))
     // Assert task.json is NOT modified with current_phase
     const taskJson = JSON.parse(
       fs.readFileSync(
-        path.join(tmpDir, ".trellis", "tasks", "issue-106", "task.json"),
+        path.join(
+          tmpDir,
+          ".trellis",
+          "tasks",
+          "in_progress",
+          "issue-106",
+          "task.json",
+        ),
         "utf-8",
       ),
     ) as Record<string, unknown>;
@@ -7623,7 +7959,10 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] codex breadcrumb defaults to native auto dispatch when config absent", () => {
     setupTaskRepo();
-    writeSessionContext("codex_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const codexHookPath = writeCodexInjectHook();
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
@@ -7648,7 +7987,10 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] codex breadcrumb routes to plain status when codex.dispatch_mode=sub-agent", () => {
     setupTaskRepo();
-    writeSessionContext("codex_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const codexHookPath = writeCodexInjectHook();
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
@@ -7674,7 +8016,10 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] codex breadcrumb routes to inline tag when codex.dispatch_mode=inline", () => {
     setupTaskRepo();
-    writeSessionContext("codex_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "codex_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const codexHookPath = writeCodexInjectHook();
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
@@ -7701,7 +8046,10 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] non-codex platform ignores codex.dispatch_mode=inline", () => {
     setupTaskRepo();
-    writeSessionContext("claude_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "claude_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     // Hook installed under .claude/ — _detect_platform returns "claude".
     const claudeHookPath = path.join(
       ".claude",
@@ -7922,7 +8270,10 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] codex hook injects <codex-mode> banner reflecting dispatch_mode", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     const codexHookPath = path.join(
       ".codex",
       "hooks",
@@ -7963,7 +8314,10 @@ print(len(entries))
 
   it("[issue-codex-dispatch-mode] non-codex hook does NOT inject <codex-mode> banner", () => {
     setupTaskRepo();
-    writeSessionContext("session_workflow-a", ".trellis/tasks/issue-106");
+    writeSessionContext(
+      "session_workflow-a",
+      ".trellis/tasks/in_progress/issue-106",
+    );
     // Hook installed under .claude/ — _detect_platform returns "claude".
     const claudeHookPath = path.join(
       ".claude",
@@ -8013,7 +8367,7 @@ print(len(entries))
     };
     expect(parsed.tasks).toHaveLength(1);
     expect(parsed.tasks[0]).toMatchObject({
-      dir: ".trellis/tasks/issue-106",
+      dir: ".trellis/tasks/in_progress/issue-106",
       title: "Issue 106 task",
       status: "in_progress",
       parent: null,
@@ -8041,7 +8395,7 @@ print(len(entries))
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
 
     execSync(
-      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/issue-106")}`,
+      `${pythonCmd} ${JSON.stringify(taskScriptPath)} start ${JSON.stringify(".trellis/tasks/in_progress/issue-106")}`,
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -8064,7 +8418,7 @@ print(len(entries))
     };
     expect(parsed.session_source).toBe("session:json-current-session");
     expect(parsed.current_task).toMatchObject({
-      dir: ".trellis/tasks/issue-106",
+      dir: ".trellis/tasks/in_progress/issue-106",
       title: "Issue 106 task",
       status: "in_progress",
     });
@@ -8102,12 +8456,19 @@ print(len(entries))
     );
 
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("base-branch-test"));
     expect(taskDir).toBeDefined();
     const taskJson = JSON.parse(
       fs.readFileSync(
-        path.join(tmpDir, ".trellis", "tasks", taskDir as string, "task.json"),
+        path.join(
+          tmpDir,
+          ".trellis",
+          "tasks",
+          "planning",
+          taskDir as string,
+          "task.json",
+        ),
         "utf-8",
       ),
     ) as { base_branch: string };
@@ -8151,11 +8512,18 @@ print(len(entries))
     expect(result.stderr).toContain("solo-branch");
 
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("no-remote-test"));
     const taskJson = JSON.parse(
       fs.readFileSync(
-        path.join(tmpDir, ".trellis", "tasks", taskDir as string, "task.json"),
+        path.join(
+          tmpDir,
+          ".trellis",
+          "tasks",
+          "planning",
+          taskDir as string,
+          "task.json",
+        ),
         "utf-8",
       ),
     ) as { base_branch: string };
@@ -8196,12 +8564,19 @@ print(len(entries))
     );
 
     const taskDir = fs
-      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks", "planning"))
       .find((d) => d.includes("explicit-base-branch-test"));
     expect(taskDir).toBeDefined();
     const taskJson = JSON.parse(
       fs.readFileSync(
-        path.join(tmpDir, ".trellis", "tasks", taskDir as string, "task.json"),
+        path.join(
+          tmpDir,
+          ".trellis",
+          "tasks",
+          "planning",
+          taskDir as string,
+          "task.json",
+        ),
         "utf-8",
       ),
     ) as { base_branch: string };
@@ -8220,6 +8595,7 @@ print(len(entries))
       tmpDir,
       ".trellis",
       "tasks",
+      "in_progress",
       "issue-106",
       "task.json",
     );
@@ -8230,7 +8606,7 @@ print(len(entries))
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const result = spawnSync(
       pythonCmd,
-      [taskScriptPath, "validate", ".trellis/tasks/issue-106"],
+      [taskScriptPath, "validate", ".trellis/tasks/in_progress/issue-106"],
       { cwd: tmpDir, encoding: "utf-8", env: sessionEnv() },
     );
 
@@ -8254,6 +8630,7 @@ print(len(entries))
       tmpDir,
       ".trellis",
       "tasks",
+      "in_progress",
       "issue-106",
       "task.json",
     );
@@ -8268,7 +8645,14 @@ print(len(entries))
   function readIssue106Task(): { branch: string | null; status: string } {
     return JSON.parse(
       fs.readFileSync(
-        path.join(tmpDir, ".trellis", "tasks", "issue-106", "task.json"),
+        path.join(
+          tmpDir,
+          ".trellis",
+          "tasks",
+          "in_progress",
+          "issue-106",
+          "task.json",
+        ),
         "utf-8",
       ),
     );
@@ -8278,12 +8662,16 @@ print(len(entries))
     setupTaskRepo();
     initTaskGitRepo("main");
     execSync("git checkout -q -b feature/record-me", { cwd: tmpDir });
-    patchIssue106Task({ status: "planning", branch: null, base_branch: "main" });
+    patchIssue106Task({
+      status: "planning",
+      branch: null,
+      base_branch: "main",
+    });
 
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const result = spawnSync(
       pythonCmd,
-      [taskScriptPath, "start", ".trellis/tasks/issue-106"],
+      [taskScriptPath, "start", ".trellis/tasks/in_progress/issue-106"],
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -8311,7 +8699,7 @@ print(len(entries))
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const result = spawnSync(
       pythonCmd,
-      [taskScriptPath, "start", ".trellis/tasks/issue-106"],
+      [taskScriptPath, "start", ".trellis/tasks/in_progress/issue-106"],
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -8327,12 +8715,16 @@ print(len(entries))
     setupTaskRepo();
     initTaskGitRepo("main");
     execSync("git checkout -q --detach", { cwd: tmpDir });
-    patchIssue106Task({ status: "planning", branch: null, base_branch: "main" });
+    patchIssue106Task({
+      status: "planning",
+      branch: null,
+      base_branch: "main",
+    });
 
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     const result = spawnSync(
       pythonCmd,
-      [taskScriptPath, "start", ".trellis/tasks/issue-106"],
+      [taskScriptPath, "start", ".trellis/tasks/in_progress/issue-106"],
       {
         cwd: tmpDir,
         encoding: "utf-8",
@@ -9423,7 +9815,9 @@ describe("regression: parse_simple_yaml Python execution (0.3.8)", () => {
       "nested: [a, [b]]\nkeep: ok\n",
     );
     expect(result).toEqual({ keep: "ok" });
-    expect(stderr).toContain("nested or invalid flow sequences are not supported");
+    expect(stderr).toContain(
+      "nested or invalid flow sequences are not supported",
+    );
   });
 
   it("quoted values that look like YAML constructs stay untouched", () => {
@@ -10412,7 +10806,9 @@ describe("regression: sub-agent context injection fallback (0.5.3)", () => {
       "packages/cli/src/templates/trellis/workflow.md",
     );
     const wf = fs.readFileSync(workflowPath, "utf-8");
-    expect(wf).toContain("任务路线从下表列出的业务阶段中按需选取，组成有序路线");
+    expect(wf).toContain(
+      "任务路线从下表列出的业务阶段中按需选取，组成有序路线",
+    );
     expect(wf).toContain("每个阶段对应一个提供本阶段流程和图示的 Skill");
     for (const phase of [
       "目标探索与需求核对阶段",
@@ -11018,7 +11414,6 @@ print(json.dumps({
       unrelated_calls: 1,
     });
   });
-
 });
 
 // =============================================================================
@@ -11178,7 +11573,16 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
   }
 
   function taskDir(...segments: string[]): string {
-    return path.join(tmpDir, ".trellis", "tasks", ...segments);
+    if (!segments.length) return path.join(tmpDir, ".trellis", "tasks");
+    if (segments[0] === "archive")
+      return path.join(
+        tmpDir,
+        ".trellis",
+        "tasks",
+        "completed",
+        ...segments.slice(1),
+      );
+    return path.join(tmpDir, ".trellis", "tasks", "planning", ...segments);
   }
 
   function readTaskJson(name: string): Record<string, unknown> {
@@ -11205,7 +11609,9 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
 
   /** Every `<file>:<line>` under .trellis/tasks/ that still names `taskName`. */
   function scanForName(taskName: string): string[] {
-    const pattern = new RegExp(`(?<![0-9A-Za-z_-])${taskName}(?![0-9A-Za-z_-])`);
+    const pattern = new RegExp(
+      `(?<![0-9A-Za-z_-])${taskName}(?![0-9A-Za-z_-])`,
+    );
     const hits: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -11274,7 +11680,7 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
     create("kid", target);
     fs.writeFileSync(
       path.join(taskDir(target), "implement.jsonl"),
-      `{"file": ".trellis/tasks/${target}/research.md", "reason": "findings"}\n`,
+      `{"file": ".trellis/tasks/planning/${target}/research.md", "reason": "findings"}\n`,
     );
     fs.writeFileSync(
       path.join(tmpDir, ".trellis", "workflow.md"),
@@ -11295,14 +11701,14 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
     // The whole point of the dry run: what it printed is what the real run did.
     expect(applied.stdout).toBe(dry.stdout);
     expect(dry.stdout).toContain(
-      `dir: .trellis/tasks/${target} -> .trellis/tasks/${datePrefix}-renamed`,
+      `dir: .trellis/tasks/planning/${target} -> .trellis/tasks/planning/${datePrefix}-renamed`,
     );
     expect(dry.stdout).toContain("task.json: id: target -> renamed");
     expect(dry.stdout).toContain(
-      `backref: .trellis/tasks/${parent}/task.json: children[0]: ${target} -> ${datePrefix}-renamed`,
+      `backref: .trellis/tasks/planning/${parent}/task.json: children[0]: ${target} -> ${datePrefix}-renamed`,
     );
     expect(dry.stdout).toContain(
-      `jsonl: .trellis/tasks/${target}/implement.jsonl:1:`,
+      `jsonl: .trellis/tasks/planning/${target}/implement.jsonl:1:`,
     );
     // References outside the task dir are reported, never rewritten.
     expect(dry.stdout).toContain(
@@ -11319,9 +11725,9 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
     fs.writeFileSync(
       path.join(taskDir(target), "check.jsonl"),
       [
-        `{"file": ".trellis/tasks/${target}/research.md", "reason": "findings"}`,
+        `{"file": ".trellis/tasks/planning/${target}/research.md", "reason": "findings"}`,
         `{"file": ".trellis/spec/guides/style.md", "reason": "spec"}`,
-        `{"file": ".trellis/tasks/${sibling}/notes.md", "reason": "sibling"}`,
+        `{"file": ".trellis/tasks/planning/${sibling}/notes.md", "reason": "sibling"}`,
         "",
       ].join("\n"),
     );
@@ -11333,10 +11739,10 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
       path.join(taskDir(renamed), "check.jsonl"),
       "utf-8",
     );
-    expect(after).toContain(`".trellis/tasks/${renamed}/research.md"`);
+    expect(after).toContain(`".trellis/tasks/planning/${renamed}/research.md"`);
     expect(after).toContain('".trellis/spec/guides/style.md"');
     // `target` is a prefix of `target-other`; the sibling must survive intact.
-    expect(after).toContain(`".trellis/tasks/${sibling}/notes.md"`);
+    expect(after).toContain(`".trellis/tasks/planning/${sibling}/notes.md"`);
   });
 
   it("[task-rename] refuses an existing destination, a bad slug and an unknown task", () => {
@@ -11387,12 +11793,12 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
     const bystanderFile = path.join(sessionsDir, "sess-b.json");
     fs.writeFileSync(
       sessionFile,
-      JSON.stringify({ current_task: `.trellis/tasks/${target}` }),
+      JSON.stringify({ current_task: `.trellis/tasks/planning/${target}` }),
       "utf-8",
     );
     fs.writeFileSync(
       bystanderFile,
-      JSON.stringify({ current_task: `.trellis/tasks/${other}` }),
+      JSON.stringify({ current_task: `.trellis/tasks/planning/${other}` }),
       "utf-8",
     );
 
@@ -11400,17 +11806,24 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
     expect(r.status, r.stderr).toBe(0);
 
     const renamed = `${datePrefix}-renamed`;
-    expect(
-      JSON.parse(fs.readFileSync(sessionFile, "utf-8")).current_task,
-    ).toBe(`.trellis/tasks/${renamed}`);
+    expect(JSON.parse(fs.readFileSync(sessionFile, "utf-8")).current_task).toBe(
+      `.trellis/tasks/planning/${renamed}`,
+    );
     // A session on a different task is left exactly as it was.
     expect(
       JSON.parse(fs.readFileSync(bystanderFile, "utf-8")).current_task,
-    ).toBe(`.trellis/tasks/${other}`);
+    ).toBe(`.trellis/tasks/planning/${other}`);
   });
 
   it("[task-rename] rejects a historical task path outside the active task directory", () => {
-    const archivedDir = taskDir("archive", yearMonth, "old-task");
+    const archivedDir = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      "archive",
+      yearMonth,
+      "old-task",
+    );
     fs.mkdirSync(archivedDir, { recursive: true });
     fs.writeFileSync(
       path.join(archivedDir, "task.json"),
@@ -11423,10 +11836,8 @@ describe("regression: task.py rename rewrites every reference in one pass", () =
       "renamed",
     );
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain("is not a task directly under");
-    expect(
-      fs.existsSync(taskDir("archive", yearMonth, "old-task", "task.json")),
-    ).toBe(true);
+    expect(r.stderr).toContain("invalid task layout");
+    expect(fs.existsSync(path.join(archivedDir, "task.json"))).toBe(true);
   });
 });
 
@@ -11531,6 +11942,7 @@ describe("regression: a linked worktree inherits developer identity", () => {
       cwd,
       ".trellis",
       "tasks",
+      "planning",
       `${datePrefix}-${slug}`,
       "task.json",
     );

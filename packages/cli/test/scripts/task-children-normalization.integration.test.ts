@@ -47,12 +47,31 @@ function setupRepo(tmp: string): void {
   fs.writeFileSync(path.join(tmp, ".trellis", ".developer"), "name=tester\n");
 }
 
+function fixtureDirectory(repo: string, name: string): string {
+  const tasks = path.join(repo, ".trellis", "tasks");
+  return (
+    ["planning", "in_progress", "cancelled", "completed/2026-08"]
+      .map((status) => path.join(tasks, status, name))
+      .find((directory) => fs.existsSync(directory)) ??
+    path.join(tasks, "planning", name)
+  );
+}
+
 function makeTask(
   repo: string,
   name: string,
   overrides: Record<string, unknown> = {},
 ): string {
-  const dir = path.join(repo, ".trellis", "tasks", name);
+  const status = String(overrides.status ?? "planning");
+  const dir =
+    status === "completed"
+      ? path.join(repo, ".trellis", "tasks", status, "2026-08", name)
+      : path.join(repo, ".trellis", "tasks", status, name);
+  const existing = fixtureDirectory(repo, name);
+  if (existing !== dir && fs.existsSync(existing)) {
+    fs.mkdirSync(path.dirname(dir), { recursive: true });
+    fs.renameSync(existing, dir);
+  }
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "prd.md"), `${name} prd\n`);
   fs.writeFileSync(
@@ -88,14 +107,14 @@ function runTask(repo: string, ...args: string[]) {
 function readChildren(repo: string, name: string): unknown {
   return JSON.parse(
     fs.readFileSync(
-      path.join(repo, ".trellis", "tasks", name, "task.json"),
+      path.join(fixtureDirectory(repo, name), "task.json"),
       "utf-8",
     ),
   ).children;
 }
 
 function setChildren(repo: string, name: string, value: unknown): void {
-  const file = path.join(repo, ".trellis", "tasks", name, "task.json");
+  const file = path.join(fixtureDirectory(repo, name), "task.json");
   const data = JSON.parse(fs.readFileSync(file, "utf-8"));
   data.children = value;
   fs.writeFileSync(file, JSON.stringify(data) + "\n");
@@ -103,133 +122,157 @@ function setChildren(repo: string, name: string, value: unknown): void {
 
 const PARENT = "08-19-parent";
 
-describe.skipIf(!hasPython())("non-list `children` in a parent task.json", () => {
-  let tmp: string;
+describe.skipIf(!hasPython())(
+  "non-list `children` in a parent task.json",
+  () => {
+    let tmp: string;
 
-  beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-children-test-"));
-    setupRepo(tmp);
-    makeTask(tmp, PARENT, { children: null });
-  });
+    beforeEach(() => {
+      tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-children-test-"));
+      setupRepo(tmp);
+      makeTask(tmp, PARENT, { children: null });
+    });
 
-  afterEach(() => {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  });
+    afterEach(() => {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    });
 
-  it("`create --parent` links, rather than writing a task the parent never references", () => {
-    const r = runTask(
-      tmp,
-      "create",
-      "Child",
-      "--description",
-      "d",
-      "--slug",
-      "kid",
-      "--parent",
-      `.trellis/tasks/${PARENT}`,
-      "--no-start",
-    );
-    expect(r.stderr).not.toContain("TypeError");
-    expect(r.status).toBe(0);
+    it("`create --parent` links, rather than writing a task the parent never references", () => {
+      const r = runTask(
+        tmp,
+        "create",
+        "Child",
+        "--description",
+        "d",
+        "--slug",
+        "kid",
+        "--parent",
+        fixtureDirectory(tmp, PARENT),
+        "--no-start",
+      );
+      expect(r.stderr).not.toContain("TypeError");
+      expect(r.status).toBe(0);
 
-    const created = fs
-      .readdirSync(path.join(tmp, ".trellis", "tasks"))
-      .filter((d) => d.endsWith("-kid"));
-    expect(created).toHaveLength(1);
+      const created = fs
+        .readdirSync(path.join(tmp, ".trellis", "tasks", "planning"))
+        .filter((d) => d.endsWith("-kid"));
+      expect(created).toHaveLength(1);
 
-    // The whole point: the task on disk and the parent's list agree.
-    expect(readChildren(tmp, PARENT)).toEqual(created);
-    expect(
-      JSON.parse(
-        fs.readFileSync(
-          path.join(tmp, ".trellis", "tasks", created[0], "task.json"),
-          "utf-8",
-        ),
-      ).parent,
-    ).toBe(PARENT);
-  });
+      // The whole point: the task on disk and the parent's list agree.
+      expect(readChildren(tmp, PARENT)).toEqual(created);
+      expect(
+        JSON.parse(
+          fs.readFileSync(
+            path.join(
+              tmp,
+              ".trellis",
+              "tasks",
+              "planning",
+              created[0],
+              "task.json",
+            ),
+            "utf-8",
+          ),
+        ).parent,
+      ).toBe(PARENT);
+    });
 
-  it.each([
-    ["null", null],
-    ["a string", "08-19-not-a-list"],
-    ["a number", 42],
-    ["an object", { "08-19-kid": true }],
-  ])("`add-subtask` normalizes %s instead of crashing", (_label, value) => {
-    const child = "08-19-standalone";
-    makeTask(tmp, child);
-    setChildren(tmp, PARENT, value);
+    it.each([
+      ["null", null],
+      ["a string", "08-19-not-a-list"],
+      ["a number", 42],
+      ["an object", { "08-19-kid": true }],
+    ])("`add-subtask` normalizes %s instead of crashing", (_label, value) => {
+      const child = "08-19-standalone";
+      makeTask(tmp, child);
+      setChildren(tmp, PARENT, value);
 
-    const r = runTask(
-      tmp,
-      "add-subtask",
-      `.trellis/tasks/${PARENT}`,
-      `.trellis/tasks/${child}`,
-    );
-    expect(r.stderr).not.toContain("TypeError");
-    expect(r.status).toBe(0);
-    expect(readChildren(tmp, PARENT)).toEqual([child]);
-  });
+      const r = runTask(
+        tmp,
+        "add-subtask",
+        fixtureDirectory(tmp, PARENT),
+        fixtureDirectory(tmp, child),
+      );
+      expect(r.stderr).not.toContain("TypeError");
+      expect(r.status).toBe(0);
+      expect(readChildren(tmp, PARENT)).toEqual([child]);
+    });
 
-  it("`remove-subtask` leaves a valid empty list when the field was null", () => {
-    const child = "08-19-standalone";
-    makeTask(tmp, child, { parent: PARENT });
-    setChildren(tmp, PARENT, null);
+    it("`remove-subtask` leaves a valid empty list when the field was null", () => {
+      const child = "08-19-standalone";
+      makeTask(tmp, child, { parent: PARENT });
+      setChildren(tmp, PARENT, null);
 
-    const r = runTask(
-      tmp,
-      "remove-subtask",
-      `.trellis/tasks/${PARENT}`,
-      `.trellis/tasks/${child}`,
-    );
-    expect(r.stderr).not.toContain("TypeError");
-    expect(r.status).toBe(0);
-    expect(readChildren(tmp, PARENT)).toEqual([]);
-  });
+      const r = runTask(
+        tmp,
+        "remove-subtask",
+        fixtureDirectory(tmp, PARENT),
+        fixtureDirectory(tmp, child),
+      );
+      expect(r.stderr).not.toContain("TypeError");
+      expect(r.status).toBe(0);
+      expect(readChildren(tmp, PARENT)).toEqual([]);
+    });
 
-  it("allows a cancelled parent to unlink a child recorded as independently continuing", () => {
-    const child = "08-19-standalone";
-    makeTask(tmp, child, { parent: PARENT });
-    makeTask(tmp, PARENT, {
-      status: "cancelled",
-      children: [child],
-      meta: {
-        task_workflow: {
-          phases: {
-            delivery_review_and_closeout: {
-              acceptance: { child_dispositions: { [child]: "independent" } },
+    it("allows a cancelled parent to unlink a child recorded as independently continuing", () => {
+      const child = "08-19-standalone";
+      makeTask(tmp, child, { parent: PARENT });
+      makeTask(tmp, PARENT, {
+        status: "cancelled",
+        children: [child],
+        meta: {
+          task_workflow: {
+            phases: {
+              delivery_review_and_closeout: {
+                acceptance: { child_dispositions: { [child]: "independent" } },
+              },
             },
           },
         },
-      },
+      });
+
+      const result = runTask(
+        tmp,
+        "remove-subtask",
+        fixtureDirectory(tmp, PARENT),
+        fixtureDirectory(tmp, child),
+      );
+
+      expect(result.status).toBe(0);
+      expect(readChildren(tmp, PARENT)).toEqual([]);
+      expect(
+        JSON.parse(
+          fs.readFileSync(
+            path.join(fixtureDirectory(tmp, child), "task.json"),
+            "utf-8",
+          ),
+        ).parent,
+      ).toBeNull();
     });
 
-    const result = runTask(
-      tmp,
-      "remove-subtask",
-      `.trellis/tasks/${PARENT}`,
-      `.trellis/tasks/${child}`,
-    );
+    it("does not unlink a child after the parent has completed closeout", () => {
+      const child = "08-19-standalone";
+      makeTask(tmp, child, { parent: PARENT });
+      makeTask(tmp, PARENT, { status: "completed", children: [child] });
 
-    expect(result.status).toBe(0);
-    expect(readChildren(tmp, PARENT)).toEqual([]);
-    expect(JSON.parse(fs.readFileSync(path.join(tmp, ".trellis", "tasks", child, "task.json"), "utf-8")).parent).toBeNull();
-  });
+      const result = runTask(
+        tmp,
+        "remove-subtask",
+        fixtureDirectory(tmp, PARENT),
+        fixtureDirectory(tmp, child),
+      );
 
-  it("does not unlink a child after the parent has completed closeout", () => {
-    const child = "08-19-standalone";
-    makeTask(tmp, child, { parent: PARENT });
-    makeTask(tmp, PARENT, { status: "completed", children: [child] });
-
-    const result = runTask(
-      tmp,
-      "remove-subtask",
-      `.trellis/tasks/${PARENT}`,
-      `.trellis/tasks/${child}`,
-    );
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("completed parent cannot unlink");
-    expect(readChildren(tmp, PARENT)).toEqual([child]);
-    expect(JSON.parse(fs.readFileSync(path.join(tmp, ".trellis", "tasks", child, "task.json"), "utf-8")).parent).toBe(PARENT);
-  });
-});
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("completed parent cannot unlink");
+      expect(readChildren(tmp, PARENT)).toEqual([child]);
+      expect(
+        JSON.parse(
+          fs.readFileSync(
+            path.join(fixtureDirectory(tmp, child), "task.json"),
+            "utf-8",
+          ),
+        ).parent,
+      ).toBe(PARENT);
+    });
+  },
+);

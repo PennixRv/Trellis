@@ -1107,7 +1107,7 @@ def _auto_commit_workspace(repo_root: Path) -> str:
 
     commit_msg = get_session_commit_message(repo_root)
     # Resolve the current task so staging is scoped to its dir only. The ref
-    # is ``.trellis/tasks/<name>`` — pass the bare task name.
+    # is ``.trellis/tasks/<task-dir>`` — pass the bare task name.
     current = get_current_task(repo_root)
     if current:
         task_name = Path(current).name

@@ -5,7 +5,6 @@ import {
   PATHS,
   getWorkspaceDir,
   getTaskDir,
-  getArchiveDir,
 } from "../../src/constants/paths.js";
 
 // =============================================================================
@@ -17,7 +16,6 @@ describe("DIR_NAMES", () => {
     expect(DIR_NAMES).toHaveProperty("WORKFLOW");
     expect(DIR_NAMES).toHaveProperty("WORKSPACE");
     expect(DIR_NAMES).toHaveProperty("TASKS");
-    expect(DIR_NAMES).toHaveProperty("ARCHIVE");
     expect(DIR_NAMES).toHaveProperty("SPEC");
     expect(DIR_NAMES).toHaveProperty("SCRIPTS");
   });
@@ -72,7 +70,9 @@ describe("PATHS", () => {
   });
 
   it("WORKSPACE is WORKFLOW/workspace", () => {
-    expect(PATHS.WORKSPACE).toBe(`${DIR_NAMES.WORKFLOW}/${DIR_NAMES.WORKSPACE}`);
+    expect(PATHS.WORKSPACE).toBe(
+      `${DIR_NAMES.WORKFLOW}/${DIR_NAMES.WORKSPACE}`,
+    );
   });
 
   it("TASKS is WORKFLOW/tasks", () => {
@@ -135,29 +135,19 @@ describe("getWorkspaceDir", () => {
 // =============================================================================
 
 describe("getTaskDir", () => {
-  it("returns correct path for task name", () => {
-    expect(getTaskDir("01-21-my-task")).toBe(".trellis/tasks/01-21-my-task");
+  it("joins a status-relative task directory", () => {
+    expect(getTaskDir("planning/01-21-my-task")).toBe(
+      ".trellis/tasks/planning/01-21-my-task",
+    );
   });
 
-  it("handles nested-looking names", () => {
-    expect(getTaskDir("sub/task")).toBe(".trellis/tasks/sub/task");
+  it("retains the completion month", () => {
+    expect(getTaskDir("completed/2026-01/task")).toBe(
+      ".trellis/tasks/completed/2026-01/task",
+    );
   });
 
   it("handles empty string", () => {
     expect(getTaskDir("")).toBe(".trellis/tasks/");
-  });
-});
-
-// =============================================================================
-// getArchiveDir — pure, no arguments
-// =============================================================================
-
-describe("getArchiveDir", () => {
-  it("returns correct archive path", () => {
-    expect(getArchiveDir()).toBe(".trellis/tasks/archive");
-  });
-
-  it("is under PATHS.TASKS", () => {
-    expect(getArchiveDir().startsWith(PATHS.TASKS + "/")).toBe(true);
   });
 });

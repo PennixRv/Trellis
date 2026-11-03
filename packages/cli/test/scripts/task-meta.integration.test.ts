@@ -56,7 +56,7 @@ function runTask(repo: string, ...args: string[]) {
 function readTaskJson(repo: string, dirName: string): Record<string, unknown> {
   return JSON.parse(
     fs.readFileSync(
-      path.join(repo, ".trellis", "tasks", dirName, "task.json"),
+      path.join(repo, ".trellis", "tasks", "planning", dirName, "task.json"),
       "utf-8",
     ),
   );
@@ -64,7 +64,7 @@ function readTaskJson(repo: string, dirName: string): Record<string, unknown> {
 
 function findTaskDir(repo: string, needle: string): string {
   const dir = fs
-    .readdirSync(path.join(repo, ".trellis", "tasks"))
+    .readdirSync(path.join(repo, ".trellis", "tasks", "planning"))
     .find((d) => d.includes(needle));
   if (!dir) {
     throw new Error(`no task dir matching ${needle}`);
@@ -155,7 +155,7 @@ describe.skipIf(!hasPython())("task.py meta (task.json.meta access)", () => {
     );
     expect(createResult.status).toBe(0);
     const dir = findTaskDir(tmp, "set-meta-task");
-    const taskDir = `.trellis/tasks/${dir}`;
+    const taskDir = `.trellis/tasks/planning/${dir}`;
 
     const r1 = runTask(tmp, "set-meta", taskDir, "priority-note", "urgent");
     expect(r1.status).toBe(0);

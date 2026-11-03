@@ -9,7 +9,7 @@ Usage (called automatically by task.py hooks):
     python3 .trellis/scripts/hooks/linear_sync.py complete
 
 Manual usage:
-    TASK_JSON_PATH=.trellis/tasks/<name>/task.json python3 .trellis/scripts/hooks/linear_sync.py sync
+    TASK_JSON_PATH=.trellis/tasks/<task-dir>/task.json python3 .trellis/scripts/hooks/linear_sync.py sync
 
 Environment:
     TASK_JSON_PATH  - Absolute path to task.json (set by task.py)
@@ -211,8 +211,18 @@ def _resolve_parent_linear_issue(task: dict) -> str | None:
         return None
 
     current_task_dir = Path(task_json_path).parent
-    tasks_dir = current_task_dir.parent
-    parent_json = tasks_dir / parent_name / "task.json"
+    scripts_dir = Path(__file__).resolve().parents[1]
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from common.paths import get_tasks_dir
+    from common.task_utils import find_task_by_name
+    workflow_dir = next((parent for parent in current_task_dir.parents if parent.name == ".trellis"), None)
+    if workflow_dir is None:
+        return None
+    parent_dir = find_task_by_name(parent_name, get_tasks_dir(workflow_dir.parent))
+    if parent_dir is None:
+        return None
+    parent_json = parent_dir / "task.json"
 
     if parent_json.exists():
         try:

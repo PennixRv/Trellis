@@ -20,7 +20,7 @@ python3 ./.trellis/scripts/get_context.py --mode spec --file <path>
 
 ### 任务记录
 
-Trellis task 位于 `.trellis/tasks/`，包含 `task.json`、需求以及任务所需的设计、实施、研究或上下文资产。使用 Trellis CLI 创建和启动任务、初始化和推进阶段路线，以及完成或取消任务。不得手工修改任务状态或阶段状态。
+Trellis task 按 `task.json.status` 存放在 `.trellis/tasks/planning/<task>`、`in_progress/<task>`、`completed/YYYY-MM/<task>` 或 `cancelled/<task>`。创建进入 `planning`，获准实施后启动进入 `in_progress`；目录仅是状态的投影。每个任务包含 `task.json`、需求以及任务所需的设计、实施、研究或上下文资产。使用 Trellis CLI 创建和启动任务、初始化和推进阶段路线，以及完成或取消任务。不得手工修改任务状态或阶段状态。
 
 ```bash
 python3 ./.trellis/scripts/task.py create "<title>" [--slug <name>] [--parent <task>]
@@ -34,7 +34,9 @@ python3 ./.trellis/scripts/task.py cancel <task> --reason "<reason>" --evidence-
 
 使用 `phase artifact`、`accept`、`skip`、`wait`、`block`、`resume`、`return`、`route` 和 `authorize` 执行对应的阶段操作。准确参数以 `task.py --help` 为准。跳过阶段必须提供理由和证据；目标探索与需求核对阶段不可省略。
 
-只有阶段路线已到达获准的实施入口时，`task.py start` 才会将任务从 `planning` 改为 `in_progress`。分析任务可在交付审查与现场收尾阶段后仍处于 `planning` 时完成。`complete` 和 `cancel` 会清除任务的运行时会话指针；任务记录保留在原位置。
+只有阶段路线已到达获准的实施入口时，`task.py start` 才会将任务从 `planning` 改为 `in_progress`。分析任务可在交付审查与现场收尾阶段后仍处于 `planning` 时完成。`complete` 将任务移入 `completed/YYYY-MM/<task>`，`cancel` 将任务移入 `cancelled/<task>`，并在同一事务中清除任务的运行时会话指针。
+
+旧布局须先预览 `task.py migrate-layout`，核对后执行 `task.py migrate-layout --apply`；旧 `archive/YYYY-MM` 中已完成的任务保留原月份，其他任务按真实状态放置。迁移会同步 JSON/JSONL 机器引用、会话指针和运行态索引，保留任务身份与父子关系，不重授历史授权。未完成事务会阻止普通任务命令，须用 `task.py migrate-layout --recover` 恢复；输入被外部改动时停止并保留现场。路径或产物内容改变导致接受证据失效时，须经原生阶段接受或 continuity 核对重新收敛。
 
 在支持原生实施或检查 agent 的平台上，任务上下文清单（`implement.jsonl`、`check.jsonl`）用于提供相关规范和研究资料。只有这些 agent 会读取清单时才需要维护；清单不能替代任务资产或阶段证据。
 

@@ -70,7 +70,7 @@ def safe_trellis_paths_to_add(
     Included:
       - .trellis/workspace/<developer>/journal-*.md
       - .trellis/workspace/<developer>/index.md
-      - .trellis/tasks/<task_name>/   (ONLY the current task dir when
+      - .trellis/tasks/<task-dir>/   (ONLY the current task dir when
         ``task_name`` is passed)
 
     Excluded (intentionally — these must not be staged):
@@ -112,16 +112,16 @@ def safe_trellis_paths_to_add(
         # Narrow scope — ONLY the current task directory.
         # Never iterdir() all tasks: parallel-window dirty task dirs must not
         # leak into the session auto-commit.
-        active_task = tasks_dir / task_name
-        if active_task.is_dir():
-            paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{task_name}")
+        from .task_utils import find_task_by_name
+        active_task = find_task_by_name(task_name, tasks_dir)
+        if active_task is not None and active_task.is_dir():
+            paths.append(active_task.relative_to(repo_root).as_posix())
         return paths
 
     # Wide scope (no task_name): each direct task directory.
-    for child in sorted(tasks_dir.iterdir()):
-        if not child.is_dir():
-            continue
-        paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{child.name}")
+    from .task_layout import iter_task_dirs
+    for child in iter_task_dirs(tasks_dir):
+        paths.append(child.relative_to(repo_root).as_posix())
 
     return paths
 

@@ -89,9 +89,11 @@ describe.skipIf(!hasPython() || process.platform === "win32")(
       store = path.join(base, "shared", ".trellis");
       repo = path.join(base, "repo");
 
-      fs.mkdirSync(path.join(store, "tasks", TASK), { recursive: true });
+      fs.mkdirSync(path.join(store, "tasks", "in_progress", TASK), {
+        recursive: true,
+      });
       fs.writeFileSync(
-        path.join(store, "tasks", TASK, "task.json"),
+        path.join(store, "tasks", "in_progress", TASK, "task.json"),
         JSON.stringify({
           id: TASK,
           name: TASK,
@@ -118,19 +120,23 @@ describe.skipIf(!hasPython() || process.platform === "win32")(
     it("task.py start resolves a task by name and stores the in-repo ref", () => {
       const r = runTask(repo, "start", TASK);
       expect(r.status).toBe(0);
-      expect(r.stdout).toContain(`Current task set to: .trellis/tasks/${TASK}`);
+      expect(r.stdout).toContain(
+        `Current task set to: .trellis/tasks/in_progress/${TASK}`,
+      );
     });
 
     it("task.py start resolves the path form too", () => {
-      const r = runTask(repo, "start", `.trellis/tasks/${TASK}`);
+      const r = runTask(repo, "start", `.trellis/tasks/in_progress/${TASK}`);
       expect(r.status).toBe(0);
-      expect(r.stdout).toContain(`Current task set to: .trellis/tasks/${TASK}`);
+      expect(r.stdout).toContain(
+        `Current task set to: .trellis/tasks/in_progress/${TASK}`,
+      );
     });
 
     it("still refuses `..` traversal in the symlinked layout", () => {
       const r = runTask(repo, "set-meta", "../escape", "pwned", "yes");
       expect(r.status).not.toBe(0);
-      expect(r.stderr).toContain("refusing to use");
+      expect(r.stderr).toMatch(/refusing to use|[Ss]ymlink/);
     });
 
     it("still refuses a task dir symlinked out of the tasks tree", () => {
@@ -140,11 +146,15 @@ describe.skipIf(!hasPython() || process.platform === "win32")(
         path.join(outside, "task.json"),
         JSON.stringify({ id: "outside", meta: {} }),
       );
-      fs.symlinkSync(outside, path.join(store, "tasks", "evil"), "dir");
+      fs.symlinkSync(
+        outside,
+        path.join(store, "tasks", "in_progress", "evil"),
+        "dir",
+      );
 
       const r = runTask(repo, "set-meta", "evil", "pwned", "yes");
       expect(r.status).not.toBe(0);
-      expect(r.stderr).toContain("refusing to use");
+      expect(r.stderr).toMatch(/refusing to use|[Ss]ymlink/);
       expect(
         JSON.parse(fs.readFileSync(path.join(outside, "task.json"), "utf-8"))
           .meta,
@@ -153,34 +163,36 @@ describe.skipIf(!hasPython() || process.platform === "win32")(
 
     it("hook injects task artifacts and jsonl refs through the symlink", () => {
       fs.writeFileSync(
-        path.join(store, "tasks", TASK, "prd.md"),
+        path.join(store, "tasks", "in_progress", TASK, "prd.md"),
         "PRD THROUGH SYMLINK\n",
       );
       fs.writeFileSync(
-        path.join(store, "tasks", TASK, "implement.jsonl"),
+        path.join(store, "tasks", "in_progress", TASK, "implement.jsonl"),
         JSON.stringify({
-          file: `.trellis/tasks/${TASK}/task.json`,
+          file: `.trellis/tasks/in_progress/${TASK}/task.json`,
           reason: "self",
         }) + "\n",
       );
       const out = runHookProbe(
         repo,
-        `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(`.trellis/tasks/${TASK}`)}))`,
+        `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(`.trellis/tasks/in_progress/${TASK}`)}))`,
       );
       expect(out).toContain("PRD THROUGH SYMLINK");
-      expect(out).toContain(`=== .trellis/tasks/${TASK}/task.json ===`);
+      expect(out).toContain(
+        `=== .trellis/tasks/in_progress/${TASK}/task.json ===`,
+      );
     });
 
     it("hook still refuses a jsonl ref outside both containment bases", () => {
       const secret = path.join(base, "secret.txt");
       fs.writeFileSync(secret, "TOP SECRET CONTENT");
       fs.writeFileSync(
-        path.join(store, "tasks", TASK, "implement.jsonl"),
+        path.join(store, "tasks", "in_progress", TASK, "implement.jsonl"),
         JSON.stringify({ file: secret, reason: "escape" }) + "\n",
       );
       const out = runHookProbe(
         repo,
-        `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(`.trellis/tasks/${TASK}`)}))`,
+        `print(mod.get_implement_context(REPO_ROOT, ${JSON.stringify(`.trellis/tasks/in_progress/${TASK}`)}))`,
       );
       expect(out).not.toContain("TOP SECRET CONTENT");
     });

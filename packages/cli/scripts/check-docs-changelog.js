@@ -45,7 +45,9 @@ function main() {
   }
   const type = args[typeIdx + 1];
   if (!["beta", "rc", "promote"].includes(type)) {
-    console.error(`Error: --type must be one of beta/rc/promote (got "${type}")`);
+    console.error(
+      `Error: --type must be one of beta/rc/promote (got "${type}")`,
+    );
     process.exit(2);
   }
 
@@ -65,10 +67,14 @@ function main() {
   if (fs.existsSync(docsJsonPath)) {
     const docsJson = fs.readFileSync(docsJsonPath, "utf-8");
     if (!docsJson.includes(`"changelog/v${target}"`)) {
-      missing.push(`docs-site/docs.json (missing "changelog/v${target}" page entry)`);
+      missing.push(
+        `docs-site/docs.json (missing "changelog/v${target}" page entry)`,
+      );
     }
     if (!docsJson.includes(`"zh/changelog/v${target}"`)) {
-      missing.push(`docs-site/docs.json (missing "zh/changelog/v${target}" page entry)`);
+      missing.push(
+        `docs-site/docs.json (missing "zh/changelog/v${target}" page entry)`,
+      );
     }
   }
 
@@ -80,9 +86,9 @@ function main() {
     for (const m of missing) console.error(`  - ${m}`);
     console.error(
       "\nRun /trellis:create-manifest Step 7 (docs-site changelogs) before\n" +
-      "retrying the release. The MDX files must be authored + committed on\n" +
-      "the docs-site submodule's main branch, then the submodule pointer\n" +
-      "bumped in the main repo.\n",
+        "retrying the release. The MDX files must be authored + committed on\n" +
+        "the docs-site submodule's selected branch, then the submodule pointer\n" +
+        "bumped in the main repo.\n",
     );
     process.exit(1);
   }

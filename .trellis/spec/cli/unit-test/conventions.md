@@ -423,11 +423,13 @@ function simulateExistingCheckout() {
   fs.mkdirSync(path.join(workflow, "spec"), { recursive: true });
 }
 
-// Updated helper — now also seeds tasks/archive/
+// Updated helper — a real completed record preserves the joiner scenario.
 function simulateExistingCheckout() {
-  fs.mkdirSync(path.join(workflow, "tasks", "archive"), { recursive: true });
-  // ...
+  const taskDir = path.join(workflow, "tasks", "completed", "2026-10", "existing");
+  fs.mkdirSync(taskDir, { recursive: true });
+  fs.writeFileSync(path.join(taskDir, "task.json"), JSON.stringify({status: "completed"}));
 }
+
 ```
 
 If production code starts using `tasks/.length === 0` as the discriminator between "real reinit" and "aborted recovery", every test that calls `simulateExistingCheckout()` silently flips to the new branch. Tests still green, but they're testing a different scenario than their name claims.
@@ -438,11 +440,10 @@ If production code starts using `tasks/.length === 0` as the discriminator betwe
 /**
  * Helper: simulate a fresh clone of an existing Trellis project...
  *
- * NOTE: the seeded `tasks/archive/` is load-bearing for the joiner branch.
- * If you change the `tasksEmpty` predicate in init.ts (currently
- * `!exists || readdirSync().length === 0`), audit this helper — e.g., if
- * archive/ stops counting as "non-empty", every joiner test below regresses
- * into the bootstrap-fallback branch and assertions flip silently.
+ * NOTE: seed a valid task record, not an empty status/month container.
+ * tasksAreEmpty reads all four status directories through getTaskProgress;
+ * partial input is not treated as an empty project.
+
  */
 ```
 

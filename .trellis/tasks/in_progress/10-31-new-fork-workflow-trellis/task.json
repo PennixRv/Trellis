@@ -1,0 +1,153 @@
+{
+  "id": "new-fork-workflow-trellis",
+  "name": "new-fork-workflow-trellis",
+  "title": "新 fork 工作流：Trellis Teamwork 与五阶段运行时改造",
+  "description": "跨仓父任务 new-fork-workflow-master-plan-v2 的 Trellis owner task。按已批准范围完成 Teamwork 改名、五阶段任务合同、阶段 workflow/Skills/resolver、连续性及归属接口，并以 bundled native 作为唯一默认主 workflow、移除 Marketplace nested submodule 依赖、保留显式 custom workflow source；等待根任务组合验收。发布、安装、根仓 gitlink 和现场切换仍由父任务处理。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-31",
+  "completedAt": null,
+  "branch": "v0.7.1",
+  "base_branch": "v0.7.1",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "root_parent_task_id": "new-fork-workflow-master-plan-v2",
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "combined",
+      "complexity": "complex",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "decision_space_construction_and_merging",
+        "solution_design_and_convergence",
+        "task_implementation",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": "task_implementation",
+      "input_revision": "7",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "b1feffb164bf825c15f82da73af6afdf1a5a4ad34d5384018417d239c5f37b59",
+          "artifact_refs": [
+            "prd.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "prd.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "b1feffb164bf825c15f82da73af6afdf1a5a4ad34d5384018417d239c5f37b59",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "prd.md"
+            ]
+          }
+        },
+        "decision_space_construction_and_merging": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "b58b0547e56d8dcfc5b59aa99661626c144c924743dc1548e24947f950c37c48",
+          "artifact_refs": [
+            "design.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "design.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "design.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "b58b0547e56d8dcfc5b59aa99661626c144c924743dc1548e24947f950c37c48",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "design.md"
+            ]
+          }
+        },
+        "solution_design_and_convergence": {
+          "status": "accepted",
+          "input_revision": "6",
+          "artifact_revision": "9bbe4cfc45bcdcf36fc943447873c76e88fb661137a2b60892758b34a2864e41",
+          "artifact_refs": [
+            "design.md",
+            "implement.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "design.md",
+          "outcome_kind": "implementation_contract",
+          "reason": null,
+          "evidence_refs": [
+            "design.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "9bbe4cfc45bcdcf36fc943447873c76e88fb661137a2b60892758b34a2864e41",
+            "result_revision": "1",
+            "input_revision": "6",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "design.md"
+            ]
+          }
+        },
+        "task_implementation": {
+          "status": "active",
+          "input_revision": "7",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": null,
+          "evidence_refs": [],
+          "acceptance": null
+        },
+        "delivery_review_and_closeout": {
+          "status": "not_started",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": null,
+          "evidence_refs": [],
+          "acceptance": null
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": {
+        "contract_ref": "design.md",
+        "contract_revision": "b58b0547e56d8dcfc5b59aa99661626c144c924743dc1548e24947f950c37c48",
+        "approval_ref": "user:2026-11-03-explicit-implement-publish-install-migrate",
+        "task_route_revision": "1"
+      },
+      "closeout_disposition": null,
+      "skip_records": {},
+      "return_record": null
+    }
+  }
+}

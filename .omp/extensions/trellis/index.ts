@@ -182,7 +182,7 @@ function displayProjectPath(projectRoot: string, filePath: string, taskDir?: str
       const taskRelative = relative(projectRoot, taskDir).split("\\").join("/");
       const taskLabel = taskRelative && !taskRelative.startsWith("../") && !isAbsolute(taskRelative)
          ? taskRelative
-         : `.trellis/tasks/${basename(taskDir)}`;
+         : taskDir.split("\\").join("/");
       const withinTask = relative(taskDir, filePath).split("\\").join("/");
       if (withinTask && !withinTask.startsWith("../") && !isAbsolute(withinTask)) {
          return `${taskLabel}/${withinTask}`;

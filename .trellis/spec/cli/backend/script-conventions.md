@@ -458,8 +458,7 @@ def has_git_remote(repo_root: Path) -> bool
   resolved. This fixes creating a task from a feature branch mis-recording
   that feature branch as the PR target (#399).
 - `branch_exists_locally()` checks `git rev-parse --verify --quiet
-  refs/heads/<branch>`. `task_context.py:cmd_validate` and
-  `task_store.py:cmd_archive` call it against `task.json.branch` and print a
+  refs/heads/<branch>`. `task_context.py:cmd_validate` calls it against `task.json.branch` and print a
   yellow warning (not a failure/block) when the recorded branch no longer
   exists locally — the common case is the branch was already merged and
   deleted upstream.
@@ -515,36 +514,9 @@ guess from `init_developer.py` alone.
 
 #### `task.json.branch` lifecycle
 
-`branch` names the feature branch the work was done on; `base_branch` names
-the branch a PR targets. They must differ for PR-backed work.
+`branch` 和 `base_branch` 是分支事实。`task.py start` 仅在 branch 为空且当前实施入口获授权时记录当前分支；既有 set-branch 值保留，detached HEAD 或无 Git 时不猜测。分支相同可以提示，不能恢复已退役 archive 的分支门禁。完成与取消由交付审查和执行资源准入决定。
 
-- `task.py start` (`task.py:_record_start_state`) records
-  `current_branch_name()` into `branch` **only when the field is empty**, in
-  the same read/write that flips `planning → in_progress`. An explicit
-  `set-branch` therefore survives re-starting a task. On detached HEAD or
-  outside git it prints a note and records nothing; the start still succeeds.
-  When the recorded branch equals `base_branch` it is written anyway (the
-  value is true) and a warning says archive will refuse that shape.
-- `task.py archive` (`task_store.py:_validate_branch_metadata`) runs before
-  any mutation and refuses, exit 1, when either
-  (a) `branch` is empty while `base_branch` is set **and** the repo has a
-  remote — the pragmatic definition of "PR-backed": a task created expecting a
-  PR whose branch was simply never written down; or
-  (b) `branch == base_branch`.
-  Both errors name the repair command (`task.py set-branch` /
-  `set-base-branch`) — hand-editing `task.json` is never the documented path.
-  `--skip-branch-validation` bypasses both for tasks that were never
-  PR-backed; it does not suppress the stale-branch warning.
-- Local-only repos (no remote) and tasks without a `base_branch` skip the
-  missing-branch check entirely.
-- Note how wide (a) actually is: `cmd_create` stamps `base_branch` on every
-  task, so in a repo with a remote the predicate reduces to "every task must
-  have a `branch`". Tasks created before start-time recording landed carry
-  `branch: null` and are refused until repaired — repair with `set-branch`,
-  or pass `--skip-branch-validation` per archive.
-- Repairing an **already-archived** task works the same way, but the bare task
-  name no longer resolves; pass the archive path explicitly:
-  `task.py set-branch .trellis/tasks/archive/<YYYY-MM>/<task> <branch>`.
+四类状态目录均可通过唯一任务名或真实路径解析。例如：`task.py set-branch .trellis/tasks/completed/2026-01/<task> <branch>`。不得通过手改 task.json 修正状态。
 
 ### `common/active_task.py` — Active Task Resolver
 
@@ -702,24 +674,10 @@ a `.current-task` fallback or a Python hook directory.
   Without a process context key, or when resolution returns no unique active
   task, it deletes nothing. It must never delete `.trellis/.current-task` or
   bulk-clear other sessions.
-- `task.py archive <task>` deletes every runtime session file whose
-  `current_task` points at the archived task before moving the task directory.
-- `resolve_task_dir(target_dir, repo_root)` (`task_utils.py`) is the
-  containment chokepoint for every command taking a task-directory argument.
-  It resolves the candidate (following symlinks) and returns `None`, after
-  printing an error naming the path, unless the result lands strictly under
-  `.trellis/tasks/` — archived tasks under `archive/<YYYY-MM>/` included.
-  Traversal (`../victim`), an absolute path outside the repo, a task dir
-  symlinked elsewhere, an unknown name, and an ambiguous suffix (two tasks
-  ending in `-<name>`; every match is printed) all resolve to nothing.
-  Callers must handle `None`; they must not add their own containment checks.
-- Before moving anything, `cmd_archive` (`task_store.py`) additionally calls
-  `is_within_tasks_dir(task_dir_abs, repo_root)` (`task_utils.py`) and refuses
-  with "refusing to archive ..." (exit 1) unless the resolved dir is a direct
-  child of `.trellis/tasks/`, so an already-archived task is not archived
-  twice. A mistyped `task.py archive src` is stopped one step earlier, by
-  `resolve_task_dir`, with the same refusal wording. See
-  [Filesystem Safety](./filesystem-safety.md#2-path--name-safety--validate-at-the-chokepoint-before-pathjoin).
+- `task.py complete` / `cancel` 在同一事务中写入终态、移动任务并清除本任务会话与 continuity/ownership runtime；finish 仍只清当前会话指针。
+- `resolve_task_dir` 是任务参数的共同边界。仅识别 planning、in_progress、cancelled 的一级任务及 completed/YYYY-MM 的任务；共享 tasks 根可为符号链接，后代符号链接和任意递归目录不能充当任务。
+- 全状态任务 basename 必须唯一。歧义后缀、越界路径、旧布局或未恢复事务均拒绝；显式 `migrate-layout` 才能读取旧平铺/archive 输入。
+
 - `task.py create --slug` is user input joined into the task directory name:
   a slug containing `/`, `\`, or `..` is rejected (exit 1) rather than
   sanitized. `task.py add-context <dir> <file>` applies the same rule to the
@@ -1208,21 +1166,15 @@ Replaces 9 scattered task iteration patterns with a single typed API.
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `load_task` | `(task_dir: Path) -> TaskInfo \| None` | Load one task; `None` if no valid task.json |
-| `iter_active_tasks` | `(tasks_dir: Path) -> Iterator[TaskInfo]` | All non-archived tasks, **sorted by dir name** |
+| `iter_active_tasks` | `(tasks_dir: Path) -> Iterator[TaskInfo]` | All four status directories, **sorted by task dir name** |
 | `get_all_statuses` | `(tasks_dir: Path) -> dict[str, str]` | `{dir_name: status}` map for progress display |
 | `children_progress` | `(children, all_statuses) -> str` | Format `" [2/3 done]"` or `""` |
 
-**Sorting guarantee**: `iter_active_tasks` uses `sorted(tasks_dir.iterdir())` — same order as the filesystem `ls` output. This is frozen behavior; changing the sort would break display consistency.
+**Sorting guarantee**: `iter_active_tasks` uses bounded `iter_task_dirs(tasks_dir)` sorted by `(task basename, path)` — same order as the filesystem `ls` output. This is frozen behavior; changing the sort would break display consistency.
 
 #### Parent-child invariant (children list)
 
-`children` on a parent task is the **historical** list of subtask dir names — it must NOT be pruned when a child is archived. The contract:
-
-- `cmd_archive` keeps the archived child's name in the parent's `children`.
-- `children_progress` treats any `child` not present in `all_statuses` (i.e. no longer in the active tasks dir) as **completed**, since `cmd_archive` always sets `status=completed` before moving the directory.
-- Renderers that walk children (e.g. `task.py:_print_task`) must guard with `if child_name in all_tasks` so archived entries are silently skipped, not shown.
-
-**Why**: pruning on archive caused `[1/6 done]` → `[0/5 done]` regression — both numerator and denominator dropped, hiding completed work. The single field `children` serves two readers (parent-to-child traversal and progress %); both must agree on its meaning. If you ever need an "active children only" view, derive it via `[c for c in t.children if c in all_statuses]`, do not mutate the field.
+parent/children 始终记录任务 basename，不嵌入状态目录。完成或取消不剪除历史子任务，rename 原子更新反向关系。发现覆盖全部四种状态；`children_progress` 只把明确 completed 的子任务计为完成，缺失或 cancelled 不伪造完成。呈现活动树时可以过滤终态，但不能据此改写关系或分母。
 
 ---
 
@@ -1437,7 +1389,7 @@ path = ".trellis/scripts/task.py"
 
 ### Scope / Trigger
 
-Task lifecycle events (`after_create`, `after_start`, `after_finish`, `after_archive`) execute user-defined shell commands configured in `config.yaml`.
+Task lifecycle events (`after_create`, `after_start`, `after_finish`, `after_complete`) execute user-defined shell commands configured in `config.yaml`.
 
 ### Signatures
 
@@ -1470,7 +1422,7 @@ Consequences for implementers:
   code (a fetched template, a cache, a `.local` override sourced from a remote).
 - Never add a hook event that fires from a *read-only* command. Today every
   event follows an explicit mutation the user asked for (`create`, `start`,
-  `finish`, `archive`); a hook on `list` or `current` would turn inspecting a
+  `finish`, `complete`); a hook on `list` or `current` would turn inspecting a
   cloned repo into executing it.
 - The bounded timeout below is a liveness guarantee, not a security boundary.
   It does not contain what a hook can do. The tree-kill on timeout is part of
@@ -1487,8 +1439,8 @@ hooks:
     - "python3 .trellis/scripts/hooks/my_hook.py create"
   after_start:
     - "python3 .trellis/scripts/hooks/my_hook.py start"
-  after_archive:
-    - "python3 .trellis/scripts/hooks/my_hook.py archive"
+  after_complete:
+    - "python3 .trellis/scripts/hooks/my_hook.py complete"
 ```
 
 **Environment variables passed to hooks**:
@@ -1698,7 +1650,7 @@ canonical `common/safe_commit.py` helpers. Hand-rolled `git add -A` /
 Staging `.trellis/` is only ever allowed via one of two precise routes:
 
 1. **`common/safe_commit.py`'s precise allowlist** — for all Python auto-commits
-   (`add_session.py`, `task.py archive`).
+   (`add_session.py`).
 2. **`release.js`'s precise pathspec** — for release commits. The pre-release
    sweep MUST exclude `.trellis/` (see `release-process.md`).
 
@@ -1728,29 +1680,20 @@ prohibition above is what closes those two escape hatches.
 
 > **Any staging helper, when given a `task_name`, MUST NOT do a
 > `tasks_dir.iterdir()` full scan over all task dirs.** It stages ONLY the
-> named task dir (active or archived) plus explicitly-passed children.
+> named task dir in its actual status directory.
 
-This holds for both `safe_trellis_paths_to_add(..., task_name=...)` and
-`safe_archive_paths_to_add(..., task_name=...)`. The legacy no-`task_name`
-wide branches exist only for backwards-compat and are dormant: every live
-caller passes `task_name`. When the current task cannot be resolved (0 or ≥2
-parallel sessions), `add_session.py:_auto_commit_workspace` does NOT fall back
-to the wide scan — it stages only the developer's journal/index and skips
-every task dir, so the parallel-window case can never silently re-open the
-wide scope.
+`safe_trellis_paths_to_add(..., task_name=...)` 只允许当前任务。没有唯一活动任务时，session auto-commit 仅包含开发者 journal/index，不回退为全任务扫描。任务生命周期移动不自动执行 Git 提交。
 
 ### Canonical helpers
 
 | Helper | Source | Purpose |
 |---|---|---|
 | `safe_trellis_paths_to_add(repo_root, task_name=None)` | `templates/trellis/scripts/common/safe_commit.py:safe_trellis_paths_to_add` | Path whitelist for `add_session.py` — current developer's journal files + index.md, and (when `task_name` is passed) ONLY the current task dir. Callers MUST pass `task_name` so parallel-window dirty task dirs never leak into the session commit (#303). |
-| `safe_archive_paths_to_add(repo_root, task_name=None, modified_children=None)` | `templates/trellis/scripts/common/safe_commit.py:safe_archive_paths_to_add` | Path whitelist for `task.py archive` — archive subtree + explicitly-passed `modified_children` task dirs (parent/child relationship updates). Callers MUST pass `task_name`. |
 | `safe_git_add(paths, repo_root)` | `templates/trellis/scripts/common/safe_commit.py:safe_git_add` | Plain `git add -- <paths>`; never `-f`. Returns `(success, used_force=False, stderr)` |
 | `print_gitignore_warning(paths)` | `templates/trellis/scripts/common/safe_commit.py:print_gitignore_warning` | Single source of truth for the "ignored by .gitignore" warning, including the AI-defense negative example |
 | `get_session_auto_commit(repo_root)` | `templates/trellis/scripts/common/config.py:get_session_auto_commit` | Reads `session_auto_commit` from `.trellis/config.yaml` (default `True`) |
 
-Callers using this contract: `add_session.py:_auto_commit_workspace` and
-`task_store.py:_auto_commit_archive` (invoked from `task.py archive`).
+Current caller: `add_session.py:_auto_commit_workspace`.
 
 ### Anti-pattern: AI-invented `git add -f .trellis/`
 
@@ -1781,7 +1724,7 @@ auto `-f` is gone. There is no `-f` retry anywhere in the auto-commit path.
 ### Pattern: path whitelist + plain `git add` + warn-and-skip
 
 ```python
-# add_session.py / task.py archive
+# add_session.py
 from common.safe_commit import (
     safe_trellis_paths_to_add,
     safe_git_add,
@@ -1832,18 +1775,13 @@ Behavior contract:
   `add_session.py` returns `COMMIT_BLOCKED` and still exits 0: a gitignored
   `.trellis/` is the user telling git to stay out of this tree, which is the
   same configured skip as `session_auto_commit: false`, not a failure worth
-  retrying. `task.py archive` returns success only when the archived source
-  was not tracked; if tracked task files were moved and the archive commit
-  cannot be created, `archive` exits non-zero so callers do not continue to
-  journal over dirty deletes.
+  retrying. Lifecycle relocation is a separate file transaction and does not auto-commit.
+
 - On any other failure → log the stderr and return `COMMIT_FAILED`. Do not
   re-attempt with different flags. `add_session.py` exits non-zero and prints
   the resume checkpoint.
-- `task.py archive` is stricter than `add_session.py`: when `session_auto_commit`
-  is enabled and the source task had tracked files, the archive move must be
-  accompanied by a successful bookkeeping commit. A failed commit leaves the
-  move on disk but exits non-zero with a "Resolve `git status` before
-  continuing" message.
+任务移动的恢复日志只包含本事务输入；不能通过 Git 提交失败恢复目录。
+
 - `used_force` in `safe_git_add`'s return tuple is kept for signature
   compatibility but is always `False`. Do not introduce a code path that
   sets it to `True`.
@@ -2043,7 +1981,7 @@ for oid, subject in evidence:
 session_auto_commit: false    # files written, git left untouched
 ```
 
-- `true` (default) — `add_session.py` and `task.py archive` stage + commit
+- `true` (default) — `add_session.py` stages and commits
   via the helpers above.
 - `false` — early-return before touching git. Files are still written; the
   user runs `git status` / `git add` / `git commit` themselves.
@@ -2121,8 +2059,7 @@ if not success:
 
 ### Tests Required
 
-When changing `safe_commit.py`, `add_session.py:_auto_commit_workspace`, or
-`task_store.py:_auto_commit_archive`:
+When changing `safe_commit.py` or `add_session.py:_auto_commit_workspace`:
 
 - `safe_trellis_paths_to_add` excludes `.trellis/.backup-*`, `.trellis/worktrees/`,
   `.trellis/.template-hashes.json`, `.trellis/.runtime`, `.trellis/.cache/`.
@@ -2132,12 +2069,8 @@ When changing `safe_commit.py`, `add_session.py:_auto_commit_workspace`, or
   `Do NOT use \`git add -f .trellis/\``.
 - `_auto_commit_*` early-returns when `session_auto_commit: false`, with no
   `git` subprocess invocations.
-- **Scope-creep guard (required for both staging routes):** with two parallel
-  task dirs both dirty, running the auto-commit in task-a's context must NOT
-  stage or commit any `task-b` path, and `task-b` stays dirty. Mirror
-  `task-archive.integration.test.ts` ("does not bundle dirty changes from
-  other task dirs") for the session route in
-  `add-session.integration.test.ts`.
+- **Scope-creep guard:** `add-session.integration.test.ts` must prove that recording task-a does not stage task-b, including when tasks occupy different status directories.
+
 - **Parity invariant:** `safe_trellis_paths_to_add(repo_root, task_name=...)`
   returns only the named task dir (active or archived), never the whole task
   list.
@@ -2434,7 +2367,7 @@ example in `packages/cli/src/templates/trellis/config.yaml`, with:
   doesn't override the in-code default until the user uncuts it).
 
 ```yaml
-# Auto-commit behavior for session journal + task archive operations.
+# Auto-commit behavior for session journals.
 # - true (default): scripts auto-stage and auto-commit ...
 # - false: scripts do not touch git. Files are still written to disk; ...
 #
@@ -2674,7 +2607,7 @@ Examples:
     # list command
     list_parser = subparsers.add_parser("list", help="List tasks")
     list_parser.add_argument("--mine", "-m", action="store_true")
-    list_parser.add_argument("--status", "-s", choices=["planning", "in_progress", "review", "completed"])
+    list_parser.add_argument("--status", "-s", choices=["planning", "in_progress", "completed", "cancelled"])
 
     args = parser.parse_args()
 
@@ -2740,7 +2673,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from common.task_store import cmd_create, cmd_archive   # CRUD operations
+from common.task_store import cmd_create                # task creation
+from common.task_workflow import cmd_complete_task      # lifecycle operations
 from common.task_context import cmd_init_context         # JSONL management
 
 def main() -> int:

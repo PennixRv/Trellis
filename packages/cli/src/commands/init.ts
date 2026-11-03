@@ -66,6 +66,19 @@ import {
 import { setupProxy, maskProxyUrl } from "../utils/proxy.js";
 import { toPosix } from "../utils/posix.js";
 import { updateHashes } from "../utils/template-hash.js";
+import { getTaskProgress } from "./task-progress.js";
+
+function tasksAreEmpty(cwd: string): boolean {
+  const progress = getTaskProgress(cwd);
+  return (
+    !progress.partial &&
+    progress.planning +
+      progress.in_progress +
+      progress.completed +
+      progress.cancelled ===
+      0
+  );
+}
 
 const MIN_PYTHON_MAJOR = 3;
 const MIN_PYTHON_MINOR = 9;
@@ -322,7 +335,7 @@ function writeTaskSkeleton(
   taskJson: TaskJson,
   prdContent: string,
 ): boolean {
-  const taskDir = path.join(cwd, PATHS.TASKS, taskName);
+  const taskDir = path.join(cwd, PATHS.TASKS, "planning", taskName);
   if (fs.existsSync(taskDir)) return true; // idempotent
 
   try {
@@ -693,7 +706,7 @@ code every session.
 
 File layout (mention when they ask "where does what live"):
 - \`.trellis/.runtime/sessions/<session>.json\` — session active-task state, gitignored
-- \`.trellis/tasks/<task>/{implement,check}.jsonl\` — per-task context manifests
+- \`.trellis/tasks/<task-dir>/{implement,check}.jsonl\` — per-task context manifests
 - \`.trellis/spec/\` — project-wide conventions (source of truth)
 - \`.trellis/workspace/${developer}/journal-*.md\` — their session log,
   rotated at ~2000 lines
@@ -1179,9 +1192,7 @@ export async function init(options: InitOptions): Promise<void> {
   // empty, the previous init never reached bootstrap creation. Fall through
   // to the full flow so the main-dispatch tasksEmpty fallback fires —
   // handleReinit's joiner branch would otherwise mis-route the recovery.
-  const tasksDirEarly = path.join(cwd, PATHS.TASKS);
-  const tasksEmptyEarly =
-    !fs.existsSync(tasksDirEarly) || fs.readdirSync(tasksDirEarly).length === 0;
+  const tasksEmptyEarly = tasksAreEmpty(cwd);
   const hasTemplateRequest = !!options.template || !!options.registry;
 
   if (
@@ -2012,9 +2023,7 @@ export async function init(options: InitOptions): Promise<void> {
     // Runs OUTSIDE the init_developer try/catch (which uses stdio: "pipe")
     // so joiner failures surface as warnings instead of being silently
     // swallowed.
-    const tasksDir = path.join(cwd, PATHS.TASKS);
-    const tasksEmpty =
-      !fs.existsSync(tasksDir) || fs.readdirSync(tasksDir).length === 0;
+    const tasksEmpty = tasksAreEmpty(cwd);
 
     if (isFirstInit || tasksEmpty) {
       createBootstrapTask(

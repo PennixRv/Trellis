@@ -76,6 +76,8 @@ describe("init() joiner onboarding", () => {
     const existingTask = path.join(
       workflow,
       DIR_NAMES.TASKS,
+      "completed",
+      "2026-10",
       "10-01-existing-task",
     );
     fs.mkdirSync(existingTask, { recursive: true });
@@ -104,12 +106,13 @@ describe("init() joiner onboarding", () => {
     const bootstrap = path.join(
       tmpDir,
       PATHS.TASKS,
+      "planning",
       "00-bootstrap-guidelines",
     );
     expect(fs.existsSync(bootstrap)).toBe(true);
 
     // No joiner task present
-    const joiner = path.join(tmpDir, PATHS.TASKS, "00-join-alice");
+    const joiner = path.join(tmpDir, PATHS.TASKS, "planning", "00-join-alice");
     expect(fs.existsSync(joiner)).toBe(false);
   });
 
@@ -118,7 +121,7 @@ describe("init() joiner onboarding", () => {
 
     await init({ yes: true, user: "bob", force: true });
 
-    const joiner = path.join(tmpDir, PATHS.TASKS, "00-join-bob");
+    const joiner = path.join(tmpDir, PATHS.TASKS, "planning", "00-join-bob");
     expect(fs.existsSync(joiner)).toBe(true);
 
     const taskJson = JSON.parse(
@@ -141,10 +144,13 @@ describe("init() joiner onboarding", () => {
     expect(prd).toContain("You (the AI) are running this task");
     expect(prd).toContain("workflow.md");
     expect(prd).toContain(".trellis/spec/");
-    expect(prd).toContain("start it from a session that provides Trellis session identity");
+    expect(prd).toContain(
+      "start it from a session that provides Trellis session identity",
+    );
     expect(prd).toContain("Delivery Review and On-Site Closeout Phase");
     expect(prd).not.toContain("task.py archive");
-    const expectedPythonCmd = process.platform === "win32" ? "python" : "python3";
+    const expectedPythonCmd =
+      process.platform === "win32" ? "python" : "python3";
     expect(prd).toContain(
       `${expectedPythonCmd} ./.trellis/scripts/task.py list --assignee bob`,
     );
@@ -156,7 +162,9 @@ describe("init() joiner onboarding", () => {
 
     // Bootstrap task NOT created
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-bootstrap-guidelines")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-bootstrap-guidelines"),
+      ),
     ).toBe(false);
   });
 
@@ -174,10 +182,14 @@ describe("init() joiner onboarding", () => {
     await init({ yes: true, user: "alice" });
 
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-bootstrap-guidelines")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-bootstrap-guidelines"),
+      ),
     ).toBe(true);
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-join-alice")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-join-alice"),
+      ),
     ).toBe(false);
   });
 
@@ -193,10 +205,14 @@ describe("init() joiner onboarding", () => {
     await init({ yes: true, user: "alice", force: true });
 
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-bootstrap-guidelines")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-bootstrap-guidelines"),
+      ),
     ).toBe(true);
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-join-alice")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-join-alice"),
+      ),
     ).toBe(false);
   });
 
@@ -206,10 +222,14 @@ describe("init() joiner onboarding", () => {
     await init({ yes: true, user: "carol", force: true });
 
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-join-carol")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-join-carol"),
+      ),
     ).toBe(false);
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-bootstrap-guidelines")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-bootstrap-guidelines"),
+      ),
     ).toBe(false);
   });
 
@@ -217,7 +237,12 @@ describe("init() joiner onboarding", () => {
     simulateExistingCheckout();
 
     await init({ yes: true, user: "dave", force: true });
-    const joinerPath = path.join(tmpDir, PATHS.TASKS, "00-join-dave");
+    const joinerPath = path.join(
+      tmpDir,
+      PATHS.TASKS,
+      "planning",
+      "00-join-dave",
+    );
     expect(fs.existsSync(joinerPath)).toBe(true);
 
     // Manually create the .developer file that init_developer.py would have
@@ -240,7 +265,7 @@ describe("init() joiner onboarding", () => {
 
     await init({ yes: true, user: "Tao Su", force: true });
 
-    const joiner = path.join(tmpDir, PATHS.TASKS, "00-join-tao-su");
+    const joiner = path.join(tmpDir, PATHS.TASKS, "planning", "00-join-tao-su");
     expect(fs.existsSync(joiner)).toBe(true);
 
     const taskJson = JSON.parse(
@@ -256,7 +281,12 @@ describe("init() joiner onboarding", () => {
     await init({ yes: true, user: "@org/bob", force: true });
 
     // slugifyDeveloperName: lowercase @org/bob → punctuation-collapsed to "org-bob"
-    const joiner = path.join(tmpDir, PATHS.TASKS, "00-join-org-bob");
+    const joiner = path.join(
+      tmpDir,
+      PATHS.TASKS,
+      "planning",
+      "00-join-org-bob",
+    );
     expect(fs.existsSync(joiner)).toBe(true);
   });
 
@@ -267,11 +297,11 @@ describe("init() joiner onboarding", () => {
 
     // Unicode letters pass through \p{Letter}, so dir name is non-empty
     const entries = fs
-      .readdirSync(path.join(tmpDir, PATHS.TASKS))
+      .readdirSync(path.join(tmpDir, PATHS.TASKS, "planning"))
       .filter((name) => name.startsWith("00-join-"));
     expect(entries).toHaveLength(1);
 
-    const joiner = path.join(tmpDir, PATHS.TASKS, entries[0]);
+    const joiner = path.join(tmpDir, PATHS.TASKS, "planning", entries[0]);
     const taskJson = JSON.parse(
       fs.readFileSync(path.join(joiner, FILE_NAMES.TASK_JSON), "utf-8"),
     );
@@ -289,19 +319,17 @@ describe("init() joiner onboarding", () => {
     simulateExistingCheckout();
 
     const originalWriteFileSync = fs.writeFileSync;
-    const writeSpy = vi
-      .spyOn(fs, "writeFileSync")
-      .mockImplementation(((
-        filePath: fs.PathOrFileDescriptor,
-        data: string | NodeJS.ArrayBufferView,
-        options?: fs.WriteFileOptions,
-      ) => {
-        const pathStr = String(filePath);
-        if (pathStr.includes("00-join-eve") && pathStr.endsWith("task.json")) {
-          throw new Error("simulated write failure");
-        }
-        return originalWriteFileSync(filePath, data, options);
-      }) as typeof fs.writeFileSync);
+    const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(((
+      filePath: fs.PathOrFileDescriptor,
+      data: string | NodeJS.ArrayBufferView,
+      options?: fs.WriteFileOptions,
+    ) => {
+      const pathStr = String(filePath);
+      if (pathStr.includes("00-join-eve") && pathStr.endsWith("task.json")) {
+        throw new Error("simulated write failure");
+      }
+      return originalWriteFileSync(filePath, data, options);
+    }) as typeof fs.writeFileSync);
 
     const warnSpy = vi.spyOn(console, "warn");
 
@@ -333,7 +361,7 @@ describe("init() joiner onboarding", () => {
 
     await init({ yes: true, user: "frank" });
 
-    const joiner = path.join(tmpDir, PATHS.TASKS, "00-join-frank");
+    const joiner = path.join(tmpDir, PATHS.TASKS, "planning", "00-join-frank");
     expect(fs.existsSync(joiner)).toBe(true);
 
     const taskJson = JSON.parse(
@@ -353,10 +381,14 @@ describe("init() joiner onboarding", () => {
     await init({ yes: true, user: "grace" });
 
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-join-grace")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-join-grace"),
+      ),
     ).toBe(false);
     expect(
-      fs.existsSync(path.join(tmpDir, PATHS.TASKS, "00-bootstrap-guidelines")),
+      fs.existsSync(
+        path.join(tmpDir, PATHS.TASKS, "planning", "00-bootstrap-guidelines"),
+      ),
     ).toBe(false);
   });
 });

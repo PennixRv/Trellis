@@ -47,7 +47,12 @@ interface RepoOpts {
 
 function setupRepo(
   tmp: string,
-  { config, developer, taskWorkflow, variants = ["native", "tdd", "channel"] }: RepoOpts,
+  {
+    config,
+    developer,
+    taskWorkflow,
+    variants = ["native", "tdd", "channel"],
+  }: RepoOpts,
 ): string | null {
   const tr = path.join(tmp, ".trellis");
   fs.mkdirSync(path.join(tr, "scripts"), { recursive: true });
@@ -57,11 +62,13 @@ function setupRepo(
   for (const v of variants) {
     fs.writeFileSync(path.join(tr, "workflows", `${v}.md`), v.toUpperCase());
   }
-  if (config !== undefined) fs.writeFileSync(path.join(tr, "config.yaml"), config);
-  if (developer !== undefined) fs.writeFileSync(path.join(tr, ".developer"), developer);
+  if (config !== undefined)
+    fs.writeFileSync(path.join(tr, "config.yaml"), config);
+  if (developer !== undefined)
+    fs.writeFileSync(path.join(tr, ".developer"), developer);
 
   if (taskWorkflow === undefined) return null;
-  const taskDir = path.join(tr, "tasks", "t1");
+  const taskDir = path.join(tr, "tasks", "in_progress", "t1");
   fs.mkdirSync(taskDir, { recursive: true });
   const data: Record<string, string> = { id: "t1", status: "in_progress" };
   if (taskWorkflow) data.workflow = taskWorkflow;
@@ -92,7 +99,9 @@ function resolve(tmp: string, taskDir: string | null): string {
 describe.skipIf(!hasPython())("layered workflow default resolution", () => {
   let tmp: string;
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "wf-layered-"));
+    tmp = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "wf-layered-"),
+    );
   });
   afterEach(() => {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -204,7 +213,7 @@ describe.skipIf(!hasPython())("layered workflow default resolution", () => {
     );
     expect(create.status, create.stderr).toBe(0);
 
-    const tasksDir = path.join(tmp, ".trellis", "tasks");
+    const tasksDir = path.join(tmp, ".trellis", "tasks", "planning");
     const taskNames = fs
       .readdirSync(tasksDir)
       .filter((name) => fs.existsSync(path.join(tasksDir, name, "task.json")));

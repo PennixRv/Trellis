@@ -201,54 +201,10 @@ def normalize_task_ref(task_ref: str) -> str:
 
 
 def resolve_task_ref(task_ref: str, repo_root: Path) -> Path | None:
-    """Resolve a task ref to an absolute task directory inside the repo.
+    """Use the canonical status-layout resolver shared by all task readers."""
+    from .paths import resolve_task_ref as resolve
 
-    Mirrors `paths.resolve_task_ref` (same containment check). Duplicated
-    rather than imported because this module is loaded standalone — hooks add
-    it to `sys.path` directly — so it stays zero-relative-import on purpose.
-    """
-    normalized = normalize_task_ref(task_ref)
-    if not normalized:
-        return None
-
-    try:
-        root = repo_root.resolve()
-    except OSError:
-        return None
-
-    path_obj = Path(normalized)
-    if path_obj.is_absolute():
-        candidate = path_obj
-    elif normalized.startswith(f"{DIR_WORKFLOW}/"):
-        candidate = root / path_obj
-    else:
-        candidate = root / DIR_WORKFLOW / DIR_TASKS / path_obj
-
-    # Both sides are resolved because repo_root itself may sit behind a
-    # symlink (/tmp on macOS does), and resolve() is what collapses `..`
-    # instead of leaving it for a lexical relative_to() to wave through.
-    try:
-        resolved = candidate.resolve()
-        workflow_real = (root / DIR_WORKFLOW).resolve()
-    except OSError:
-        return None
-
-    try:
-        resolved.relative_to(root)
-        return resolved
-    except ValueError:
-        pass
-
-    # `.trellis` may itself be a symlink into a store outside the repo (#567).
-    # The workflow dir's own real location is then a second legitimate
-    # containment base; a ref that escapes BOTH bases is still refused. Map
-    # back to the in-repo (lexical) form so callers store a repo-relative ref.
-    try:
-        rel = resolved.relative_to(workflow_real)
-    except ValueError:
-        return None
-
-    return root / DIR_WORKFLOW / rel
+    return resolve(task_ref, repo_root)
 
 
 def _runtime_sessions_dir(repo_root: Path) -> Path:

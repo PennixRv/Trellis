@@ -1,0 +1,152 @@
+{
+  "id": "trellis-agents-monorepo",
+  "name": "trellis-agents-monorepo",
+  "title": "Trellis Agents GUI - Monorepo Migration",
+  "description": "",
+  "status": "cancelled",
+  "dev_type": null,
+  "scope": null,
+  "priority": "P2",
+  "creator": "kleinhe",
+  "assignee": "kleinhe",
+  "createdAt": "2026-01-22",
+  "completedAt": null,
+  "branch": "feature/trellis-agents",
+  "base_branch": "main",
+  "worktree_path": "/Users/kleincr/Dev/mindfold/trellis-worktrees/feature/trellis-agents",
+  "current_phase": 0,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "implement"
+    },
+    {
+      "phase": 2,
+      "action": "check"
+    },
+    {
+      "phase": 3,
+      "action": "finish"
+    },
+    {
+      "phase": 4,
+      "action": "create-pr"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "2",
+      "task_kind": "combined",
+      "complexity": "simple",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "4",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "skipped",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": "用户明确撤回历史任务，仅审查取消处置",
+          "evidence_refs": [
+            "user:2026-11-03-withdraw-three-legacy-source-tasks",
+            "cancellation-review.md"
+          ],
+          "acceptance": null
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "3",
+          "artifact_revision": "686f74aed8f842b34d17ed9ceab6836886eeedbeddf772c6f0d26249aa285e28",
+          "artifact_refs": [
+            "cancellation-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "cancellation-review.md",
+          "outcome_kind": "cancelled",
+          "reason": null,
+          "evidence_refs": [
+            "cancellation-review.md",
+            "user:2026-11-03-withdraw-three-legacy-source-tasks"
+          ],
+          "acceptance": {
+            "artifact_revision": "686f74aed8f842b34d17ed9ceab6836886eeedbeddf772c6f0d26249aa285e28",
+            "result_revision": "1",
+            "input_revision": "3",
+            "task_route_revision": "2",
+            "evidence_refs": [
+              "cancellation-review.md",
+              "user:2026-11-03-withdraw-three-legacy-source-tasks"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": null,
+      "closeout_disposition": "cancelled",
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "用户明确撤回历史任务，仅审查取消处置",
+          "evidence_refs": [
+            "user:2026-11-03-withdraw-three-legacy-source-tasks",
+            "cancellation-review.md"
+          ],
+          "task_route_revision": "2"
+        },
+        "solution_design_and_convergence": {
+          "reason": "用户明确撤回历史任务，仅审查取消处置",
+          "evidence_refs": [
+            "user:2026-11-03-withdraw-three-legacy-source-tasks",
+            "cancellation-review.md"
+          ],
+          "task_route_revision": "2"
+        },
+        "task_implementation": {
+          "reason": "用户明确撤回历史任务，仅审查取消处置",
+          "evidence_refs": [
+            "user:2026-11-03-withdraw-three-legacy-source-tasks",
+            "cancellation-review.md"
+          ],
+          "task_route_revision": "2"
+        },
+        "goal_exploration_and_requirements": {
+          "reason": "用户明确撤回历史任务，仅审查取消处置",
+          "evidence_refs": [
+            "user:2026-11-03-withdraw-three-legacy-source-tasks",
+            "cancellation-review.md"
+          ],
+          "task_route_revision": "2"
+        }
+      },
+      "return_record": {
+        "from": "goal_exploration_and_requirements",
+        "to": "delivery_review_and_closeout",
+        "reason": "用户明确撤回历史任务，仅审查取消处置",
+        "evidence_refs": [
+          "user:2026-11-03-withdraw-three-legacy-source-tasks",
+          "cancellation-review.md"
+        ],
+        "task_route_revision": "2"
+      }
+    },
+    "task_cancellation": {
+      "reason": "用户明确撤回历史任务",
+      "evidence_refs": [
+        "cancellation-review.md"
+      ]
+    }
+  }
+}

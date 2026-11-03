@@ -1,6 +1,6 @@
 # Local Task System
 
-Tasks live under .trellis/tasks/. A task record keeps its artifacts and history in place after completion or cancellation; Trellis does not move tasks into an archive.
+任务按状态存放于 `.trellis/tasks/planning/<task>`、`in_progress/<task>`、`completed/YYYY-MM/<task>`、`cancelled/<task>`。`task.json.status` 是唯一状态事实；目录只投影状态，不增加第五种状态。创建进入 planning，获准实施的 start 进入 in_progress，complete 进入当月 completed，cancel 进入 cancelled。任务身份和父子关系不因移动改变。
 
 ## Task records
 
@@ -27,7 +27,13 @@ The active task pointer is scoped to an AI session under .trellis/.runtime/sessi
 
 Use phase operations through task.py phase for artifact revisions, acceptance, evidence-backed skips, waits, blocks, resume, return, route, and authorization. Consult task.py help for current arguments. Completion and cancellation occur only after Delivery Review and On-Site Closeout Phase.
 
-The read-only trellis task progress command summarizes planning, in_progress, and completed lifecycle records. It does not change task state.
+The read-only trellis task progress command summarizes planning, in_progress, completed, and cancelled lifecycle records, with a partial flag for unreadable or inconsistent input. It does not change task state.
+
+## 布局迁移与恢复
+
+旧平铺目录和 `archive/YYYY-MM` 只能作为显式迁移输入。先运行 `task.py migrate-layout` 预览，再使用 `--apply`；已完成 archive 任务保留原月份，非终态任务按真实状态归位，不伪造完成。`--recover` 恢复未完成事务。重复名称、无效 JSON、符号链接、未知执行资源或交接所有权冲突会阻止迁移；不跳过记录。
+
+移动同步 JSON/JSONL 机器引用、会话指针及 runtime 哈希索引；终态操作在同一事务中清除本任务 runtime。历史正文和正式交接包保留。内容绑定的接受证据或 continuity digest 失效后，通过原生重新接受、capture、目标会话 reconcile 核对，不静默重授历史授权。文档中的 `<task-dir>` 指包含状态及必要月份的真实任务相对路径。
 
 ## Context manifests
 

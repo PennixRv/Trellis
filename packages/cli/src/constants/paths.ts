@@ -13,8 +13,6 @@ export const DIR_NAMES = {
   WORKSPACE: "workspace",
   /** Tasks directory (under .trellis/) - unified task storage */
   TASKS: "tasks",
-  /** Archive directory (under tasks/) */
-  ARCHIVE: "archive",
   /** Spec/guidelines directory (under .trellis/) */
   SPEC: "spec",
   /** Scripts directory (under .trellis/) */
@@ -72,17 +70,9 @@ export function getWorkspaceDir(developer: string): string {
 }
 
 /**
- * Get task directory path
- * @example getTaskDir("01-21-my-task") => ".trellis/tasks/01-21-my-task"
+ * Join an explicit path relative to the task storage root.
+ * @example getTaskDir("planning/01-21-my-task") => ".trellis/tasks/planning/01-21-my-task"
  */
-export function getTaskDir(taskName: string): string {
-  return `${PATHS.TASKS}/${taskName}`;
-}
-
-/**
- * Get archive directory path
- * @example getArchiveDir() => ".trellis/tasks/archive"
- */
-export function getArchiveDir(): string {
-  return `${PATHS.TASKS}/${DIR_NAMES.ARCHIVE}`;
+export function getTaskDir(taskPath: string): string {
+  return `${PATHS.TASKS}/${taskPath}`;
 }

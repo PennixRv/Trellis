@@ -29,7 +29,7 @@ from .config import get_context_injection_limits
 from .git import branch_exists_locally
 from .io import read_json
 from .log import Colors, colored
-from .paths import DIR_TASKS, DIR_WORKFLOW, FILE_TASK_JSON, get_repo_root
+from .paths import FILE_TASK_JSON, get_repo_root
 from .task_utils import resolve_task_dir
 
 # Extensions that look like code rather than spec/research docs. Entries with
@@ -195,54 +195,6 @@ def _is_exempt_from_code_file_warning(file_path: str, task_rel: str) -> bool:
     return False
 
 
-def _resolve_context_entry_path(
-    file_path: str, repo_root: Path, task_dir: Path | None
-) -> Path | None:
-    """Bind historical self-references to their archive copy without fallback."""
-    repo_path = repo_root / file_path
-    if task_dir is None:
-        return repo_path
-
-    try:
-        task_parts = task_dir.resolve().relative_to(repo_root.resolve()).parts
-    except ValueError:
-        return repo_path
-
-    archive_prefix = (DIR_WORKFLOW, DIR_TASKS, "archive")
-    if len(task_parts) != 5 or task_parts[:3] != archive_prefix:
-        return repo_path
-
-    year_month = task_parts[3]
-    if (
-        len(year_month) != 7
-        or year_month[4] != "-"
-        or not year_month[:4].isdigit()
-        or not year_month[5:].isdigit()
-    ):
-        return repo_path
-
-    historical_root = f"{DIR_WORKFLOW}/{DIR_TASKS}/{task_dir.name}"
-    posix_path = file_path.replace("\\", "/")
-    if posix_path == historical_root:
-        relative_parts: tuple[str, ...] = ()
-    elif posix_path.startswith(f"{historical_root}/"):
-        relative_path = posix_path[len(historical_root) + 1 :]
-        if relative_path.endswith("/"):
-            relative_path = relative_path[:-1]
-        relative_parts = tuple(relative_path.split("/")) if relative_path else ()
-        if any(part in ("", ".", "..") for part in relative_parts):
-            return None
-    else:
-        return repo_path
-
-    try:
-        archive_root = task_dir.resolve()
-        resolved_path = task_dir.joinpath(*relative_parts).resolve()
-        resolved_path.relative_to(archive_root)
-    except (OSError, RuntimeError, ValueError):
-        return None
-    return resolved_path
-
 
 def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = None) -> int:
     """Validate a single JSONL file.
@@ -268,7 +220,7 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
     task_rel = ""
     if task_dir is not None:
         try:
-            task_rel = task_dir.resolve().relative_to(repo_root.resolve()).as_posix()
+            task_rel = task_dir.absolute().relative_to(repo_root.absolute()).as_posix()
         except ValueError:
             task_rel = ""
 
@@ -323,7 +275,15 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
             continue
 
         real_entries += 1
-        full_path = _resolve_context_entry_path(file_path, repo_root, task_dir)
+        full_path = repo_root / file_path
+        normalized = file_path.replace("\\", "/")
+        if task_dir is not None and task_rel and (normalized == task_rel or normalized.startswith(task_rel + "/")):
+            try:
+                if ".." in Path(normalized).parts:
+                    raise ValueError("Traversal in task reference")
+                full_path.resolve().relative_to(task_dir.resolve())
+            except (ValueError, OSError, RuntimeError):
+                full_path = None
         if entry_type == "directory":
             if full_path is None or not full_path.is_dir():
                 print(f"  {colored(f'{file_name}:{line_num}: Directory not found: {file_path}', Colors.RED)}")

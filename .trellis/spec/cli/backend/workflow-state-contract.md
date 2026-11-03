@@ -320,25 +320,19 @@ the current packaged template so `--platform codex` can resolve to
 
 ## Status writer table
 
-The table below enumerates every code path that writes `task.json.status` —
-i.e., every path that can change which breadcrumb fires next turn. **Adding
-a new writer requires updating this spec.**
+`task.json.status` 只有 planning、in_progress、completed、cancelled 四种原生状态。目录只是状态投影；移动不改变 task identity、parent/children 或阶段路线。
 
-| # | Writer | File:Line | Value | Trigger |
-|---|--------|-----------|-------|---------|
-| 1 | `cmd_create` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:206` | `"planning"` | `task.py create "<title>"` (also visibly auto-sets the session active-task pointer when session identity is available; `--no-start` skips pointer movement for backlog batching — see R7 in 04-30-workflow-state-commit-gap PRD) |
-| 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py:114-115, 128-129` | `"in_progress"` (gated on prior `"planning"`; both branches in `cmd_start`) | `task.py start <dir>` |
-| 3 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:337` | `"completed"` (unconditional flip + archive `mv`) | `task.py archive <dir>` |
-| 4 | `emptyTaskJson` factory | `packages/cli/src/utils/task-json.ts:54` | `"planning"` (default) | TS callers (init, update) |
-| 5 | `getBootstrapTaskJson` | `packages/cli/src/commands/init.ts:535` | `"in_progress"` (override) | `trellis init` (creator path) |
-| 6 | `getJoinerTaskJson` | `packages/cli/src/commands/init.ts:587` | `"in_progress"` (override) | `trellis init` (joiner path) |
-| 7 | migration-task via `emptyTaskJson` | `packages/cli/src/commands/update.ts:2483-2494` | `"planning"` (override on factory) | `trellis update --migrate` for breaking-change manifest |
+| Writer | 状态与目录 | 条件 |
+| --- | --- | --- |
+| `task_store.cmd_create` | planning / `planning/<task>` | 创建不授予实施权限；按会话身份附加指针。 |
+| `task._record_start_state` | in_progress / `in_progress/<task>` | 已接受的实施合同及当前实施授权有效。 |
+| `task_workflow.cmd_complete_task` | completed / `completed/YYYY-MM/<task>` | 当前交付审查已接受且资源安全；新完成按完成月。 |
+| `task_workflow.cmd_cancel_task` | cancelled / `cancelled/<task>` | 用户撤回且取消审查已接受。 |
+| `emptyTaskJson`、bootstrap/joiner、update migration task | planning / `planning/<task>` | 不推断阶段接受或实施授权。 |
 
-**No other writer exists.** No hook script writes `task.json.status` — verified
-by `grep -rn '"status"' .trellis/scripts/`. Linear-sync hook (`linear_sync.py`)
-writes `meta.linear_issue` only.
+`task_move.relocate_task` 在同一恢复事务中写入状态、移动目录、更新机器引用，并在终态清除任务 runtime。`migrate-layout` 仅按已有 status 修复目录，保留旧 archive 的完成月份，不推断完成或取消；`rename` 保持状态与月份。普通任务入口不接受旧平铺或 archive 布局。
 
----
+历史记录缺少 `meta` 时，只有显式 `phase init` 可以补建空对象并初始化路线；已有 `meta` 类型错误仍须拒绝，不改写任务。读取、取消和其他阶段操作不得隐式初始化或授予实施权限。
 
 ## Lifecycle events ≠ status transitions
 
@@ -350,12 +344,12 @@ Subscribers must understand the difference:
 | `after_create` | end of `cmd_create` | `"planning"` (just written) |
 | `after_start` | end of `cmd_start` | `"in_progress"` if status was `"planning"`; otherwise unchanged. Re-running `start` does NOT re-fire status flip. |
 | `after_finish` | end of `cmd_finish` | **unchanged** — `cmd_finish` only clears the per-session active-task pointer. Status stays whatever it was (typically `"in_progress"`). |
-| `after_archive` | end of `cmd_archive` | `"completed"` (just written, then dir moved to `archive/YYYY-MM/`) |
+| `after_complete` | end of `cmd_complete_task` | completed，事务已提交，任务已位于 completed/YYYY-MM；`TASK_JSON_PATH` 为新路径。 |
 
 **Common mistake**: subscribing to `after_finish` to mark a task "done" in an
 external system (Linear, Jira). `after_finish` means "AI session closed its
 pointer to this task" — the task may resume in a different session. The
-correct event for "task is done" is `after_archive`.
+correct event for "task is done" is `after_complete`. Cancellation does not emit this completion hook.
 
 ---
 
@@ -367,20 +361,11 @@ Which breadcrumbs actually fire in normal flow:
 |--------|--------------|-------|
 | `no_task` | ✅ reachable | Pseudo-status; emitted when `resolve_active_task()` returns no pointer. |
 | `planning` | ✅ reachable | After `cmd_create` (which now auto-sets the session pointer when available) and before `cmd_start`. `planning-inline` is the Codex inline-mode breadcrumb body for the same task status. |
-| `in_progress` | ✅ reachable | After `cmd_start`, until `cmd_archive`. `in_progress-inline` is the Codex inline-mode breadcrumb body for the same task status. |
-| `completed` | ❌ DEAD in normal flow | `cmd_archive` writes `status="completed"` and immediately moves the task dir to `archive/`. The session-pointer cleanup in `clear_task_from_sessions` runs before the move, so the resolver loses the pointer in the same call. The block body in workflow.md is preserved for a future status-transition redesign (e.g. an explicit `in_progress → completed` command) but no current code path produces it. |
+| `in_progress` | ✅ reachable | After `cmd_start`, until `complete` or `cancel`. `in_progress-inline` is the Codex inline-mode breadcrumb body for the same task status. |
+| `completed` / `cancelled` | 生命周期终态；普通活动指针已清除 | 原生完成或取消会在事务中清除指针；不会将终态目录误作正在实施任务。 |
 | `stale_<source_type>` | ✅ reachable (rare) | Synthesized when the session pointer references a deleted task directory. Emits the generic body via `build_breadcrumb` because no `stale_*` tag is shipped. |
 
-**Test invariant** (`test/regression.test.ts`): workflow-state blocks must
-preserve the runtime gates that cannot be recovered from model memory:
-`no_task` triages and asks for task-creation consent; planning distinguishes
-lightweight PRD-only tasks from complex tasks requiring `prd.md`, `design.md`,
-and `implement.md`; in-progress keeps the commit step reachable before
-`/trellis:finish-work`. See:
-
-- `test that workflow.md [workflow-state:in_progress] mentions commit (Phase 3.4)`
-- `test that workflow.md [workflow-state:planning] mentions planning artifact gate`
-- `test that workflow.md [workflow-state:no_task] asks for task-creation consent`
+**Test invariant**：`no_task` 保留请求分流，planning 保留当前需求确认、设计接受和独立实施授权，in_progress 按当前阶段继续。phase workflow 不得因状态目录变动丢失。`task-layout.integration.test.ts`、`task-workflow.integration.test.ts` 和 `regression.test.ts` 覆盖迁移、生命周期、指针及提示注入。
 
 ---
 
@@ -450,7 +435,7 @@ nested Trellis sub-agents.
   has an explicit compatibility strategy and upgrade test coverage.
 - Don't introduce a `task.json.status` writer without updating this spec.
 - Don't subscribe to `after_finish` to detect task completion — it doesn't
-  mean what you think. Use `after_archive`.
+  mean what you think. Use `after_complete`.
 - Don't silently re-route a writer to a different status without auditing
   every breadcrumb consumer (`session-start.py`, `inject-workflow-state.py`,
   `task.py list`, etc.).

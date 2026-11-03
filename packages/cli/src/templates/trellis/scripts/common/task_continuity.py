@@ -524,35 +524,39 @@ def clear_task_runtime_records(repo_root: Path, task_path: str) -> bool:
 @contextlib.contextmanager
 def active_task_change_guard(repo_root: Path, context_key: str, task_path: str, *, clearing: bool):
     """Serialize pointer writes with ownership changes for the same task."""
-    directory = resolve_task_dir(task_path, repo_root)
-    if directory is None:
-        yield False
-        return
-    task_path = directory.relative_to(repo_root).as_posix()
-    path = _ownership_path(repo_root, task_path)
-    with _record_lock(path):
-        try:
-            record = _load_owner(path)
-        except ContinuityError:
+    from .task_move import layout_lock, require_settled_layout
+
+    with layout_lock(repo_root):
+        require_settled_layout(repo_root)
+        directory = resolve_task_dir(task_path, repo_root)
+        if directory is None:
             yield False
             return
-        if record is None:
-            yield True
-            return
-        data, _ = read_json_checked(directory / FILE_TASK_JSON)
-        task_id = (data.get("id") or data.get("name")) if isinstance(data, dict) else None
-        if task_id != record["task_id"] or record["task_path"] != task_path:
-            yield False
-            return
-        if clearing:
-            allowed = record["status"] == "consumed" and record["target_session_id"] == context_key
-        elif record["status"] == "ready":
-            allowed = context_key != record["source_session_id"] and task_path == record["task_path"]
-        elif record["status"] == "consumed":
-            allowed = context_key == record["target_session_id"] and task_path == record["task_path"]
-        else:
-            allowed = record["status"] in {"claiming", "claimed"} and context_key == record["target_session_id"] and task_path == record["task_path"]
-        yield allowed
+        task_path = directory.relative_to(repo_root).as_posix()
+        path = _ownership_path(repo_root, task_path)
+        with _record_lock(path):
+            try:
+                record = _load_owner(path)
+            except ContinuityError:
+                yield False
+                return
+            if record is None:
+                yield True
+                return
+            data, _ = read_json_checked(directory / FILE_TASK_JSON)
+            task_id = (data.get("id") or data.get("name")) if isinstance(data, dict) else None
+            if task_id != record["task_id"] or record["task_path"] != task_path:
+                yield False
+                return
+            if clearing:
+                allowed = record["status"] == "consumed" and record["target_session_id"] == context_key
+            elif record["status"] == "ready":
+                allowed = context_key != record["source_session_id"] and task_path == record["task_path"]
+            elif record["status"] == "consumed":
+                allowed = context_key == record["target_session_id"] and task_path == record["task_path"]
+            else:
+                allowed = record["status"] in {"claiming", "claimed"} and context_key == record["target_session_id"] and task_path == record["task_path"]
+            yield allowed
 
 
 def assert_task_mutation_allowed(repo_root: Path, task_dir: Path, data: dict) -> None:
@@ -578,21 +582,25 @@ def assert_task_identity_change_allowed(repo_root: Path, task_dir: Path, data: d
 @contextlib.contextmanager
 def task_mutation_guard(repo_root: Path, task_dir: Path, data: dict):
     """Hold the ownership lock across a single task mutation."""
-    task_path = task_dir.relative_to(repo_root).as_posix()
-    path = _ownership_path(repo_root, task_path)
-    with _record_lock(path):
-        try:
-            record = _load_owner(path)
-        except ContinuityError:
-            yield False
-            return
-        if record is None:
-            yield True
-            return
-        task_id = (data.get("id") or data.get("name")) if isinstance(data, dict) else None
-        if task_id != record["task_id"] or record["task_path"] != task_path:
-            yield False
-            return
-        active = resolve_active_task(repo_root)
-        allowed = record["status"] == "consumed" and active.context_key == record["target_session_id"] and active.task_path == task_path
-        yield allowed
+    from .task_move import layout_lock, require_settled_layout
+
+    with layout_lock(repo_root):
+        require_settled_layout(repo_root)
+        task_path = task_dir.relative_to(repo_root).as_posix()
+        path = _ownership_path(repo_root, task_path)
+        with _record_lock(path):
+            try:
+                record = _load_owner(path)
+            except ContinuityError:
+                yield False
+                return
+            if record is None:
+                yield True
+                return
+            task_id = (data.get("id") or data.get("name")) if isinstance(data, dict) else None
+            if task_id != record["task_id"] or record["task_path"] != task_path:
+                yield False
+                return
+            active = resolve_active_task(repo_root)
+            allowed = record["status"] == "consumed" and active.context_key == record["target_session_id"] and active.task_path == task_path
+            yield allowed

@@ -16,11 +16,11 @@ assignment,
 the paths are:
 
 ```text
-.trellis/tasks/<task>/teammates/<batch>/<assignment>/brief.json
-.trellis/tasks/<task>/teammates/<batch>/<assignment>/queue.json
-.trellis/tasks/<task>/teammates/<batch>/<assignment>/attempts/<attempt-id>/claim.json
-.trellis/tasks/<task>/teammates/<batch>/<assignment>/attempts/<attempt-id>/worklog.md
-.trellis/tasks/<task>/teammates/<batch>/<assignment>/attempts/<attempt-id>/report.json
+.trellis/tasks/<task-dir>/teammates/<batch>/<assignment>/brief.json
+.trellis/tasks/<task-dir>/teammates/<batch>/<assignment>/queue.json
+.trellis/tasks/<task-dir>/teammates/<batch>/<assignment>/attempts/<attempt-id>/claim.json
+.trellis/tasks/<task-dir>/teammates/<batch>/<assignment>/attempts/<attempt-id>/worklog.md
+.trellis/tasks/<task-dir>/teammates/<batch>/<assignment>/attempts/<attempt-id>/report.json
 ```
 
 Read the brief and claim, append material progress to the assigned worklog,

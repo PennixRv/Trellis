@@ -443,8 +443,14 @@ def cmd_create(args: argparse.Namespace) -> int:
             return 1
 
     dir_name = f"{date_prefix}-{slug}"
-    task_dir = tasks_dir / dir_name
+    from .task_layout import task_location
+    task_dir = task_location(tasks_dir, dir_name, "planning")
     task_json_path = task_dir / FILE_TASK_JSON
+    from .task_layout import iter_task_dirs
+    conflicts = [directory for directory in iter_task_dirs(tasks_dir) if directory.name == dir_name and directory != task_dir]
+    if conflicts:
+        print(f"Error: Task already exists outside planning: {dir_name}; use its lifecycle commands", file=sys.stderr)
+        return 1
 
     # Reusing a slug on the same day is an ordinary accident, and continuing
     # would rewrite the existing task.json below — resetting status, children,
@@ -691,7 +697,7 @@ def cmd_create(args: argparse.Namespace) -> int:
     print("", file=sys.stderr)
 
     # Output relative path for script chaining
-    print(f"{DIR_WORKFLOW}/{DIR_TASKS}/{dir_name}")
+    print(task_dir.relative_to(repo_root).as_posix())
 
     run_task_hooks("after_create", task_json_path, repo_root)
     return 0
@@ -841,7 +847,8 @@ def _plan_backrefs(
     changes: list[tuple[Path, dict, list[str]]] = []
     unreadable: list[Path] = []
 
-    for candidate in sorted(tasks_dir.iterdir()):
+    from .task_layout import iter_task_dirs
+    for candidate in iter_task_dirs(tasks_dir):
         if not candidate.is_dir():
             continue
         if candidate == task_dir:
@@ -964,62 +971,27 @@ def _rename_interrupted(plan: _RenamePlan) -> None:
 
 
 def _apply_rename(plan: _RenamePlan, repo_root: Path) -> int:
-    """Write the planned change set.
+    """Apply rename through the same recoverable transaction as status moves."""
+    from .task_move import _plan, apply_plan
 
-    The directory move goes last on purpose. Everything before it is an
-    in-place edit that re-running the identical command recomputes as
-    already-done, so an interruption leaves a tree that the same command
-    finishes; a move-first ordering would instead leave the old name
-    unresolvable and the remaining edits to be made by hand.
-    """
     if not _task_mutation_allowed(repo_root, plan.task_dir, plan.task_data):
         return 1
     if plan.identity and not _task_identity_change_allowed(repo_root, plan.task_dir, plan.task_data):
         return 1
-    if plan.identity:
-        data = dict(plan.task_data)
-        for field_name, _old_value, new_value in plan.identity:
-            data[field_name] = new_value
-        if not write_json(plan.task_json_path, data):
-            _report_write_failure(plan.task_json_path)
-            print("Nothing was renamed.", file=sys.stderr)
-            return 1
-
-    for jsonl_path, _linenos, text in plan.jsonl:
-        try:
-            jsonl_path.write_text(text, encoding="utf-8")
-        except OSError as exc:
-            print(
-                colored(f"Error: Failed to write {jsonl_path}: {exc}", Colors.RED),
-                file=sys.stderr,
-            )
-            _rename_interrupted(plan)
-            return 1
-
-    for json_path, data, _labels in plan.backrefs:
-        if not write_json(json_path, data):
-            _report_write_failure(json_path)
-            _rename_interrupted(plan)
-            return 1
-
-    try:
-        plan.task_dir.rename(plan.new_dir)
-    except OSError as exc:
-        print(
-            colored(f"Error: Failed to move {plan.old_rel} -> {plan.new_rel}: {exc}", Colors.RED),
-            file=sys.stderr,
-        )
-        _rename_interrupted(plan)
+    if plan.unreadable:
+        print("Error: unreadable task back-references; nothing renamed", file=sys.stderr)
         return 1
-
-    # Last, and after the move: a session pointing at the old path would now
-    # resolve to a missing directory, so `current` would report the task stale
-    # and the context hook would inject nothing until the user ran `start`
-    # again. Rename moves the pointers because the task is still being worked on.
-    from .active_task import repoint_task_in_sessions
-
-    repoint_task_in_sessions(str(plan.task_dir), str(plan.new_dir), repo_root)
-
+    data = dict(plan.task_data)
+    for field_name, _old_value, new_value in plan.identity:
+        data[field_name] = new_value
+    updates = {plan.task_dir: data}
+    updates.update({path.parent: value for path, value, _labels in plan.backrefs})
+    try:
+        transaction = _plan(repo_root, [(plan.task_dir, plan.new_dir)], updates)
+        apply_plan(repo_root, transaction)
+    except (OSError, ValueError) as error:
+        print(f"Error: rename withheld: {error}", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -1034,12 +1006,12 @@ def cmd_rename(args: argparse.Namespace) -> int:
             print(colored(f"Error: Task not found: {args.name}", Colors.RED), file=sys.stderr)
         return 1
 
-    # Restrict renames to task records directly under the tasks directory.
+    # Restrict renames to the prescribed status directory levels.
     if not is_within_tasks_dir(task_dir, repo_root):
         print(
             colored(
                 f"Error: refusing to rename '{args.name}': "
-                f"{task_dir} is not a task directly under {tasks_dir}",
+                f"{task_dir} is not a task in the status layout under {tasks_dir}",
                 Colors.RED,
             ),
             file=sys.stderr,
@@ -1062,7 +1034,8 @@ def cmd_rename(args: argparse.Namespace) -> int:
         return 1
 
     new_dir = task_dir.parent / new_name
-    if new_dir.exists():
+    from .task_layout import iter_task_dirs
+    if new_dir.exists() or any(directory.name == new_name for directory in iter_task_dirs(tasks_dir)):
         print(
             colored(f"Error: Task already exists: {new_name}", Colors.RED),
             file=sys.stderr,

@@ -1,6 +1,6 @@
 # Change Local Task Lifecycle
 
-Read the installed project's workflow and task record before changing task creation or lifecycle behavior. Task records remain in .trellis/tasks/ after completion or cancellation; Trellis does not archive task records.
+Read the installed project's workflow and task record before changing task creation or lifecycle behavior. 任务目录由 status 投影到 planning、in_progress、completed/YYYY-MM、cancelled；完成或取消必须通过原生事务同步移动、引用与会话清理，不能只改字段或手工移动目录。
 
 ## Read these files first
 
@@ -9,7 +9,8 @@ Read the installed project's workflow and task record before changing task creat
 3. .trellis/scripts/task.py
 4. .trellis/scripts/common/task_store.py
 5. .trellis/scripts/common/task_workflow.py
-6. The current task's task.json
+6. .trellis/scripts/common/task_layout.py and task_move.py
+7. The current task's task.json
 
 ## Common edit points
 

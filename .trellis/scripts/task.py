@@ -101,7 +101,7 @@ def _record_start_state(
     task_json_path: Path,
     repo_root: Path,
     label: str = "",
-) -> None:
+) -> Path:
     """Enter implementation and record its branch after current authorization.
 
     Planning and analysis tasks keep their lifecycle status while the active
@@ -121,7 +121,7 @@ def _record_start_state(
             file=sys.stderr,
         )
         print(hint, file=sys.stderr)
-        return
+        return task_json_path
 
     applied: list[str] = []
 
@@ -132,7 +132,7 @@ def _record_start_state(
             colored(f"Warning: Implementation start withheld; task.json not updated: {error.code}: {error}", Colors.YELLOW),
             file=sys.stderr,
         )
-        return
+        return task_json_path
     if data.get("status") == "planning" and implementation_ready:
         data["status"] = "in_progress"
         applied.append(f"✓ Status: planning → in_progress{label}")
@@ -158,15 +158,18 @@ def _record_start_state(
             )
 
     if not applied:
-        return
+        return task_json_path
 
     try:
         assert_task_mutation_allowed(repo_root, task_json_path.parent, data)
     except TaskWorkflowError as error:
         print(colored(f"{error.code}: task metadata update withheld: {error}", Colors.YELLOW), file=sys.stderr)
-        return
+        return task_json_path
 
-    if not write_json(task_json_path, data):
+    from common.task_move import relocate_task
+    relocated = relocate_task(repo_root, task_json_path.parent, data)
+    task_json_path = relocated / FILE_TASK_JSON
+    if not task_json_path.is_file():
         print(
             colored(
                 f"Warning: Failed to write {task_json_path}; "
@@ -175,7 +178,7 @@ def _record_start_state(
             ),
             file=sys.stderr,
         )
-        return
+        return task_json_path
 
     for line in applied:
         print(colored(line, Colors.GREEN))
@@ -190,11 +193,14 @@ def _record_start_state(
             ),
             file=sys.stderr,
         )
+
         print(
             f"Once you branch off, run: python3 {DIR_WORKFLOW}/scripts/task.py "
             "set-branch <task> <feature-branch>",
             file=sys.stderr,
         )
+
+    return task_json_path
 
 
 def cmd_start(args: argparse.Namespace) -> int:
@@ -256,18 +262,17 @@ def cmd_start(args: argparse.Namespace) -> int:
 
         # Enter implementation only when the accepted phase contract authorizes it.
         if task_json_path.is_file():
-            _record_start_state(task_json_path, repo_root, " (degraded)")
+            task_json_path = _record_start_state(task_json_path, repo_root, " (degraded)")
             run_task_hooks("after_start", task_json_path, repo_root)
         return 0
 
     active = set_active_task(task_dir, repo_root)
     if active:
-        print(colored(f"✓ Current task set to: {task_dir}", Colors.GREEN))
-        print(f"Source: {active.source}")
-
         if task_json_path.is_file():
-            _record_start_state(task_json_path, repo_root)
+            task_json_path = _record_start_state(task_json_path, repo_root)
 
+        print(colored(f"✓ Current task set to: {task_json_path.parent.relative_to(repo_root).as_posix()}", Colors.GREEN))
+        print(f"Source: {active.source}")
         print()
         print(colored("The hook will now inject context from this task's jsonl files.", Colors.BLUE))
 
@@ -499,7 +504,7 @@ def cmd_list(args: argparse.Namespace) -> int:
             if filter_status and t.status != filter_status:
                 continue
             items.append({
-                "dir": f"{DIR_WORKFLOW}/{DIR_TASKS}/{dir_name}",
+                "dir": t.directory.relative_to(repo_root).as_posix(),
                 "id": t.raw.get("id") or dir_name,
                 "title": t.title,
                 "status": t.status,
@@ -538,7 +543,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         if filter_status and t.status != filter_status:
             return
 
-        relative_path = f"{DIR_WORKFLOW}/{DIR_TASKS}/{dir_name}"
+        relative_path = t.directory.relative_to(repo_root).as_posix()
         marker = ""
         if relative_path == current_task:
             marker = f" {colored('<- current', Colors.GREEN)}"
@@ -622,7 +627,7 @@ Rename options:
 
 List options:
   --mine, -m           Show only tasks assigned to current developer
-  --status, -s <s>     Filter by status (planning, in_progress, review, completed)
+  --status, -s <s>     Filter by status (planning, in_progress, completed, cancelled)
   --json               Output machine-readable JSON (also available on `current`)
 
 Examples:
@@ -849,16 +854,18 @@ def main() -> int:
     p_complete = subparsers.add_parser("complete", help="Complete after Delivery Review and On-Site Closeout Phase acceptance")
     p_complete.add_argument("task_dir", help="Task directory or task name")
 
+    p_migrate = subparsers.add_parser("migrate-layout", help="Preview or explicitly apply task status directory migration")
+    migration_mode = p_migrate.add_mutually_exclusive_group()
+    migration_mode.add_argument("--apply", action="store_true", help="Recheck and apply the migration")
+    migration_mode.add_argument("--recover", action="store_true", help="Roll back an interrupted relocation")
+
     args = parser.parse_args()
 
     if not args.command:
         show_usage()
         return 1
 
-    if args.command == "continuity":
-        return continuity_show(args) if args.continuity_action == "show" else continuity_capture(args)
-    if args.command == "transfer":
-        return transfer_task_ownership(args)
+    from common.task_move import cmd_migrate_layout, layout_lock, require_settled_layout
 
     commands = {
         "create": cmd_create,
@@ -881,12 +888,23 @@ def main() -> int:
         "add-subtask": cmd_add_subtask,
         "remove-subtask": cmd_remove_subtask,
         "list": cmd_list,
+        "migrate-layout": cmd_migrate_layout,
     }
 
-    if args.command in commands:
-        return commands[args.command](args)
-    else:
-        show_usage()
+    try:
+        with layout_lock(get_repo_root()):
+            if args.command != "migrate-layout":
+                require_settled_layout(get_repo_root())
+            if args.command == "continuity":
+                return continuity_show(args) if args.continuity_action == "show" else continuity_capture(args)
+            if args.command == "transfer":
+                return transfer_task_ownership(args)
+            if args.command in commands:
+                return commands[args.command](args)
+            show_usage()
+            return 1
+    except (ValueError, OSError) as error:
+        print(f"TASK_LAYOUT_WITHHELD: {error}", file=sys.stderr)
         return 1
 
 

@@ -61,11 +61,14 @@ def _task_dir(value: str) -> Path:
     return task_dir
 
 
-def _load(task_dir: Path) -> tuple[dict, dict]:
+def _load(task_dir: Path, *, initialize_meta: bool = False) -> tuple[dict, dict]:
     task_file = task_dir / FILE_TASK_JSON
     data, reason = read_json_checked(task_file)
     if data is None:
         raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", f"cannot read {task_file}: {reason}")
+    # Explicit initialization may adopt legacy records; malformed metadata still fails.
+    if initialize_meta and "meta" not in data:
+        data["meta"] = {}
     meta = data.get("meta")
     if not isinstance(meta, dict):
         raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "task.meta must be an object")
@@ -177,7 +180,8 @@ def _save(task_file: Path, data: dict) -> None:
 
 @contextlib.contextmanager
 def _task_lock(task_dir: Path):
-    lock_file = task_dir / ".task-phase.lock"
+    lock_file = get_repo_root() / ".trellis/.runtime/task-phase" / f"{task_dir.name}.lock"
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
     with lock_file.open("a+b") as handle:
         if os.name == "nt":
             import msvcrt
@@ -696,7 +700,7 @@ def cmd_phase(args: argparse.Namespace) -> int:
     try:
         task_dir = _task_dir(args.task_dir)
         with _task_lock(task_dir):
-            data, meta = _load(task_dir)
+            data, meta = _load(task_dir, initialize_meta=args.phase_action == "init")
             if args.phase_action == "init":
                 return _init(args, task_dir, data, meta)
             return _update(args, task_dir, data, _state(meta))
@@ -982,7 +986,8 @@ def cmd_cancel_task(args: argparse.Namespace) -> int:
             }
             data["status"] = "cancelled"
             data["completedAt"] = None
-            _save(task_dir / FILE_TASK_JSON, data)
+            from .task_move import relocate_task
+            task_dir = relocate_task(get_repo_root(), task_dir, data)
             from .active_task import clear_task_from_sessions
             from .task_continuity import clear_task_runtime_records
 
@@ -1069,26 +1074,28 @@ def _validate_child_dispositions(
 
 
 def _assert_delegated_resources_closed(task_dir: Path, data: dict) -> None:
-    repo_root = get_repo_root()
     children = data.get("children", [])
     if not isinstance(children, list):
         raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", "linked child task list is malformed")
     for task_id in [task_dir.name, *children]:
         _, child_meta = _load(_task_dir(task_id))
-        record = child_meta.get("delegated_worktree_execution_record")
-        if record is None:
-            continue
-        agent_id = record.get("agent_id") if isinstance(record, dict) else None
-        if not isinstance(agent_id, str) or not agent_id.strip():
-            raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated execution status is unknown for {task_id}; preserve the current state")
-        agents = _paseo_list(
-            ["agent", "ls", "--all", "--global", "--background", "--json", "--label", f"trellis.task_id={task_id}"],
-            repo_root,
-            "TASK_PHASE_RESOURCE_ACTIVE",
-        )
-        agent = next((item for item in agents if item.get("id") == agent_id), None)
-        if agent is None or agent.get("status") != "closed":
-            raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated Paseo agent for {task_id} is not confirmed closed; preserve the current state")
+        _assert_delegated_record_closed(task_id, child_meta.get("delegated_worktree_execution_record"))
+
+
+def _assert_delegated_record_closed(task_id: str, record) -> None:
+    if record is None:
+        return
+    agent_id = record.get("agent_id") if isinstance(record, dict) else None
+    if not isinstance(agent_id, str) or not agent_id.strip():
+        raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated execution status is unknown for {task_id}; preserve the current state")
+    agents = _paseo_list(
+        ["agent", "ls", "--all", "--global", "--background", "--json", "--label", f"trellis.task_id={task_id}"],
+        get_repo_root(),
+        "TASK_PHASE_RESOURCE_ACTIVE",
+    )
+    agent = next((item for item in agents if item.get("id") == agent_id), None)
+    if agent is None or agent.get("status") != "closed":
+        raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated Paseo agent for {task_id} is not confirmed closed; preserve the current state")
 
 
 def cmd_complete_task(args: argparse.Namespace) -> int:
@@ -1114,7 +1121,8 @@ def cmd_complete_task(args: argparse.Namespace) -> int:
                 raise TaskWorkflowError("TASK_PHASE_IMPLEMENTATION_NOT_STARTED", "implementation tasks must enter in_progress before complete")
             data["status"] = "completed"
             data["completedAt"] = datetime.now().strftime("%Y-%m-%d")
-            _save(task_dir / FILE_TASK_JSON, data)
+            from .task_move import relocate_task
+            task_dir = relocate_task(get_repo_root(), task_dir, data)
             from .active_task import clear_task_from_sessions
             from .task_continuity import clear_task_runtime_records
 

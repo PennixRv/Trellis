@@ -76,7 +76,7 @@ delete escapes the store.
 | Concern | Guard | Location |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | Teamwork Session / teammate name | `assertSafeName(name, kind)` — `^[A-Za-z0-9._-]+$`, rejects `.`/`..` — called inside `sessionDir` (the shared chokepoint every session path helper passes through) | `core/teamwork/internal/store/paths.ts` and `cli/commands/teamwork/store/paths.ts` |
-| `task.py archive <name>` target | `is_within_tasks_dir(task_dir_abs, repo_root)` — dir must be a direct child of `.trellis/tasks/` | `scripts/common/task_utils.py` |
+| Task command / relocation target | 仅允许四种状态目录的确切层级；拒绝越界、后代符号链接与冲突，恢复前核对全部输入 | `scripts/common/task_layout.py`, `task_utils.py`, `task_move.py` |
 | rename-dir migration source | `dirHasManifestEntries(fromDir, hashes)` — only auto-move a dir Trellis provably created | `commands/update.ts` |
 
 > **Why the chokepoint, not the entrypoint**: validating inside `sessionDir`

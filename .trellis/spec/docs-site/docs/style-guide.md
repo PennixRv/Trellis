@@ -322,7 +322,7 @@ Lead with the change. Background (if any) goes into a second paragraph or a coll
 
 Product narrative ("why we're doing this", user quotes, design rationale) belongs in:
 
-- **Task PRD** (`.trellis/tasks/<task>/prd.md`) during development
+- **Task PRD** (`.trellis/tasks/<task-dir>/prd.md`, including the status directory) during development
 - **Blog post** (`docs-site/blog/`) for marketing
 - **Spec decision record** (`spec/*/` design-decision sections) for lasting architectural choices
 

@@ -40,7 +40,11 @@ function makeTask(
   name: string,
   overrides: Record<string, unknown> = {},
 ): void {
-  const dir = path.join(repo, ".trellis", "tasks", name);
+  const status = String(overrides.status ?? "planning");
+  const dir =
+    status === "completed"
+      ? path.join(repo, ".trellis", "tasks", status, "2026-07", name)
+      : path.join(repo, ".trellis", "tasks", status, name);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "prd.md"), `${name} prd\n`);
   const taskJson: Record<string, unknown> = {

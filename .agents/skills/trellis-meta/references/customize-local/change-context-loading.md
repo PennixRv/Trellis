@@ -17,11 +17,11 @@ Context loading determines when AI reads workflow, task, spec, research, workspa
 | Source | Purpose |
 | --- | --- |
 | `.trellis/workflow.md` | Workflow and next-action hints. |
-| `.trellis/tasks/<task>/prd.md` | Current task requirements. |
-| `.trellis/tasks/<task>/design.md` | Complex task technical design. |
-| `.trellis/tasks/<task>/implement.md` | Complex task execution plan. |
-| `.trellis/tasks/<task>/implement.jsonl` | Spec/research to read before implementation. |
-| `.trellis/tasks/<task>/check.jsonl` | Spec/research to read during checking. |
+| `.trellis/tasks/<task-dir>/prd.md` | Current task requirements. |
+| `.trellis/tasks/<task-dir>/design.md` | Complex task technical design. |
+| `.trellis/tasks/<task-dir>/implement.md` | Complex task execution plan. |
+| `.trellis/tasks/<task-dir>/implement.jsonl` | Spec/research to read before implementation. |
+| `.trellis/tasks/<task-dir>/check.jsonl` | Spec/research to read during checking. |
 | `.trellis/spec/` | Project specs. |
 | `.trellis/workspace/` | Session records. |
 | git status | Current working tree changes. |

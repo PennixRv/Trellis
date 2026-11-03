@@ -2843,7 +2843,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       const taskSlug = `migrate-to-${cliVersion}`;
       const taskDirName = `${monthDay}-${taskSlug}`;
       const tasksDir = path.join(cwd, DIR_NAMES.WORKFLOW, DIR_NAMES.TASKS);
-      const taskDir = path.join(tasksDir, taskDirName);
+      const taskDir = path.join(tasksDir, "planning", taskDirName);
 
       // Check if task already exists
       if (!fs.existsSync(taskDir)) {
@@ -2926,7 +2926,7 @@ export async function update(options: UpdateOptions): Promise<void> {
         );
         console.log(
           chalk.white(
-            `   ${DIR_NAMES.WORKFLOW}/${DIR_NAMES.TASKS}/${taskDirName}/`,
+            `   ${DIR_NAMES.WORKFLOW}/${DIR_NAMES.TASKS}/planning/${taskDirName}/`,
           ),
         );
         console.log("");
