@@ -115,3 +115,11 @@
 - 同步更新 CLI 规范、beta.7 非破坏性迁移清单及中英文 Beta 指南、发布说明和导航；docs-site 既有分支提交 `c1d2ad5` 已推送。GitNexus detect-changes 报告 7 个文件、1 个变更符号、2 条受影响流程，风险 medium；以当前源码与真实更新回归核对。
 - beta.6 已公开发布，不覆盖其 tag 或 npm 包；本次补修将发布 `0.7.1-beta.7`，再真实重装并更新两仓版本记录。根侧当前会话仍接管原 Lifecycle 任务，原始来源绑定和业务路线保持。
 - 发布前观察发现同名 tag 还会使 git rev-parse --abbrev-ref HEAD 返回 heads/v0.7.1；此前推送前缀修复不足。已在推送前停止 orchestrator，远端没有错误分支或 beta.7 tag；版本提交由在途钩子完成。现用 git branch --show-current 取得实际分支名，保留 detached HEAD 拒绝；真实 bare remote 回归从脚本提取分支查询并参与推送，修复前明确失败，修复后通过。不重新递增 beta.7，检查完成后显式推送既有分支及精确 tag。
+
+## 2026-11-03：beta.7 正式发布与两仓现场复核
+
+- 最终标签 v0.7.1-beta.7 指向 5ec6fcc25fa83eb1de598cd5c97f2aa06a332f65，源码推送到既有 refs/heads/v0.7.1，docs-site 为既有分支提交 b689a5d。没有创建错误分支或 worktree，也没有改写已公开标签。CLI 本地全量 2136 项通过、2 项跳过；发布 CI 同时验证 Core、CLI、类型、构建及精确依赖。
+- Actions 41618195604 首次运行仅公共 npm 可见性检查超时，npm 已接收并处理发行包；确认公共包、精确 Core 依赖及 beta 标签实际可见后重跑失败作业，第 2 次运行 completed/success，既有包由原生发布计划跳过。latest 仍为 0.7.1，没有本地 npm publish。
+- 通过 pennix update trellis-cli --version 0.7.1-beta.7 真实安装，原生回执 changed，归档 SHA-256 为 7ca6147c9539ac33bc8e9a5ba7026b3614f4022f97d03015dbd68040285579f9。安装 CLI 及其精确 Core 依赖均为 beta.7。两仓先原生 dry-run，再以 --skip-all 保留专有配置并更新版本记录。
+- beta.7 更新前后，源码仓 1421 个任务及交接文件全部哈希一致，根仓除两份明确修订的设计/实施计划外 3532 个文件全部一致，没有额外任务。两仓 migrate-layout 均返回空 moves/changed_files。最终任务分布保持：源码仓 251 项（1/15/232/3），根仓 369 项（0/2/366/1），依次为 planning/in_progress/completed/cancelled。
+- 本增量已经完成源码、发布、真实安装及目录迁移；根父任务继续固定最终 gitlink 并补录最终组合验收。源码 owner task 仍按原授权保持 in_progress，不把目录治理完成等同于全部跨组件任务关闭。
