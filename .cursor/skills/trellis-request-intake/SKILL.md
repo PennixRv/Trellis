@@ -1,15 +1,17 @@
 ---
-name: trellis-brainstorm
-description: "Guides collaborative requirements discovery before implementation. Creates task directory, seeds PRD, asks high-value questions one at a time, researches technical choices, and converges on MVP scope. Use when requirements are unclear, there are multiple valid approaches, or the user describes a new feature or complex task."
+name: trellis-request-intake
+description: "Routes a new request by its relationship to the active task, existing authorization and the taskless contract. Creates or selects a task and hands off to the appropriate phase when needed. Use for new work or a new request during an existing session; use trellis-continue to resume existing work."
 ---
 
-# Trellis Brainstorm
+# Trellis Request Intake
 
-Use this entry skill for a new request that needs a Trellis task. For a clear, low-risk, reversible, authorized, immediately verifiable request, follow the taskless route in workflow.md.
+Use this entry skill to route a new request. First check its relationship to the active task: a change to the same goal returns to the earliest affected phase; independent work needs its own intake. Do not put unrelated work into the active task or bypass its ownership and acceptance gates. To resume existing work, use trellis-continue and the current native task facts.
+
+Reuse verified evidence and existing authorization. For a clear, low-risk, reversible, authorized, immediately verifiable request, follow the taskless route in workflow.md. Intake ends when the request reaches its appropriate phase; do not repeat session initialization or conduct a second requirements or planning workflow here.
 
 ## Start the task
 
-1. Inspect only repository evidence that can change the goal, scope, acceptance criteria, constraints, or route. Ask the user when intent or a material choice remains unclear.
+1. Inspect only evidence that can change the goal, scope, acceptance criteria, constraints, or route. Ask the user only for missing intent or a material user choice; use the project's decision method when needed.
 2. Create a Trellis task when the work needs a persistent route, coordination, or review:
 
        python3 ./.trellis/scripts/task.py create "<title>" --description "<summary>"

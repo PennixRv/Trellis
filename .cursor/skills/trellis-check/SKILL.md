@@ -18,11 +18,7 @@ git status
 
 ## Step 2: Read Task Artifacts and Applicable Specs
 
-Read the current task artifacts in order:
-
-- `prd.md`
-- `design.md` if present
-- `implement.md` if present
+Read the current native phase, accepted contract and its actual artifact references for requirements, design, execution and validation. Common filenames such as `prd.md`, `design.md` and `implement.md` do not prove current acceptance or authorization. For taskless work, check the authorized bounded request.
 
 ```bash
 python3 ./.trellis/scripts/get_context.py --mode packages
@@ -38,7 +34,7 @@ Read the specific guideline files referenced — the index is a pointer, not the
 
 ## Step 3: Run Project Checks
 
-Run the project's lint, type-check, and test commands. Fix any failures before proceeding.
+Run the applicable required project checks and verification appropriate to the changed behavior and risk. Investigate failures and fix those caused by the change within its authorization; record unrelated baseline failures and unavailable checks accurately. Do not silently expand the task to repair unrelated failures or claim checks passed when evidence is incomplete.
 
 ## Step 4: Review Against Checklist
 
@@ -52,9 +48,9 @@ Run the project's lint, type-check, and test commands. Fix any failures before p
 
 ### Test Coverage
 
-- [ ] New function → unit test added?
-- [ ] Bug fix → regression test added?
-- [ ] Changed behavior → existing tests updated?
+- [ ] Non-trivial new behavior and risk covered by meaningful existing or new tests?
+- [ ] Bug fix reproduced by a regression check at the actual entry path?
+- [ ] Changed behavior reflected in tests without mirroring implementation details?
 
 ### Spec Sync
 
@@ -85,7 +81,7 @@ Skip this step if your change is confined to a single layer.
 
 - [ ] Searched for existing similar code before creating new?
   ```bash
-  grep -r "pattern" src/
+  rg "pattern" src/
   ```
 - [ ] If the same value repeats, does it represent one stable concept whose callers must change together? Extract only then — two literals that merely happen to match today should stay separate.
 - [ ] After batch modification, all occurrences updated?
@@ -106,6 +102,6 @@ Skip this step if your change is confined to a single layer.
 Report every violation you find. Then:
 
 - Mechanical and local (lint nit, missing type, wrong import, dead branch, failing assertion) → fix in place, then re-run project checks.
-- Design or judgment (naming a shared concept, moving a module boundary, changing a public interface, reassigning where behavior lives) → record the evidence and your recommendation, and stop. Do not rewrite it silently.
+- Local engineering judgment within the accepted contract → resolve it with evidence and continue. A material unresolved change to scope, public behavior, ownership, risk or acceptance → record the recommendation and pause dependent work for the project's decision process.
 
 If a fix would touch files outside the current task's scope, say so and stop instead of widening the change.

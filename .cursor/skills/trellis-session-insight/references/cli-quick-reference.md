@@ -55,9 +55,10 @@ trellis mem projects
 
 ## Caveats
 
-- **OpenCode adapter is a stub on `0.6.0-beta.*`.** When `--platform` resolves to OpenCode (or `all` and OpenCode would be included), `mem` prints a one-line "reader unavailable" notice and continues with the other platforms. Don't promise OpenCode coverage in your reply until the adapter ships.
+- **OpenCode reads its local SQLite database.** `--include-children` merges supported child-session dialogue for search/context. Historical `--phase` slicing is unavailable for OpenCode: it warns and returns all dialogue. Report unreadable stores or unsupported slices from the actual command result.
 - **`--platform devin` is Cognition Devin CLI** (`~/.local/share/devin/cli/sessions.db`). It is not `trellis init --devin` (Devin Desktop / Cascade) and not Factory Droid.
 - **`--phase` slicing depends on `task.py create` / `task.py start` invocations appearing in the recorded bash calls of the session.** Sessions where the user ran `task.py` from a different terminal — outside the recorded AI loop — will not have phase boundaries. `--phase all` is the safe fallback.
+- **Historical slice names are not native workflow state.** `brainstorm` and `implement` remain valid retrieval flags; they do not identify any of the current five phases, prove acceptance or implementation authorization, or grant task ownership. There is no `--task` filter. Unknown, inapplicable, duplicate, or incomplete flags fail with exit code 2.
 - **`mem` indexes platform JSONL files directly.** If the user has cleared their Claude / Codex / Pi session storage, `mem` cannot recover what is no longer on disk.
 - **`mem` is read-only.** No remote sync, no edits to platform JSONL. Any write you do based on `mem` findings is your own follow-up call into the editing tools available to you.
 

@@ -57,7 +57,7 @@ trellis teamwork context list <session> --scope global --thread <thread>
 - Pretty `messages` output is an operator dashboard and may truncate progress. Use `--raw` for audit.
 - `--as` is the speaker or worker handle, depending on the command. Use explicit, stable names when multiple agents or sessions are involved.
 - `--scope project` (default) operates on the current cwd's project bucket; `--scope global` operates on the shared `__global__` bucket. Pick scope deliberately — a global board is invisible from project listings unless `--scope global` is passed.
-- For brainstorm, do multiple pressure-test rounds. One answer plus one confirmation is review, not brainstorm.
+- For exploratory discussion, choose distinct questions and pressure-test unresolved assumptions. Continue only while another exchange can change the decision or its evidence; do not require a fixed number of rounds or relabel a confirmation as new evidence.
 - **Dispatcher wait pattern**: use `--kind done` / `--kind turn_finished` (Trellis-emitted system events), not a user `--tag` as the completion signal. Tags are labels, not runtime completion events.
 - Teamwork Sessions are event-sourced. Do not parse `events.jsonl` first; use `forum`, `thread`, `messages --thread`, and `context list`.
 - `@pennixrv/trellis-core` owns reusable Teamwork Session/thread state, event append, sequence allocation, context/title projection, reducers, and task helpers. The CLI owns flags, terminal rendering, prompts, teammate lifecycle, and process exits.

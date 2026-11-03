@@ -7,10 +7,7 @@ Read the relevant development guidelines before starting your task.
 
 Execute these steps:
 
-1. **Read current task artifacts**:
-   - `prd.md` for requirements and acceptance criteria
-   - `design.md` if present for technical design
-   - `implement.md` if present for execution order and validation plan
+1. **Read the current native phase and its accepted implementation contract**, including referenced requirements, design, execution and validation artifacts. Use the actual references; `prd.md`, `design.md` and `implement.md` are common filenames, not proof of acceptance, freshness or implementation authorization. For the authorized taskless route, use its bounded request and applicable specs.
 
 2. **Discover packages and their spec layers**:
    ```bash

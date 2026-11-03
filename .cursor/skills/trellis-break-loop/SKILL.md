@@ -119,13 +119,7 @@ When multiple root causes are plausible and evidence is incomplete, update your 
 
 Before investigating, state what you believe and why:
 
-| Hypothesis | Prior | Reasoning |
-|------------|-------|-----------|
-| H1: [cause A] | 40% | Most common for this pattern |
-| H2: [cause B] | 30% | Plausible given environment |
-| H3: [other] | 30% | Catch-all |
-
-Priors must sum to 100%. If you can't assign probabilities, investigate first.
+List plausible hypotheses with current supporting and contradicting evidence, uncertainty and a discriminating check. Qualitative confidence is sufficient; do not invent numeric probabilities or require them to sum to 100%.
 
 ### Step 2: Observe Evidence
 
@@ -152,12 +146,7 @@ Don't gather more of the same. Find evidence that **differs strongly** between t
 
 ### Step 5: State Confidence
 
-| Confidence | Action |
-|------------|--------|
-| 90%+ | Proceed with fix, monitor |
-| 70-90% | Proceed, add fallback check |
-| 50-70% | Test hypothesis before committing |
-| <50% | Need more evidence, don't guess |
+State which hypothesis the evidence supports, what it rules out, and which limits remain. Choose the next check or authorized fix based on consequences and uncertainty, not a numeric threshold. Do not add speculative fallbacks to compensate for an unverified cause.
 
 Never express binary certainty when evidence is incomplete. Use "most likely", "plausible but unlikely", "worth investigating".
 
@@ -173,16 +162,16 @@ Never express binary certainty when evidence is incomplete. Use "most likely", "
 
 ## After Analysis: Immediate Actions
 
-**IMPORTANT**: After completing the analysis above, you MUST immediately:
+After analysis, preserve the reusable finding at its natural owner:
 
-1. **Update spec/guides** - Don't just list TODOs, actually update the relevant files:
+1. **Update applicable spec/guides** when the finding establishes a reusable executable contract or thinking trigger within the task's authority:
    - If it's a cross-platform issue → update `cross-platform-thinking-guide.md`
    - If it's a cross-layer issue → update `cross-layer-thinking-guide.md`
    - If it's a code reuse issue → update `code-reuse-thinking-guide.md`
    - If it's domain-specific → update `backend/*.md` or `frontend/*.md`
 
-2. **Sync templates** - After updating `.trellis/spec/`, sync to `src/templates/markdown/spec/`
+2. **Respect the source owner** — project specs do not automatically belong in Trellis's bundled templates. Update a component template only when that component owns the rule and the task authorizes that source change; use its native generation path for installed assets.
 
-3. **Commit the spec updates** - This is the primary output, not just the analysis text
+3. **Record evidence and verification** in the current task or journal when no reusable spec change is justified. Commit only under the project's existing authorization; analysis does not grant commit, publication or installation authority.
 
-> **The analysis is worthless if it stays in chat. The value is in the updated specs.**
+Keep the finding discoverable without manufacturing a spec change or a second task ledger.

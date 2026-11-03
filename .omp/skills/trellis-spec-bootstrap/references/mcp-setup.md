@@ -2,6 +2,8 @@
 
 GitNexus and ABCoder are recommended when bootstrapping Trellis specs because they expose architecture and AST context to the agent. They are tool choices, not platform requirements. Configure them through whatever MCP mechanism your agent host provides.
 
+First discover the project's approved, available tools and existing indexes. Use source and tests directly when no suitable index is available; record that limit. Spec bootstrapping does not authorize installing tools, configuring MCP servers, downloading executables, or creating or refreshing indexes. The setup examples below apply only after those operations have separate authorization and the target repository is explicit. Prefer an already installed, pinned owner entry point over an unpinned download.
+
 ## GitNexus
 
 GitNexus builds a code knowledge graph from the repository. Use it for module boundaries, execution flows, dependency relationships, blast radius, and graph queries.
@@ -15,7 +17,7 @@ npx gitnexus analyze
 # Check index status.
 npx gitnexus status
 
-# Re-index after code changes when the analysis is stale.
+# Re-index only when explicitly authorized for this repository.
 npx gitnexus analyze
 ```
 
@@ -82,7 +84,7 @@ abcoder mcp ~/abcoder-asts
 
 ## Verification
 
-After configuration, verify from the agent host that both MCP servers are visible. Then run one simple query against each server before starting the spec writing pass.
+After an authorized configuration change, verify the selected MCP server from the agent host and run a simple query. Neither server is mandatory; unavailable tooling does not block a source-backed spec pass.
 
 ```bash
 ls .gitnexus/meta.json

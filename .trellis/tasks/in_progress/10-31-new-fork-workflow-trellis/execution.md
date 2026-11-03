@@ -148,3 +148,11 @@
 - beta.9 已在既有 v0.7.1 分支正式推送，标签提交 `262e9b4f4f26b23e8d072c83675ac92fb1c101c8`；CI 41657605393 双包发布步骤通过，但公共 npm CLI 可见性检查超时。后续补修递增 beta.10，不覆盖 beta.9。
 - 真实旧快照保存顶层平台目录，而分类器原先直接比较 ALL_MANAGED_DIRS 的深层路径，导致 39 份已知旧快照被保护。现按顶层目录识别，并接受经实物核验的可选 `.backup-complete` 版本标记；未知根、无效标记、符号链接及活动恢复仍保护。原生清单重查全部为 legacy。CLI 版本提示统一写入 stderr，避免版本不同时破坏备份 JSON。
 - 新增旧 writer 布局、标记及真实 dist CLI JSON 回归，快照专项 20 项通过；ESLint、TypeScript、构建及双语文档 659 文件检查通过。checkForUpdates 图影响为 LOW、单一调用方；新 listAssetBackups 未被旧索引覆盖，以当前源码和专项回归核验。docs-site 既有分支提交 533655e 已推送，准备发布 beta.10，再执行真实安装、两仓更新和最终全清。
+
+## 2026-11-03：beta.10 真实交付与资产收尾
+
+- beta.10 标签提交 `4fd7ff72fe825a931b397754d84bf64b9f488f05` 已推送至既有 v0.7.1；Actions 41660773859 第二次运行成功。首次只在公共 npm CLI 可见性检查超时，实际可见后重跑失败作业并由原生计划跳过既有包；没有本地 npm publish、版本覆盖或移动标签。双包 beta 标签、精确依赖、verify-npm 与 verify-packed-cli 均通过，Core 403/1 条件跳过、CLI 2196/2 条件跳过。
+- Lifecycle 原生重装返回 changed，归档 SHA-256 `f4cbdefd75bba56217d0abf93d4cc050e9e34b4df248ddf859e33237b4b6107c`；安装 CLI/Core 均 beta.10。两仓从 beta.8 经原生预览和 --skip-all 更新，保留已确认专用配置；本仓新增 5、更新 63、退休 5 份入口，native workflow 匹配。安装包配置器期望的六平台 320 份模板全部匹配，35 份 Python 在源码、安装包与两现场一致；旧可执行入口无残留。
+- 本仓保护基线 1488 份 task/spec/workspace/handoff 文件仅本 execution.md 追加，其他逐字节相同，无新增、删除或移动；251 项任务分布为 1/15/232/3，当前原生实施阶段和会话归属保持，migrate-layout 预览为空。根仓保护基线、369 项任务及 consumed 来源绑定亦核验，详细证据归父任务。
+- 原生 verify 核验本次更新完整快照后，按用户明确全清授权最后删除本仓 17 份快照、8611 个文件、68,800,751 字节，backup list 回读为空，无保护或失败对象。工作区六处合计删除 41 份快照、13,151 个文件、2,980,377,388 字节；不删除源任务或交接历史，不升级额外四仓的项目资产。
+- 根侧 offline 11 项、runner 自测 11 项、独立 handoff 三模块通过；安装组件 match/keep。仅提交本仓生成资产及本记录，源码保持既有分支，父任务固定最终 gitlink。本 owner task 继续 in_progress；没有把本轮交付等同于长期总任务关闭。全部宿主运行、Mintlify 页面渲染与未修改旧文档全站格式仍按父记录说明其验证边界。

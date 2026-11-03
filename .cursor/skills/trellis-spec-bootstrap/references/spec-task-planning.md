@@ -14,7 +14,7 @@ Avoid artificial decomposition. A small library usually needs one focused spec p
 
 ## Task Shape
 
-When a Trellis task is useful, write a concise PRD with these sections:
+Reuse the current task when the spec work belongs to its authorized scope. Otherwise route the request through request-intake and the project's native phases. The following is an example of useful coverage; preserve the project's actual artifact structure rather than requiring a new PRD or these exact headings:
 
 ```markdown
 # Fill <package-or-layer> Trellis Specs
@@ -55,7 +55,7 @@ If the host supports subagents, helpers can inspect independent packages or run 
 Helper tasks must have clear ownership:
 
 - Read-only research tasks may inspect any source needed for the assigned scope.
-- Write tasks should own disjoint spec directories.
+- Native helper write tasks require explicit project authorization and disjoint spec directories. Trellis Teamwork teammates remain in their research, review, or verification role and return findings in the assigned format; the coordinator applies accepted spec edits.
 - Verification tasks should check placeholder removal, broken links, and consistency.
 
 Do not encode helper-agent names, vendor-specific commands, or platform-specific routing in the skill. Put only the required work and acceptance criteria in the task.

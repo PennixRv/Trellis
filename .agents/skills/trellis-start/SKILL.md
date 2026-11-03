@@ -1,11 +1,11 @@
 ---
 name: trellis-start
-description: "Initializes an AI development session by reading workflow guides, developer identity, git status, active tasks, and project guidelines from .trellis/. Classifies incoming tasks and routes to brainstorm, direct edit, or task workflow. Use when beginning a new coding session, resuming work, starting a new task, or re-establishing project context."
+description: "Initializes session context from .trellis/, including workflow, developer identity, git status, tasks and guidelines. Routes new requests through trellis-request-intake and existing work through trellis-continue. Use when beginning a session or re-establishing missing project context."
 ---
 
 # Start Session
 
-Load the current Trellis context and continue from the task record's current phase.
+Load the session's Trellis context. Route a new request through `trellis-request-intake`; resume existing work through `trellis-continue` and the task record's current phase. Do not repeat initialization when context and ownership have already been established.
 
 ## Load context
 
@@ -17,7 +17,7 @@ Read the applicable spec indexes before editing code. The active phase breadcrum
 
 ## Route the current request
 
-- No active Trellis task: use the taskless route when the request is clear, low-risk, reversible, authorized, and immediately verifiable. Otherwise create the task with the user's consent and load `trellis-goal-exploration-and-requirements`.
+- New request: use `trellis-request-intake` to determine whether it changes the current goal, is independent work, or qualifies for the taskless route. Reuse existing authorization and evidence.
 - Task with no initialized route: inspect its current requirements, choose the applicable ordered phases with evidence for omissions, then initialize the route through task.py phase init.
 - Goal Exploration and Requirements Confirmation Phase: load `trellis-goal-exploration-and-requirements`. Do not leave until the user confirms the current requirements artifact revision.
 - Decision Space Construction and Consolidation Phase: load `trellis-decision-space-construction-and-merging`.
