@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -311,6 +312,33 @@ describe("asset snapshots", () => {
     expect(all.deleted).toHaveLength(5);
     expect(all.failed).toEqual([]);
     expect(read(".trellis/.backup-unknown/unknown")).toBe("do not delete");
+  });
+
+  it("recognizes actual old writer roots and version markers without trusting unknown content", () => {
+    const legacy = ".trellis/.backup-2026-11-01T01-02-03";
+    write(`${legacy}/.trellis/config.yaml`, "legacy asset");
+    write(`${legacy}/.codex/config.toml`, "legacy Codex config");
+    write(`${legacy}/.agents/skills/trellis-start/SKILL.md`, "legacy Skill");
+    write(`${legacy}/.backup-complete`, "0.7.0-beta.52");
+    expect(listAssetBackups(root)[0].kind).toBe("legacy");
+    expect(
+      pruneAssetBackups(root, { all: true, includeLegacy: true }).selected,
+    ).toHaveLength(1);
+    write(`${legacy}/.backup-complete`, "unknown marker");
+    expect(listAssetBackups(root)[0].kind).toBe("protected");
+    write(`${legacy}/.backup-complete`, "0.7.0-beta.52");
+    write(`${legacy}/user-data/private.txt`, "unknown owner");
+    expect(listAssetBackups(root)[0].kind).toBe("protected");
+  });
+
+  it("keeps native backup JSON parseable when the CLI and project versions differ", () => {
+    write(".trellis/.version", "0.0.1");
+    const output = execFileSync(
+      process.execPath,
+      [path.resolve("dist/cli/index.js"), "backup", "list"],
+      { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    expect(JSON.parse(output)).toEqual([]);
   });
 
   it("reports partial cleanup failures and preserves failed objects", () => {

@@ -344,14 +344,26 @@ export function listAssetBackups(root: string): BackupInventoryItem[] {
         else item.kind = "complete";
       } else if (LEGACY_ID.test(id)) {
         const names = fs.readdirSync(location);
+        const roots = new Set(ALL_MANAGED_DIRS.map((dir) => dir.split("/")[0]));
         if (
           !names.length ||
           !names.some((name) => name === ".trellis" || name === "AGENTS.md") ||
           names.some(
-            (name) => name !== "AGENTS.md" && !ALL_MANAGED_DIRS.includes(name),
+            (name) =>
+              name !== "AGENTS.md" &&
+              name !== ".backup-complete" &&
+              !roots.has(name),
           )
         )
           throw new Error("Unknown legacy backup scope.");
+        const marker = path.join(location, ".backup-complete");
+        if (
+          fs.existsSync(marker) &&
+          !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(
+            fs.readFileSync(marker, "utf-8").trim(),
+          )
+        )
+          throw new Error("Unknown legacy completion marker.");
         item.kind = "legacy";
       } else item.problem = "Unknown or incomplete backup; retained.";
     } catch (error) {

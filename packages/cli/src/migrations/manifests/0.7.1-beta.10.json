@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.10",
+  "description": "对齐历史资产备份格式及机器可读报告",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "修复旧 writer 顶层目录及版本完成标记识别；版本提示写入 stderr，保持 backup JSON 可解析。",
+  "migrations": [],
+  "notes": "No migration required."
+}
