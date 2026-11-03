@@ -81,10 +81,17 @@ describe("release pre-commit staging", () => {
     git(tmp, "tag", "v0.7.1-beta.6");
 
     const release = fs.readFileSync(RELEASE_SCRIPT, "utf-8");
+    const branchQuery = release.match(
+      /function currentBranch\(\)\s*\{\s*return output\("([^"]+)"\)/,
+    );
+    if (!branchQuery) throw new Error("release branch query is missing");
+    const branchArgs = branchQuery[1].split(" ").slice(1);
+    const branch = git(tmp, ...branchArgs);
+    expect(branch).toBe("v0.7.1");
     const command = release.match(/run\(`(git push origin [^`]+)`\);/);
     if (!command) throw new Error("release push command is missing");
     const tokens = command[1]
-      .replaceAll("${branch}", "v0.7.1")
+      .replaceAll("${branch}", branch)
       .replaceAll("${version}", "0.7.1-beta.6")
       .match(/[^\s"]+/g);
     if (!tokens) throw new Error("release push command is empty");

@@ -90,7 +90,7 @@ function assertNextVersionManifest(type) {
 const PRERELEASE_TYPES = new Set(["beta", "rc"]);
 
 function currentBranch() {
-  return output("git rev-parse --abbrev-ref HEAD");
+  return output("git branch --show-current") || "HEAD";
 }
 
 /**

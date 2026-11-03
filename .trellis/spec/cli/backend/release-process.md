@@ -228,17 +228,19 @@ pnpm release:promote
 
 1. `check-manifest-continuity`
 2. `check-docs-changelog --type beta|rc|promote` for prerelease/promotion tracks
-3. core tests
+3. CLI build
 4. CLI tests
 5. pre-release commit excluding `docs-site` and `.trellis`
 6. `bump-versions.js <type>` to update both package versions together
 7. `release-preflight check-versions`
 8. version commit with the version string as the commit message
 9. git tag `v<version>`
-10. push branch and tags
+10. push HEAD to the fully qualified selected branch and the exact release tag
 11. GitHub Actions publish workflow builds, tests, packs, publishes, and verifies both packages
 
 The release script does not publish locally. The pushed tag is what starts official npm publication.
+
+Read the branch with `git branch --show-current`, retaining detached-HEAD rejection. `git rev-parse --abbrev-ref HEAD` can return `heads/<branch>` when a tag shares the branch name. Push to `HEAD:refs/heads/<branch>` and only `refs/tags/v<version>`; never create a different branch while recovering a release. If the version commit already exists but publication stopped before the tag push, verify the target version and remote refs before resuming that exact version.
 
 ---
 

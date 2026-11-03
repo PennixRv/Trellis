@@ -114,3 +114,4 @@
 - 最终核验发现 updater 只检查 planning 下同名迁移任务，跨越旧版本再次升级时可能与其他状态或旧布局中的记录重名。真实更新回归修复前为 5 项失败、1 项通过；修复后六种位置均保留原记录，不重复创建，update.integration.test.ts 全部 63 项通过，TypeScript 检查通过。无需新增依赖或公开接口。
 - 同步更新 CLI 规范、beta.7 非破坏性迁移清单及中英文 Beta 指南、发布说明和导航；docs-site 既有分支提交 `c1d2ad5` 已推送。GitNexus detect-changes 报告 7 个文件、1 个变更符号、2 条受影响流程，风险 medium；以当前源码与真实更新回归核对。
 - beta.6 已公开发布，不覆盖其 tag 或 npm 包；本次补修将发布 `0.7.1-beta.7`，再真实重装并更新两仓版本记录。根侧当前会话仍接管原 Lifecycle 任务，原始来源绑定和业务路线保持。
+- 发布前观察发现同名 tag 还会使 git rev-parse --abbrev-ref HEAD 返回 heads/v0.7.1；此前推送前缀修复不足。已在推送前停止 orchestrator，远端没有错误分支或 beta.7 tag；版本提交由在途钩子完成。现用 git branch --show-current 取得实际分支名，保留 detached HEAD 拒绝；真实 bare remote 回归从脚本提取分支查询并参与推送，修复前明确失败，修复后通过。不重新递增 beta.7，检查完成后显式推送既有分支及精确 tag。

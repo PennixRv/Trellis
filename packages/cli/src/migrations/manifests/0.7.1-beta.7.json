@@ -3,6 +3,6 @@
   "description": "修复自动迁移任务在目录移动后被重复创建的问题",
   "breaking": false,
   "recommendMigrate": false,
-  "changelog": "自动创建迁移任务前检查四种状态目录及旧布局；已完成、已取消或进行中的同名迁移任务保留原记录，不再在 planning 创建重复任务。",
+  "changelog": "自动创建迁移任务前检查四种状态目录及旧布局；已完成、已取消或进行中的同名迁移任务保留原记录，不再在 planning 创建重复任务。修正分支与 tag 同名时的发布分支解析及精确推送。",
   "migrations": []
 }
