@@ -127,6 +127,10 @@
 ## 2026-11-03：两仓活动资产审查与旧参考目录清理
 
 - 用户要求检查根仓及本源码仓的 Trellis 资产，并清理确定的旧版本残留。根仓当前平台模板全部匹配，Codex 禁用原生 agents 的配置为用户明确事实，继续保留。本源码仓的六个平台模板匹配，但 OpenCode package.json 缺失、package-lock.json 仍锁定旧依赖；通过原生 configurePlatform 的 skip 模式仅恢复该模板，再由 npm 更新锁文件。
-- 追溯发现 46 份旧 trellis-meta 参考文档及 13 份 SKILL.md.backup 没有被当前模板摘要覆盖。旧参考目录已由 local-architecture、platform-files、customize-local 承接，当前入口无入链；副本来自旧自更新提交 54d27d76。自定义 Skill、GitNexus 文件及源码维护命令仍有独立用途，不列为退役资产。
+- 追溯发现 46 份旧 trellis-meta 参考文档及 13 份 SKILL.md.backup 没有被当前模板摘要覆盖。旧参考目录已由 local-architecture、platform-files、customize-local 承接，当前入口无入链；副本来自旧自更新提交 54d27d76。GitNexus 文件及仍有独立用途的自定义 Skill、维护命令保留；仓库专用入口另按下述实际用途裁决。
 - 修改范围为 beta.8 的逐文件哈希删除清单、真实 updater 回归与两个历史夹具、迁移规范及双语发布说明；不修改删除算法或新增清理命令。清单只含核验过的 59 条路径，依赖锁文件由 npm 维护，任务、交接历史与回滚备份不进入删除范围。
-- GitNexus getAllMigrations impact 报告 6 个受影响符号，涉及 update、manifest-prune 及卸载调用链，风险 HIGH；索引落后 10 个提交，结合当前源码确认本轮仅增加清单数据，不改变这些接口。更新、清单与 hash 裁剪定向回归 100 项通过，覆盖旧文件清理、当前文档和修改版保护、原任务不变及重复更新幂等。待完成 beta.8 正式发布、真实安装和两仓最终对齐验收。
+- GitNexus getAllMigrations impact 报告 6 个受影响符号，涉及 update、manifest-prune 及卸载调用链，风险 HIGH；索引落后 10 个提交，结合当前源码确认本轮仅增加清单数据，不改变这些接口。更新、清单与 hash 裁剪定向回归 100 项通过，覆盖旧文件清理、当前文档和修改版保护、原任务不变及重复更新幂等。Core 403 项通过、1 项条件跳过，CLI 2136 项通过、2 项条件跳过；ESLint、TypeScript、构建、清单连续性、双语导航及打包精确依赖核验通过。六个平台全新初始化后，原生更新预览无差异。
+- 仓库专用辅助资产不以是否在模板摘要内判定用途。保留 create-manifest 三宿主副本和 contribute 两份 Skill，统一到当前 monorepo、@pennixrv 双包、内置 native workflow、文档 fork 及 CI 发布合同；三个 Skill 均通过 quick_validate。仅删除两份只用于已退役 Marketplace checkout、没有当前入链的 publish-skill 命令。通过 git submodule set-url 将 docs-site 登记地址对齐实际 PennixRv/docs，保持既有文档分支。以上均为非 npm 分发的仓库维护资产，不改写已发布标签。
+- beta.8 标签指向 ee493ba49218a70b5bfe2e495b40d8617ffc0f4e，源码保持既有 v0.7.1；docs-site 提交 2344851ab1687fa550d42794189af3570996a160 已推送。Actions 41627374159 首轮发布成功后仅公共 npm 可见性检查超时；确认双包及 beta 标签实际可见、原生 verify-npm 通过后重跑失败作业，第 2 次 completed/success，既有包由发布计划跳过。
+- 原生 pennix update trellis-cli --version 0.7.1-beta.8 真实重装返回 changed，归档 SHA-256 为 12c6cf3b5a2cf810475b7393709fb879cd8e12676c2b556b1917c0a733ef89a6。安装 CLI 及其精确 Core 依赖均为 beta.8；两仓先原生预览、再以 --skip-all 保留专有配置并更新版本记录，最终预览没有缺失、待清理或模板变更。根仓 103 份规范资产中 102 份一致，唯一差异为用户明确的 Codex agents 禁用配置；本仓 359 份全部一致。35 份 Python 脚本在源码、安装包和两仓现场逐字节一致。
+- 原生 updater 已按已知哈希清理 59 份旧文件并保留回滚备份；两个仓库均无清单路径残留。清理前后根仓 3537 份、本仓 1422 份任务与交接文件，除各自明确补记的 execution.md 外全部逐字节不变，无新增、删除或移动。两仓 migrate-layout 预览均为空；任务分布保持根仓 369 项、本仓 251 项，本 owner task 继续 in_progress。

@@ -15,8 +15,8 @@ Create a migration manifest for a new patch, beta, rc, or minor release based on
 
 Trellis currently publishes two npm packages from the same git tag:
 
-- `@mindfoldhq/trellis`
-- `@mindfoldhq/trellis-core`
+- `@pennixrv/trellis`
+- `@pennixrv/trellis-core`
 
 Both packages must always share the exact same version and npm dist-tag. Source uses `workspace:*`; the packed CLI must depend on the exact published core version.
 
@@ -204,8 +204,15 @@ Verify:
 1. `packages/cli/src/migrations/manifests/<version>.json` exists and has valid JSON.
 2. Manifest `changelog` renders as real newlines.
 3. Both docs-site changelog MDX files exist and match 1:1.
-4. **All** submodule commits are pushed before the main repo pointer commit (currently `docs-site/` + `marketplace/`). Verify with: `git submodule foreach 'sha=$(git rev-parse HEAD); git ls-remote origin $sha | grep -q $sha && echo "ok $name" || echo "FAIL $name $sha"'`. Tag-triggered CI does `git submodule update --init --recursive` and fails on the first unpushed pointer with `fatal: remote error: upload-pack: not our ref <SHA>`.
-5. `@mindfoldhq/trellis` and `@mindfoldhq/trellis-core` versions still match.
+4. Push the `docs-site/` commit to its selected remote branch before committing the parent gitlink. Verify the pinned commit is reachable after fetching, without assuming the branch is named `main`:
+
+   ```bash
+   git -C docs-site fetch origin -q
+   git -C docs-site branch -r --contains HEAD
+   ```
+
+   The selected branch must appear in that output. Inspect `.gitmodules` and the actual remote before release; this fork uses `PennixRv/docs` and bundles its native workflow in the CLI source.
+5. `@pennixrv/trellis` and `@pennixrv/trellis-core` versions still match.
 
 ## Step 11: Publish Through CI
 
@@ -221,8 +228,8 @@ pnpm release:promote
 After CI succeeds, verify public npm:
 
 ```bash
-npm view @mindfoldhq/trellis@<version> version dist-tags --json --registry=https://registry.npmjs.org/
-npm view @mindfoldhq/trellis-core@<version> version dist-tags --json --registry=https://registry.npmjs.org/
+npm view @pennixrv/trellis@<version> version dist-tags --json --registry=https://registry.npmjs.org/
+npm view @pennixrv/trellis-core@<version> version dist-tags --json --registry=https://registry.npmjs.org/
 ```
 
 If CI fails or npm visibility is wrong, fix the workflow/scripts and re-run the CI path. Do not use local publish to fill the gap.
@@ -233,7 +240,7 @@ Breaking releases must run end-to-end migration in a throwaway directory:
 
 ```bash
 mkdir /tmp/migrate-test && cd /tmp/migrate-test && git init -q .
-npx -y @mindfoldhq/trellis@<last-ga> init -y -u test --claude --cursor --<platforms>
+npx -y @pennixrv/trellis@<last-ga> init -y -u test --claude --cursor --<platforms>
 node <repo>/packages/cli/dist/cli/index.js update --migrate --dry-run
 yes | node <repo>/packages/cli/dist/cli/index.js update --migrate --force
 yes | node <repo>/packages/cli/dist/cli/index.js update
