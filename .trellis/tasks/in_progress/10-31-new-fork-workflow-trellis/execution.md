@@ -171,3 +171,12 @@
 - 候选验证完成：Core 24 文件、411 项通过／1 项条件跳过；CLI 101 文件、2214 项通过／2 项条件跳过。ESLint、TypeScript、构建通过，basedpyright 为 0 errors／72 项既有 warnings。先前并行运行 typecheck 的 Core clean 与测试产生一次模块缺失；构建稳定后串行重跑全量通过，未将该失败归为产品问题。
 - handoff 原生专项 32 项及适配器三模块通过；其中主模块 29 项。Teamwork 清理新增 9 项、run 2 项、Core 诊断 2 项、JSONL 6 项、SessionStart 6 项，覆盖新锁等待、身份拒绝及错误输入。六平台隔离 init 后 update 预览无差异；npm pack 清单核验 CLI 983 文件及 Core 241 文件，相关分发资产均存在，packed CLI 精确依赖核验通过。
 - 本仓和根仓通过原生 updater 同步脚本与 Hook，保留各自明确的专用配置。GitNexus detect-changes 为 29 文件、47 符号、30 流程及 critical 影响，索引限制沿父记录保留；当前调用方和全量回归补核。双语发布说明、663 文件文档 lint、共享导航、修改文件格式与目标 beta.12 清单连续性通过。正式发布、真实重装及最终备份全清仍待本次交付回执。
+
+### beta.12 正式交付回执
+
+- 修复提交 `111d0566`，发布标签 `v0.7.1-beta.12` 指向 `44d04149c0fa75f7b00c366fbe65e9921f492c5b`，均在既有 `v0.7.1`；docs-site 既有分支提交 `ac23d67` 已先推送。原生 release:beta、提交 Hook 的 Core／CLI 全量回归均通过；[Actions 41738874551](https://github.com/PennixRv/Trellis/actions/runs/41738874551) 首次运行 completed/success。双包公共 npm 可见且 beta 标签匹配，latest 保持 0.7.1，没有本地 npm publish 或移动既有标签。
+- 原生 `pennix update trellis-cli --version 0.7.1-beta.12 --json` 返回 changed，候选与结果归档 SHA-256 均为 `d8fd557eb839743698996c7e9ad7a28e32dc2fe29f0cd70b4b453ad97515f6fc`；安装 CLI、Core 与 packed 精确依赖均 beta.12。Pennix handoff Skill 源码 `fd43e8affa4839cb09203f9b5e2ff5eba658dd75` 已在 main 推送并真实安装，归档 SHA-256 `59bde227c89692b0723a84df38acc3f7faef3d52af301f1750b7eddfc6435a01`。三项相关组件 check 为 match/keep，check 全局退出码仍受无关组件既有告警影响。
+- 两仓经原生 dry-run、已批准的 --skip-all 和 native workflow 核验升至 beta.12。真实安装包配置器核对根仓 64 份模板，唯一差异为批准保留的 .codex/config.toml；本仓六平台 372 份全部一致。35 份 Python 在源码、安装包及两仓逐字节一致，活动 Skill 无退休入口引用，两仓 migrate-layout 预览均为空。
+- 两仓更新后的保护基线逐字节一致：根仓 3560、本仓 1488 份 task/spec/workspace/handoff 文件没有新增、删除或变化；后续只追加本轮明确的交付记录。根侧来源归属仍 consumed／generation 12，来源摘要 `65036215a7e59dad83eab100a0303b331226c0abe58c16d9ca2236ed4915d23e` 保持，未改写旧交接包或执行 pending action。本 owner task 继续原实施阶段。
+- 更新快照全部通过 native verify，先预览后按用户全清授权执行 prune --all --include-legacy --yes。本仓删除 3 份、1104 文件、7,581,373 字节，根仓 3 份、327 文件、2,983,566 字节；无 protected／failed 对象，两仓回读 []，其他四处既有现场也为 []。字节为文件大小合计。
+- 本轮发布、安装和两仓现场对齐已完成；父任务的最终 gitlink 与组合结果由根侧追加。验证边界：未运行全部 22 个宿主或 Mintlify 页面渲染；未核验的 managed batch host adapter 仍拒绝派发，非 Linux 孤儿清理仍保留供人工恢复。图索引落后及既有 Python warnings 不作已消除声明。
