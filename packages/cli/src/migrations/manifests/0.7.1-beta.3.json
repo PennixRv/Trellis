@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.3",
+  "description": "Preserve the Teamwork host wait continuation contract",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Teamwork process guidance preserves a single active host continuation until the wait resolves, times out, or errors. Existing beta.2 asset cleanup and platform re-init hash protection remain in effect.",
+  "migrations": [],
+  "notes": "Run trellis update to refresh the Teamwork process reference. Existing task records are unchanged."
+}

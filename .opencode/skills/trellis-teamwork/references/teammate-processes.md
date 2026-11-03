@@ -14,6 +14,12 @@ identity, or unconfirmed cancellation enters reconciliation and is not
 automatically duplicated. Reconciliation is a runtime outcome; the task
 coordinator decides whether a later task phase needs a return.
 
+When a live Teamwork wait returns a host continuation, resume only that
+continuation until it resolves, times out, or errors. Do not run another
+host action meanwhile, including another wait, shell command, or status/message
+query. An empty transport slice does not mean the wait has completed. Run
+diagnostics only after the continuation returns and diagnosis is needed.
+
 Use the ordinary Teamwork Session commands for a deliberate one-shot or
 interactive discussion:
 
