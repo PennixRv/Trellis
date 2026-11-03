@@ -106,3 +106,11 @@
 - 发布候选为 0.7.1-beta.6；尚待提交、GitHub Actions 正式发布、Lifecycle 全局重装及根项目迁移。文档保留既有 codex/chinese-user-templates 分支，beta 新行为位于 beta/、zh/beta/，不覆盖稳定版说明。
 
 - 发布恢复：本地已生成 beta.6 后，原 release.js 用 HEAD:v0.7.1 推送，被远端同名分支与稳定 tag 的歧义拒绝。已核验远端 beta.6 tag 不存在，未公开发布；修复为 HEAD:refs/heads/${branch}，以真实 bare remote 和同名 tag/branch 回归覆盖。恢复沿当前 beta.6 继续，不再次递增版本；仅在远端 tag 仍不存在时更新本地候选 tag，再显式推送目标分支和该 tag。
+
+## 2026-11-03：beta.6 正式部署及 updater 跨状态查重补修
+
+- beta.6 标签指向 `98d7381493661ec9a018407b62415a54af209828`，GitHub Actions `41614110775` 成功发布 CLI/Core；已通过 Lifecycle 原生入口从公共 npm 真实安装，再通过原生 updater 更新两仓资产。根侧完整组合验收为 19 项通过，独立 handoff 三模块通过。
+- 根项目完成 368 项旧任务迁移，3485 个文件中仅 8 个机器引用文件按预期更新，51 个正式 handoff 文件哈希不变；源码仓 250 项旧任务的迁移验证仍通过。两仓自动生成的 beta.6 迁移任务均已完成真实审查并经原生 complete 进入 completed/2026-11。当前源码仓共 251 项：planning 1、in_progress 15、completed 232、cancelled 3；本 owner task 保持实施阶段。
+- 最终核验发现 updater 只检查 planning 下同名迁移任务，跨越旧版本再次升级时可能与其他状态或旧布局中的记录重名。真实更新回归修复前为 5 项失败、1 项通过；修复后六种位置均保留原记录，不重复创建，update.integration.test.ts 全部 63 项通过，TypeScript 检查通过。无需新增依赖或公开接口。
+- 同步更新 CLI 规范、beta.7 非破坏性迁移清单及中英文 Beta 指南、发布说明和导航；docs-site 既有分支提交 `c1d2ad5` 已推送。GitNexus detect-changes 报告 7 个文件、1 个变更符号、2 条受影响流程，风险 medium；以当前源码与真实更新回归核对。
+- beta.6 已公开发布，不覆盖其 tag 或 npm 包；本次补修将发布 `0.7.1-beta.7`，再真实重装并更新两仓版本记录。根侧当前会话仍接管原 Lifecycle 任务，原始来源绑定和业务路线保持。

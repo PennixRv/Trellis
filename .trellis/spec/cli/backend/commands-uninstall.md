@@ -188,7 +188,7 @@ Returns `{ deletedFiles, modifiedFiles, deletedDirs }` for the green summary lin
 
 This is **deliberately destructive** for user data inside `.trellis/`. Users are responsible for backing up `spec/`, `tasks/`, or `workspace/` before running `uninstall` if they want history preserved — the command does not create a backup itself. The plan output prints `WORKFLOW/  (entire directory — including your specs, task PRDs, journals, and memory)` so this is visible before the confirmation prompt.
 
-> Rationale: a "soft uninstall" that leaves orphan `.trellis/` content behind is a worse state than either fully-installed or fully-uninstalled — the leftover files reference removed scripts (`.trellis/scripts/`) and broken sub-agent configs (`.trellis/tasks/<id>/implement.jsonl` pointing at deleted spec files). Either keep Trellis or remove it cleanly. There is no half-Trellis mode.
+> Rationale: a "soft uninstall" that leaves orphan `.trellis/` content behind is a worse state than either fully-installed or fully-uninstalled — the leftover files reference removed scripts (`.trellis/scripts/`) and broken sub-agent configs (`.trellis/tasks/<status>/<id>/implement.jsonl`, with a month directory for completed tasks, pointing at deleted spec files). Either keep Trellis or remove it cleanly. There is no half-Trellis mode.
 
 ### Dirty-Data Guard — `collectUncommittedTrellisData`
 

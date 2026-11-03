@@ -615,7 +615,7 @@ a `.current-task` fallback or a Python hook directory.
 ##### 3. Contracts
 
 - `task.py create` always creates task-owned files under
-  `.trellis/tasks/<date-slug>/`. It must never write `.trellis/.current-task`.
+  `.trellis/tasks/planning/<date-slug>/`. It must never write `.trellis/.current-task`.
 - `task.py create` normalizes `--description` with `.strip()` before writing
   `task.json` and `prd.md`. Missing or whitespace-only descriptions are stored
   as `""` and emit a warning on stderr.

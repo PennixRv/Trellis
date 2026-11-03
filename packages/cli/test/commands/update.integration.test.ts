@@ -199,6 +199,48 @@ describe("update() integration", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  it.each([
+    "planning",
+    "in_progress",
+    "cancelled",
+    "completed/2026-10",
+    "",
+    "archive/2026-10",
+  ])("reuses migration tasks already stored in %s", async (directory) => {
+    await setupProject();
+    const today = new Date();
+    const monthDay = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const taskName = `${monthDay}-migrate-to-${VERSION}`;
+    const tasksRoot = `${DIR_NAMES.WORKFLOW}/${DIR_NAMES.TASKS}`;
+    const existing = path.posix.join(tasksRoot, directory, taskName);
+    const status = ["planning", "in_progress", "cancelled"].includes(directory)
+      ? directory
+      : "completed";
+    const task = JSON.stringify({
+      status,
+      notes: "preserve existing migration",
+    });
+    writeProjectFile(`${existing}/task.json`, task);
+    writeProjectFile(`${existing}/prd.md`, "existing migration evidence\n");
+    stageVersionedUpgradeProject({
+      fromVersion: "0.7.1-beta.5",
+      pristineTemplates: { [MANAGED_FILE]: "# older managed script\n" },
+    });
+
+    await update({ force: true, migrate: true });
+
+    expect(readProjectFile(`${existing}/task.json`)).toBe(task);
+    expect(readProjectFile(`${existing}/prd.md`)).toBe(
+      "existing migration evidence\n",
+    );
+    if (directory !== "planning") {
+      expect(
+        fs.existsSync(projectFile(`${tasksRoot}/planning/${taskName}`)),
+      ).toBe(false);
+    }
+    expect(fs.readFileSync(versionFilePath(), "utf-8")).toBe(VERSION);
+  });
+
   it("removes retired workflow assets without migrating old tasks", async () => {
     await init({ yes: true, force: true, codex: true });
     const fixtures = new URL("../fixtures/retired-workflow/", import.meta.url);

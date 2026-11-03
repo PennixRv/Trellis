@@ -18,7 +18,7 @@ User-facing contract:
 
 - Input: a project directory containing `.trellis/`, the CLI binary on `PATH`.
 - Output: bundled templates on disk match the CLI version; `.trellis/.version` advanced; modified files preserved or backed up; renamed/deleted files migrated when `--migrate`; legacy deprecated files cleaned up via hash-verified `safe-file-delete`; a follow-up migration task created when the upgrade crosses a breaking release with a `migrationGuide`.
-- Side effects: snapshot backup at `.trellis/.backup-<timestamp>/`, `.trellis/.template-hashes.json` rewritten, optional `.trellis/tasks/<MM-DD>-migrate-to-<version>/` task tree.
+- Side effects: snapshot backup at `.trellis/.backup-<timestamp>/`, `.trellis/.template-hashes.json` rewritten, optional `.trellis/tasks/planning/<MM-DD>-migrate-to-<version>/` task tree.
 
 Two big invariants:
 
@@ -234,7 +234,7 @@ Order of operations in `commands/update.ts:update` (after the `Proceed?` confirm
 
 9. **Hash refresh** — every newly-written file (`newFiles`, `autoUpdateFiles`, overwritten `changedFiles`, plus any `missingAgentsMdHash` entry from `collectMissingAgentsMdHash`) gets its hash recomputed and saved via `utils/template-hash.ts:updateHashes`. `.new` copies and skipped files do NOT get their hash updated — the original file's recorded hash continues to drive the next-update conflict decision.
 
-10. **Migration task creation** — only when the upgrade crosses a manifest with `breaking: true` AND a non-empty `migrationGuide` (collected via `migrations/index.ts:getMigrationMetadata`). `update()` writes `.trellis/tasks/<MM-DD>-migrate-to-<cliVersion>/` containing `task.json` (built via `utils/task-json.ts:emptyTaskJson`) and `prd.md` listing every guide and AI-instruction block. Skipped if the directory already exists. Assignee is read from `.trellis/.developer` via the strict `name=<value>` regex — DO NOT change this to a raw `.trim()` (see Common Pitfalls).
+10. **Migration task creation** — only when the upgrade crosses a manifest with `breaking: true` AND a non-empty `migrationGuide` (collected via `migrations/index.ts:getMigrationMetadata`). `update()` writes `.trellis/tasks/planning/<MM-DD>-migrate-to-<cliVersion>/` containing `task.json` (built via `utils/task-json.ts:emptyTaskJson`) and `prd.md` listing every guide and AI-instruction block. A same-name task in any lifecycle directory prevents creation; the guard also checks the flat legacy layout and bounded `archive/YYYY-MM` history so an upgrade before explicit layout migration cannot create a duplicate. Assignee is read from `.trellis/.developer` via the strict `name=<value>` regex — DO NOT change this to a raw `.trim()` (see Common Pitfalls).
 
 11. **End-of-run banners** — breaking-change banner and `--migrate` recommendation are intentionally printed last so they don't scroll off screen on long updates.
 

@@ -2845,8 +2845,32 @@ export async function update(options: UpdateOptions): Promise<void> {
       const tasksDir = path.join(cwd, DIR_NAMES.WORKFLOW, DIR_NAMES.TASKS);
       const taskDir = path.join(tasksDir, "planning", taskDirName);
 
-      // Check if task already exists
-      if (!fs.existsSync(taskDir)) {
+      // A prior migration task may have moved to another lifecycle directory.
+      const taskLocations = [
+        tasksDir,
+        ...["planning", "in_progress", "cancelled"].map((status) =>
+          path.join(tasksDir, status),
+        ),
+      ];
+      for (const status of ["completed", "archive"]) {
+        const statusDir = path.join(tasksDir, status);
+        if (!fs.existsSync(statusDir)) continue;
+        for (const month of fs.readdirSync(statusDir, {
+          withFileTypes: true,
+        })) {
+          if (
+            month.isDirectory() &&
+            /^\d{4}-(0[1-9]|1[0-2])$/.test(month.name)
+          ) {
+            taskLocations.push(path.join(statusDir, month.name));
+          }
+        }
+      }
+      if (
+        !taskLocations.some((directory) =>
+          fs.existsSync(path.join(directory, taskDirName)),
+        )
+      ) {
         fs.mkdirSync(taskDir, { recursive: true });
 
         // Get current developer for assignee.
