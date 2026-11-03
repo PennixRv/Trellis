@@ -81,6 +81,7 @@ export const initDeveloperScript = readTemplate("scripts/init_developer.py");
 export const taskScript = readTemplate("scripts/task.py");
 export const getContextScript = readTemplate("scripts/get_context.py");
 export const addSessionScript = readTemplate("scripts/add_session.py");
+export const linearSyncScript = readTemplate("scripts/hooks/linear_sync.py");
 
 // Configuration files
 export const workflowMdTemplate = readTemplate("workflow.md");
@@ -140,6 +141,7 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("task.py", taskScript);
   scripts.set("get_context.py", getContextScript);
   scripts.set("add_session.py", addSessionScript);
+  scripts.set("hooks/linear_sync.py", linearSyncScript);
 
   return scripts;
 }

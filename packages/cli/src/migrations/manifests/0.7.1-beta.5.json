@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.5",
+  "description": "Refresh the bundled Linear lifecycle hook during project updates",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "The Linear lifecycle hook is now registered in the shared Python script update list, so pristine projects receive the current complete action instead of retaining the old archive action. Locally customized hooks remain protected by normal conflict handling. Includes all beta.4 fixes; existing task records are unchanged.",
+  "migrations": [],
+  "notes": "Run trellis update to refresh the hook. Linear synchronization remains opt-in through project configuration. No task migration is performed."
+}

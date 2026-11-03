@@ -691,6 +691,26 @@ describe("update() integration", () => {
     );
   });
 
+  it.each([false, true])(
+    "refreshes the Linear hook while protecting local edits (customized=%s)",
+    async (customized) => {
+      await setupProject();
+      const hook = `${PATHS.SCRIPTS}/hooks/linear_sync.py`;
+      const current = readProjectFile(hook);
+      const legacy = current.replaceAll("complete", "archive");
+      const edited = `${legacy}\n# Local customization\n`;
+      stageVersionedUpgradeProject({
+        fromVersion: "0.7.1-beta.3",
+        pristineTemplates: { [hook]: legacy },
+        userModifiedTemplates: customized ? { [hook]: edited } : undefined,
+      });
+
+      await update({ skipAll: true });
+
+      expect(readProjectFile(hook)).toBe(customized ? edited : current);
+    },
+  );
+
   it("#4c preserves user-modified untracked AGENTS.md managed block", async () => {
     await setupProject();
 
