@@ -180,3 +180,10 @@
 - 两仓更新后的保护基线逐字节一致：根仓 3560、本仓 1488 份 task/spec/workspace/handoff 文件没有新增、删除或变化；后续只追加本轮明确的交付记录。根侧来源归属仍 consumed／generation 12，来源摘要 `65036215a7e59dad83eab100a0303b331226c0abe58c16d9ca2236ed4915d23e` 保持，未改写旧交接包或执行 pending action。本 owner task 继续原实施阶段。
 - 更新快照全部通过 native verify，先预览后按用户全清授权执行 prune --all --include-legacy --yes。本仓删除 3 份、1104 文件、7,581,373 字节，根仓 3 份、327 文件、2,983,566 字节；无 protected／failed 对象，两仓回读 []，其他四处既有现场也为 []。字节为文件大小合计。
 - 本轮发布、安装和两仓现场对齐已完成；父任务的最终 gitlink 与组合结果由根侧追加。验证边界：未运行全部 22 个宿主或 Mintlify 页面渲染；未核验的 managed batch host adapter 仍拒绝派发，非 Linux 孤儿清理仍保留供人工恢复。图索引落后及既有 Python warnings 不作已消除声明。
+
+## 2026-11-04：第二轮阶段准入与并发复审
+
+- 从 beta.12 `f0fb9ea7` 继续，源码仍在既有 `v0.7.1`。按 v2 阶段回流、阻塞处置、委派准入及已决交接合同修复：已接受的待授权合同允许显式退回本阶段或更早阶段；实施 start-ready 要求阶段 active；委派启动核验父任务 ownership，并拒绝终态子任务。未引入子任务独立五阶段准入或 teammate 技术只读限制。
+- beta4 与旧 fork 共同继承的锁缺陷也已修复：未知或空 PID 保留，只有 ESRCH 允许回收；CLI 与 Core 均用独占 recovery 文件串行回收并重查 holder，保护中断恢复现场。新增测试在原实现上复现返修拒绝、暂停／终态／交接中成功派发及未知锁误回收；竞争与恢复围栏均有专项回归。
+- 阶段集成现为 41 项，两层锁各 11 项；Core 全量 422 项通过／1 项条件跳过，CLI 2234 项通过／2 项条件跳过。ESLint、TypeScript、构建通过，Python 静态检查 0 errors／72 项既有 warnings；双语新发布说明、665 文件文档 lint、共享导航及 beta.13 清单连续性通过。
+- 原生 updater 已同步两仓候选脚本及阶段 Skills，明确保留专用配置；GitNexus detect-changes 为 21 文件、9 符号、4 流程，medium；预先 impact 中 CLI 锁为 HIGH。索引落后 28 个提交，以当前调用方及全量回归补核。正式 beta.13 发布、真实安装、两仓版本核验与最后备份清理待回执，不预先视为交付。

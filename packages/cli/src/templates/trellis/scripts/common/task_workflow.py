@@ -133,6 +133,10 @@ def implementation_start_ready(data: dict, task_dir: Path) -> bool:
     phase_ids = state.get("phase_ids")
     if not isinstance(phase_ids, list) or PHASE_IDS[3] not in phase_ids:
         return False
+    phases = state.get("phases")
+    implementation = phases.get(PHASE_IDS[3]) if isinstance(phases, dict) else None
+    if not isinstance(implementation, dict) or implementation.get("status") != "active":
+        return False
     if state.get("task_kind") not in {"implementation", "combined"}:
         return False
     authorization = state.get("implementation_authorization")
@@ -460,11 +464,12 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         current, record = PHASE_IDS[4], state["phases"][PHASE_IDS[4]]
     else:
         current, record = _phase(state)
+    accepted_design_return = action == "return" and current == PHASE_IDS[2] and record.get("status") == "accepted"
     returning_to_requirements = action == "return" and args.target_phase == PHASE_IDS[0]
     rerouting_to_requirements = action == "route" and args.target_phase == PHASE_IDS[0]
     if current != PHASE_IDS[0] and not returning_to_requirements and not rerouting_to_requirements:
         _require_current_requirements_confirmation(task_dir, state)
-    if action not in {"show", "resume", "route", "authorize", "admission"} and record.get("status") != "active" and not reviewed_delivery:
+    if action not in {"show", "resume", "route", "authorize", "admission"} and record.get("status") != "active" and not reviewed_delivery and not accepted_design_return:
         raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "only the active phase can be changed")
 
     if action == "artifact":
@@ -565,7 +570,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         target = _required_text(args.target_phase, "--target-phase")
         if target not in state["phase_ids"] or (
             state["phase_ids"].index(target) >= state["phase_ids"].index(current)
-            and not (reviewed_delivery and target == current)
+            and not ((reviewed_delivery or accepted_design_return) and target == current)
         ):
             raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "return target must be an earlier phase in the current route")
         reason = _required_text(args.reason, "--reason")
@@ -760,6 +765,11 @@ def cmd_delegate_start(args: argparse.Namespace) -> int:
             child_data, child_meta = _load(child_dir)
             if child_data.get("parent") != parent_dir.name or child_dir.name not in parent_data.get("children", []):
                 raise TaskWorkflowError("TASK_DELEGATE_PARENT_LINK_INVALID", "parent and child task links do not match")
+            from .task_continuity import assert_task_mutation_allowed
+
+            assert_task_mutation_allowed(repo_root, parent_dir, parent_data)
+            if child_data.get("status") not in {"planning", "in_progress"}:
+                raise TaskWorkflowError("TASK_DELEGATE_CHILD_TERMINAL", "only a planning or in-progress child task can be delegated")
             if parent_data.get("status") != "in_progress" or not implementation_start_ready(parent_data, parent_dir):
                 raise TaskWorkflowError("TASK_DELEGATE_IMPLEMENTATION_NOT_AUTHORIZED", "parent task is not at an authorized Task Implementation and Test Verification Phase entry")
 

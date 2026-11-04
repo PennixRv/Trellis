@@ -67,6 +67,13 @@ Every event has `seq`, `ts`, `kind`, and `by`; optional shared fields include `i
 
 Append and sequence allocation are serialized by the session lock. The `.seq` sidecar is reconciled with the JSONL tail before the next append. A final record without a newline is a torn append and is truncated to the last complete record; complete but unparsable lines remain as evidence of mid-file damage. If a nonempty log has no recoverable sequence, append fails instead of guessing and risking duplicate sequence numbers. Idempotency checks, event validation, and projections belong to Core APIs.
 
+CLI and Core advisory locks preserve empty or malformed holder files and any
+liveness result other than a verified `ESRCH`. An empty file may be a live
+holder's create-before-write window. Stale recovery serializes through an
+exclusive `<lock>.recovery` file and rechecks the holder under that guard, so
+concurrent reapers cannot delete a replacement lock. An interrupted recovery
+guard remains for explicit inspection; callers time out without stealing it.
+
 `thread` events describe forum thread actions (`opened`, `comment`, `status`, `labels`, `assignees`, `summary`, `processed`, `rename`). `context` events add or delete typed file/raw entries at session or thread scope. `teamwork` events currently carry session-title changes. `coordination` events record batch, assignment, attempt, teammate, lease, command, claim, and receipt facts; the Core reducer validates state transitions and builds the current projection from the event log.
 
 ## Teammate process lifecycle

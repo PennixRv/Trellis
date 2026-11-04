@@ -83,14 +83,35 @@ export async function withLock<T>(
 }
 
 async function checkAndStealStale(lockFile: string): Promise<boolean> {
+  const recoveryFile = `${lockFile}.recovery`;
+  let recoveryFd: number;
+  try {
+    recoveryFd = fs.openSync(recoveryFile, "wx");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw error;
+  }
+  // Serialize stale recovery so a second reaper cannot unlink a new holder.
+  try {
+    return stealVerifiedDeadLock(lockFile);
+  } finally {
+    fs.closeSync(recoveryFd);
+    fs.unlinkSync(recoveryFile);
+  }
+}
+
+function stealVerifiedDeadLock(lockFile: string): boolean {
   let holderPid = 0;
   try {
-    holderPid = Number(fs.readFileSync(lockFile, "utf-8").trim());
+    const content = fs.readFileSync(lockFile, "utf-8").trim();
+    // An empty file may belong to a live holder between creation and PID write.
+    if (!/^[1-9][0-9]*$/.test(content)) return false;
+    holderPid = Number(content);
   } catch {
     // Lock vanished while we checked — let outer loop retry openSync.
     return false;
   }
-  if (!holderPid || !pidAlive(holderPid)) {
+  if (Number.isSafeInteger(holderPid) && !pidAlive(holderPid)) {
     try {
       fs.unlinkSync(lockFile);
       process.stderr.write(
@@ -108,8 +129,8 @@ function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
   }
 }
 

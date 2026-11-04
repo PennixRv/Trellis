@@ -492,6 +492,170 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     );
   });
 
+  it.each([GOAL_EXPLORATION_AND_REQUIREMENTS, SOLUTION_DESIGN_AND_CONVERGENCE])(
+    "returns an accepted implementation contract to %s before authorization",
+    (target) => {
+      const designPath = prepareImplementationContract(root);
+      fs.writeFileSync(designPath, "# Revised implementation contract\n");
+      runOk(
+        root,
+        "phase",
+        "return",
+        TASK,
+        "--expected-route-revision",
+        "1",
+        "--target-phase",
+        target,
+        "--reason",
+        "Contract needs revision",
+        "--evidence-ref",
+        "user-message:revision",
+      );
+      const state = readState(root);
+      expect(state.current_phase_id).toBe(target);
+      expect(state.phases[target].status).toBe("active");
+      expect(
+        state.phases[SOLUTION_DESIGN_AND_CONVERGENCE].acceptance,
+      ).toBeNull();
+      expect(state.implementation_authorization).toBeNull();
+      expect(parseTaskWorkflowState(state)).toEqual(state);
+      if (target === SOLUTION_DESIGN_AND_CONVERGENCE) {
+        accept(root, target, "implementation_contract", [], "design.md");
+        authorizeImplementation(root, "design.md");
+        expect(readState(root).current_phase_id).toBe(TASK_IMPLEMENTATION);
+      }
+    },
+  );
+
+  it.each(["block", "wait", "completed", "cancelled", "transfer"])(
+    "does not dispatch a child when its parent or child is %s",
+    (condition) => {
+      prepareImplementationContract(root);
+      authorizeImplementation(root, "design.md");
+      const childId = linkChildTask(root);
+      const childDir = taskDirectory(root, childId);
+      if (condition === "block" || condition === "wait") {
+        runOk(
+          root,
+          "phase",
+          condition,
+          TASK,
+          "--expected-route-revision",
+          "1",
+          "--reason",
+          "Implementation paused",
+          "--evidence-ref",
+          "user-message:pause",
+        );
+      } else if (condition === "completed" || condition === "cancelled") {
+        const taskPath = path.join(childDir, "task.json");
+        const child = JSON.parse(fs.readFileSync(taskPath, "utf-8"));
+        child.status = condition;
+        fs.writeFileSync(taskPath, JSON.stringify(child));
+        const destination = path.join(
+          root,
+          ".trellis",
+          "tasks",
+          condition,
+          ...(condition === "completed" ? ["2026-11"] : []),
+          childId,
+        );
+        fs.mkdirSync(path.dirname(destination), { recursive: true });
+        fs.renameSync(childDir, destination);
+      }
+      const roleDir = path.join(root, ".trellis", "agents");
+      fs.mkdirSync(roleDir, { recursive: true });
+      fs.copyFileSync(
+        path.resolve(
+          __dirname,
+          "../../src/templates/trellis/agents/delegated-worktree-primary-agent.md",
+        ),
+        path.join(roleDir, "delegated-worktree-primary-agent.md"),
+      );
+      createGitBaseline(root);
+      if (condition === "transfer") {
+        runOkAs(root, "source", "start", TASK);
+        runOkAs(
+          root,
+          "source",
+          "transfer",
+          "quiesce",
+          "--task-id",
+          TASK,
+          "--task-path",
+          `.trellis/tasks/in_progress/${TASK}`,
+          "--package-id",
+          "package-delegate-fence",
+          "--expected-generation",
+          "0",
+          "--package-digest",
+          "a".repeat(64),
+          "--explicit-user-request",
+        );
+      }
+      const paseo = installPaseoStub(root);
+      const childPath = path.join(taskDirectory(root, childId), "task.json");
+      const before = fs.readFileSync(childPath, "utf-8");
+      const result = runTaskWithEnv(
+        root,
+        {
+          TRELLIS_CONTEXT_ID: "source",
+          PATH: `${paseo.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+          PASEO_TEST_REPO: root,
+          PASEO_TEST_CALLS: paseo.callsFile,
+        },
+        "delegate-start",
+        childId,
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        condition === "transfer"
+          ? "TASK_TRANSFER_ACTIVE"
+          : condition === "completed" || condition === "cancelled"
+            ? "TASK_DELEGATE_CHILD_TERMINAL"
+            : "TASK_DELEGATE_IMPLEMENTATION_NOT_AUTHORIZED",
+      );
+      expect(fs.existsSync(paseo.callsFile)).toBe(false);
+      expect(fs.readFileSync(childPath, "utf-8")).toBe(before);
+      expect(fs.existsSync(path.join(root, ".paseo-worktrees", childId))).toBe(
+        false,
+      );
+    },
+  );
+
+  it.each(["block", "wait"])(
+    "withholds implementation start during %s",
+    (action) => {
+      const taskPath = planFixture(root);
+      const task = JSON.parse(fs.readFileSync(taskPath, "utf-8"));
+      task.status = "planning";
+      fs.writeFileSync(taskPath, JSON.stringify(task));
+      prepareImplementationContract(root);
+      authorizeImplementation(root, "design.md");
+      runOk(
+        root,
+        "phase",
+        action,
+        TASK,
+        "--expected-route-revision",
+        "1",
+        "--reason",
+        "Implementation paused",
+        "--evidence-ref",
+        "user-message:pause",
+      );
+      const before = fs.readFileSync(taskPath, "utf-8");
+      runOk(root, "start", TASK);
+      expect(fs.readFileSync(taskPath, "utf-8")).toBe(before);
+      expect(taskDirectory(root)).toContain(`${path.sep}planning${path.sep}`);
+      runOk(root, "phase", "resume", TASK, "--expected-route-revision", "1");
+      runOk(root, "start", TASK);
+      expect(taskDirectory(root)).toContain(
+        `${path.sep}in_progress${path.sep}`,
+      );
+    },
+  );
+
   it("starts an authorized child through Paseo and records its worktree and agent mapping", () => {
     const designPath = prepareImplementationContract(root);
     authorizeImplementation(

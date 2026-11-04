@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.13",
+  "description": "补齐阶段返修、委派准入与 Teamwork 锁竞争保护",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "允许待授权的已接受实施合同显式返修；阻止暂停实施、终态子任务及交接围栏内的委派启动；Teamwork CLI/Core 保留未知锁和权限失败，串行核验与回收死锁。",
+  "migrations": [],
+  "notes": "Run the native update to refresh managed scripts and phase Skills. Task and handoff history are unchanged. Interrupted lock recovery guards are preserved for explicit inspection."
+}

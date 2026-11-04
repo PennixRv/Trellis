@@ -79,6 +79,15 @@ selection behavior but warns and withholds implementation state changes when
 the contract is stale. Delivery acceptance does not terminate a task: return or
 route can invalidate the affected results before explicit completion.
 
+An accepted design awaiting implementation authorization can explicitly return
+to that design phase or an earlier affected phase. Return invalidates affected
+acceptance and authorization; it does not silently re-accept an edited contract.
+Implementation start readiness requires the implementation phase to be active,
+so `blocked` and `waiting_user` retain the task pointer without starting work.
+`delegate-start` checks that readiness and the parent's ownership fence before
+external dispatch, and accepts only planning or in-progress children. Pending
+parent transfer and terminal children cannot launch or reuse delegated work.
+
 `pennix-session-handoff` may call these commands as an optional adapter. Its package readiness, source lifecycle receipt, target admission, and retention archive remain separate from Trellis phase and task status. The adapter must not write task pointers or Trellis runtime records itself.
 
 ## 恢复路径的校验与验收
