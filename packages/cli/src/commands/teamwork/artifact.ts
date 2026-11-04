@@ -790,11 +790,8 @@ export function validateTeammateReport(
       summary: boundedText(item.summary, `report.evidence[${index}].summary`),
     };
   });
-  if (status !== "complete" || evidence.length === 0) {
-    throw new Error(
-      `report status '${status}' cannot be accepted as completed work`,
-    );
-  }
+  if (evidence.length === 0)
+    throw new Error("report.evidence must include at least one item");
   const report: TeammateReport = {
     schemaVersion: 1,
     taskId: identity.taskId,
@@ -1380,6 +1377,25 @@ export function writeTeammateDisposition(input: {
   );
 }
 
+export class TeammateReportReadError extends Error {
+  constructor(
+    readonly kind: "missing" | "storage" | "incomplete",
+    message: string,
+  ) {
+    super(message);
+    this.name = "TeammateReportReadError";
+  }
+}
+
+function isMissingFile(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
 export function readTeammateReport(input: {
   taskRoot: string;
   briefPath: string;
@@ -1398,22 +1414,65 @@ export function readTeammateReport(input: {
   sourceDigest: string;
 }): TeammateReport {
   if (!ID.test(input.attemptId)) throw new Error("attempt id must be safe");
-  const reportPath = safePath(
-    input.taskRoot,
-    path.join(
-      path.dirname(input.briefPath),
-      "attempts",
-      input.attemptId,
-      "report.json",
-    ),
-  );
-  const stat = fs.lstatSync(reportPath);
+  let reportPath: string;
+  try {
+    reportPath = safePath(
+      input.taskRoot,
+      path.join(
+        path.dirname(input.briefPath),
+        "attempts",
+        input.attemptId,
+        "report.json",
+      ),
+    );
+  } catch {
+    throw new TeammateReportReadError(
+      "storage",
+      "teammate report path is unsafe",
+    );
+  }
+  let stat: fs.Stats;
+  try {
+    stat = fs.lstatSync(reportPath);
+  } catch (error) {
+    if (isMissingFile(error))
+      throw new TeammateReportReadError(
+        "missing",
+        "teammate report is missing",
+      );
+    throw new TeammateReportReadError(
+      "storage",
+      "could not inspect teammate report",
+    );
+  }
   if (!stat.isFile() || stat.size > 128 * 1024)
-    throw new Error(
+    throw new TeammateReportReadError(
+      "storage",
       "teammate report must be a regular file under 131072 bytes",
     );
-  const raw = fs.readFileSync(reportPath, "utf8");
-  const report = JSON.parse(raw) as unknown;
+  let raw: string;
+  try {
+    raw = fs.readFileSync(reportPath, "utf8");
+  } catch (error) {
+    if (isMissingFile(error))
+      throw new TeammateReportReadError(
+        "missing",
+        "teammate report is missing",
+      );
+    throw new TeammateReportReadError(
+      "storage",
+      "could not read teammate report",
+    );
+  }
+  let report: unknown;
+  try {
+    report = JSON.parse(raw) as unknown;
+  } catch {
+    throw new TeammateReportReadError(
+      "incomplete",
+      "teammate report is not complete JSON",
+    );
+  }
   rejectSecrets(report, "teammate report");
   return validateTeammateReport(
     report,
@@ -1425,7 +1484,7 @@ export function readTeammateReport(input: {
 export function cleanupSettledTeamworkArtifacts(input: {
   taskRoot: string;
   assignments: TeamworkPlan["assignments"];
-  acceptedAttempts: ReadonlyMap<string, string>;
+  retainedReports: ReadonlyMap<string, string>;
 }): string[] {
   const failures: string[] = [];
   for (const assignment of input.assignments) {
@@ -1451,7 +1510,7 @@ export function cleanupSettledTeamworkArtifacts(input: {
           path.join(attemptsDir, attemptId),
         );
         const keepReport =
-          input.acceptedAttempts.get(assignment.assignmentId) === attemptId;
+          input.retainedReports.get(assignment.assignmentId) === attemptId;
         const transientFiles = [
           "claim.json",
           "disposition.json",

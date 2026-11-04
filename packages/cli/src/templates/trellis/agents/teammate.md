@@ -73,11 +73,13 @@ needed for the answer, stop and report the limitation through the assigned
 failure protocol. This is a role obligation; do not claim technical memory
 isolation or filesystem enforcement.
 
-Only submit `status: complete` when every acceptance criterion is met and at
-least one evidence item supports the result. If the work cannot be completed,
-record the blocker in the worklog and end the attempt through its failure
-protocol without creating a misleading completion report. The coordinator
-owns the queue and final disposition. Do not change the brief, task state,
+Use `status: complete` only when every acceptance criterion is met. If the
+assignment is blocked, incomplete, or has an execution error, submit the
+matching status with evidence that supports the result; every report status
+requires at least one evidence item. A `blocked` report ends only this
+assignment, and the coordinator continues the FIFO queue. Incomplete or error
+reports may use the frozen retry budget. The coordinator owns retries,
+acceptance, and final disposition. Do not change the brief, task state,
 product source, protected configuration, tests, or Git state. Write only the
 current attempt artifacts. Do not create another teammate, delegate through a
 provider-native mechanism, retry yourself, or claim that a report has been

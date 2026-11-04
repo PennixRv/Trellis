@@ -7,10 +7,7 @@ import {
   type TeamworkEvent,
 } from "../../src/teamwork/index.js";
 
-function event(
-  seq: number,
-  extra: Record<string, unknown>,
-): TeamworkEvent {
+function event(seq: number, extra: Record<string, unknown>): TeamworkEvent {
   return {
     seq,
     ts: `2026-10-24T00:00:${String(seq).padStart(2, "0")}.000Z`,
@@ -94,7 +91,37 @@ describe("coordination projection", () => {
     });
     expect(state.attempts[0].state).toBe("ASSIGNED");
     expect(state.teammates[0].state).toBe("ASSIGNED");
-    expect(state.leases[0]).toMatchObject({ leaseId: "lease-1", protected: true });
+    expect(state.leases[0]).toMatchObject({
+      leaseId: "lease-1",
+      protected: true,
+    });
+    expect(state.issues).toEqual([]);
+  });
+
+  it("settles queued assignments that stop before dispatch", () => {
+    const state = reduceCoordinationState([
+      event(1, {
+        action: "state_transition",
+        entity: "assignment",
+        batchId: "b1",
+        assignmentId: "w1",
+        state: "QUEUED",
+      }),
+      event(2, {
+        action: "state_transition",
+        entity: "assignment",
+        batchId: "b1",
+        assignmentId: "w1",
+        state: "FINAL_FAILED",
+        payload: { reason: "batch cancelled", dispatched: false },
+      }),
+    ]);
+
+    expect(canTransition("assignment", "QUEUED", "FINAL_FAILED")).toBe(true);
+    expect(state.assignments[0]).toMatchObject({
+      assignmentId: "w1",
+      state: "FINAL_FAILED",
+    });
     expect(state.issues).toEqual([]);
   });
 
@@ -201,22 +228,36 @@ describe("coordination projection", () => {
     expect(state.attempts).toHaveLength(2);
     expect(state.teammates).toHaveLength(2);
     expect(state.leases).toEqual([
-      expect.objectContaining({ batchId: "b2", leaseId: "lease-1", protected: true }),
+      expect.objectContaining({
+        batchId: "b2",
+        leaseId: "lease-1",
+        protected: true,
+      }),
     ]);
-    expect(state.attempts.find((attempt) => attempt.batchId === "b1")?.terminal).toBe(true);
-    expect(state.attempts.find((attempt) => attempt.batchId === "b2")?.terminal).toBeUndefined();
-    expect(state.teammates.find((teammate) => teammate.batchId === "b1")?.terminal).toBe(true);
-    expect(state.teammates.find((teammate) => teammate.batchId === "b2")?.terminal).toBeUndefined();
+    expect(
+      state.attempts.find((attempt) => attempt.batchId === "b1")?.terminal,
+    ).toBe(true);
+    expect(
+      state.attempts.find((attempt) => attempt.batchId === "b2")?.terminal,
+    ).toBeUndefined();
+    expect(
+      state.teammates.find((teammate) => teammate.batchId === "b1")?.terminal,
+    ).toBe(true);
+    expect(
+      state.teammates.find((teammate) => teammate.batchId === "b2")?.terminal,
+    ).toBeUndefined();
     expect(state.issues).toEqual([]);
   });
 
   it("requires explicit retry and timeout paths", () => {
-    expect(canTransition("attempt", "TIMEOUT_YIELDED", "WAITING_FOR_MAIN_COMMAND")).toBe(true);
+    expect(
+      canTransition("attempt", "TIMEOUT_YIELDED", "WAITING_FOR_MAIN_COMMAND"),
+    ).toBe(true);
     expect(canTransition("attempt", "TIMEOUT_YIELDED", "ASSIGNED")).toBe(false);
     expect(canTransition("assignment", "VALIDATING", "ASSIGNED")).toBe(true);
-    expect(() => assertCoordinationTransition("teammate", "FAILED", "RUNNING")).toThrow(
-      "invalid teammate transition",
-    );
+    expect(() =>
+      assertCoordinationTransition("teammate", "FAILED", "RUNNING"),
+    ).toThrow("invalid teammate transition");
   });
 
   it("deduplicates durable facts, preserves terminal separation, and carries host facts", () => {
@@ -317,7 +358,9 @@ describe("coordination projection", () => {
       providerSessionId: "session-1",
       terminal: true,
     });
-    expect(state.issues).toContain("4: invalid attempt transition REPORT_SUBMITTED -> RUNNING");
+    expect(state.issues).toContain(
+      "4: invalid attempt transition REPORT_SUBMITTED -> RUNNING",
+    );
     expect(state.claims).toEqual(["claim-1"]);
     expect(state.commands).toEqual(["command-1"]);
     expect(state.receipts).toEqual(["receipt-1"]);

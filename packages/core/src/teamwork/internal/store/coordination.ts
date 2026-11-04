@@ -76,21 +76,41 @@ export interface CoordinationProjection {
 }
 
 const BATCH_TRANSITIONS: Record<string, readonly string[]> = {
-  PREPARED: ["VALIDATING_PLAN", "SUSPENDED", "CANCEL_PENDING", "RECONCILIATION_REQUIRED"],
+  PREPARED: [
+    "VALIDATING_PLAN",
+    "SUSPENDED",
+    "CANCEL_PENDING",
+    "RECONCILIATION_REQUIRED",
+  ],
   VALIDATING_PLAN: ["RUNNING", "SUSPENDED", "RECONCILIATION_REQUIRED"],
-  RUNNING: ["SETTLING", "SUSPENDED", "CANCEL_PENDING", "RECONCILIATION_REQUIRED"],
+  RUNNING: [
+    "SETTLING",
+    "SUSPENDED",
+    "CANCEL_PENDING",
+    "RECONCILIATION_REQUIRED",
+  ],
   SETTLING: ["ALL_ACCEPTED", "SETTLED_WITH_FAILURE", "RECONCILIATION_REQUIRED"],
   SUSPENDED: ["RUNNING", "CANCEL_PENDING", "RECONCILIATION_REQUIRED"],
   CANCEL_PENDING: ["SETTLING", "RECONCILIATION_REQUIRED"],
-  RECONCILIATION_REQUIRED: ["VALIDATING_PLAN", "RUNNING", "SETTLING", "SETTLED_WITH_FAILURE"],
+  RECONCILIATION_REQUIRED: [
+    "VALIDATING_PLAN",
+    "RUNNING",
+    "SETTLING",
+    "SETTLED_WITH_FAILURE",
+  ],
   ALL_ACCEPTED: [],
   SETTLED_WITH_FAILURE: [],
 };
 
 const WORK_TRANSITIONS: Record<string, readonly string[]> = {
-  QUEUED: ["ASSIGNED"],
+  QUEUED: ["ASSIGNED", "FINAL_FAILED"],
   ASSIGNED: ["EXECUTING", "FINAL_FAILED", "WAITING_FOR_MAIN_COMMAND"],
-  EXECUTING: ["REPORT_PENDING", "ASSIGNED", "FINAL_FAILED", "WAITING_FOR_MAIN_COMMAND"],
+  EXECUTING: [
+    "REPORT_PENDING",
+    "ASSIGNED",
+    "FINAL_FAILED",
+    "WAITING_FOR_MAIN_COMMAND",
+  ],
   REPORT_PENDING: ["VALIDATING", "ASSIGNED", "FINAL_FAILED"],
   VALIDATING: ["ACCEPTED", "ASSIGNED", "FINAL_FAILED"],
   WAITING_FOR_MAIN_COMMAND: ["EXECUTING", "ASSIGNED", "FINAL_FAILED"],
@@ -117,7 +137,9 @@ const TEAMMATE_TRANSITIONS: Record<string, readonly string[]> = {
   WAITING_FOR_MAIN_COMMAND: ["RUNNING"],
 };
 
-function transitionTable(entity: CoordinationEntity): Record<string, readonly string[]> {
+function transitionTable(
+  entity: CoordinationEntity,
+): Record<string, readonly string[]> {
   switch (entity) {
     case "batch":
       return BATCH_TRANSITIONS;
@@ -130,7 +152,9 @@ function transitionTable(entity: CoordinationEntity): Record<string, readonly st
   }
 }
 
-export function isCoordinationAction(value: unknown): value is CoordinationAction {
+export function isCoordinationAction(
+  value: unknown,
+): value is CoordinationAction {
   return (
     value === "state_transition" ||
     value === "terminal_observed" ||
@@ -188,7 +212,10 @@ function scopedId(batchId: string, id: string): string {
   return JSON.stringify([batchId, id]);
 }
 
-function transitionIssue(ev: CoordinationTeamworkEvent, current?: CoordinationState): string {
+function transitionIssue(
+  ev: CoordinationTeamworkEvent,
+  current?: CoordinationState,
+): string {
   return `${ev.seq}: invalid ${ev.entity} transition ${current ?? "<none>"} -> ${ev.state ?? "<missing>"}`;
 }
 
@@ -215,18 +242,24 @@ export function reduceCoordinationState(
       // Sequence is projected at the end as a monotonic high-water mark.
     }
     if (event.action === "claim_created") {
-      if (event.claimId && !claims.includes(event.claimId)) claims.push(event.claimId);
+      if (event.claimId && !claims.includes(event.claimId))
+        claims.push(event.claimId);
       continue;
     }
     if (event.action === "command_issued") {
-      if (event.commandId && !commands.includes(event.commandId)) commands.push(event.commandId);
+      if (event.commandId && !commands.includes(event.commandId))
+        commands.push(event.commandId);
       continue;
     }
     if (event.action === "receipt_recorded") {
-      if (event.receiptId && !receipts.includes(event.receiptId)) receipts.push(event.receiptId);
+      if (event.receiptId && !receipts.includes(event.receiptId))
+        receipts.push(event.receiptId);
       continue;
     }
-    if (event.action === "lease_acquired" || event.action === "lease_released") {
+    if (
+      event.action === "lease_acquired" ||
+      event.action === "lease_released"
+    ) {
       if (!event.leaseId) {
         issues.push(`${event.seq}: lease event has no leaseId`);
         continue;
@@ -256,14 +289,20 @@ export function reduceCoordinationState(
       continue;
     }
     if (event.action === "terminal_observed") {
-      if (event.entity !== "attempt" || !event.attemptId || event.terminal !== true) {
+      if (
+        event.entity !== "attempt" ||
+        !event.attemptId ||
+        event.terminal !== true
+      ) {
         issues.push(`${event.seq}: terminal fact is missing attempt identity`);
         continue;
       }
       const attemptKey = scopedId(event.batchId, event.attemptId);
       const attempt = attempts.get(attemptKey);
       if (attempt?.batchId !== event.batchId) {
-        issues.push(`${event.seq}: terminal fact references an unknown attempt`);
+        issues.push(
+          `${event.seq}: terminal fact references an unknown attempt`,
+        );
         continue;
       }
       attempts.set(attemptKey, {
@@ -278,7 +317,9 @@ export function reduceCoordinationState(
         const teammateKey = scopedId(event.batchId, event.teammateId);
         const teammate = teammates.get(teammateKey);
         if (teammate?.batchId !== event.batchId) {
-          issues.push(`${event.seq}: terminal fact references an unknown teammate`);
+          issues.push(
+            `${event.seq}: terminal fact references an unknown teammate`,
+          );
         } else {
           teammates.set(teammateKey, {
             ...teammate,
@@ -293,12 +334,16 @@ export function reduceCoordinationState(
       continue;
     }
     if (event.action === "reconciliation_required") {
-      issues.push(`${event.seq}: reconciliation required${event.reason ? `: ${event.reason}` : ""}`);
+      issues.push(
+        `${event.seq}: reconciliation required${event.reason ? `: ${event.reason}` : ""}`,
+      );
     }
     if (event.action !== "state_transition") continue;
     const id = idFor(event);
     if (!id || !event.state) {
-      issues.push(`${event.seq}: state transition is missing identity or state`);
+      issues.push(
+        `${event.seq}: state transition is missing identity or state`,
+      );
       continue;
     }
 

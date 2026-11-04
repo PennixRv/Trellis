@@ -386,14 +386,29 @@ describe("getAllAgents", () => {
       ),
       "utf8",
     );
+    const processes = fs.readFileSync(
+      path.join(
+        process.cwd(),
+        "src/templates/common/bundled-skills/trellis-teamwork/references/teammate-processes.md",
+      ),
+      "utf8",
+    );
     const teammate = getAllAgents().get("teammate.md") ?? "";
     expect(skill).toContain("independent from the Trellis task lifecycle");
     expect(skill).toContain("Teamwork validates and executes a frozen plan");
     expect(skill).toContain("references/teamwork-plan-construction.md");
     expect(skill).toContain("does not select the task phase");
+    expect(skill).toContain("one foreground `teamwork batch` command");
+    expect(skill).toContain(
+      "must not schedule per-assignment waits or retries",
+    );
+    expect(processes).toContain("same provider process and attempt identity");
+    expect(processes).toContain("does not send another provider prompt");
+    expect(processes).toContain("does not control a managed `teamwork batch`");
     expect(teammate).toContain('"status": "complete"');
     expect(teammate).toContain('"source_digest"');
     expect(teammate).toContain('"evidence"');
+    expect(teammate).toMatch(/A `blocked` report ends only this\s+assignment/);
     expect(teammate).toContain("attempts/<attempt-id>/report.json");
     expect(teammate).toContain("Do not read or use");
     expect(teammate).toContain("do not claim technical memory");

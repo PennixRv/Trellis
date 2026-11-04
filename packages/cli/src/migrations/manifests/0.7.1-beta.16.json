@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.16",
+  "description": "收敛 Teamwork FIFO 状态机与失败恢复",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Teamwork CLI coordinator keeps FIFO dispatch, deadline closure, and cancellation settlement under Trellis control. Same-process waits do not consume provider retry budget. Terminal receipts require validated assignment, attempt, teammate, and capacity facts.",
+  "migrations": [],
+  "notes": "No task or Teamwork history migration is required. Run trellis update to refresh the bundled Teamwork Skill and teammate role card; install the matching CLI/Core beta.16 pair."
+}

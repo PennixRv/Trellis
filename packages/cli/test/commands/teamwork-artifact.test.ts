@@ -375,7 +375,7 @@ describe("TeamworkSession teammate artifacts", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("accepts only a complete report with matching identity and evidence", () => {
+  it("accepts evidence-backed statuses with matching identity", () => {
     const report = {
       schema_version: 1,
       task_id: "task-1",
@@ -393,40 +393,34 @@ describe("TeamworkSession teammate artifacts", () => {
         { id: "e1", locator: "src/example.ts:1", summary: "Observed." },
       ],
     };
+    const identity = {
+      taskId: "task-1",
+      batchId: "batch-1",
+      assignmentId: "work-1",
+      attemptId: "work-1.attempt.0",
+      teammateId: "work-1.teammate.0",
+      planHash: "b".repeat(64),
+      phaseId: "decision_space_construction_and_merging",
+      taskRouteRevision: "1",
+      inputRevision: "1",
+    };
+    expect(validateTeammateReport(report, identity, sourceDigest).status).toBe(
+      "complete",
+    );
     expect(
       validateTeammateReport(
-        report,
-        {
-          taskId: "task-1",
-          batchId: "batch-1",
-          assignmentId: "work-1",
-          attemptId: "work-1.attempt.0",
-          teammateId: "work-1.teammate.0",
-          planHash: "b".repeat(64),
-          phaseId: "decision_space_construction_and_merging",
-          taskRouteRevision: "1",
-          inputRevision: "1",
-        },
+        { ...report, status: "blocked" },
+        identity,
         sourceDigest,
       ).status,
-    ).toBe("complete");
+    ).toBe("blocked");
     expect(() =>
       validateTeammateReport(
-        { ...report, status: "blocked" },
-        {
-          taskId: "task-1",
-          batchId: "batch-1",
-          assignmentId: "work-1",
-          attemptId: "work-1.attempt.0",
-          teammateId: "work-1.teammate.0",
-          planHash: "b".repeat(64),
-          phaseId: "decision_space_construction_and_merging",
-          taskRouteRevision: "1",
-          inputRevision: "1",
-        },
+        { ...report, status: "blocked", evidence: [] },
+        identity,
         sourceDigest,
       ),
-    ).toThrow(/cannot be accepted/);
+    ).toThrow(/at least one item/);
   });
 
   it("binds claim and disposition records to the attempt identity", () => {

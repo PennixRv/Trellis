@@ -1,5 +1,7 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 import {
   isTaskPhaseId,
@@ -15,6 +17,7 @@ import {
 
 import {
   type TeamworkPlan,
+  TeammateReportReadError,
   cleanupSettledTeamworkArtifacts,
   readTeammateReport,
   writeTeammateQueueFact,
@@ -159,6 +162,232 @@ export function assertTeamworkPlanCurrent(
   }
 }
 
+function terminalReceiptFromProjection(
+  plan: TeamworkPlan,
+  projection: Awaited<ReturnType<typeof readCoordinationState>>,
+): TeamworkReceipt {
+  const mismatch = (reason: string): never => {
+    throw new Error(`batch '${plan.batchId}' ${reason}`);
+  };
+  if (projection.issues.length > 0)
+    mismatch("has coordination projection issues");
+  const batch = projection.batches.find(
+    (entry) => entry.batchId === plan.batchId,
+  );
+  if (!batch) return mismatch("does not match the frozen plan");
+  if (batch.planHash !== plan.planHash)
+    return mismatch("does not match the frozen plan");
+  if (batch.state !== "ALL_ACCEPTED" && batch.state !== "SETTLED_WITH_FAILURE")
+    mismatch("is not terminal");
+  const effectiveCapacity = batch.effectiveCapacity;
+  if (
+    typeof effectiveCapacity !== "number" ||
+    !Number.isSafeInteger(effectiveCapacity) ||
+    effectiveCapacity < 1
+  )
+    return mismatch("has no valid effective capacity");
+  if (projection.leases.some((lease) => lease.batchId === plan.batchId))
+    mismatch("still owns capacity leases");
+
+  const projectedAssignments = projection.assignments.filter(
+    (assignment) => assignment.batchId === plan.batchId,
+  );
+  if (
+    projectedAssignments.length !== plan.assignments.length ||
+    new Set(projectedAssignments.map((assignment) => assignment.assignmentId))
+      .size !== plan.assignments.length
+  )
+    mismatch("does not contain the exact frozen assignment set");
+  const assignmentById = new Map(
+    projectedAssignments.map((assignment) => [
+      assignment.assignmentId,
+      assignment,
+    ]),
+  );
+  const planAssignmentIds = new Set(
+    plan.assignments.map((assignment) => assignment.assignmentId),
+  );
+  const attempts = projection.attempts.filter(
+    (attempt) => attempt.batchId === plan.batchId,
+  );
+  const teammates = projection.teammates.filter(
+    (teammate) => teammate.batchId === plan.batchId,
+  );
+  if (attempts.length !== teammates.length)
+    mismatch("has unmatched provider attempts and teammates");
+  for (const attempt of attempts) {
+    if (
+      !attempt.assignmentId ||
+      !planAssignmentIds.has(attempt.assignmentId) ||
+      !attempt.teammateId ||
+      attempt.terminal !== true ||
+      !["REPORT_SUBMITTED", "FAILED", "FINAL_FAILED"].includes(attempt.state)
+    )
+      mismatch("has an unresolved provider attempt");
+    const teammate = teammates.find(
+      (entry) =>
+        entry.attemptId === attempt.attemptId &&
+        entry.teammateId === attempt.teammateId,
+    );
+    if (
+      teammate?.terminal !== true ||
+      (teammate?.state !== "REPORT_SUBMITTED" && teammate?.state !== "FAILED")
+    )
+      mismatch("has an unresolved teammate terminal fact");
+  }
+
+  const assignments = plan.assignments.map((assignment) => {
+    const projected = assignmentById.get(assignment.assignmentId);
+    if (
+      !projected ||
+      (projected.state !== "ACCEPTED" && projected.state !== "FINAL_FAILED")
+    )
+      return mismatch(`assignment '${assignment.assignmentId}' is not settled`);
+    if (projected.state === "ACCEPTED") {
+      const acceptedAttempt = attempts.find(
+        (attempt) =>
+          attempt.attemptId === projected.attemptId &&
+          attempt.assignmentId === assignment.assignmentId,
+      );
+      if (acceptedAttempt?.state !== "REPORT_SUBMITTED")
+        return mismatch(
+          `assignment '${assignment.assignmentId}' has no accepted attempt`,
+        );
+    }
+    return {
+      assignmentId: assignment.assignmentId,
+      status: projected.state as "ACCEPTED" | "FINAL_FAILED",
+    };
+  });
+  const status = assignments.every((item) => item.status === "ACCEPTED")
+    ? "ALL_ACCEPTED"
+    : "SETTLED_WITH_FAILURE";
+  if (batch.state !== status)
+    mismatch("terminal state disagrees with its assignment dispositions");
+  const retryCounts = Object.fromEntries(
+    plan.assignments.flatMap((assignment) => {
+      const count = assignmentById.get(assignment.assignmentId)?.retryCount;
+      if (count === undefined)
+        return mismatch(`assignment '${assignment.assignmentId}' is missing`);
+      const started = attempts.some(
+        (attempt) => attempt.assignmentId === assignment.assignmentId,
+      );
+      return started || count > 0 ? [[assignment.assignmentId, count]] : [];
+    }),
+  );
+  const evaluationGroups = [
+    ...new Set(
+      plan.assignments
+        .map((assignment) => assignment.evaluationGroup?.id)
+        .filter((id): id is string => id !== undefined),
+    ),
+  ].map((id) => ({
+    id,
+    status: plan.assignments
+      .filter((assignment) => assignment.evaluationGroup?.id === id)
+      .every(
+        (assignment) =>
+          assignmentById.get(assignment.assignmentId)?.state === "ACCEPTED",
+      )
+      ? ("COMPLETE" as const)
+      : ("INCOMPLETE" as const),
+  }));
+  return {
+    schemaVersion: 1,
+    batchId: plan.batchId,
+    status,
+    assignments,
+    capacity: effectiveCapacity,
+    retryCounts,
+    evaluationGroups,
+  };
+}
+
+function reconciliationReceipt(
+  plan: TeamworkPlan,
+  projection: Awaited<ReturnType<typeof readCoordinationState>>,
+  capacity: number,
+): TeamworkReceipt {
+  return {
+    schemaVersion: 1,
+    batchId: plan.batchId,
+    status: "RECONCILIATION_REQUIRED",
+    assignments: plan.assignments.map((item) => {
+      const current = projection.assignments.find(
+        (entry) =>
+          entry.batchId === plan.batchId &&
+          entry.assignmentId === item.assignmentId,
+      );
+      return {
+        assignmentId: item.assignmentId,
+        status:
+          current?.state === "ACCEPTED" || current?.state === "FINAL_FAILED"
+            ? current.state
+            : "UNKNOWN",
+      };
+    }),
+    capacity:
+      projection.batches.find((entry) => entry.batchId === plan.batchId)
+        ?.effectiveCapacity ?? capacity,
+    retryCounts: Object.fromEntries(
+      projection.assignments
+        .filter((entry) => entry.batchId === plan.batchId)
+        .map((entry) => [entry.assignmentId, entry.retryCount]),
+    ),
+  };
+}
+
+async function recordRecoveryReconciliation(input: {
+  plan: TeamworkPlan;
+  cwd: string;
+  by: string;
+  existingState: CoordinationState;
+  projection: Awaited<ReturnType<typeof readCoordinationState>>;
+  capacity: number;
+  reason: string;
+}): Promise<TeamworkReceipt> {
+  const { plan, cwd, by, existingState, projection, capacity, reason } = input;
+  if (
+    existingState !== "RECONCILIATION_REQUIRED" &&
+    existingState !== "ALL_ACCEPTED" &&
+    existingState !== "SETTLED_WITH_FAILURE"
+  ) {
+    await appendTransition({
+      sessionId: plan.sessionId,
+      cwd,
+      by,
+      batchId: plan.batchId,
+      entity: "batch",
+      id: plan.batchId,
+      state: "RECONCILIATION_REQUIRED",
+      states: new Map([[plan.batchId, existingState]]),
+      planHash: plan.planHash,
+      payload: { recoveredAfterRestart: true },
+    });
+  }
+  const receipt = reconciliationReceipt(plan, projection, capacity);
+  await appendAction({
+    sessionId: plan.sessionId,
+    cwd,
+    by,
+    batchId: plan.batchId,
+    entity: "batch",
+    action: "reconciliation_required",
+    reason,
+  });
+  await appendAction({
+    sessionId: plan.sessionId,
+    cwd,
+    by,
+    batchId: plan.batchId,
+    entity: "batch",
+    action: "receipt_recorded",
+    id: `${plan.batchId}:RECONCILIATION_REQUIRED`,
+    payload: { ...receipt, reason },
+  });
+  return receipt;
+}
+
 async function recoverExistingBatch(input: {
   plan: TeamworkPlan;
   cwd: string;
@@ -180,73 +409,61 @@ async function recoverExistingBatch(input: {
     sessionId: input.plan.sessionId,
     cwd: input.cwd,
   });
-  const saved = events.find(
-    (event) =>
-      event.kind === "coordination" &&
-      event.batchId === input.plan.batchId &&
-      event.action === "receipt_recorded" &&
-      event.payload &&
-      (event.payload.status === "ALL_ACCEPTED" ||
-        event.payload.status === "SETTLED_WITH_FAILURE"),
-  );
-  if (saved?.kind === "coordination" && saved.payload) {
-    return saved.payload as unknown as TeamworkReceipt;
-  }
-  const states = new Map<string, CoordinationState>([
-    [input.plan.batchId, existing.state],
-  ]);
-  if (existing.state !== "RECONCILIATION_REQUIRED") {
-    await appendTransition({
-      sessionId: input.plan.sessionId,
-      by: input.by,
-      batchId: input.plan.batchId,
-      entity: "batch",
-      id: input.plan.batchId,
-      state: "RECONCILIATION_REQUIRED",
-      states,
-      planHash: input.plan.planHash,
-      payload: { recoveredAfterRestart: true },
-    });
-  }
-  const assignments = input.plan.assignments.map((item) => {
-    const current = projection.assignments.find(
-      (entry) =>
-        entry.batchId === input.plan.batchId &&
-        entry.assignmentId === item.assignmentId,
+  if (
+    existing.state === "ALL_ACCEPTED" ||
+    existing.state === "SETTLED_WITH_FAILURE"
+  ) {
+    let receipt: TeamworkReceipt;
+    try {
+      receipt = terminalReceiptFromProjection(input.plan, projection);
+    } catch (error) {
+      return recordRecoveryReconciliation({
+        ...input,
+        existingState: existing.state,
+        projection,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+    const receipts = events.filter(
+      (event) =>
+        event.kind === "coordination" &&
+        event.batchId === input.plan.batchId &&
+        event.action === "receipt_recorded",
     );
-    return {
-      assignmentId: item.assignmentId,
-      status:
-        current?.state === "ACCEPTED" || current?.state === "FINAL_FAILED"
-          ? current.state
-          : "UNKNOWN",
-    } as TeamworkReceipt["assignments"][number];
+    if (
+      receipts.length > 1 ||
+      (receipts.length === 1 &&
+        !isDeepStrictEqual(receipts[0]?.payload, receipt))
+    ) {
+      return recordRecoveryReconciliation({
+        ...input,
+        existingState: existing.state,
+        projection,
+        reason:
+          "saved terminal receipt disagrees with durable coordination facts",
+      });
+    }
+    if (receipts.length === 0) {
+      await appendAction({
+        sessionId: input.plan.sessionId,
+        cwd: input.cwd,
+        by: input.by,
+        batchId: input.plan.batchId,
+        entity: "batch",
+        action: "receipt_recorded",
+        id: `${input.plan.batchId}:${receipt.status}`,
+        payload: { ...receipt },
+      });
+    }
+    await assertTeamworkReceiptDurable(input.plan, receipt, input.cwd);
+    return receipt;
+  }
+  return recordRecoveryReconciliation({
+    ...input,
+    existingState: existing.state,
+    projection,
+    reason: "recovered nonterminal batch requires reconciliation",
   });
-  const retryCounts = Object.fromEntries(
-    projection.assignments
-      .filter((entry) => entry.batchId === input.plan.batchId)
-      .map((entry) => [entry.assignmentId, entry.retryCount]),
-  );
-  const receipt: TeamworkReceipt = {
-    schemaVersion: 1,
-    batchId: input.plan.batchId,
-    status: "RECONCILIATION_REQUIRED",
-    assignments,
-    capacity: existing.effectiveCapacity ?? input.capacity,
-    retryCounts,
-  };
-  await recordCoordinationEvent({
-    sessionId: input.plan.sessionId,
-    cwd: input.cwd,
-    by: input.by,
-    batchId: input.plan.batchId,
-    entity: "batch",
-    action: "receipt_recorded",
-    receiptId: `${input.plan.batchId}:RECONCILIATION_REQUIRED`,
-    payload: { ...receipt, reason: "recovered batch requires reconciliation" },
-    idempotencyKey: `${input.plan.batchId}:RECONCILIATION_REQUIRED:receipt`,
-  });
-  return receipt;
 }
 
 interface ActiveAssignment {
@@ -271,6 +488,7 @@ function transitionState(
 
 async function appendTransition(input: {
   sessionId: string;
+  cwd?: string;
   by: string;
   batchId: string;
   entity: "batch" | "assignment" | "attempt" | "teammate";
@@ -291,6 +509,7 @@ async function appendTransition(input: {
   transitionState(input.states, input.id, input.state, input.entity);
   await recordCoordinationEvent({
     sessionId: input.sessionId,
+    ...(input.cwd ? { cwd: input.cwd } : {}),
     by: input.by,
     batchId: input.batchId,
     entity: input.entity,
@@ -313,6 +532,7 @@ async function appendTransition(input: {
 
 async function appendAction(input: {
   sessionId: string;
+  cwd?: string;
   by: string;
   batchId: string;
   entity: "batch" | "assignment" | "attempt" | "teammate";
@@ -334,6 +554,7 @@ async function appendAction(input: {
 }): Promise<void> {
   await recordCoordinationEvent({
     sessionId: input.sessionId,
+    ...(input.cwd ? { cwd: input.cwd } : {}),
     by: input.by,
     batchId: input.batchId,
     entity: input.entity,
@@ -534,8 +755,9 @@ export async function runTeamworkCoordinator(
     Promise<{ slot: number; result: AttemptWaitResult }>
   >();
   const final = new Map<string, "ACCEPTED" | "FINAL_FAILED">();
-  const acceptedAttempts = new Map<string, string>();
+  const retainedReports = new Map<string, string>();
   const retryCounts: Record<string, number> = {};
+  let admissionClosed = false;
 
   async function reconcile(reason: string): Promise<TeamworkReceipt> {
     await appendAction({
@@ -580,13 +802,43 @@ export async function runTeamworkCoordinator(
     return receipt;
   }
 
+  async function failPending(reason: string): Promise<void> {
+    admissionClosed = true;
+    while (pending.length > 0) {
+      const assignment = pending.shift();
+      if (!assignment) continue;
+      await appendTransition({
+        sessionId: plan.sessionId,
+        by,
+        batchId: plan.batchId,
+        entity: "assignment",
+        id: assignment.assignmentId,
+        state: "FINAL_FAILED",
+        states: assignmentStates,
+        assignmentId: assignment.assignmentId,
+        retryCount: retryCounts[assignment.assignmentId] ?? 0,
+        payload: { reason, dispatched: false },
+      });
+      final.set(assignment.assignmentId, "FINAL_FAILED");
+    }
+  }
+
   async function dispatch(
     slot: number,
     assignment: TeamworkPlan["assignments"][number],
     retryCount: number,
   ): Promise<void> {
-    const attemptId = `${assignment.assignmentId}.attempt.${retryCount}`;
-    const teammateId = `${assignment.assignmentId}.teammate.${retryCount}`;
+    const boundedId = (kind: string): string => {
+      const candidate = `${assignment.assignmentId}.${kind}.${retryCount}`;
+      return candidate.length <= 64
+        ? candidate
+        : crypto
+            .createHash("sha256")
+            .update(`${assignment.assignmentId}:${kind}:${retryCount}`)
+            .digest("hex");
+    };
+    const attemptId = boundedId("attempt");
+    const teammateId = boundedId("teammate");
     const frozen = frozenLaunches.get(assignment.assignmentId);
     if (!frozen)
       throw new Error(`missing frozen launch for '${assignment.assignmentId}'`);
@@ -722,6 +974,7 @@ export async function runTeamworkCoordinator(
       teammateId,
       slot,
       retryCount,
+      transitionKey: `attempt:${attemptId}`,
       ...(context.providerSessionId
         ? { providerSessionId: context.providerSessionId }
         : {}),
@@ -778,10 +1031,69 @@ export async function runTeamworkCoordinator(
     guardHeld = false;
   }
 
+  async function resumeFromWait(current: ActiveAssignment): Promise<void> {
+    if (
+      assignmentStates.get(current.assignment.assignmentId) !==
+      "WAITING_FOR_MAIN_COMMAND"
+    )
+      return;
+    const transitionKey = `continuation:${current.continuations}`;
+    await appendTransition({
+      sessionId: plan.sessionId,
+      by,
+      batchId: plan.batchId,
+      entity: "attempt",
+      id: current.context.attemptId,
+      state: "RUNNING",
+      states: attemptStates,
+      assignmentId: current.assignment.assignmentId,
+      attemptId: current.context.attemptId,
+      teammateId: current.context.teammateId,
+      retryCount: current.retryCount,
+      ...(current.providerSessionId
+        ? { providerSessionId: current.providerSessionId }
+        : {}),
+      transitionKey,
+    });
+    await appendTransition({
+      sessionId: plan.sessionId,
+      by,
+      batchId: plan.batchId,
+      entity: "teammate",
+      id: current.context.teammateId,
+      state: "RUNNING",
+      states: teammateStates,
+      attemptId: current.context.attemptId,
+      teammateId: current.context.teammateId,
+      ...(current.providerSessionId
+        ? { providerSessionId: current.providerSessionId }
+        : {}),
+      transitionKey,
+    });
+    await appendTransition({
+      sessionId: plan.sessionId,
+      by,
+      batchId: plan.batchId,
+      entity: "assignment",
+      id: current.assignment.assignmentId,
+      state: "EXECUTING",
+      states: assignmentStates,
+      assignmentId: current.assignment.assignmentId,
+      attemptId: current.context.attemptId,
+      teammateId: current.context.teammateId,
+      retryCount: current.retryCount,
+      ...(current.providerSessionId
+        ? { providerSessionId: current.providerSessionId }
+        : {}),
+      transitionKey,
+    });
+  }
+
   async function cancelAndDrain(
     reason: string,
     terminal?: { current: ActiveAssignment; result: AttemptWaitResult },
   ): Promise<TeamworkReceipt> {
+    await failPending(reason);
     if (batchStates.get(plan.batchId) === "RUNNING") {
       await appendTransition({
         sessionId: plan.sessionId,
@@ -794,62 +1106,74 @@ export async function runTeamworkCoordinator(
         payload: { reason },
       });
     }
-    if (!input.runtime.cancel && active.size > 0 && !terminal) {
-      return reconcile(`host cannot confirm cancellation: ${reason}`);
-    }
-    for (const current of [...active.values()]) {
-      let result: AttemptWaitResult;
-      if (terminal?.current === current) {
-        result = terminal.result;
-      } else {
+    const cancel = input.runtime.cancel;
+    const outcomes = await Promise.all(
+      [...active.values()].map(async (current) => {
+        if (terminal?.current === current)
+          return { current, result: terminal.result };
+        if (!cancel)
+          return {
+            current,
+            error: new Error(`host cannot cancel active attempt: ${reason}`),
+          };
         try {
-          if (!input.runtime.cancel)
-            return reconcile(`host cannot cancel active attempt: ${reason}`);
-          result = await input.runtime.cancel(current.context);
+          return { current, result: await cancel(current.context) };
         } catch (error) {
-          return reconcile(
-            error instanceof Error ? error.message : String(error),
-          );
+          return { current, error };
         }
+      }),
+    );
+    let cancellationFailure: string | undefined;
+    for (const outcome of outcomes) {
+      const { current } = outcome;
+      if ("error" in outcome) {
+        cancellationFailure ??=
+          outcome.error instanceof Error
+            ? outcome.error.message
+            : String(outcome.error);
+        continue;
       }
+      const { result } = outcome;
       if (
         result.kind === "reconciliation" ||
         result.kind === "timeout" ||
         result.terminal !== true
       ) {
-        return reconcile(`attempt cancellation is not terminal: ${reason}`);
+        cancellationFailure ??= `attempt cancellation is not terminal: ${reason}`;
+        continue;
       }
       if (
         result.providerSessionId &&
         current.providerSessionId &&
         result.providerSessionId !== current.providerSessionId
       ) {
-        return reconcile("cancellation returned a different host session");
+        cancellationFailure ??=
+          "cancellation returned a different host session";
+        continue;
       }
       if (result.providerSessionId) {
         current.providerSessionId = result.providerSessionId;
         current.context.providerSessionId = result.providerSessionId;
       }
       try {
-        if (result.kind === "report") await complete(current, false);
-        else
+        await resumeFromWait(current);
+        if (result.kind === "report") {
+          await complete(current, false);
+        } else
           await fail(
             current,
             result.reason ?? "cancelled by coordinator",
             false,
           );
       } catch (error) {
-        return reconcile(
-          error instanceof Error ? error.message : String(error),
-        );
+        cancellationFailure ??=
+          error instanceof Error ? error.message : String(error);
+        continue;
       }
       active.delete(current.slot);
       waits.delete(current.slot);
     }
-    if (pending.length > 0)
-      return reconcile(
-        `queued assignment remains after cancellation: ${reason}`,
-      );
+    if (cancellationFailure) return reconcile(cancellationFailure);
     return settle();
   }
 
@@ -891,7 +1215,7 @@ export async function runTeamworkCoordinator(
         : {}),
       terminal: true,
     });
-    if (allowRetry && retryCount < assignment.maxRetries) {
+    if (allowRetry && !admissionClosed && retryCount < assignment.maxRetries) {
       await release(activeWork);
       retryCounts[assignment.assignmentId] = retryCount + 1;
       pending.unshift(assignment);
@@ -981,7 +1305,7 @@ export async function runTeamworkCoordinator(
     });
     await release(activeWork);
     final.set(assignment.assignmentId, "ACCEPTED");
-    acceptedAttempts.set(assignment.assignmentId, context.attemptId);
+    retainedReports.set(assignment.assignmentId, context.attemptId);
   }
 
   async function complete(
@@ -1004,7 +1328,7 @@ export async function runTeamworkCoordinator(
       terminal: true,
       idempotencyKey: `${plan.batchId}:terminal:${context.attemptId}`,
     });
-    let report;
+    let report: ReturnType<typeof readTeammateReport>;
     try {
       report = readTeammateReport({
         taskRoot: input.taskRoot,
@@ -1023,11 +1347,26 @@ export async function runTeamworkCoordinator(
         sourceDigest: assignment.sourceDigest,
       });
     } catch (error) {
+      if (error instanceof TeammateReportReadError && error.kind !== "missing")
+        throw error;
       await fail(
         activeWork,
         error instanceof Error ? error.message : String(error),
         allowRetry,
       );
+      return;
+    }
+    if (report.status === "blocked") {
+      retainedReports.set(assignment.assignmentId, context.attemptId);
+      await fail(
+        activeWork,
+        `teammate reported blocked: ${report.evidence[0]?.summary ?? "blocker evidence missing"}`,
+        false,
+      );
+      return;
+    }
+    if (report.status !== "complete") {
+      await fail(activeWork, `teammate reported ${report.status}`, allowRetry);
       return;
     }
     if (
@@ -1126,7 +1465,7 @@ export async function runTeamworkCoordinator(
     const cleanupFailures = cleanupSettledTeamworkArtifacts({
       taskRoot: input.taskRoot,
       assignments: plan.assignments,
-      acceptedAttempts,
+      retainedReports,
     });
     if (cleanupFailures.length > 0) {
       return reconcile(
@@ -1182,18 +1521,26 @@ export async function runTeamworkCoordinator(
       id: `${plan.batchId}:${status}`,
       payload: { ...receipt },
     });
-    await assertTeamworkReceiptDurable(
-      plan.sessionId,
-      plan.batchId,
-      plan.planHash,
-      cwd,
-    );
+    await assertTeamworkReceiptDurable(plan, receipt, cwd);
     await releaseGuard();
     return receipt;
   }
 
   async function fill(): Promise<void> {
+    if (admissionClosed) return;
     while (active.size < capacity && pending.length > 0) {
+      if (Date.parse(plan.deadline) <= Date.now()) {
+        await failPending("batch deadline elapsed before dispatch");
+        return;
+      }
+      try {
+        assertTeamworkPlanCurrent(plan, input.taskRoot);
+      } catch (error) {
+        await failPending(
+          `task phase changed before dispatch: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return;
+      }
       const assignment = pending.shift();
       if (!assignment) return;
       const retryCount = retryCounts[assignment.assignmentId] ?? 0;
@@ -1264,167 +1611,119 @@ export async function runTeamworkCoordinator(
         result: next.result,
       });
     }
+    try {
+      await resumeFromWait(current);
+    } catch (error) {
+      return reconcile(error instanceof Error ? error.message : String(error));
+    }
     let releaseSlot = true;
     if (next.result.kind === "timeout") {
       current.continuations += 1;
-      if (current.continuations > 8) {
-        return reconcile("continuation limit exceeded");
-      } else {
-        await appendTransition({
-          sessionId: plan.sessionId,
-          by,
-          batchId: plan.batchId,
-          entity: "attempt",
-          id: current.context.attemptId,
-          state: "TIMEOUT_YIELDED",
-          states: attemptStates,
-          assignmentId: current.assignment.assignmentId,
-          attemptId: current.context.attemptId,
-          teammateId: current.context.teammateId,
-          retryCount: current.retryCount,
-          ...(current.providerSessionId
-            ? { providerSessionId: current.providerSessionId }
-            : {}),
-          transitionKey: `continuation:${current.continuations}`,
-        });
-        await appendTransition({
-          sessionId: plan.sessionId,
-          by,
-          batchId: plan.batchId,
-          entity: "teammate",
-          id: current.context.teammateId,
-          state: "TIMEOUT_YIELDED",
-          states: teammateStates,
-          attemptId: current.context.attemptId,
-          teammateId: current.context.teammateId,
-          ...(current.providerSessionId
-            ? { providerSessionId: current.providerSessionId }
-            : {}),
-          transitionKey: `continuation:${current.continuations}`,
-        });
-        await appendTransition({
-          sessionId: plan.sessionId,
-          by,
-          batchId: plan.batchId,
-          entity: "assignment",
-          id: current.assignment.assignmentId,
-          state: "WAITING_FOR_MAIN_COMMAND",
-          states: assignmentStates,
-          assignmentId: current.assignment.assignmentId,
-          attemptId: current.context.attemptId,
-          teammateId: current.context.teammateId,
-          retryCount: current.retryCount,
-          ...(current.providerSessionId
-            ? { providerSessionId: current.providerSessionId }
-            : {}),
-          transitionKey: `continuation:${current.continuations}`,
-        });
-        await appendTransition({
-          sessionId: plan.sessionId,
-          by,
-          batchId: plan.batchId,
-          entity: "attempt",
-          id: current.context.attemptId,
-          state: "WAITING_FOR_MAIN_COMMAND",
-          states: attemptStates,
-          assignmentId: current.assignment.assignmentId,
-          attemptId: current.context.attemptId,
-          teammateId: current.context.teammateId,
-          retryCount: current.retryCount,
-          ...(current.providerSessionId
-            ? { providerSessionId: current.providerSessionId }
-            : {}),
-          transitionKey: `continuation:${current.continuations}`,
-        });
-        await appendTransition({
-          sessionId: plan.sessionId,
-          by,
-          batchId: plan.batchId,
-          entity: "teammate",
-          id: current.context.teammateId,
-          state: "WAITING_FOR_MAIN_COMMAND",
-          states: teammateStates,
-          attemptId: current.context.attemptId,
-          teammateId: current.context.teammateId,
-          ...(current.providerSessionId
-            ? { providerSessionId: current.providerSessionId }
-            : {}),
-          transitionKey: `continuation:${current.continuations}`,
-        });
-        let continued: AttemptWaitResult;
-        try {
-          continued = await input.runtime.continue(current.context);
-        } catch (error) {
-          return reconcile(
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-        if (
-          continued.providerSessionId &&
-          current.providerSessionId &&
-          continued.providerSessionId !== current.providerSessionId
-        ) {
-          return reconcile("continuation returned a different host session");
-        }
-        if (continued.providerSessionId) {
-          current.providerSessionId = continued.providerSessionId;
-          current.context.providerSessionId = continued.providerSessionId;
-        }
-        await appendTransition({
-          sessionId: plan.sessionId,
-          by,
-          batchId: plan.batchId,
-          entity: "attempt",
-          id: current.context.attemptId,
-          state: "RUNNING",
-          states: attemptStates,
-          assignmentId: current.assignment.assignmentId,
-          attemptId: current.context.attemptId,
-          teammateId: current.context.teammateId,
-          retryCount: current.retryCount,
-          ...(current.providerSessionId
-            ? { providerSessionId: current.providerSessionId }
-            : {}),
-          transitionKey: `continuation:${current.continuations}`,
-        });
-        await appendTransition({
-          sessionId: plan.sessionId,
-          by,
-          batchId: plan.batchId,
-          entity: "teammate",
-          id: current.context.teammateId,
-          state: "RUNNING",
-          states: teammateStates,
-          attemptId: current.context.attemptId,
-          teammateId: current.context.teammateId,
-          ...(current.providerSessionId
-            ? { providerSessionId: current.providerSessionId }
-            : {}),
-          transitionKey: `continuation:${current.continuations}`,
-        });
-        await appendTransition({
-          sessionId: plan.sessionId,
-          by,
-          batchId: plan.batchId,
-          entity: "assignment",
-          id: current.assignment.assignmentId,
-          state: "EXECUTING",
-          states: assignmentStates,
-          assignmentId: current.assignment.assignmentId,
-          attemptId: current.context.attemptId,
-          teammateId: current.context.teammateId,
-          retryCount: current.retryCount,
-          ...(current.providerSessionId
-            ? { providerSessionId: current.providerSessionId }
-            : {}),
-          transitionKey: `continuation:${current.continuations}`,
-        });
-        waits.set(
-          next.slot,
-          Promise.resolve({ slot: next.slot, result: continued }),
+      if (Date.now() >= Date.parse(plan.deadline))
+        return cancelAndDrain("batch deadline elapsed");
+      const transitionKey = `continuation:${current.continuations}`;
+      await appendTransition({
+        sessionId: plan.sessionId,
+        by,
+        batchId: plan.batchId,
+        entity: "attempt",
+        id: current.context.attemptId,
+        state: "TIMEOUT_YIELDED",
+        states: attemptStates,
+        assignmentId: current.assignment.assignmentId,
+        attemptId: current.context.attemptId,
+        teammateId: current.context.teammateId,
+        retryCount: current.retryCount,
+        ...(current.providerSessionId
+          ? { providerSessionId: current.providerSessionId }
+          : {}),
+        transitionKey,
+      });
+      await appendTransition({
+        sessionId: plan.sessionId,
+        by,
+        batchId: plan.batchId,
+        entity: "teammate",
+        id: current.context.teammateId,
+        state: "TIMEOUT_YIELDED",
+        states: teammateStates,
+        attemptId: current.context.attemptId,
+        teammateId: current.context.teammateId,
+        ...(current.providerSessionId
+          ? { providerSessionId: current.providerSessionId }
+          : {}),
+        transitionKey,
+      });
+      await appendTransition({
+        sessionId: plan.sessionId,
+        by,
+        batchId: plan.batchId,
+        entity: "assignment",
+        id: current.assignment.assignmentId,
+        state: "WAITING_FOR_MAIN_COMMAND",
+        states: assignmentStates,
+        assignmentId: current.assignment.assignmentId,
+        attemptId: current.context.attemptId,
+        teammateId: current.context.teammateId,
+        retryCount: current.retryCount,
+        ...(current.providerSessionId
+          ? { providerSessionId: current.providerSessionId }
+          : {}),
+        transitionKey,
+      });
+      await appendTransition({
+        sessionId: plan.sessionId,
+        by,
+        batchId: plan.batchId,
+        entity: "attempt",
+        id: current.context.attemptId,
+        state: "WAITING_FOR_MAIN_COMMAND",
+        states: attemptStates,
+        assignmentId: current.assignment.assignmentId,
+        attemptId: current.context.attemptId,
+        teammateId: current.context.teammateId,
+        retryCount: current.retryCount,
+        ...(current.providerSessionId
+          ? { providerSessionId: current.providerSessionId }
+          : {}),
+        transitionKey,
+      });
+      await appendTransition({
+        sessionId: plan.sessionId,
+        by,
+        batchId: plan.batchId,
+        entity: "teammate",
+        id: current.context.teammateId,
+        state: "WAITING_FOR_MAIN_COMMAND",
+        states: teammateStates,
+        attemptId: current.context.attemptId,
+        teammateId: current.context.teammateId,
+        ...(current.providerSessionId
+          ? { providerSessionId: current.providerSessionId }
+          : {}),
+        transitionKey,
+      });
+      let continued: Promise<AttemptWaitResult>;
+      try {
+        continued = input.runtime.continue(current.context);
+      } catch (error) {
+        return reconcile(
+          error instanceof Error ? error.message : String(error),
         );
-        releaseSlot = false;
       }
+      waits.set(
+        next.slot,
+        Promise.resolve(continued)
+          .then((result) => ({ slot: next.slot, result }))
+          .catch((error: unknown) => ({
+            slot: next.slot,
+            result: {
+              kind: "reconciliation" as const,
+              reason: error instanceof Error ? error.message : String(error),
+            },
+          })),
+      );
+      releaseSlot = false;
     } else if (next.result.kind === "report") {
       try {
         await complete(current);
@@ -1459,30 +1758,36 @@ export async function runTeamworkCoordinator(
 }
 
 export async function assertTeamworkReceiptDurable(
-  sessionId: string,
-  batchId: string,
-  planHash: string,
+  plan: TeamworkPlan,
+  receipt: TeamworkReceipt,
   cwd?: string,
 ): Promise<void> {
   const [state, events] = await Promise.all([
-    readCoordinationState({ sessionId, ...(cwd ? { cwd } : {}) }),
-    readTeamworkEvents({ sessionId, ...(cwd ? { cwd } : {}) }),
+    readCoordinationState({
+      sessionId: plan.sessionId,
+      ...(cwd ? { cwd } : {}),
+    }),
+    readTeamworkEvents({
+      sessionId: plan.sessionId,
+      ...(cwd ? { cwd } : {}),
+    }),
   ]);
-  const batch = state.batches.find((entry) => entry.batchId === batchId);
-  if (
-    batch?.planHash !== planHash ||
-    (batch.state !== "ALL_ACCEPTED" && batch.state !== "SETTLED_WITH_FAILURE")
-  ) {
-    throw new Error(`batch '${batchId}' has no durable terminal receipt`);
-  }
-  const receiptRecorded = events.some(
+  const expected = terminalReceiptFromProjection(plan, state);
+  if (!isDeepStrictEqual(receipt, expected))
+    throw new Error(
+      `batch '${plan.batchId}' receipt disagrees with durable facts`,
+    );
+  const receipts = events.filter(
     (event) =>
       event.kind === "coordination" &&
-      event.batchId === batchId &&
-      event.action === "receipt_recorded" &&
-      event.payload?.status === batch.state,
+      event.batchId === plan.batchId &&
+      event.action === "receipt_recorded",
   );
-  if (!receiptRecorded) {
-    throw new Error(`batch '${batchId}' has no matching durable receipt event`);
-  }
+  if (
+    receipts.length !== 1 ||
+    !isDeepStrictEqual(receipts[0]?.payload, expected)
+  )
+    throw new Error(
+      `batch '${plan.batchId}' has no matching durable receipt event`,
+    );
 }
