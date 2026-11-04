@@ -93,6 +93,8 @@ reconciliation. A restart returns a durable terminal receipt or
 Capacity reservations survive a coordinator crash because a dead coordinator
 does not prove its provider processes exited. Do not delete an unresolved
 reservation to make another batch fit; inspect ownership and terminal evidence.
+An unreadable or conflicting recovery state also retains the reservation and
+original evidence; it does not authorize a replacement dispatch.
 
 ## Teamwork Session and forum commands
 

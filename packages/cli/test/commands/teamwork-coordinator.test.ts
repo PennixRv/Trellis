@@ -13,7 +13,10 @@ import {
   runTeamworkCoordinator,
   type TeammateDispatchContext,
 } from "../../src/commands/teamwork/coordinator.js";
-import { readCoordinationState } from "@pennixrv/trellis-core/teamwork";
+import {
+  readCoordinationState,
+  resolveTeamworkSession,
+} from "@pennixrv/trellis-core/teamwork";
 import {
   installTeammateAssets,
   frozenExecution,
@@ -982,6 +985,49 @@ describe("TeamworkSession teammate coordinator", () => {
     });
     expect(recovered.status).toBe("RECONCILIATION_REQUIRED");
     expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains capacity when recovery cannot read an uncertain batch", async () => {
+    const plan = createPlan(env.taskRoot, ["work-a"]);
+    const batchGuard = {
+      acquire: vi.fn(async () => undefined),
+      release: vi.fn(async () => undefined),
+    };
+    const dispatch = vi.fn(async () => {
+      throw new Error("provider launch outcome is unknown");
+    });
+    const input = {
+      plan,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard: batchGuard,
+      config,
+      runtime: {
+        dispatch,
+        async wait() {
+          throw new Error("uncertain attempt must not wait");
+        },
+        async continue() {
+          throw new Error("uncertain attempt must not continue");
+        },
+      },
+    };
+    expect((await runTeamworkCoordinator(input)).status).toBe(
+      "RECONCILIATION_REQUIRED",
+    );
+    const ref = resolveTeamworkSession({
+      sessionId: "parallel",
+      cwd: env.projectDir,
+    });
+    const events = path.join(ref.dir, "events.jsonl");
+    fs.renameSync(events, `${events}.saved`);
+    fs.mkdirSync(events);
+    await expect(runTeamworkCoordinator(input)).rejects.toThrow();
+    expect(batchGuard.acquire).toHaveBeenCalledTimes(2);
+    expect(batchGuard.release).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(fs.existsSync(`${events}.saved`)).toBe(true);
   });
 
   it("rejects a plan hash mismatch before writing coordinator state", async () => {

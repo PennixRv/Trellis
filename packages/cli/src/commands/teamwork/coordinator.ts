@@ -421,18 +421,8 @@ export async function runTeamworkCoordinator(
     capacity,
   });
   let guardHeld = true;
-  let recovered: TeamworkReceipt | undefined;
-  try {
-    recovered = await recoverExistingBatch({ plan, cwd, by, capacity });
-  } catch (error) {
-    await input.guard.release({
-      batchId: plan.batchId,
-      planHash: plan.planHash,
-      capacity,
-    });
-    guardHeld = false;
-    throw error;
-  }
+  // Failed recovery cannot prove that an older provider process exited.
+  const recovered = await recoverExistingBatch({ plan, cwd, by, capacity });
   if (recovered) {
     if (recovered.status !== "RECONCILIATION_REQUIRED") {
       await input.guard.release({

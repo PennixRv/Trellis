@@ -1,5 +1,11 @@
 # 执行记录
 
+## 2026-11-04：恢复读取失败保护与最终 beta.15
+
+追加发现并修复已有 batch 恢复读取/对账异常释放 guard 的漏洞。未知旧进程不能因读取异常被判为已退出，现保留容量和原始事件证据。回归模拟不确定 attempt 后的不可读事件存储，确认无容量释放、无二次派发；协调器/容量相关 17 项、lint/typecheck 通过，Skill 同步说明。
+
+最终统一版本为 beta.15，保留 beta.14 tag 与已发布内容。beta.14 取消时已发布 Core，已重跑原 CI 补齐对应 CLI；待其结束后再发布 beta.15。现场仅更新了本仓 beta.14 资产，用户安装仍为 beta.13，未把中间版本当成最终交付。
+
 ## 2026-11-04：真实 batch 与 beta.14 发布准备
 
 真实前台 batch 经原生 plan 构造、预检和派发完成：Codex Sol/high 与 Copilot Sonnet/high 的报告均为 ACCEPTED，batch 为 ALL_ACCEPTED，重试均为 0。回执及终态事件已持久化，容量保留已释放。完整 CLI 回归 2,248 项通过、2 项跳过；新增两项 provider 原生恢复协议测试后定向六项通过，当前合计 2,250 项通过；Core 422 项通过、1 项跳过。lint/typecheck/build、Skill quick_validate、差异检查与精确打包依赖检查通过。真实 beta.14 临时 init/update 一致，六角色卡和 teamwork.json 齐全。Claude/DSH 未真实调用。

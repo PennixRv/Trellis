@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.15",
+  "description": "恢复失败时保留 Teamwork 容量和原始证据",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "读取或对账已有 batch 失败时，不再释放无法证明安全的容量保留；阻止不确定进程导致超额派发或证据被清理，补充不可读事件存储回归测试。",
+  "migrations": [],
+  "notes": "Install the matching CLI/Core beta.15 pair. This completes the beta.14 Teamwork role/configuration/protocol delivery. Existing versions and tags remain immutable; unresolved attempts retain their reservation for explicit reconciliation."
+}
