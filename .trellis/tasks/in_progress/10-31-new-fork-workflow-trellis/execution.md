@@ -1,5 +1,19 @@
 # 执行记录
 
+## 2026-11-04：Teamwork beta.15 交付与现场验收
+
+源码在既有 `v0.7.1` 完成并推送：主要实现 `67dcc5c1a31dd4e70b2cb4ed86174aa2812f2ea7`，恢复读取失败保护及 beta.15 为 `ddd32335eb8cec347fc2a36258903ebc9c0fad3a`。docs-site 既有 `codex/chinese-user-templates` 已更新中英 Beta 指南、changelog 和导航，最终文档提交 `27c0d42`。未创建分支或 worktree。
+
+双包 `@pennixrv/trellis`、`@pennixrv/trellis-core` 及 beta dist-tag 均已公开为 `0.7.1-beta.15`。最终 CI https://github.com/PennixRv/Trellis/actions/runs/41780909872 attempt 2 为 success；首次已发布成功但 npm 可见性等待超时，原生可见性检查通过后重跑原幂等 CI，没有本地重发或改旧 tag。pennix 已真实升级到该版本，目标 SHA-256 为 `9fbb79fad0e942f49bb8317773f4566a3ef6c7722f6879fb5ccf24c9d1ec0f66`；实际 CLI/Core 均为 beta.15、ACP SDK 为 2.4.0，pennix 的 trellis-cli 检查为 match。
+
+最终 CLI 为 105 个文件、2,251 项通过、2 项跳过；Core 为 25 个文件、422 项通过、1 项跳过。lint/typecheck/build、Skill 原生校验、版本同步与打包精确依赖门禁、临时 beta.15 init/update、MDX lint 和共享导航均通过。CI 再次执行全套测试及发布门禁。
+
+已安装发行包再次完成真实 managed batch：Codex Sol/high 和 Copilot Sonnet/high，plan `7ec51cee4929c93d652c0b73cf55b146b036aa59600e9154aa523bf49a4f0b54`，52.8 秒 ALL_ACCEPTED、重试均为 0；报告身份、plan/source 摘要和证据一致，终态/回执已持久化、容量已释放，临时源码没有改动。重复调用 0.262 秒返回原回执、事件文件未变，无重复派发。真实 run 及发布前 batch 也已通过；Claude/DSH 只有协议 fixture 验证，未安装或真实调用。
+
+根仓与本仓均已原生更新到 beta.15。两仓 workflow 与 bundled native 一致，六专业卡、通用卡、配置及已部署 Teamwork/meta Skills 与源码和实际安装包逐字节一致。原生 update dry-run 无待更新项；根仓保留 Codex 定制，本仓保留 config.yaml/.gitignore 定制。根侧自动迁移提示任务已原生 complete。本仓及根仓所有 3 份 Trellis 备份经原生预览、复核清理，共 6,117,181 字节；protected/failed 为 0，回读两仓库存均为空。
+
+父任务 A-017–A-021 的本轮缺口均已完成实现、发布及现场验收，详细关闭证据统一记录父任务 execution.md。Pennix Skills/extra 的路由、角色边界和清理 owner 已核对，无需重复修改。未知旧 provider 的退出无法确认时仍保留容量和原证据，读取失败不会释放预留；这是显式恢复边界。父任务另有 A-004 的目标环境验收未完成，整体任务继续 in_progress；根侧组合门禁由父任务固定最终 gitlink 后记录。
+
 ## 2026-11-04：恢复读取失败保护与最终 beta.15
 
 追加发现并修复已有 batch 恢复读取/对账异常释放 guard 的漏洞。未知旧进程不能因读取异常被判为已退出，现保留容量和原始事件证据。回归模拟不确定 attempt 后的不可读事件存储，确认无容量释放、无二次派发；协调器/容量相关 17 项、lint/typecheck 通过，Skill 同步说明。
