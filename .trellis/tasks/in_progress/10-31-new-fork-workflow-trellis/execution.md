@@ -187,3 +187,12 @@
 - beta4 与旧 fork 共同继承的锁缺陷也已修复：未知或空 PID 保留，只有 ESRCH 允许回收；CLI 与 Core 均用独占 recovery 文件串行回收并重查 holder，保护中断恢复现场。新增测试在原实现上复现返修拒绝、暂停／终态／交接中成功派发及未知锁误回收；竞争与恢复围栏均有专项回归。
 - 阶段集成现为 41 项，两层锁各 11 项；Core 全量 422 项通过／1 项条件跳过，CLI 2234 项通过／2 项条件跳过。ESLint、TypeScript、构建通过，Python 静态检查 0 errors／72 项既有 warnings；双语新发布说明、665 文件文档 lint、共享导航及 beta.13 清单连续性通过。
 - 原生 updater 已同步两仓候选脚本及阶段 Skills，明确保留专用配置；GitNexus detect-changes 为 21 文件、9 符号、4 流程，medium；预先 impact 中 CLI 锁为 HIGH。索引落后 28 个提交，以当前调用方及全量回归补核。正式 beta.13 发布、真实安装、两仓版本核验与最后备份清理待回执，不预先视为交付。
+
+### beta.13 正式交付回执
+
+- 修复提交 `0dcb3f6e`，原生 release:beta 产生的标签 `v0.7.1-beta.13` 指向 `36817be5682a7d376d79c335ecc280ba15fea340`，均在既有 `v0.7.1`。docs-site 既有分支 `codex/chinese-user-templates` 已推送 `09a72c0`。提交 Hook 与原生发布流程的全量回归均通过；[Actions 41756875785](https://github.com/PennixRv/Trellis/actions/runs/41756875785) 首次 completed/success，公共 npm 双包及 beta 标签均可见，latest 保持 0.7.1，packed CLI 精确依赖通过。CLI 的公共可见性在等待后恢复，没有重发包、重跑 CI 或改写标签。
+- 原生 `pennix update trellis-cli --version 0.7.1-beta.13 --json` 在交互终端核对候选后执行，结果 changed；候选与安装结果归档 SHA-256 均为 `80aadfb5b6a55021364e8614d3c28963f6ace8891b88e7f089dc5aded9f89048`。安装 CLI／Core 及精确依赖均 beta.13；相关三个组件 check 均 match/keep，全局检查仍受无关组件既有告警影响。
+- 两仓均经原生 dry-run、已批准的 --skip-all 和 native workflow 核验升至 beta.13。根仓 64 项平台模板仅有批准保留的 .codex/config.toml 差异；本仓六平台合计 372 项、去重后 320 个文件全部匹配。35 份 Python 在源码、真实安装及两仓逐字节一致，CLI／Core 的安装锁模块也与构建源码一致。最终 update 预览仅保留既定专用配置，无模板待更新或退休项。
+- 保护基线根仓 3560、本仓 1488 份 task/spec/workspace/handoff 文件无新增、删除或移动，除本 execution.md 主动补记外全部一致；根侧后续明确追加审查及交付记录。两仓原生布局迁移预览为空，任务分布仍为根仓 0/2/366/1、本仓 1/15/232/3。根 ownership 仍 consumed／generation 12，来源摘要 `65036215a7e59dad83eab100a0303b331226c0abe58c16d9ca2236ed4915d23e` 不变；没有刷新旧包、阶段或 pending action。
+- 全本地组合检查 19/19、自测 11/11、独立 handoff 三模块通过。发布途中 offline 唯一失败项是尚未固定的新 gitlink；固定后已在组合检查通过，最终现场收尾 gitlink 再由根侧复验。新增回归合计 31 项，包括阶段 9 项和两层锁各 11 项；总量为 Core 422 通过／1 跳过，CLI 2234 通过／2 跳过。
+- 两仓本轮共 4 份快照先逐份 verify，再原生预览及全清；根仓删除 2 份／218 文件／1,991,555 字节，本仓 2 份／736 文件／5,059,905 字节，无 protected 或 failed。六处既有现场回读 backup list 均为 []，未删除任务、交接或其他 owner 数据。中断后的 lock.recovery 保留供显式核验是当前恢复边界；未运行全部宿主、Mintlify 页面渲染或未核验的 managed batch adapter，不关闭长期父任务。
