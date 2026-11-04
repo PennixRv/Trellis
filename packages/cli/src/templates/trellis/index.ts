@@ -19,7 +19,7 @@
  *   └── gitattributes.txt     # project-root .gitattributes content
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -88,6 +88,7 @@ export const linearSyncScript = readTemplate("scripts/hooks/linear_sync.py");
 // Configuration files
 export const workflowMdTemplate = readTemplate("workflow.md");
 export const configYamlTemplate = readTemplate("config.yaml");
+export const teamworkConfigTemplate = readTemplate("teamwork.json");
 export const gitignoreTemplate = readTemplate("gitignore.txt");
 export const gitattributesTemplate = readTemplate("gitattributes.txt");
 
@@ -160,11 +161,17 @@ export function getAllScripts(): Map<string, string> {
  */
 export function getAllAgents(): Map<string, string> {
   const agents = new Map<string, string>();
-  agents.set("teammate.md", teammateAgentTemplate);
-  agents.set(
-    "delegated-worktree-primary-agent.md",
-    delegatedWorktreeAgentTemplate,
-  );
-  agents.set("teammate-profiles.json", teammateProfilesTemplate);
+  function collect(directory: string): void {
+    for (const entry of readdirSync(join(__dirname, "agents", directory), {
+      withFileTypes: true,
+    })) {
+      const relative = join(directory, entry.name);
+      if (entry.isDirectory()) collect(relative);
+      else if (entry.isFile())
+        agents.set(relative, readTemplate(join("agents", relative)));
+      else throw new Error(`unsupported agent template: ${relative}`);
+    }
+  }
+  collect("");
   return agents;
 }

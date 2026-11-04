@@ -277,7 +277,7 @@ export function startStdoutPump(args: {
     signal,
   } = args;
   const drained = pumpStdout(
-    child.stdout,
+    adapter.output?.(child, adapterCtx) ?? child.stdout,
     async (line: string) => {
       if (processLines && !(await processLines)) return;
       const result = adapter.parseLine(line, adapterCtx);

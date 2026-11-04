@@ -1,5 +1,19 @@
 # 设计：Trellis Teamwork 与业务阶段运行时改造
 
+## 2026-11-04：当前 Teamwork 实施合同
+
+本轮完整承接根父任务设计 3.4.1–3.4.12、六张角色正文及 18 套配置矩阵，当前基线 `9ad095cfa58010441a1f56e81d956d5695315b41`，分支 `v0.7.1`。用户最后明确“然后你就可以开工了，不需二次决策了”，记录见本 owner 执行增量与根父任务 execution.md；原生阶段接受和授权分别登记，不复用旧 artifact。
+
+先实现配置与冻结边界，再贯通执行层：`agents/teammate-profiles.json` 新 schema 包含六项专业卡引用、default_configuration 和三套候选；新增 `.trellis/teamwork.json` 保存三种已定义模式的默认与参数；现有 `config.yaml` 保留资源设置。计划解析/构造统一选择、显式覆盖和后端兼容验证，并把角色、brief、完整 execution、模式与来源摘要冻结；runtime/retry 不重新读取配置。未知键、旧版本、越界路径和不支持参数前置拒绝。
+
+六套默认均 `codex/gpt-6.1-sol`，architecture 为 xhigh，其余 high；第二套对应 `copilot/gpt-6.1-sol`；第三套 architecture/review/diagnosis 为 `copilot/claude-opus-5.5`，其余为 `copilot/claude-sonnet-5.5`，effort 与本行相同。不使用 Luna。上下文默认，不新增长度或预算机制。专业卡与共同卡分开，优先 Codex developerInstructions、Claude append-system-prompt；Copilot/DSH ACP 使用已核验通道及明确封装，不伪称独立指令优先级，不改 AGENTS 或注册原生 persona/agent。
+
+四后端 registry/能力采用同源定义，Codex/Claude 参数贯通，Copilot/DSH 使用官方 ACP SDK（候选 2.4.0、Apache-2.0，安装前核验兼容）集成原生 stdio。统一 supervisor 生命周期、交互 spawn/run 的 profile 入口，接通 managed batch coordinator 与只读预检。取消/等待/继续/错误/终态、部分成员失败、报告核验、不确定执行和自己进程清理必须保持原有围栏，不引入第二 FSM，也不依赖 Paseo。
+
+公开 role_id 精简及 lens 规则按父任务 T-05 覆盖 schema/claims/全部消费者。六卡、新 JSON、Skill/四 references、meta/workflow 和公开文档经统一模板/hash/init/update/build/pack 分发；不手改根侧生成资产。以真实配置变化、冻结不变、完整角色输入和实际启动参数证明文件被消费，不以存在文件或 JSON 合法代替集成证据。
+
+四后端协议 fixture 均须通过，真实 Codex/Copilot 任务通过才形成交付候选，Claude/DSH 明确 not_run。局部失败在本阶段修复；重要依赖出现实质不兼容时保留证据并按父任务合同处理，不自动引入新组件。旧任务、交接包、AGENTS GitNexus 资产与无关源码保留；缺失旧 GitNexus 可执行文件时不自动安装，使用当前已登记 CodeGraph 影响分析及实际调用点核对，并如实记录限制。根任务负责最终发布、Lifecycle 重装与两仓 native 更新。
+
 ## 目标与边界
 
 2026-11-03 的当前增量为任务目录治理，直接承接根父任务 `design.md` 的“任务目录治理增量”。它明确覆盖本文件早先“不执行数据迁移”的任务目录部分：新增显式目录迁移，并保留原记录和任务资料；旧阶段 schema、Teamwork 旧运行态、旧接口兼容仍排除。实施在当前 `v0.7.1` 分支，以 `025395bf9639df8b8f7dcb231470d2a1378bb279` 为本增量基线。复用已有路径守卫、原子写入、任务锁、ownership 围栏及会话指针重定向，统一处理状态与路径变更，不能只改目录名。

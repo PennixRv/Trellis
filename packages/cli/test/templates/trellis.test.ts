@@ -150,17 +150,26 @@ describe("trellis template constants", () => {
       ),
       "utf-8",
     );
-    expect(decisionSpaceConstructionAndMergingWorkflow).toContain("仅当选择之间存在条件依赖时使用决策树");
-    expect(decisionSpaceConstructionAndMergingWorkflow).toContain("prior-art review");
+    expect(decisionSpaceConstructionAndMergingWorkflow).toContain(
+      "仅当选择之间存在条件依赖时使用决策树",
+    );
+    expect(decisionSpaceConstructionAndMergingWorkflow).toContain(
+      "prior-art review",
+    );
     expect(stepSection("3.1")).toContain("解决必要的用户决定");
-    expect(stepSection("4.1")).toContain("只有明确授权委派 Git worktree 写入时才使用 Paseo");
+    expect(stepSection("4.1")).toContain(
+      "只有明确授权委派 Git worktree 写入时才使用 Paseo",
+    );
     expect(stepSection("5.2")).toContain("正式会话交接仍是独立操作");
   });
 
   it("phase diagrams use standard names and show conditional delivery acceptance", () => {
     const phaseSkills: [string, string][] = [
       ["trellis-goal-exploration-and-requirements", "目标探索与需求核对阶段"],
-      ["trellis-decision-space-construction-and-merging", "决策空间构造与归并阶段"],
+      [
+        "trellis-decision-space-construction-and-merging",
+        "决策空间构造与归并阶段",
+      ],
       ["trellis-solution-design-and-convergence", "解决方案设计与收敛阶段"],
       ["trellis-task-implementation", "任务实施与测试验证阶段"],
       ["trellis-delivery-review-and-closeout", "交付审查与现场收尾阶段"],
@@ -183,22 +192,33 @@ describe("trellis template constants", () => {
       const content = workflows.get(name) ?? "";
       expect(content).toContain(`# ${title}流程`);
       const diagrams = [...content.matchAll(/```mermaid\s*([\s\S]*?)```/g)];
-      expect(diagrams.length, `${name} should contain a workflow diagram`).toBeGreaterThan(0);
+      expect(
+        diagrams.length,
+        `${name} should contain a workflow diagram`,
+      ).toBeGreaterThan(0);
       for (const [, diagram] of diagrams) {
         expect(diagram).not.toMatch(/阶段\s*[一二三四五1-5]/);
       }
     }
-    const deliveryWorkflow = workflows.get("trellis-delivery-review-and-closeout") ?? "";
-    const deliveryDiagram = deliveryWorkflow.match(/```mermaid\s*([\s\S]*?)```/)?.[1] ?? "";
+    const deliveryWorkflow =
+      workflows.get("trellis-delivery-review-and-closeout") ?? "";
+    const deliveryDiagram =
+      deliveryWorkflow.match(/```mermaid\s*([\s\S]*?)```/)?.[1] ?? "";
     expect(deliveryDiagram).toContain("必要用户决定缺失");
     expect(deliveryDiagram).toContain("pennix-decision-grill 同步请求用户接受");
-    expect(deliveryDiagram).toContain("Trellis CLI 接受 delivery_ready 或 no_go");
+    expect(deliveryDiagram).toContain(
+      "Trellis CLI 接受 delivery_ready 或 no_go",
+    );
     expect(deliveryDiagram).toContain(
       "交付合同、用户明确要求或不可由主代理替代的价值/风险取舍要求用户接受",
     );
-    expect(deliveryDiagram).toContain('child_disposition -->|"无关联子任务"| cancelReview');
+    expect(deliveryDiagram).toContain(
+      'child_disposition -->|"无关联子任务"| cancelReview',
+    );
     expect(deliveryDiagram).toContain("使当前交付候选失效并判断最早受影响阶段");
-    expect(deliveryDiagram).toContain("Trellis CLI 将路线收敛为仅‘交付审查与现场收尾阶段’并记录原因");
+    expect(deliveryDiagram).toContain(
+      "Trellis CLI 将路线收敛为仅‘交付审查与现场收尾阶段’并记录原因",
+    );
     expect(deliveryDiagram).toContain("关联子任务如何处置？");
     expect(deliveryDiagram).toContain("记录子任务标识与依据后解除父子关系");
     expect(deliveryDiagram).toContain("另行执行子任务自身的取消流程");
@@ -236,9 +256,15 @@ describe("trellis template constants", () => {
       ),
       "utf-8",
     );
-    expect(goalExplorationAndRequirementsSkill).toContain("复杂度判断的实际触发维度与理由");
-    expect(goalExplorationAndRequirementsSkill).toContain("不机械计分或套用固定路由矩阵");
-    expect(goalExplorationAndRequirementsSkill).toContain("路线发生变化时，使用 Trellis CLI 更新受影响的分类和阶段");
+    expect(goalExplorationAndRequirementsSkill).toContain(
+      "复杂度判断的实际触发维度与理由",
+    );
+    expect(goalExplorationAndRequirementsSkill).toContain(
+      "不机械计分或套用固定路由矩阵",
+    );
+    expect(goalExplorationAndRequirementsSkill).toContain(
+      "路线发生变化时，使用 Trellis CLI 更新受影响的分类和阶段",
+    );
   });
 
   it("workflow.md planning breadcrumb requires a route before implementation", () => {
@@ -251,7 +277,9 @@ describe("trellis template constants", () => {
   });
 
   it("start command enters the requirements Skill and follows the current phase route", () => {
-    const start = getCommandTemplates().find((command) => command.name === "start")?.content ?? "";
+    const start =
+      getCommandTemplates().find((command) => command.name === "start")
+        ?.content ?? "";
     expect(start).toContain("trellis-goal-exploration-and-requirements");
     expect(start).toContain("business phase route");
     expect(start).not.toContain("trellis-brainstorm");
@@ -333,11 +361,13 @@ describe("getAllScripts", () => {
 describe("getAllAgents", () => {
   it("ships the Teamwork and delegated worktree roles with the profile registry", () => {
     const agents = getAllAgents();
-    expect([...agents.keys()]).toEqual([
-      "teammate.md",
-      "delegated-worktree-primary-agent.md",
-      "teammate-profiles.json",
-    ]);
+    const registry = JSON.parse(agents.get("teammate-profiles.json") ?? "{}");
+    expect(agents.has("teammate.md")).toBe(true);
+    expect(agents.has("delegated-worktree-primary-agent.md")).toBe(true);
+    for (const profile of Object.values(registry.profiles) as {
+      role: string;
+    }[])
+      expect(agents.has(profile.role)).toBe(true);
   });
 
   it("values match exported constants", () => {
@@ -366,12 +396,18 @@ describe("getAllAgents", () => {
     expect(teammate).toContain('"evidence"');
     expect(teammate).toContain("attempts/<attempt-id>/report.json");
     expect(teammate).toContain("Do not read or use");
-    expect(teammate).toContain("host exposes such memory and cannot isolate");
+    expect(teammate).toContain("do not claim technical memory");
   });
 
   it("each agent body starts with `---` frontmatter and a matching name field", () => {
     const agents = getAllAgents();
     for (const [file, content] of agents) {
+      if (file.startsWith("profiles/")) {
+        expect(content).toContain("输入");
+        expect(content).toContain("结果");
+        expect(content).toContain("停止");
+        continue;
+      }
       if (file.endsWith(".json")) {
         expect(() => JSON.parse(content)).not.toThrow();
         continue;

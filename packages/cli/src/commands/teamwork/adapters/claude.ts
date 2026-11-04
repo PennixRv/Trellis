@@ -257,6 +257,7 @@ export function shouldUseSystemPromptFile(systemPrompt: string): boolean {
 export function buildClaudeArgs(opts: {
   resumeSessionId?: string;
   model?: string;
+  reasoningEffort?: string;
   verbose?: boolean;
   /** Appended to Claude's default system prompt (per agent definition body). */
   systemPrompt?: string;
@@ -282,6 +283,13 @@ export function buildClaudeArgs(opts: {
   if (opts.verbose !== false) args.push("--verbose");
   if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
   if (opts.model) args.push("--model", opts.model);
+  if (opts.reasoningEffort) {
+    if (!["low", "medium", "high", "max"].includes(opts.reasoningEffort))
+      throw new Error(
+        `Claude CLI does not support reasoning effort '${opts.reasoningEffort}'`,
+      );
+    args.push("--effort", opts.reasoningEffort);
+  }
   if (opts.systemPromptFile) {
     args.push("--append-system-prompt-file", opts.systemPromptFile);
   } else if (opts.systemPrompt?.trim()) {

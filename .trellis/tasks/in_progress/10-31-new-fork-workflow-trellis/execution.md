@@ -1,5 +1,23 @@
 # 执行记录
 
+## 2026-11-04：真实 batch 与 beta.14 发布准备
+
+真实前台 batch 经原生 plan 构造、预检和派发完成：Codex Sol/high 与 Copilot Sonnet/high 的报告均为 ACCEPTED，batch 为 ALL_ACCEPTED，重试均为 0。回执及终态事件已持久化，容量保留已释放。完整 CLI 回归 2,248 项通过、2 项跳过；新增两项 provider 原生恢复协议测试后定向六项通过，当前合计 2,250 项通过；Core 422 项通过、1 项跳过。lint/typecheck/build、Skill quick_validate、差异检查与精确打包依赖检查通过。真实 beta.14 临时 init/update 一致，六角色卡和 teamwork.json 齐全。Claude/DSH 未真实调用。
+
+源码与双包使用 `0.7.1-beta.14`，仍在既有 `v0.7.1` 分支。中英 Beta 指南、changelog、导航与 breaking manifest 已补齐；旧自定义 schema-1 profile/冻结 plan 明确要求转换或重新构造，不静默丢弃。现场更新保留自定义 config.yaml/.gitignore，以原生 update --skip-all 刷新其余受管资产；当前阶段不代表 CI 发布、真实重装或两仓现场已经完成。
+
+## 2026-11-04：Teamwork 配置与运行路径实施
+
+源码仍在既有 `v0.7.1`。已贯通配置 schema 2、六专业卡/18候选、模式文件、config/plan/batch CLI、交互 profile、冻结执行快照和四 provider adapters；新增精确固定的 ACP SDK 2.4.0，不使用 provider 原生角色注册。Codex 模型/effort 协商与真实中断、ACP 参数应用/取消确认、进程终止、持久容量及清理围栏已进入源码和测试。宿主证明仅表达实际运行能力，记忆/递归委派/源码只读限制由角色合同约束。
+
+CLI 全套测试首轮发现 profiles 子目录安装漏建，已修复；之后全套测试退出 0。此前 Core 422 项通过、1 项跳过；build/typecheck、Teamwork/模板定向 219 项通过。临时项目真实 init 安装六张卡并通过 update dry-run 一致性；Codex Sol/high 与 Copilot Sonnet/high 的原生 run 实测返回指定确认并正常清理。Skill 与引用文档同步了实际 CLI、矩阵、角色职责、模式及边界。仍须验证 managed batch 报告链路、最终全套检查、发行包与两仓现场，不据此宣称完成。
+
+## 2026-11-04：Teamwork 补充方案与实施批准
+
+用户已审查完整补充方案，确认六 profile、每项三套跨 provider/模型候选，不使用 Luna；上下文使用默认。本轮最后明确要求配置文件化、纠正错误和不完整实现、核对相关 Skills，将完整修复方案落到原始任务后“就可以开工了，不需二次决策了”。这是本 owner 同范围源码实施批准，根父任务的当前 design.md 已作为 implementation_contract 经原生接受及 authorize 进入 task_implementation。
+
+当前 Trellis 源码基线 `v0.7.1@9ad095cfa58010441a1f56e81d956d5695315b41`；源码开始前只修改本 owner 需求/方案/实施记录并重开受影响阶段。使用当前宿主已登记 CodeGraph 核验 profile/coordinator/launch/supervisor 调用链，尚未误删任何有效能力。旧 GitNexus CLI 当前不在 PATH，不自动通过 runner 下载旧组件；相关旧资产按原任务边界保留。
+
 ## 2026-11-01：静态实现与组件验证
 
 - 在 `pennix/new-fork-workflow` 分支、批准基线 `fa678d8bedd6ddc3891ad69706c79418a75bf147` 上完成本 owner task 的源码、测试、模板和规范资产；任务仍为 `in_progress`，等待根任务接纳组件证据。

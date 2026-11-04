@@ -3,6 +3,7 @@ import fs from "node:fs";
 import { parseClaudeLine } from "./adapters/claude.js";
 import { createCodexCtx, parseCodexLine } from "./adapters/codex.js";
 import type { ParseResult } from "./adapters/types.js";
+import type { Provider } from "./adapters/index.js";
 
 /**
  * Dev-only command: feed a recorded stream-json / wire trace into the
@@ -16,7 +17,11 @@ import type { ParseResult } from "./adapters/types.js";
  * trace; we pre-seed the ctx with the ids the probe used (1 for initialize,
  * 2 for thread/start, 3 for turn/start) so id-matching works.
  */
-export function parseTrace(adapter: "claude" | "codex", file: string): void {
+export function parseTrace(adapter: Provider, file: string): void {
+  if (adapter !== "claude" && adapter !== "codex")
+    throw new Error(
+      "ACP wire traces require an SDK protocol fixture, not the line parser",
+    );
   const raw = fs.readFileSync(file, "utf-8");
   const lines = raw.split("\n");
   let lineNo = 0;

@@ -24,6 +24,7 @@ import {
 } from "./artifact.js";
 import {
   assertTeammateAdapterContract,
+  assertTeammateHostCapability,
   type TeammateHostCapabilities,
 } from "./teammate-adapters.js";
 import {
@@ -31,11 +32,8 @@ import {
   resolveTeammateRuntimeConfig,
   type TeammateRuntimeConfig,
 } from "./teammate-config.js";
-import { resolveTeammateProfile } from "./profiles.js";
-import {
-  buildTeammateLaunchSpec,
-  type TeammateLaunchSpec,
-} from "./teammate-launch.js";
+import type { resolveTeammateProfile } from "./profiles.js";
+import { type TeammateLaunchSpec } from "./teammate-launch.js";
 
 export type AttemptWaitResult =
   | { kind: "report"; terminal: true; providerSessionId?: string }
@@ -119,7 +117,10 @@ export interface TeamworkReceipt {
 }
 
 export function assertTeamworkPlanCurrent(
-  plan: TeamworkPlan,
+  plan: Pick<
+    TeamworkPlan,
+    "taskId" | "phaseId" | "taskRouteRevision" | "inputRevision"
+  >,
   taskRoot: string,
 ): void {
   const taskFile = path.join(taskRoot, "task.json");
@@ -357,7 +358,10 @@ async function appendAction(input: {
   });
 }
 
-function readPlanFile(planPath: string): unknown {
+export function readPlanFile(planPath: string): unknown {
+  const stat = fs.lstatSync(planPath);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 2 * 1024 * 1024)
+    throw new Error("Teamwork plan must be a regular file under 2097152 bytes");
   const raw = fs.readFileSync(planPath, "utf8");
   return JSON.parse(raw) as unknown;
 }
@@ -366,7 +370,12 @@ export function loadTeamworkPlan(
   planPath: string,
   taskRoot: string,
 ): TeamworkPlan {
-  const plan = validateTeamworkPlan(readPlanFile(planPath), taskRoot);
+  const plan = validateTeamworkPlan(
+    readPlanFile(planPath),
+    taskRoot,
+    undefined,
+    { allowExpired: true },
+  );
   assertTeamworkPlanCurrent(plan, taskRoot);
   return plan;
 }
@@ -374,7 +383,9 @@ export function loadTeamworkPlan(
 export async function runTeamworkCoordinator(
   input: TeamworkCoordinatorInput,
 ): Promise<TeamworkReceipt> {
-  const plan = validateTeamworkPlan(input.plan, input.taskRoot);
+  const plan = validateTeamworkPlan(input.plan, input.taskRoot, undefined, {
+    allowExpired: true,
+  });
   assertTeamworkPlanCurrent(plan, input.taskRoot);
   const cwd = input.cwd ?? input.taskRoot;
   const frozenLaunches = new Map<
@@ -386,23 +397,12 @@ export async function runTeamworkCoordinator(
   >();
   for (const assignment of plan.assignments) {
     assertTeammateAdapterContract(assignment.provider);
-    const profile = resolveTeammateProfile({
-      cwd,
-      profile: assignment.profile,
-      provider: assignment.provider,
-      model: assignment.model,
-    });
-    frozenLaunches.set(assignment.assignmentId, {
-      profile,
-      launch: buildTeammateLaunchSpec({
-        cwd,
-        profile,
-        host: input.host,
-        contextFiles: assignment.contextFiles,
-        contextManifests: assignment.contextManifests,
-        protectedTargets: plan.protectedTargets,
-      }),
-    });
+    assertTeammateHostCapability(
+      assignment.provider,
+      input.host,
+      assignment.execution.profile.options,
+    );
+    frozenLaunches.set(assignment.assignmentId, assignment.execution);
   }
   const config = input.config ?? resolveTeammateRuntimeConfig(cwd);
   const capacity = effectiveTeammateCapacity({
@@ -443,6 +443,14 @@ export async function runTeamworkCoordinator(
       guardHeld = false;
     }
     return recovered;
+  }
+  if (Date.parse(plan.deadline) <= Date.now()) {
+    await input.guard.release({
+      batchId: plan.batchId,
+      planHash: plan.planHash,
+      capacity,
+    });
+    throw new Error("deadline elapsed before batch dispatch");
   }
   try {
     for (const [queueIndex, assignment] of plan.assignments.entries()) {

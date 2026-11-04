@@ -22,6 +22,7 @@ trellis --version
 trellis teamwork --help
 trellis teamwork list --all
 trellis teamwork list --scope global --all
+trellis teamwork config
 ```
 
 If the user names a Teamwork Session or thread, inspect it before asking for
@@ -38,8 +39,9 @@ trellis teamwork context list <session> --scope global --thread <thread>
 | User intent | Read |
 |---|---|
 | `general`: bounded research, review, or verification assignments | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
-| Advisor: one bounded consultation | `references/coordination-modes.md` |
-| `committee`: parallel assessment by two or three distinct lenses | `references/coordination-modes.md` |
+| Advisor: one bounded consultation | `references/coordination-modes.md`, then `references/teamwork-plan-construction.md` |
+| `committee`: parallel assessment by two or three distinct lenses | `references/coordination-modes.md`, then `references/teamwork-plan-construction.md` |
+| Profile, model, provider, reasoning effort, or role-card configuration | `references/teammate-configuration-matrix.md` |
 | “和 codex/claude 讨论一下”, “brainstorm with another agent” | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
 | “派 teammate 做研究或验证”, “让 agent review”, “spawn a worker” | `references/teamwork-plan-construction.md`, then `references/teammate-processes.md` |
 | “开 issue 区 / topic 群 / changelog / board”, “make a forum” | `references/teamwork-plan-construction.md` |
@@ -50,7 +52,9 @@ trellis teamwork context list <session> --scope global --thread <thread>
 ## Core Rules
 
 - Teammates provide research, review, verification, evidence, and advice under a role contract; they do not implement product code. Coding tools or provider permission modes do not grant that role authority. Return results in the assigned format and let the coordinator review them.
-- `general`, `advisor`, and `committee` are coordination modes, independent from `run`, batch execution, and forum sessions. The current `batch` CLI is reserved and refuses dispatch; see the plan reference for the current boundary.
+- `general`, `advisor`, and `committee` are coordination modes, independent from profiles, providers, `run`, batch execution, and forum sessions. Read project defaults with `teamwork config`; construct a frozen plan with `teamwork plan` and execute it with `teamwork batch --task <task-dir>`.
+- Select one of the six professional profiles and one of its named configurations. For multiple teammates, consider the second and third candidates and record the selection reason; using the same configuration is allowed. See the configuration matrix reference before constructing a new plan.
+- Teamwork does not create or operate Paseo workspaces, Git worktrees, or source-writing implementation agents. Those mechanisms remain independent.
 - New forum Teamwork Sessions use `--type forum`. A `thread` is one item inside a forum Teamwork Session.
 - Use `--context-file` / `--context-raw` and `trellis teamwork context add/delete/list`.
 - Use `--stdin` or `--text-file` for long messages. Do not put long mixed Chinese/English text in the positional shell argument.

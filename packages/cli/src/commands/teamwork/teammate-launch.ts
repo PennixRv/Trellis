@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { z } from "zod";
+
 import { assembleContext } from "./context-loader.js";
 import {
   assertTeammateHostCapability,
@@ -9,7 +11,10 @@ import {
   type TeammateAdapterContract,
   type TeammateHostCapabilities,
 } from "./teammate-adapters.js";
-import type { ResolvedTeammateProfile } from "./profiles.js";
+import {
+  frozenProfileSchema,
+  type ResolvedTeammateProfile,
+} from "./profiles.js";
 
 /** Role obligations frozen with the launch, not filesystem or Git isolation. */
 export interface TeammateWritePolicy {
@@ -22,7 +27,6 @@ export interface TeammateWritePolicy {
 
 export interface TeammateCapabilitySnapshot {
   transport: TeammateAdapterContract["transport"];
-  nativeDelegationDisabled: true;
   supportsContinuation: true;
   supportsInterrupt: true;
   supportsCancel: true;
@@ -34,8 +38,6 @@ export interface TeammateCapabilitySnapshot {
     foregroundWait: true;
     protectedArtifactWrites: true;
     attemptArtifactWrites: true;
-    nativeDelegationDisabled: true;
-    implicitMemoryDisabled: true;
     providerTransports: TeammateHostCapabilities["providerTransports"];
     providerOptions: Partial<TeammateHostCapabilities["providerOptions"]>;
     verifiedHostCap: number;
@@ -47,17 +49,111 @@ export interface TeammateLaunchSpec {
   roleId: "teammate";
   provider: ResolvedTeammateProfile["provider"];
   profile?: string;
+  configuration: string;
   model?: string;
   reasoningEffort?: ResolvedTeammateProfile["reasoningEffort"];
   options: ResolvedTeammateProfile["options"];
   profileDigest?: string;
   prompt: string;
+  instructions: string;
+  context: string;
   rolePath: string;
   contextPaths: string[];
   contextManifests: string[];
   roleDigest: string;
   contextDigest: string;
   capability: TeammateCapabilitySnapshot;
+}
+
+const sha256 = z.string().regex(/^[a-f0-9]{64}$/);
+const frozenLaunchSchema = z
+  .object({
+    roleId: z.literal("teammate"),
+    provider: frozenProfileSchema.shape.provider,
+    profile: z.string().optional(),
+    configuration: frozenProfileSchema.shape.configuration,
+    model: z.string().optional(),
+    reasoningEffort: frozenProfileSchema.shape.reasoningEffort,
+    options: frozenProfileSchema.shape.options,
+    profileDigest: sha256.optional(),
+    prompt: z.string().max(256 * 1024),
+    instructions: z
+      .string()
+      .min(1)
+      .max(128 * 1024),
+    context: z.string().max(128 * 1024),
+    rolePath: z.string(),
+    contextPaths: z.array(z.string()),
+    contextManifests: z.array(z.string()),
+    roleDigest: sha256,
+    contextDigest: sha256,
+    capability: z
+      .object({
+        transport: z.enum(["claude-cli", "codex-app-server", "acp"]),
+        supportsContinuation: z.literal(true),
+        supportsInterrupt: z.literal(true),
+        supportsCancel: z.literal(true),
+        supportsTerminal: z.literal(true),
+        supportsFailure: z.literal(true),
+        writePolicy: z
+          .object({
+            protectedTargets: z.literal("read-only"),
+            gitState: z.literal("read-only"),
+            attemptArtifacts: z.literal("write-only"),
+            nativeDelegation: z.literal("disabled"),
+            recursiveDelegation: z.literal("disabled"),
+          })
+          .strict(),
+        protectedTargets: z.array(z.string()),
+        hostProof: z
+          .object({
+            foregroundWait: z.literal(true),
+            protectedArtifactWrites: z.literal(true),
+            attemptArtifactWrites: z.literal(true),
+            providerTransports: z.array(
+              z.enum(["claude-cli", "codex-app-server", "acp"]),
+            ),
+            providerOptions: z.record(z.string(), z.array(z.string())),
+            verifiedHostCap: z.number().int().positive(),
+          })
+          .strict(),
+        digest: sha256,
+      })
+      .strict(),
+  })
+  .strict();
+
+export function parseFrozenTeammate(input: unknown): {
+  profile: ResolvedTeammateProfile;
+  launch: TeammateLaunchSpec;
+} {
+  const result = z
+    .object({ profile: frozenProfileSchema, launch: frozenLaunchSchema })
+    .strict()
+    .parse(input);
+  const { profile, launch } = result;
+  for (const field of [
+    "provider",
+    "model",
+    "profile",
+    "configuration",
+    "reasoningEffort",
+    "profileDigest",
+    "roleDigest",
+  ] as const)
+    if (profile[field] !== launch[field])
+      throw new Error(`frozen execution ${field} does not match profile`);
+  if (
+    canonical(profile.options) !== canonical(launch.options) ||
+    profile.rolePrompt !== launch.instructions
+  )
+    throw new Error(
+      "frozen execution instructions or options do not match profile",
+    );
+  const { digest: expected, ...capability } = launch.capability;
+  if (hash(canonical(capability)) !== expected)
+    throw new Error("frozen capability digest does not match");
+  return result;
 }
 
 function hash(value: string | Buffer): string {
@@ -152,13 +248,7 @@ export function buildTeammateLaunchSpec(input: {
       );
   }
 
-  const roleFile = requireRegularFile(
-    input.cwd,
-    input.profile.rolePath,
-    "teammate role",
-  );
-  const roleBytes = fs.readFileSync(roleFile);
-  const roleDigest = hash(roleBytes);
+  const roleDigest = input.profile.roleDigest;
   const contextDigest = hash(
     assembled.paths
       .map(
@@ -182,7 +272,6 @@ export function buildTeammateLaunchSpec(input: {
   };
   const capability = {
     transport: adapter.transport,
-    nativeDelegationDisabled: true as const,
     supportsContinuation: true as const,
     supportsInterrupt: true as const,
     supportsCancel: true as const,
@@ -194,8 +283,6 @@ export function buildTeammateLaunchSpec(input: {
       foregroundWait: true as const,
       protectedArtifactWrites: true as const,
       attemptArtifactWrites: true as const,
-      nativeDelegationDisabled: true as const,
-      implicitMemoryDisabled: true as const,
       providerTransports: [...input.host.providerTransports].sort(),
       providerOptions: Object.fromEntries(
         Object.entries(input.host.providerOptions).map(
@@ -211,6 +298,7 @@ export function buildTeammateLaunchSpec(input: {
   };
   return {
     roleId: "teammate",
+    configuration: input.profile.configuration,
     provider: input.profile.provider,
     ...(input.profile.profile ? { profile: input.profile.profile } : {}),
     ...(input.profile.model ? { model: input.profile.model } : {}),
@@ -224,6 +312,8 @@ export function buildTeammateLaunchSpec(input: {
     prompt: [input.profile.rolePrompt, assembled.prompt]
       .filter(Boolean)
       .join("\n\n---\n\n"),
+    instructions: input.profile.rolePrompt,
+    context: assembled.prompt,
     rolePath: input.profile.rolePath,
     contextPaths: assembled.paths,
     contextManifests: assembled.manifests,

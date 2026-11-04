@@ -8,6 +8,7 @@ import { copyTrellisDir } from "../templates/extract.js";
 import {
   workflowMdTemplate,
   configYamlTemplate,
+  teamworkConfigTemplate,
   gitignoreTemplate,
   gitattributesTemplate,
   getAllAgents,
@@ -157,6 +158,10 @@ export async function createWorkflowStructure(
     path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml"),
     configYamlTemplate,
   );
+  await writeFile(
+    path.join(cwd, DIR_NAMES.WORKFLOW, "teamwork.json"),
+    teamworkConfigTemplate,
+  );
 
   // Ensure project-root .gitattributes carries the journal merge=union rule
   // (additive-only — never overwrites a user's existing file wholesale).
@@ -170,6 +175,7 @@ export async function createWorkflowStructure(
   // --template`.
   ensureDir(path.join(cwd, PATHS.AGENTS));
   for (const [agentFile, content] of getAllAgents()) {
+    ensureDir(path.dirname(path.join(cwd, PATHS.AGENTS, agentFile)));
     await writeFile(path.join(cwd, PATHS.AGENTS, agentFile), content);
   }
 

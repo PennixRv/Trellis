@@ -3,6 +3,10 @@ import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import {
+  installTeammateAssets,
+  frozenExecution,
+} from "../helpers/teammate-assets.js";
 
 import {
   computeTeamworkPlanHash,
@@ -20,9 +24,13 @@ import {
 const sourceDigest = "a".repeat(64);
 
 it("accepts a report authored from the bundled teammate role example", () => {
-  const role = fs.readFileSync(path.resolve(__dirname, "../../src/templates/trellis/agents/teammate.md"), "utf8");
+  const role = fs.readFileSync(
+    path.resolve(__dirname, "../../src/templates/trellis/agents/teammate.md"),
+    "utf8",
+  );
   const example = /```json\s*([\s\S]*?)```/.exec(role)?.[1];
-  if (!example) throw new Error("bundled teammate role must include a JSON report example");
+  if (!example)
+    throw new Error("bundled teammate role must include a JSON report example");
   const report = JSON.parse(example);
   const assigned = {
     task_id: "task-1",
@@ -39,7 +47,13 @@ it("accepts a report authored from the bundled teammate role example", () => {
   for (const [key, value] of Object.entries(assigned)) {
     if (key in report) report[key] = value;
   }
-  report.evidence = [{ id: "finding-1", locator: "src/contract.ts", summary: "The assigned contract is consistent." }];
+  report.evidence = [
+    {
+      id: "finding-1",
+      locator: "src/contract.ts",
+      summary: "The assigned contract is consistent.",
+    },
+  ];
   const identity = {
     taskId: assigned.task_id,
     batchId: assigned.batch_id,
@@ -51,11 +65,15 @@ it("accepts a report authored from the bundled teammate role example", () => {
     taskRouteRevision: assigned.task_route_revision,
     inputRevision: assigned.input_revision,
   };
-  expect(validateTeammateReport(report, identity, sourceDigest).status).toBe("complete");
+  expect(validateTeammateReport(report, identity, sourceDigest).status).toBe(
+    "complete",
+  );
 });
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-artifact-test-"));
+  installTeammateAssets(root);
+  const execution = frozenExecution(root);
   const deadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const briefPath = path.join(
     root,
@@ -66,11 +84,15 @@ function fixture() {
   );
   fs.mkdirSync(path.dirname(briefPath), { recursive: true });
   const brief = {
-    schema_version: 1,
+    schema_version: 2,
+    input: "Inspect the assigned source and return cited findings.",
     task_id: "task-1",
     batch_id: "batch-1",
     assignment_id: "work-1",
-    role_id: "teammate",
+    execution,
+    profile: "review",
+    model: execution.profile.model,
+    selection_reason: "Independent review using the configured default",
     provider: "codex",
     summary: "Check the source contract and report concrete evidence.",
     scope: "Inspect the source contract",
@@ -81,7 +103,8 @@ function fixture() {
   };
   fs.writeFileSync(briefPath, JSON.stringify(brief));
   const plan: Record<string, unknown> = {
-    schema_version: 1,
+    schema_version: 2,
+    coordination_digest: "c".repeat(64),
     task_id: "task-1",
     batch_id: "batch-1",
     session_id: "parallel",
@@ -94,7 +117,10 @@ function fixture() {
       {
         assignment_id: "work-1",
         brief_path: "teammates/batch-1/work-1/brief.json",
-        role_id: "teammate",
+        execution,
+        profile: brief.profile,
+        model: brief.model,
+        selection_reason: brief.selection_reason,
         provider: "codex",
         summary: brief.summary,
         scope: brief.scope,
@@ -130,6 +156,7 @@ function addPairedWork(
     ...primaryBrief,
     assignment_id: "work-2",
     provider: "claude",
+    execution: frozenExecution(root, "claude"),
     lens: options.lens ?? "Check assumptions and independent evidence",
     ...(options.summary ? { summary: options.summary } : {}),
   };
@@ -147,6 +174,7 @@ function addPairedWork(
     assignment_id: "work-2",
     brief_path: "teammates/batch-1/work-2/brief.json",
     provider: "claude",
+    execution: secondBrief.execution,
     lens: secondBrief.lens,
     brief_digest: computeTeamworkPlanHash(secondBrief),
     ...(options.summary ? { summary: options.summary } : {}),
@@ -172,7 +200,8 @@ describe("TeamworkSession teammate artifacts", () => {
     expect(validateTeamworkPlan(plan, root).assignments[0].sourceDigest).toBe(
       sourceDigest,
     );
-    (plan.assignments as Record<string, unknown>[])[0].source_digest = "b".repeat(64);
+    (plan.assignments as Record<string, unknown>[])[0].source_digest =
+      "b".repeat(64);
     plan.plan_hash = computeTeamworkPlanHash(plan);
     expect(() => validateTeamworkPlan(plan, root)).toThrow(/source_digest/);
     fs.rmSync(root, { recursive: true, force: true });
@@ -263,18 +292,18 @@ describe("TeamworkSession teammate artifacts", () => {
       kind: "committee",
     };
     incomplete.plan.plan_hash = computeTeamworkPlanHash(incomplete.plan);
-    expect(() => validateTeamworkPlan(incomplete.plan, incomplete.root)).toThrow(
-      /two or three/,
-    );
+    expect(() =>
+      validateTeamworkPlan(incomplete.plan, incomplete.root),
+    ).toThrow(/two or three/);
     fs.rmSync(incomplete.root, { recursive: true, force: true });
 
     const mismatched = fixture();
     addPairedWork(mismatched.root, mismatched.plan, "committee", {
       summary: "A different objective",
     });
-    expect(() => validateTeamworkPlan(mismatched.plan, mismatched.root)).toThrow(
-      /same assignment contract/,
-    );
+    expect(() =>
+      validateTeamworkPlan(mismatched.plan, mismatched.root),
+    ).toThrow(/same assignment contract/);
     fs.rmSync(mismatched.root, { recursive: true, force: true });
   });
 
@@ -412,7 +441,7 @@ describe("TeamworkSession teammate artifacts", () => {
     expect(
       validateTeammateClaim(
         {
-          schema_version: 1,
+          schema_version: 2,
           task_id: "task-1",
           batch_id: "batch-1",
           assignment_id: "work-1",
@@ -456,7 +485,7 @@ describe("TeamworkSession teammate artifacts", () => {
     };
     const planHash = "b".repeat(64);
     const makeClaim = (options: Record<string, string | number | boolean>) => ({
-      schema_version: 1,
+      schema_version: 2,
       task_id: identity.taskId,
       batch_id: identity.batchId,
       assignment_id: identity.assignmentId,
@@ -467,7 +496,7 @@ describe("TeamworkSession teammate artifacts", () => {
       source_digest: sourceDigest,
       slot: 0,
       status: "issued",
-      role_id: "teammate",
+      configuration: "codex-sol",
       provider: "codex",
       options,
       role_digest: planHash,

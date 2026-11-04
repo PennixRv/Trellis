@@ -1,5 +1,18 @@
 # 新 fork 工作流：Trellis Teamwork 与业务阶段运行时改造
 
+## 2026-11-04：Teamwork 完整配置与执行修复
+
+承接根父任务 `10-29-new-fork-workflow-master-plan-v2` 的 T-01–T-08、设计 3.4.1–3.4.12 与 U1–U8。用户已审查补充方案，并明确授权形成完整修复优化方案后直接实施，无须二次决策。本轮源码基线为 `v0.7.1@9ad095cfa58010441a1f56e81d956d5695315b41`，只在现有 submodule checkout 修改，不建分支或 worktree。
+
+- 六项专业 profile 为 architecture、review、research、verification、exploration、diagnosis，各有精确角色卡。新版项目 profile JSON 持有卡片引用、明确默认与三套候选；六项默认 Codex Sol，第二套 Copilot Sol，第三套为对应 Copilot Opus/Sonnet；architecture 使用 xhigh，其余 high，不使用 Luna。
+- 模式默认及可调整参数写入版本化 `.trellis/teamwork.json`，既有并发/guard 留在 config.yaml；本次计划保存模式、成员选择/覆盖、选型理由与不可变 execution。参数来自配置文件，不在代码/Skill 维护第二份运行默认。
+- 共同/专业指令与 brief 分离、摘要并冻结，启动/继续/重试不读可变 profile 重新选型。公开成员字段移除固定 role_id，普通 lens 可省略，committee 按既定语义保持互异关注点。保留通用交互 agent loader。
+- 完整接通 Codex/Claude/Copilot/DSH adapter、模型/思考参数、supervisor、交互与 batch coordinator、只读预检、失败/取消/恢复和报告核验；原生 CLI 与 ACP 边界如实披露。角色只读是行为合同，不新增权限隔离；与 Paseo 完全正交。
+- 上下文使用默认，不新增窗口、token 预算或输出预留机制。模板枚举、六卡与配置、全平台 Skill/四 references、meta/阶段指导、测试/spec/公开文档须同步。四后端协议/fixture 验证，Codex/Copilot 真实任务验证，Claude/DSH not_run；当前元数据成功不是实现验收。
+- 修复前核对所有调用者及失效路径；配置变化影响后续新计划，已经冻结的批次不变。原生 init/update、构建/打包和必要质量检查通过才向根父任务交付。发布重装、两仓现场迁移和备份清理由根父任务负责；旧任务与一次性交接包不改。
+
+详细设计与恢复边界以本 owner 的设计/实施增量及根父任务上述章节为准；本增量不重做已经交付的无关任务治理和阶段实现。
+
 ## Goal
 
 在 Trellis fork 中按父任务已批准的范围，先完成既有 Teamwork 产品与资产改名，再实现业务阶段、路线、授权和阶段接受的 Core/CLI 合同，以及各业务阶段对应的 bundled native workflow、Skill 和 resolver。完成 Trellis 仓内验证后，为 Pennix Skills 和根侧验收提供稳定接口与验证证据。

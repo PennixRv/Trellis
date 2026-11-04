@@ -654,9 +654,17 @@ export function encodeCodexInterruptMessage(
   );
 }
 
-export function buildCodexArgs(opts: { model?: string }): string[] {
+export function buildCodexArgs(opts: {
+  model?: string;
+  reasoningEffort?: string;
+}): string[] {
   const args = ["app-server"];
-  if (opts.model) args.push("-c", `model="${opts.model}"`);
+  if (opts.model) args.push("-c", `model=${JSON.stringify(opts.model)}`);
+  if (opts.reasoningEffort)
+    args.push(
+      "-c",
+      `model_reasoning_effort=${JSON.stringify(opts.reasoningEffort)}`,
+    );
   return args;
 }
 
@@ -690,6 +698,8 @@ export function buildCodexThreadStartParams(
   cwd: string,
   systemPrompt?: string,
   sandbox?: CodexSandboxMode,
+  model?: string,
+  reasoningEffort?: string,
 ): Record<string, unknown> {
   const params: Record<string, unknown> = {
     cwd,
@@ -710,6 +720,11 @@ export function buildCodexThreadStartParams(
   };
   if (systemPrompt?.trim()) {
     params.developerInstructions = systemPrompt;
+  }
+  if (model) params.model = model;
+  if (reasoningEffort) {
+    const config = params.config as Record<string, unknown>;
+    config.model_reasoning_effort = reasoningEffort;
   }
   return params;
 }

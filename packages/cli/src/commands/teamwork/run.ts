@@ -13,6 +13,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 
 import type { Provider } from "./adapters/index.js";
+import type { ReasoningEffort } from "./profiles.js";
 import { createTeamworkSession } from "./create.js";
 import { teamworkSessionRm } from "./rm.js";
 import { teamworkSessionSend } from "./send.js";
@@ -29,6 +30,9 @@ export interface RunOptions {
   as?: string;
   cwd?: string;
   model?: string;
+  profile?: string;
+  configuration?: string;
+  reasoningEffort?: ReasoningEffort;
   files?: string[];
   jsonls?: string[];
   message?: string;
@@ -60,6 +64,9 @@ export async function teamworkSessionRun(opts: RunOptions): Promise<void> {
       as: opts.as,
       cwd: opts.cwd,
       model: opts.model,
+      profile: opts.profile,
+      configuration: opts.configuration,
+      reasoningEffort: opts.reasoningEffort,
       timeoutMs,
       files: opts.files,
       jsonls: opts.jsonls,

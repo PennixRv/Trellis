@@ -14,6 +14,10 @@ import {
   type TeammateDispatchContext,
 } from "../../src/commands/teamwork/coordinator.js";
 import { readCoordinationState } from "@pennixrv/trellis-core/teamwork";
+import {
+  installTeammateAssets,
+  frozenExecution,
+} from "../helpers/teammate-assets.js";
 
 const sourceDigest = "a".repeat(64);
 
@@ -37,7 +41,8 @@ function setup(): TestEnv {
   });
   fs.mkdirSync(taskRoot, { recursive: true });
   const goalExplorationAndRequirements = "goal_exploration_and_requirements";
-  const decisionSpaceConstructionAndMerging = "decision_space_construction_and_merging";
+  const decisionSpaceConstructionAndMerging =
+    "decision_space_construction_and_merging";
   const solutionDesignAndConvergence = "solution_design_and_convergence";
   const taskImplementation = "task_implementation";
   const deliveryReviewAndCloseout = "delivery_review_and_closeout";
@@ -66,7 +71,13 @@ function setup(): TestEnv {
           task_kind: "combined",
           complexity: "standard",
           project_context: "existing",
-          phase_ids: [goalExplorationAndRequirements, decisionSpaceConstructionAndMerging, solutionDesignAndConvergence, taskImplementation, deliveryReviewAndCloseout],
+          phase_ids: [
+            goalExplorationAndRequirements,
+            decisionSpaceConstructionAndMerging,
+            solutionDesignAndConvergence,
+            taskImplementation,
+            deliveryReviewAndCloseout,
+          ],
           current_phase_id: decisionSpaceConstructionAndMerging,
           input_revision: "1",
           phases: {
@@ -127,18 +138,30 @@ function teardown(env: TestEnv): void {
 }
 
 function createPlan(taskRoot: string, assignmentIds: string[], maxRetries = 0) {
+  const cwd = path.resolve(taskRoot, "../../..");
+  installTeammateAssets(cwd);
+  const execution = frozenExecution(cwd);
   const batchId = "batch-1";
   const deadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const work = assignmentIds.map((assignmentId) => {
-    const briefPath = path.join("teammates", batchId, assignmentId, "brief.json");
+    const briefPath = path.join(
+      "teammates",
+      batchId,
+      assignmentId,
+      "brief.json",
+    );
     const briefFile = path.join(taskRoot, briefPath);
     fs.mkdirSync(path.dirname(briefFile), { recursive: true });
     const brief = {
-      schema_version: 1,
+      schema_version: 2,
+      input: "Inspect the assigned source and return cited findings.",
       task_id: "task-1",
       batch_id: batchId,
       assignment_id: assignmentId,
-      role_id: "teammate",
+      execution,
+      profile: "review",
+      model: execution.profile.model,
+      selection_reason: "Independent configured review",
       provider: "codex",
       summary: `Review the ${assignmentId} source area and return evidence-backed findings.`,
       scope: `Inspect ${assignmentId}`,
@@ -151,7 +174,10 @@ function createPlan(taskRoot: string, assignmentIds: string[], maxRetries = 0) {
     return {
       assignment_id: assignmentId,
       brief_path: briefPath,
-      role_id: "teammate",
+      execution,
+      profile: brief.profile,
+      model: brief.model,
+      selection_reason: brief.selection_reason,
       provider: "codex",
       summary: brief.summary,
       scope: brief.scope,
@@ -163,7 +189,8 @@ function createPlan(taskRoot: string, assignmentIds: string[], maxRetries = 0) {
     };
   });
   const plan: Record<string, unknown> = {
-    schema_version: 1,
+    schema_version: 2,
+    coordination_digest: "c".repeat(64),
     task_id: "task-1",
     batch_id: batchId,
     session_id: "parallel",
@@ -286,8 +313,6 @@ const host = {
   foregroundWait: true,
   protectedArtifactWrites: true,
   attemptArtifactWrites: true,
-  nativeDelegationDisabled: true,
-  implicitMemoryDisabled: true,
   providerTransports: ["codex-app-server" as const],
   providerOptions: { codex: [] },
   verifiedHostCap: 2,
@@ -326,7 +351,7 @@ describe("TeamworkSession teammate coordinator", () => {
         plan,
         taskRoot: env.taskRoot,
         cwd: env.projectDir,
-        host: { ...host, implicitMemoryDisabled: false },
+        host: { ...host, attemptArtifactWrites: false },
         guard: batchGuard,
         config,
         runtime: {
@@ -359,7 +384,11 @@ describe("TeamworkSession teammate coordinator", () => {
     const dispatched: TeammateDispatchContext[] = [];
     const waiters = new Map<
       string,
-      (result: { kind: "report"; terminal: true; providerSessionId?: string }) => void
+      (result: {
+        kind: "report";
+        terminal: true;
+        providerSessionId?: string;
+      }) => void
     >();
     let resolveTwoStarted!: () => void;
     let resolveTwoWaiting!: () => void;
@@ -397,7 +426,8 @@ describe("TeamworkSession teammate coordinator", () => {
           return new Promise((resolve) => {
             waiters.set(context.assignment.assignmentId, resolve);
             if (waiters.size === 2) resolveTwoWaiting();
-            if (context.assignment.assignmentId === "work-c") resolveThreeWaiting();
+            if (context.assignment.assignmentId === "work-c")
+              resolveThreeWaiting();
           });
         },
         async continue() {
@@ -428,14 +458,17 @@ describe("TeamworkSession teammate coordinator", () => {
       "work-c",
     ]);
     for (const assignmentId of ["work-c", "work-a"]) {
-      const context = dispatched.find((item) => item.assignment.assignmentId === assignmentId);
+      const context = dispatched.find(
+        (item) => item.assignment.assignmentId === assignmentId,
+      );
       expect(context).toBeDefined();
       if (!context) throw new Error(`missing dispatch for ${assignmentId}`);
       writeReport(env.taskRoot, context);
       waiters.get(assignmentId)?.({
         kind: "report",
         terminal: true,
-        providerSessionId: assignmentId === "work-a" ? "session-a" : `session-${assignmentId}`,
+        providerSessionId:
+          assignmentId === "work-a" ? "session-a" : `session-${assignmentId}`,
       });
     }
 
@@ -651,7 +684,11 @@ describe("TeamworkSession teammate coordinator", () => {
         },
         async continue(context) {
           writeReport(env.taskRoot, context);
-          return { kind: "report", terminal: true, providerSessionId: "session-a" };
+          return {
+            kind: "report",
+            terminal: true,
+            providerSessionId: "session-a",
+          };
         },
       },
     });
@@ -664,7 +701,10 @@ describe("TeamworkSession teammate coordinator", () => {
       sessionId: "parallel",
       cwd: env.projectDir,
     });
-    expect(state.assignments[0]).toMatchObject({ state: "ACCEPTED", retryCount: 0 });
+    expect(state.assignments[0]).toMatchObject({
+      state: "ACCEPTED",
+      retryCount: 0,
+    });
     expect(state.attempts[0]).toMatchObject({
       state: "REPORT_SUBMITTED",
       providerSessionId: "session-a",

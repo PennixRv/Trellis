@@ -21,10 +21,12 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { isProvider, type Provider } from "./adapters/index.js";
+
 export interface AgentDefinition {
   name: string;
   description?: string;
-  provider?: "claude" | "codex";
+  provider?: Provider;
   model?: string;
   labels?: string[];
   systemPrompt: string;
@@ -119,12 +121,10 @@ export function loadAgent(
   };
 }
 
-function normalizeProvider(
-  v: string | undefined,
-): "claude" | "codex" | undefined {
+function normalizeProvider(v: string | undefined): Provider | undefined {
   if (!v) return undefined;
   const t = v.trim().toLowerCase();
-  if (t === "claude" || t === "codex") return t;
+  if (isProvider(t)) return t;
   return undefined;
 }
 

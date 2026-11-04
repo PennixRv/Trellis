@@ -14,10 +14,13 @@ coordination_mode
 ```
 
 The plan also freezes the Teamwork Session, batch, deadline, protected targets,
-and ordered `assignments`. Each assignment has an `assignment_id`, brief path,
-role, provider, optional profile and model, scope, lens, source digest,
-acceptance criteria, and an explicit retry budget. The CLI validates the plan
-and the immutable brief before dispatch.
+and ordered `assignments`. Each assignment has an `assignment_id`, selected
+profile/configuration, selection reason, task input, scope, optional lens,
+source digest, acceptance criteria, and an explicit retry budget. The native
+constructor resolves the effective provider/model/effort/options and common
+plus professional instructions, then publishes schema-2 plan and briefs.
+Claims also use schema 2; reports remain schema 1. Do not hand-author frozen
+execution objects, role or capability digests, claims, or plan hashes.
 
 Use the native task lifecycle for task status and acceptance. Teamwork records
 coordination facts and teammate reports; it does not write `current_phase_id`,
@@ -39,19 +42,57 @@ specs, and the generic teammate role card. Freeze the input revision and route
 revision after the coordinator has selected the scope. If those values change,
 construct a new plan rather than mixing results from different task inputs.
 
-The reserved managed-batch entry point is:
+Construct and run through the native entry points:
 
 ```bash
-trellis teamwork batch <plan-path>
+trellis teamwork config --profile review --mode advisor
+trellis teamwork plan <draft.json> --task <task-dir> --output <task-dir>/plan.json --dry-run
+trellis teamwork plan <draft.json> --task <task-dir> --output <task-dir>/plan.json
+trellis teamwork batch <task-dir>/plan.json --task <task-dir> --preflight
+trellis teamwork batch <task-dir>/plan.json --task <task-dir>
 ```
 
-The current CLI unconditionally refuses this command before writing
-coordination state: a verified runtime adapter has not been connected to the
-coordinator. It does not discover an adapter or start the batch. The shared
-coordinator and its plan/report contracts exist and are tested separately.
-Do not present `run` or `spawn` as a substitute for managed batch execution.
-When connected, the coordinator owns dispatch, waiting, report acceptance,
-and the terminal receipt; the coordinating agent must not add a second retry loop.
+The draft is a JSON object with `schema_version: 2`, the binding fields above,
+safe `batch_id` and `session_id`, `deadline`, optional `requested_capacity`
+and `protected_targets`, and explicit `assignments`. A minimal member is:
+
+```json
+{
+  "assignment_id": "review-a",
+  "profile": "review",
+  "configuration": "codex-sol",
+  "selection_reason": "Use the configured source reviewer",
+  "summary": "Review the selected change",
+  "scope": "src/example.ts",
+  "input": "Inspect the assigned source and return evidence in the requested report.",
+  "source_digest": "<SHA-256 of the selected source evidence>",
+  "acceptance": ["Cite precise source locations and explain observable impact"],
+  "max_retries": 0
+}
+```
+
+Optional member overrides are `provider`, `model`, `reasoning_effort`, and
+adapter-supported `options`; context comes from `context_files` and
+`context_manifests`. Committee members additionally need distinct `lens`
+values and otherwise share the same task/evidence/acceptance contract. The
+constructor creates their evaluation group. Read the configuration matrix
+before choosing candidates. Output must be inside the selected task under
+this project's `.trellis/tasks/`; existing immutable artifacts are preserved.
+
+`--dry-run` validates all prepared briefs and paths without writing artifacts.
+`--preflight` validates frozen inputs, current native task revisions and
+capacity without launching a provider; `processProbe: not_run` means accounts,
+models and transport have not been tested by that command. Actual dispatch
+negotiates provider model and effort and fails explicitly if unsupported.
+
+The foreground CLI owns dispatch, waiting, report acceptance, retries, process
+shutdown and the terminal receipt. Do not add a second scheduler or retry
+loop. `run` and `spawn` operate interactive sessions and do not bypass batch
+reconciliation. A restart returns a durable terminal receipt or
+`RECONCILIATION_REQUIRED`; it never silently replays an uncertain attempt.
+Capacity reservations survive a coordinator crash because a dead coordinator
+does not prove its provider processes exited. Do not delete an unresolved
+reservation to make another batch fit; inspect ownership and terminal evidence.
 
 ## Teamwork Session and forum commands
 
@@ -59,7 +100,7 @@ Create and inspect the durable runtime object with the native CLI:
 
 ```bash
 trellis teamwork create <name> --type chat|forum \
-  --task .trellis/tasks/<task-dir> --description "bounded discussion"
+  --task .trellis/tasks/in_progress/<task-dir> --description "bounded discussion"
 trellis teamwork list [--scope project|global] [--all]
 trellis teamwork messages <name> [--raw]
 trellis teamwork wait <name> --as <agent> --kind done,turn_finished

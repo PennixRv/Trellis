@@ -1,8 +1,23 @@
 import chalk from "chalk";
+import fs from "node:fs";
+import path from "node:path";
 import { InvalidArgumentError, type Command } from "commander";
 
 import { isProvider, listProviders, type Provider } from "./adapters/index.js";
 import { parseCodexSandboxMode } from "./adapters/codex.js";
+import {
+  REASONING_EFFORTS,
+  resolveTeammateProfile,
+  type ReasoningEffort,
+} from "./profiles.js";
+import {
+  resolveCoordination,
+  COORDINATION_MODES,
+  type CoordinationMode,
+} from "./coordination.js";
+import { constructTeamworkPlan } from "./plan.js";
+import { CLI_TEAMMATE_HOST } from "./runtime.js";
+import { teamworkBatch } from "./batch.js";
 import {
   teamworkSessionContextAdd,
   teamworkSessionContextDelete,
@@ -39,11 +54,66 @@ function parseNonNegativeInteger(value: string): number {
   return Number(value);
 }
 
+function parseReasoningEffort(value: string): ReasoningEffort {
+  if (!REASONING_EFFORTS.includes(value as ReasoningEffort))
+    throw new InvalidArgumentError(
+      `reasoning effort must be one of ${REASONING_EFFORTS.join(", ")}`,
+    );
+  return value as ReasoningEffort;
+}
+
 export function registerTeamworkCommand(program: Command): void {
   const teamwork = program
     .command("teamwork")
     .description(
       "Trellis Teamwork runtime — coordinate teammates through a shared event log",
+    );
+
+  teamwork
+    .command("config")
+    .description(
+      "Resolve the project profile, execution configuration, and coordination defaults",
+    )
+    .option("--profile <name>", "professional profile")
+    .option(
+      "--configuration <name>",
+      "candidate configuration within the profile",
+    )
+    .option("--mode <mode>", "general | advisor | committee")
+    .action(
+      (options: {
+        profile?: string;
+        configuration?: string;
+        mode?: string;
+      }) => {
+        if (
+          options.mode &&
+          !COORDINATION_MODES.includes(options.mode as CoordinationMode)
+        )
+          throw new InvalidArgumentError(
+            "mode must be general, advisor, or committee",
+          );
+        const profile = resolveTeammateProfile({
+          cwd: process.cwd(),
+          ...options,
+        });
+        console.log(
+          JSON.stringify({
+            profile: profile.profile,
+            configuration: profile.configuration,
+            provider: profile.provider,
+            model: profile.model,
+            reasoning_effort: profile.reasoningEffort,
+            options: profile.options,
+            role_path: profile.rolePath,
+            professional_role_path: profile.professionalRolePath,
+            coordination: resolveCoordination(
+              process.cwd(),
+              options.mode as CoordinationMode | undefined,
+            ),
+          }),
+        );
+      },
     );
 
   teamwork
@@ -264,7 +334,7 @@ export function registerTeamworkCommand(program: Command): void {
   teamwork
     .command("spawn <name>")
     .description(
-      "Register a teammate process (claude/codex) in a Teamwork session — it stays idle until the first `teamwork send --to <teammate>` arrives",
+      "Register a teammate process in a Teamwork session; waits for the first targeted message",
     )
     .option("--scope <scope>", "Teamwork session scope: project | global")
     .option(
@@ -273,7 +343,7 @@ export function registerTeamworkCommand(program: Command): void {
     )
     .option(
       "--provider <provider>",
-      "teammate provider: claude | codex (overrides agent)",
+      "teammate provider: claude | codex | copilot | dsh",
     )
     .option(
       "--as <name>",
@@ -281,6 +351,13 @@ export function registerTeamworkCommand(program: Command): void {
     )
     .option("--cwd <path>", "teammate working directory (default: process cwd)")
     .option("--model <id>", "model override")
+    .option("--profile <id>", "professional teammate profile")
+    .option("--configuration <id>", "configuration within the selected profile")
+    .option(
+      "--reasoning-effort <effort>",
+      "provider reasoning effort override",
+      parseReasoningEffort,
+    )
     .option("--resume <id>", "resume an existing session/thread id")
     .option(
       "--sandbox <mode>",
@@ -330,6 +407,9 @@ export function registerTeamworkCommand(program: Command): void {
         as?: string;
         cwd?: string;
         model?: string;
+        profile?: string;
+        configuration?: string;
+        reasoningEffort?: ReasoningEffort;
         resume?: string;
         sandbox?: string;
         timeout?: string;
@@ -357,6 +437,9 @@ export function registerTeamworkCommand(program: Command): void {
           as: opts.as,
           cwd: opts.cwd,
           model: opts.model,
+          profile: opts.profile,
+          configuration: opts.configuration,
+          reasoningEffort: opts.reasoningEffort,
           resume: opts.resume,
           sandbox,
           timeoutMs: parseDuration(opts.timeout),
@@ -379,23 +462,56 @@ export function registerTeamworkCommand(program: Command): void {
     });
 
   teamwork
+    .command("plan <spec>")
+    .description(
+      "Resolve project configuration and publish an immutable Teamwork plan and briefs",
+    )
+    .requiredOption("--task <path>", "current task directory")
+    .requiredOption("--output <path>", "new plan file")
+    .option(
+      "--dry-run",
+      "validate and resolve without writing files or starting processes",
+    )
+    .action(
+      (
+        spec: string,
+        opts: { task: string; output: string; dryRun?: boolean },
+      ) => {
+        const plan = constructTeamworkPlan({
+          draft: JSON.parse(fs.readFileSync(spec, "utf8")),
+          cwd: process.cwd(),
+          taskRoot: path.resolve(opts.task),
+          output: path.resolve(opts.output),
+          host: CLI_TEAMMATE_HOST,
+          dryRun: opts.dryRun,
+        });
+        console.log(JSON.stringify(plan));
+      },
+    );
+
+  teamwork
     .command("batch <plan>")
     .description(
-      "Submit one frozen Teamwork plan; requires an installed host adapter",
+      "Execute a frozen Teamwork plan through foreground provider processes",
     )
-    .action(async (_planPath: string) => {
-      try {
-        throw new Error(
-          "no verified teammate host adapter is installed; batch dispatch refused before writing coordination state",
-        );
-      } catch (err) {
-        console.error(
-          chalk.red("Error:"),
-          err instanceof Error ? err.message : err,
-        );
-        process.exit(1);
-      }
-    });
+    .requiredOption("--task <path>", "current task directory")
+    .option(
+      "--preflight",
+      "read-only validation; creates no files or provider processes",
+    )
+    .action(
+      async (planPath: string, opts: { task: string; preflight?: boolean }) => {
+        try {
+          await teamworkBatch(planPath, opts);
+        } catch (err) {
+          console.error(
+            chalk.red("Error:"),
+            err instanceof Error ? err.message : err,
+          );
+          process.exit(1);
+        }
+      },
+    );
 
   teamwork
     .command("run [name]")
@@ -408,11 +524,18 @@ export function registerTeamworkCommand(program: Command): void {
     )
     .option(
       "--provider <provider>",
-      "teammate provider: claude | codex (overrides agent)",
+      "teammate provider: claude | codex | copilot | dsh",
     )
     .option("--as <name>", "teammate name (default: agent name if --agent set)")
     .option("--cwd <path>", "teammate working directory")
     .option("--model <id>", "model override")
+    .option("--profile <id>", "professional teammate profile")
+    .option("--configuration <id>", "configuration within the selected profile")
+    .option(
+      "--reasoning-effort <effort>",
+      "provider reasoning effort override",
+      parseReasoningEffort,
+    )
     .option(
       "--file <path>",
       "include a file as context (glob supported, repeatable)",
@@ -439,6 +562,9 @@ export function registerTeamworkCommand(program: Command): void {
         as?: string;
         cwd?: string;
         model?: string;
+        profile?: string;
+        configuration?: string;
+        reasoningEffort?: ReasoningEffort;
         file?: string[];
         jsonl?: string[];
         message?: string;
@@ -461,6 +587,9 @@ export function registerTeamworkCommand(program: Command): void {
           as: opts.as,
           cwd: opts.cwd,
           model: opts.model,
+          profile: opts.profile,
+          configuration: opts.configuration,
+          reasoningEffort: opts.reasoningEffort,
           files: opts.file,
           jsonls: opts.jsonl,
           message: opts.message,

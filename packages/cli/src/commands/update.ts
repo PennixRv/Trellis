@@ -48,6 +48,7 @@ import {
   getAllAgents,
   // Configuration
   configYamlTemplate,
+  teamworkConfigTemplate,
   gitignoreTemplate,
   workflowMdTemplate,
 } from "../templates/trellis/index.js";
@@ -950,6 +951,7 @@ async function collectTemplateFiles(
   }
 
   // Configuration
+  files.set(`${DIR_NAMES.WORKFLOW}/teamwork.json`, teamworkConfigTemplate);
   files.set(
     `${DIR_NAMES.WORKFLOW}/config.yaml`,
     preserveExistingRegistryConfig(cwd, configYamlTemplate),

@@ -8,7 +8,9 @@
 | --- | --- |
 | `~/.trellis/teamwork/<project>/<session>/events.jsonl` | Durable Teamwork Session event log. |
 | `.trellis/agents/teammate.md` | Generic behavior card loaded for a teammate. |
-| `.trellis/agents/teammate-profiles.json` | Provider and execution profiles. |
+| `.trellis/agents/teammate-profiles.json` | Schema-2 professional profiles and named execution candidates. |
+| `.trellis/agents/profiles/*.md` | Six professional role cards combined with the common card. |
+| `.trellis/teamwork.json` | Coordination mode and member-count defaults. |
 | `.trellis/config.yaml` (`teamwork.*`) | Teammate concurrency and process guard settings. |
 | `packages/core/src/teamwork/` | Reusable Teamwork Session event and storage APIs. |
 | `packages/cli/src/commands/teamwork/` | CLI commands, provider adapters, and process supervision. |
@@ -26,6 +28,16 @@ The storage root defaults to `~/.trellis/teamwork`; `TRELLIS_TEAMWORK_ROOT` over
 ## Configuration
 
 The project configuration supports `teamwork.teammate.max_concurrency` and `teamwork.teammate_guard.idle_timeout`, `max_live_teammates`, and `non_batch_reserved`. Defaults and CLI overrides are defined by the current Trellis CLI; read `packages/cli/src/commands/teamwork/teammate-config.ts` before changing them.
+
+`teamwork config` resolves project defaults. `teamwork plan` freezes profile,
+configuration, instructions and evidence into schema-2 plan/brief artifacts;
+`teamwork batch --task` connects the foreground coordinator to Codex app-server,
+Claude CLI, Copilot ACP or DSH ACP. Claims are schema 2, reports schema 1.
+An unresolved batch keeps a durable project capacity reservation, including
+after coordinator exit. The guard and session cleanup preserve that evidence.
+Role read-only and history-use requirements are behavioral contracts; runtime
+capabilities do not claim filesystem or memory isolation. Teamwork is independent
+of Paseo workspaces, Git worktrees and source-writing delegated agents.
 
 ## Related entry points
 

@@ -26,6 +26,7 @@ import {
 import { shouldUseSystemPromptFile } from "./adapters/claude.js";
 import type { CodexSandboxMode } from "./adapters/codex.js";
 import { getAdapter, type Provider } from "./adapters/index.js";
+import type { ReasoningEffort } from "./profiles.js";
 import { appendEvent } from "./store/events.js";
 import { readProcessIdentity } from "./process-identity.js";
 import { workerFile } from "./store/paths.js";
@@ -54,6 +55,8 @@ export interface SupervisorConfig {
   env?: Record<string, string>;
   /** Optional model override. */
   model?: string;
+  reasoningEffort?: ReasoningEffort;
+  options?: Record<string, string | number | boolean>;
   /** Resume an existing session/thread if id is provided. */
   resume?: string;
   /** Codex-only: overrides the `thread/start` sandbox mode (default `workspace-write`). */
@@ -215,6 +218,8 @@ export async function runSupervisor(
   const view = {
     resume: config.resume,
     model: config.model,
+    reasoningEffort: config.reasoningEffort,
+    options: config.options,
     systemPrompt: config.systemPrompt,
     ...(systemPromptFile ? { systemPromptFile } : {}),
     cwd: config.cwd,

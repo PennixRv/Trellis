@@ -1,0 +1,11 @@
+{
+  "version": "0.7.1-beta.14",
+  "description": "落地 Teamwork 角色配置矩阵与前台受管执行",
+  "breaking": true,
+  "recommendMigrate": false,
+  "changelog": "新增六份专业角色卡、18 组可编辑执行候选及独立 mode 配置；接通 config/plan/batch、Codex app-server 与 Copilot/DSH ACP；补齐冻结验证、取消确认、容量保留和真实报告验收。",
+  "migrations": [],
+  "migrationGuide": "Run the native project update to refresh unmodified managed assets. Customized teammate-profiles.json files must be explicitly converted from schema 1 to schema 2: default_profile, profiles.<id>.role, default_configuration, and configurations.<name>.{provider,model,reasoning_effort,options}. Reconstruct schema-1 frozen plans from the current task inputs through teamwork plan; do not hand-edit frozen hashes or reuse uncertain attempts. Existing tasks and handoff history remain intact.",
+  "aiInstructions": "Use the bundled trellis-teamwork Skill and teamwork config to inspect effective defaults. Review customized profile conflicts before replacement. Keep professional role cards as ordinary Trellis Markdown, preserve native provider permissions, and do not substitute interactive run/spawn or Paseo worktree delegation for managed batch execution.",
+  "notes": "Native init/update includes teamwork.json and all six nested professional role cards. CLI/Core versions remain synchronized. Live Linux validation covers Codex and Copilot; Claude and DSH are fixture-verified only. Unresolved capacity reservations are retained for explicit reconciliation."
+}

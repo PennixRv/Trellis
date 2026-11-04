@@ -11,6 +11,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { teamworkSessionKill } from "./kill.js";
 import { withLock } from "./store/lock.js";
+import { readBatchReservations } from "./batch-reservation.js";
 
 import {
   sessionDir,
@@ -50,6 +51,14 @@ export async function teamworkSessionRm(
   await withLock(
     path.join(projectDir(project), ".worker-guard.lock"),
     async () => {
+      if (
+        readBatchReservations(projectDir(project)).some(
+          (item) => item.sessionId === name,
+        )
+      )
+        throw new Error(
+          "Batch capacity reservation is unresolved; session evidence preserved",
+        );
       const teammates = new Set(
         fs
           .readdirSync(dir)
@@ -144,6 +153,8 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
     for (const name of entries) {
       if (name.startsWith(".")) continue; // skip .bucket marker
       if (keep.has(name)) continue;
+      if (readBatchReservations(dir).some((item) => item.sessionId === name))
+        continue;
       const chDir = sessionDir(name, project);
       try {
         if (!fs.statSync(chDir).isDirectory()) continue;
@@ -226,6 +237,12 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
         () =>
           withLock(lockPath(c.name, c.project), () => {
             const directory = sessionDir(c.name, c.project);
+            if (
+              readBatchReservations(projectDir(c.project)).some(
+                (item) => item.sessionId === c.name,
+              )
+            )
+              return;
             if (hasLiveWorker(directory)) return;
             // Do not remove a session that changed after the preview.
             const current = fs.readFileSync(

@@ -2,184 +2,212 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { z } from "zod";
+
 import { loadAgent } from "./agent-loader.js";
 
 export const TEAMMATE_ROLE_ID = "teammate";
 export const TEAMMATE_PROFILES_PATH = ".trellis/agents/teammate-profiles.json";
-export const REASONING_EFFORTS = ["medium", "high", "xhigh"] as const;
+export const REASONING_EFFORTS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 export type TeammateProvider = "claude" | "codex" | "dsh" | "copilot";
 
-interface ProfileEntry {
-  provider?: TeammateProvider;
-  model?: string;
-  reasoning_effort?: ReasoningEffort;
-  options?: Record<string, string | number | boolean>;
-}
-
-interface ProfileFile {
-  default_provider?: TeammateProvider;
-  default_model?: string;
-  profiles: Record<string, ProfileEntry>;
-}
+const identifier = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/);
+const boundedText = z
+  .string()
+  .trim()
+  .min(1)
+  .max(256)
+  .regex(/^[^\r\n\0]+$/);
+const optionsSchema = z
+  .record(
+    z.string().regex(/^[A-Za-z0-9._-]{1,64}$/),
+    z.union([boundedText, z.number().finite(), z.boolean()]),
+  )
+  .refine(
+    (value) => Object.keys(value).length <= 32,
+    "too many provider options",
+  );
+const executionSchema = z
+  .object({
+    provider: z.enum(["claude", "codex", "dsh", "copilot"]),
+    model: boundedText,
+    reasoning_effort: z.enum(REASONING_EFFORTS).optional(),
+    options: optionsSchema.optional(),
+  })
+  .strict();
+const profileSchema = z
+  .object({
+    role: boundedText,
+    default_configuration: identifier,
+    configurations: z
+      .record(identifier, executionSchema)
+      .refine(
+        (entries) =>
+          Object.keys(entries).length >= 2 && Object.keys(entries).length <= 3,
+        "each profile requires two or three configurations",
+      ),
+  })
+  .strict()
+  .refine(
+    (entry) => Object.hasOwn(entry.configurations, entry.default_configuration),
+    "default_configuration must name a configuration in this profile",
+  );
+const profilesSchema = z
+  .object({
+    schema_version: z.literal(2),
+    default_profile: identifier,
+    profiles: z.record(identifier, profileSchema),
+  })
+  .strict()
+  .refine(
+    (file) => Object.hasOwn(file.profiles, file.default_profile),
+    "default_profile must name an existing profile",
+  );
 
 export interface ResolvedTeammateProfile {
-  roleId: string;
+  roleId: "teammate";
   provider: TeammateProvider;
-  model?: string;
-  profile?: string;
+  model: string;
+  profile: string;
+  configuration: string;
   reasoningEffort?: ReasoningEffort;
   options: Record<string, string | number | boolean>;
   rolePrompt: string;
   rolePath: string;
-  profilePath?: string;
-  profileDigest?: string;
+  professionalRolePath: string;
+  roleDigest: string;
+  profilePath: string;
+  profileDigest: string;
 }
 
-function text(value: unknown, field: string): string | undefined {
-  if (value === undefined) return undefined;
+export const frozenProfileSchema = z
+  .object({
+    roleId: z.literal("teammate"),
+    provider: executionSchema.shape.provider,
+    model: boundedText,
+    profile: identifier,
+    configuration: identifier,
+    reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
+    options: optionsSchema,
+    rolePrompt: z
+      .string()
+      .min(1)
+      .max(128 * 1024),
+    rolePath: boundedText,
+    professionalRolePath: boundedText,
+    roleDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    profilePath: boundedText,
+    profileDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+/** Configuration and role cards are project assets, never ambient or symlinked instructions. */
+export function readTeamworkAsset(cwd: string, relative: string): string {
+  const root = path.resolve(cwd);
+  const target = path.resolve(root, relative);
+  const local = path.relative(root, target);
   if (
-    typeof value !== "string" ||
-    value.trim() === "" ||
-    value.length > 256 ||
-    /[\r\n\0]/.test(value)
-  ) {
-    throw new Error(`${field} must be bounded text`);
+    !local ||
+    local.startsWith(`..${path.sep}`) ||
+    local === ".." ||
+    path.isAbsolute(local)
+  )
+    throw new Error(`Teamwork asset must stay within the project: ${relative}`);
+  let current = root;
+  for (const part of local.split(path.sep)) {
+    current = path.join(current, part);
+    if (fs.lstatSync(current).isSymbolicLink())
+      throw new Error(`Teamwork asset must not contain symlinks: ${relative}`);
   }
-  return value.trim();
-}
-
-function provider(value: unknown, field: string): TeammateProvider | undefined {
-  const result = text(value, field);
-  if (result === undefined) return undefined;
-  if (
-    result !== "claude" &&
-    result !== "codex" &&
-    result !== "dsh" &&
-    result !== "copilot"
-  ) {
-    throw new Error(`${field} must be claude, codex, dsh, or copilot`);
-  }
-  return result;
-}
-
-function record(value: unknown, field: string): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${field} must be an object`);
-  }
-  return value as Record<string, unknown>;
-}
-
-function loadProfiles(
-  cwd: string,
-): { file: ProfileFile; digest: string } | undefined {
-  const filePath = path.resolve(cwd, TEAMMATE_PROFILES_PATH);
-  if (!fs.existsSync(filePath)) return undefined;
-  const stat = fs.lstatSync(filePath);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 64 * 1024) {
-    throw new Error(`invalid teammate profile file: ${TEAMMATE_PROFILES_PATH}`);
-  }
-  const raw = fs.readFileSync(filePath);
-  const value = record(
-    JSON.parse(raw.toString("utf8")),
-    "teammate profile file",
-  ) as unknown as ProfileFile;
-  if (
-    !value.profiles ||
-    typeof value.profiles !== "object" ||
-    Array.isArray(value.profiles)
-  ) {
+  const stat = fs.statSync(target);
+  if (!stat.isFile() || stat.size > 64 * 1024)
     throw new Error(
-      "teammate profile file must contain an object named profiles",
+      `Teamwork asset must be a regular file of at most 64 KiB: ${relative}`,
     );
-  }
-  provider(value.default_provider, "default_provider");
-  text(value.default_model, "default_model");
-  for (const [id, entry] of Object.entries(value.profiles)) {
-    if (
-      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(id) ||
-      !entry ||
-      typeof entry !== "object" ||
-      Array.isArray(entry)
-    ) {
-      throw new Error(`invalid teammate profile '${id}'`);
-    }
-    provider(entry.provider, `profiles.${id}.provider`);
-    text(entry.model, `profiles.${id}.model`);
-    if (
-      entry.reasoning_effort !== undefined &&
-      !REASONING_EFFORTS.includes(entry.reasoning_effort)
-    ) {
-      throw new Error(`profiles.${id}.reasoning_effort is invalid`);
-    }
-    if (entry.options !== undefined) {
-      const options = record(entry.options, `profiles.${id}.options`);
-      if (Object.keys(options).length > 32)
-        throw new Error(`profiles.${id}.options has too many entries`);
-      for (const [key, option] of Object.entries(options)) {
-        if (!/^[A-Za-z0-9._-]{1,64}$/.test(key))
-          throw new Error(`profiles.${id}.options has an invalid key`);
-        if (
-          typeof option !== "string" &&
-          typeof option !== "number" &&
-          typeof option !== "boolean"
-        ) {
-          throw new Error(`profiles.${id}.options.${key} must be a scalar`);
-        }
-        if (typeof option === "number" && !Number.isFinite(option))
-          throw new Error(`profiles.${id}.options.${key} must be finite`);
-        if (typeof option === "string")
-          text(option, `profiles.${id}.options.${key}`);
-      }
-    }
-  }
-  return {
-    file: value,
-    digest: crypto.createHash("sha256").update(raw).digest("hex"),
-  };
+  return fs.readFileSync(target, "utf8");
 }
 
 export function resolveTeammateProfile(input: {
   cwd: string;
   profile?: string;
+  configuration?: string;
   provider?: TeammateProvider;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
+  options?: Record<string, string | number | boolean>;
   roleId?: string;
 }): ResolvedTeammateProfile {
-  const roleId = input.roleId ?? TEAMMATE_ROLE_ID;
-  if (roleId !== TEAMMATE_ROLE_ID)
-    throw new Error(`unsupported role '${roleId}'`);
-  const agent = loadAgent(roleId, input.cwd);
-  const loaded = loadProfiles(input.cwd);
-  const profile = input.profile
-    ? loaded?.file.profiles[input.profile]
+  if (input.roleId !== undefined && input.roleId !== TEAMMATE_ROLE_ID)
+    throw new Error(`unsupported role '${input.roleId}'`);
+  const raw = readTeamworkAsset(input.cwd, TEAMMATE_PROFILES_PATH);
+  const file = profilesSchema.parse(JSON.parse(raw));
+  const profileId = input.profile ?? file.default_profile;
+  const profile = Object.hasOwn(file.profiles, profileId)
+    ? file.profiles[profileId]
     : undefined;
-  if (input.profile && !profile)
-    throw new Error(`unknown teammate profile '${input.profile}'`);
-  const selectedProvider =
-    input.provider ?? profile?.provider ?? loaded?.file.default_provider;
-  if (!selectedProvider)
+  if (!profile) throw new Error(`unknown teammate profile '${profileId}'`);
+  const configuration = input.configuration ?? profile.default_configuration;
+  const selected = Object.hasOwn(profile.configurations, configuration)
+    ? profile.configurations[configuration]
+    : undefined;
+  if (!selected)
     throw new Error(
-      "teammate provider must be selected explicitly or by profile",
+      `unknown configuration '${configuration}' in profile '${profileId}'`,
     );
-  const selectedModel =
-    input.model ?? profile?.model ?? loaded?.file.default_model;
+  const execution = executionSchema.parse({
+    ...selected,
+    ...(input.provider !== undefined ? { provider: input.provider } : {}),
+    ...(input.model !== undefined ? { model: input.model } : {}),
+    ...(input.reasoningEffort !== undefined
+      ? { reasoning_effort: input.reasoningEffort }
+      : {}),
+    options: { ...selected.options, ...input.options },
+  });
+  const rolePath = ".trellis/agents/teammate.md";
+  const common = readTeamworkAsset(input.cwd, rolePath);
+  if (
+    !profile.role.startsWith("profiles/") ||
+    path.extname(profile.role) !== ".md"
+  )
+    throw new Error(
+      "professional role must reference profiles/*.md under .trellis/agents",
+    );
+  const professionalRolePath = path.posix.join(".trellis/agents", profile.role);
+  if (!professionalRolePath.startsWith(".trellis/agents/profiles/"))
+    throw new Error(
+      "professional role must stay inside .trellis/agents/profiles",
+    );
+  const professional = readTeamworkAsset(input.cwd, professionalRolePath);
+  const agent = loadAgent(TEAMMATE_ROLE_ID, input.cwd);
   return {
-    roleId,
-    provider: selectedProvider,
-    ...(selectedModel ? { model: selectedModel } : {}),
-    ...(input.profile ? { profile: input.profile } : {}),
-    ...(profile?.reasoning_effort
-      ? { reasoningEffort: profile.reasoning_effort }
+    roleId: TEAMMATE_ROLE_ID,
+    provider: execution.provider,
+    model: execution.model,
+    profile: profileId,
+    configuration,
+    ...(execution.reasoning_effort
+      ? { reasoningEffort: execution.reasoning_effort }
       : {}),
-    options: profile?.options ?? {},
-    rolePrompt: agent.systemPrompt,
-    rolePath: agent.filePath,
-    ...(loaded
-      ? {
-          profilePath: path.resolve(input.cwd, TEAMMATE_PROFILES_PATH),
-          profileDigest: loaded.digest,
-        }
-      : {}),
+    options: execution.options ?? {},
+    rolePrompt: `${agent.systemPrompt}\n\n${professional}`,
+    rolePath: path.resolve(input.cwd, rolePath),
+    professionalRolePath: path.resolve(input.cwd, professionalRolePath),
+    roleDigest: crypto
+      .createHash("sha256")
+      .update(common)
+      .update("\0")
+      .update(professional)
+      .digest("hex"),
+    profilePath: path.resolve(input.cwd, TEAMMATE_PROFILES_PATH),
+    profileDigest: crypto.createHash("sha256").update(raw).digest("hex"),
   };
 }

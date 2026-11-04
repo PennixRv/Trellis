@@ -3,6 +3,14 @@
 The plan's `coordination_mode` selects the call shape. It is independent from
 the teammate role, execution profile, and Teamwork Session type.
 
+Project defaults live in `.trellis/teamwork.json`: general defaults to one
+member, advisor to one, and committee to three. Read them with
+`trellis teamwork config --mode <mode>`. The coordinator uses `defaultMembers`
+when composing assignments; it must write each member explicitly. The runtime
+does not invent assignments or silently duplicate one to reach the default.
+Changing defaults affects only newly constructed plans. Advisor must have one
+member, committee two or three, and general one or more within capacity.
+
 ## `general`
 
 Use general coordination for one or more independent assignments. Each
@@ -25,6 +33,12 @@ All members share the assignment contract and use distinct lenses. They return
 independently authored reports; the coordinator compares them after they finish.
 Members may cite the same authoritative sources. Distinct lenses do not
 guarantee independent evidence or require different providers, models, or profiles.
+
+`lens` is the member's “本次关注点”, not another role directory. It is optional
+in general and advisor mode. Committee members receive the same task, evidence
+and acceptance contract; they must not read peer reports before submitting
+their own. Profiles and configurations may differ, with a recorded selection
+reason. Paseo workspace and Git worktree collaboration are independent.
 
 Committee members do not debate with one another, run a consensus loop, or use
 a directional counter relationship. If a question does not need independent

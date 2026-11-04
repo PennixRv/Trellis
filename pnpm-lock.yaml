@@ -17,6 +17,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@agentclientprotocol/sdk':
+        specifier: 2.4.0
+        version: 2.4.0(zod@4.4.2)
       '@pennixrv/trellis-core':
         specifier: workspace:*
         version: link:../core
@@ -98,6 +101,15 @@ importers:
         version: 4.0.18(@types/node@20.19.28)(yaml@2.8.2)
 
 packages:
+
+  '@agentclientprotocol/sdk@2.4.0':
+    resolution: {integrity: sha512-7qJ8nnyj7WesC5ve185ioTpB2/svQoeGV4HA4nLEhgDUrcmBe54/08VcXc/oL4p14tDbxxECZzdYmUYQ+4l+Wg==}
+    peerDependencies:
+      '@modelcontextprotocol/server': ^2.4.0
+      zod: ^3.25.76 || ^4.0.0
+    peerDependenciesMeta:
+      '@modelcontextprotocol/server':
+        optional: true
 
   '@babel/helper-string-parser@7.27.1':
     resolution: {integrity: sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA==}
@@ -1450,6 +1462,10 @@ packages:
     resolution: {integrity: sha512-IynmDyxsEsb9RKzO3J9+4SxXnl2FTFSzNBaKKaMV6tsSk0rw9gYw9gs+JFCq/qk2LCZ78KDwyj+Z289TijSkUw==}
 
 snapshots:
+
+  '@agentclientprotocol/sdk@2.4.0(zod@4.4.2)':
+    dependencies:
+      zod: 4.4.2
 
   '@babel/helper-string-parser@7.27.1': {}
 

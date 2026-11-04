@@ -1,6 +1,6 @@
 ---
 name: commands-teamwork
-description: "Trellis Teamwork CLI and Core contracts: Teamwork Sessions, event storage, teammate processes, forums, and the gated batch coordinator"
+description: "Trellis Teamwork CLI and Core contracts: sessions, configurable profiles, provider processes, and managed batch coordination"
 paths:
   - packages/cli/src/commands/teamwork/**
   - packages/core/src/teamwork/**
@@ -30,18 +30,22 @@ This spec records the current runtime contracts for `packages/cli/src/commands/t
 | `forum <name>` / `thread <name> <thread>` / `thread rename <name> <old> <new>` | List forum threads, inspect a thread timeline, or rename a thread. |
 | `context add|delete|list <name>` | Add, remove, or project session- or thread-level context entries. |
 | `title set|clear <name>` | Set or clear the display title without changing the session address. |
-| `batch <plan>` | Reserved for the managed coordinator. The current CLI rejects dispatch before writing coordination state because no verified teammate host adapter is installed. |
+| `config` | Resolve the project professional profile, named configuration and mode defaults without launching a process. |
+| `plan <draft>` | Validate and freeze schema-2 execution inputs and immutable briefs under the selected task; `--dry-run` writes nothing. |
+| `batch <plan> --task <path>` | Run the foreground managed coordinator; `--preflight` checks inputs without provider calls. |
 
 The hidden `__supervisor` command is an internal child-process entry point. `__parse-trace` is a development command for exercising a registered adapter against a recorded trace. Neither is a user workflow surface.
 
-Provider names, launch capabilities, and option validation come from `adapters/`, `teammate-adapters.ts`, `teammate-config.ts`, and `teammate-launch.ts`; do not duplicate their registries here. `run` and `spawn` use the interactive process runtime. The managed batch path has a separate host-capability contract and must remain closed until a verified host adapter is integrated.
+Provider names, launch capabilities, and option validation come from `adapters/`, `teammate-adapters.ts`, `teammate-config.ts`, and `teammate-launch.ts`; do not duplicate their registries here. `run` and `spawn` use the interactive process runtime. Managed batch uses `batch.ts` and `runtime.ts` with the same executable adapter registry.
 
 Product-source and Git write boundaries are teammate role obligations, frozen
 in the launch `writePolicy`. They do not require host permission isolation, and
 the capability snapshot must not claim technical read-only enforcement. Every
 interactive teammate receives these role and result requirements even when
 `--agent` is omitted. Host proof still covers actual runtime capabilities such
-as waiting, artifact output, context isolation, transport, and capacity.
+as waiting, artifact output, transport, and capacity. Native delegation and
+implicit-history restrictions remain role obligations; do not publish unproven
+memory-isolation or provider-feature claims in the host proof.
 
 ## Core and CLI boundary
 
@@ -109,7 +113,30 @@ Core 在写入 `error`、`progress` 事件前脱敏已知凭据格式；CLI 渲�
 
 The runtime state machine is event-sourced through Core `coordination` events. The batch ends with `ALL_ACCEPTED`, `SETTLED_WITH_FAILURE`, or `RECONCILIATION_REQUIRED`. Uncertain dispatch or cancellation is reconciled before work is duplicated. Retry is limited to an assignment's declared budget and confirmed failure; a timeout may continue the same attempt when the host confirms that continuation is valid.
 
-Although the coordinator and artifact contracts exist, `trellis teamwork batch <plan>` currently refuses dispatch before writing coordination state. Do not describe or test the command as an active dispatcher until a verified host adapter is installed and the gate is deliberately connected to the coordinator.
+`profiles.ts` reads schema-2 `.trellis/agents/teammate-profiles.json`; each of six
+professional profiles owns a role-card path and 2–3 named execution candidates.
+`coordination.ts` reads `.trellis/teamwork.json` separately. Selection is explicit;
+there is no silent provider/model fallback or context-window tuning. Common and
+professional instructions, evidence, effective execution values and digests are
+frozen by `plan.ts`. Execution does not reread mutable project role files.
+Claims use schema 2 and configuration identity; reports retain schema 1.
+
+The constructor validates before publication, including prepared brief size,
+secret checks, committee equivalence, symlink ancestors, current task revisions
+and output containment. Preview performs the same validation without writes.
+`batch --preflight` is not an account or generation probe. Codex negotiates the
+full paginated model catalog and reasoning support; ACP applies advertised
+configuration options before accepting a prompt. DSH uses `--profile acp` and
+advertised `session/resume`; Copilot uses `session/load`. ACP instructions and
+task data use distinct user-content blocks, without claiming system priority.
+
+Batch capacity is reserved durably under the project guard lock, counted by
+interactive spawn too, and released after a durable terminal receipt. A dead
+coordinator or uncertain cancellation does not release it. Session rm/prune
+preserve unresolved reservations. Runtime signal shutdown confirms child exit;
+unconfirmed exit yields reconciliation. Codex and ACP interrupt replacements
+wait for the old turn's terminal response. Recovery may read an expired plan to
+return an existing receipt, but an expired new batch cannot dispatch.
 
 ## Change and verification requirements
 

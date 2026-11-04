@@ -14,13 +14,12 @@ import {
 import { registerTeamworkCommand } from "../../src/commands/teamwork/index.js";
 import { resolveTeammateProfile } from "../../src/commands/teamwork/profiles.js";
 import { buildTeammateLaunchSpec } from "../../src/commands/teamwork/teammate-launch.js";
+import { installTeammateAssets } from "../helpers/teammate-assets.js";
 
 const host = {
   foregroundWait: true,
   protectedArtifactWrites: true,
   attemptArtifactWrites: true,
-  nativeDelegationDisabled: true,
-  implicitMemoryDisabled: true,
   providerTransports: ["codex-app-server" as const],
   providerOptions: { codex: ["temperature"] },
   verifiedHostCap: 2,
@@ -28,6 +27,7 @@ const host = {
 
 function project() {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-launch-test-"));
+  installTeammateAssets(cwd);
   fs.mkdirSync(path.join(cwd, ".trellis", "agents"), { recursive: true });
   fs.writeFileSync(
     path.join(cwd, ".trellis", "agents", "teammate.md"),
@@ -40,7 +40,20 @@ function project() {
   );
   fs.writeFileSync(
     path.join(cwd, ".trellis", "agents", "teammate-profiles.json"),
-    JSON.stringify({ profiles: { review: { options: { temperature: 0 } } } }),
+    JSON.stringify({
+      schema_version: 2,
+      default_profile: "review",
+      profiles: {
+        review: {
+          role: "profiles/review.md",
+          default_configuration: "a",
+          configurations: {
+            a: { provider: "codex", model: "m", options: { temperature: 0 } },
+            b: { provider: "copilot", model: "m" },
+          },
+        },
+      },
+    }),
   );
   return cwd;
 }
@@ -48,29 +61,21 @@ function project() {
 describe("teammate adapter contract", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("registers the four provider transports without native delegation", () => {
-    expect(listTeammateProviders()).toEqual([
-      "codex",
-      "dsh",
-      "copilot",
+  it("registers the four provider lifecycle transports", () => {
+    expect(listTeammateProviders().sort()).toEqual([
       "claude",
+      "codex",
+      "copilot",
+      "dsh",
     ]);
     for (const provider of listTeammateProviders()) {
       expect(() => assertTeammateAdapterContract(provider)).not.toThrow();
     }
   });
 
-  it("rejects an adapter without interrupt support", () => {
-    const adapter = getTeammateAdapter("codex");
-    const supportsInterrupt = adapter.supportsInterrupt;
-    try {
-      adapter.supportsInterrupt = false;
-      expect(() => assertTeammateAdapterContract("codex")).toThrow(
-        /incomplete lifecycle contract/,
-      );
-    } finally {
-      adapter.supportsInterrupt = supportsInterrupt;
-    }
+  it("gets executable transports from the runtime registry", () => {
+    expect(getTeammateAdapter("copilot").transport).toBe("acp");
+    expect(getTeammateAdapter("codex").transport).toBe("codex-app-server");
   });
 
   it("fails closed when the host cannot prove the required boundary", () => {
@@ -79,8 +84,6 @@ describe("teammate adapter contract", () => {
         foregroundWait: false,
         protectedArtifactWrites: true,
         attemptArtifactWrites: true,
-        nativeDelegationDisabled: true,
-        implicitMemoryDisabled: true,
         providerTransports: ["codex-app-server"],
         providerOptions: { codex: [] },
         verifiedHostCap: 2,
@@ -92,8 +95,6 @@ describe("teammate adapter contract", () => {
         foregroundWait: true,
         protectedArtifactWrites: true,
         attemptArtifactWrites: true,
-        nativeDelegationDisabled: true,
-        implicitMemoryDisabled: true,
         providerTransports: ["codex-app-server"],
         providerOptions: { dsh: [] },
         verifiedHostCap: 2,
@@ -101,16 +102,16 @@ describe("teammate adapter contract", () => {
     ).toThrow(/not verified/);
   });
 
-  it("fails closed when the host cannot isolate implicit memory", () => {
+  it("fails closed when the host cannot write attempt artifacts", () => {
     expect(() =>
       assertTeammateHostCapability("codex", {
         ...host,
-        implicitMemoryDisabled: false,
+        attemptArtifactWrites: false,
       }),
     ).toThrow(/capability proof/);
 
     const missingProof = { ...host } as Partial<typeof host>;
-    delete missingProof.implicitMemoryDisabled;
+    delete missingProof.attemptArtifactWrites;
     expect(() =>
       assertTeammateHostCapability("codex", missingProof as typeof host),
     ).toThrow(/capability proof/);
@@ -125,13 +126,21 @@ describe("teammate adapter contract", () => {
         gitStateReadOnly: false,
       };
       const profile = resolveTeammateProfile({ cwd, provider: "codex" });
-      const launch = buildTeammateLaunchSpec({ cwd, profile, host: roleOnlyHost });
+      const launch = buildTeammateLaunchSpec({
+        cwd,
+        profile,
+        host: roleOnlyHost,
+      });
       expect(launch.capability.writePolicy).toMatchObject({
         protectedTargets: "read-only",
         gitState: "read-only",
       });
-      expect(launch.capability.hostProof).not.toHaveProperty("protectedTargetsReadOnly");
-      expect(launch.capability.hostProof).not.toHaveProperty("gitStateReadOnly");
+      expect(launch.capability.hostProof).not.toHaveProperty(
+        "protectedTargetsReadOnly",
+      );
+      expect(launch.capability.hostProof).not.toHaveProperty(
+        "gitStateReadOnly",
+      );
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
@@ -160,7 +169,6 @@ describe("teammate adapter contract", () => {
       protectedTargets: [".trellis/config.yaml", "src"],
       hostProof: {
         verifiedHostCap: 2,
-        implicitMemoryDisabled: true,
       },
     });
     const originalDigest = launch.contextDigest;
@@ -232,12 +240,14 @@ describe("teammate adapter contract", () => {
         "teamwork",
         "batch",
         "missing-plan.json",
+        "--task",
+        ".trellis/tasks/missing",
       ]),
     ).rejects.toThrow("process.exit(1)");
     expect(exit).toHaveBeenCalledWith(1);
     expect(error).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringContaining("host adapter"),
+      expect.stringContaining("ENOENT"),
     );
   });
 });

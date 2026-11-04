@@ -9,9 +9,11 @@ import {
   resolveTeammateRuntimeConfig,
 } from "../../src/commands/teamwork/teammate-config.js";
 import { resolveTeammateProfile } from "../../src/commands/teamwork/profiles.js";
+import { installTeammateAssets } from "../helpers/teammate-assets.js";
 
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-profile-test-"));
+  installTeammateAssets(root);
   fs.mkdirSync(path.join(root, ".trellis", "agents"), { recursive: true });
   fs.writeFileSync(
     path.join(root, ".trellis", "agents", "teammate.md"),
@@ -20,13 +22,21 @@ function project() {
   fs.writeFileSync(
     path.join(root, ".trellis", "agents", "teammate-profiles.json"),
     JSON.stringify({
-      default_provider: "codex",
+      schema_version: 2,
+      default_profile: "review",
       profiles: {
         review: {
-          provider: "claude",
-          model: "claude-review",
-          reasoning_effort: "high",
-          options: { temperature: 0, mode: "review" },
+          role: "profiles/review.md",
+          default_configuration: "primary",
+          configurations: {
+            primary: {
+              provider: "claude",
+              model: "claude-review",
+              reasoning_effort: "high",
+              options: { temperature: 0, mode: "review" },
+            },
+            alternative: { provider: "codex", model: "other" },
+          },
         },
       },
     }),
@@ -86,11 +96,11 @@ describe("TeamworkSession teammate config and profiles", () => {
     const root = project();
     fs.writeFileSync(
       path.join(root, ".trellis", "agents", "teammate-profiles.json"),
-      '{"profiles":{"review":{"options":{"temperature":1e400}}}}',
+      '{"schema_version":2,"default_profile":"review","profiles":{"review":{"role":"profiles/review.md","default_configuration":"a","configurations":{"a":{"provider":"codex","model":"m","options":{"temperature":1e400}},"b":{"provider":"copilot","model":"m"}}}}}',
     );
     expect(() =>
       resolveTeammateProfile({ cwd: root, profile: "review" }),
-    ).toThrow(/must be finite/);
+    ).toThrow(/Infinity|number/);
     fs.rmSync(root, { recursive: true, force: true });
   });
 });

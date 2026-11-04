@@ -2,11 +2,19 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import type { TeammateLaunchSpec } from "./teammate-launch.js";
+import {
+  parseFrozenTeammate,
+  type TeammateLaunchSpec,
+} from "./teammate-launch.js";
+import {
+  assertCoordinationMembers,
+  type CoordinationMode,
+} from "./coordination.js";
+import { REASONING_EFFORTS, type ReasoningEffort } from "./profiles.js";
 
 export type ReportStatus = "complete" | "blocked" | "incomplete" | "error";
 
-export type CoordinationMode = "general" | "advisor" | "committee";
+export type { CoordinationMode } from "./coordination.js";
 
 export interface TeammateAssignment {
   assignmentId: string;
@@ -18,7 +26,10 @@ export interface TeammateAssignment {
   model?: string;
   summary: string;
   scope: string;
-  lens: string;
+  lens?: string;
+  execution: ReturnType<typeof parseFrozenTeammate>;
+  selectionReason: string;
+  taskInput: string;
   briefDigest: string;
   sourceDigest: string;
   contextFiles?: string[];
@@ -28,7 +39,7 @@ export interface TeammateAssignment {
 }
 
 export interface TeamworkPlan {
-  schemaVersion: 1;
+  schemaVersion: 2;
   taskId: string;
   batchId: string;
   sessionId: string;
@@ -37,6 +48,7 @@ export interface TeamworkPlan {
   inputRevision: string;
   planSummary: string;
   coordinationMode: CoordinationMode;
+  coordinationDigest: string;
   planHash: string;
   requestedCapacity?: number;
   assignments: TeammateAssignment[];
@@ -80,7 +92,7 @@ export type TeammateDispositionStatus = "accepted" | "final_failed";
 export type TeammateArtifactIdentity = TeammateIdentity;
 
 export interface TeammateClaim extends TeammateIdentity {
-  schemaVersion: 1;
+  schemaVersion: 2;
   planHash: string;
   briefDigest?: string;
   sourceDigest: string;
@@ -91,10 +103,11 @@ export interface TeammateClaim extends TeammateIdentity {
 
 export interface TeammateExecutionSnapshot {
   roleId: "teammate";
+  configuration: string;
   provider: "claude" | "codex" | "dsh" | "copilot";
   profile?: string;
   model?: string;
-  reasoningEffort?: "medium" | "high" | "xhigh";
+  reasoningEffort?: ReasoningEffort;
   options: Record<string, string | number | boolean>;
   profileDigest?: string;
   roleDigest: string;
@@ -241,9 +254,9 @@ function writeImmutableJson(filePath: string, value: unknown): void {
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => key !== "plan_hash")
-      .sort(([a], [b]) => a.localeCompare(b));
+    const entries = Object.entries(value as Record<string, unknown>).sort(
+      ([a], [b]) => a.localeCompare(b),
+    );
     return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
   }
   return JSON.stringify(value);
@@ -259,19 +272,32 @@ function withoutFields(
 }
 
 export function computeTeamworkPlanHash(value: unknown): string {
-  return crypto.createHash("sha256").update(canonicalJson(value)).digest("hex");
+  const contents =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? withoutFields(value as Record<string, unknown>, ["plan_hash"])
+      : value;
+  return crypto
+    .createHash("sha256")
+    .update(canonicalJson(contents))
+    .digest("hex");
 }
 
 export function validateTeamworkPlan(
   input: unknown,
   taskRoot: string,
   expectedContext?: TeamworkPlanContext,
+  options: {
+    briefContents?: ReadonlyMap<string, string>;
+    allowExpired?: boolean;
+  } = {},
 ): TeamworkPlan {
   if (!input || typeof input !== "object" || Array.isArray(input))
     throw new Error("Teamwork plan must be an object");
   const value = input as Record<string, unknown>;
-  if (value.schema_version !== 1)
-    throw new Error("Teamwork plan schema_version must be 1");
+  if (value.schema_version !== 2)
+    throw new Error(
+      "Teamwork plan schema_version must be 2; construct a new frozen plan",
+    );
   const taskId = id(value.task_id, "task_id");
   const batchId = id(value.batch_id, "batch_id");
   const sessionId = id(value.session_id, "session_id");
@@ -282,6 +308,10 @@ export function validateTeamworkPlan(
   );
   const inputRevision = boundedText(value.input_revision, "input_revision");
   const planSummary = boundedText(value.plan_summary, "plan_summary");
+  const coordinationDigest = digest(
+    value.coordination_digest,
+    "coordination_digest",
+  );
   const coordinationMode = value.coordination_mode;
   if (
     coordinationMode !== "general" &&
@@ -306,7 +336,7 @@ export function validateTeamworkPlan(
   const deadline = boundedText(value.deadline, "deadline");
   const deadlineAt = Date.parse(deadline);
   if (Number.isNaN(deadlineAt)) throw new Error("deadline must be an ISO date");
-  if (deadlineAt <= Date.now())
+  if (!options.allowExpired && deadlineAt <= Date.now())
     throw new Error("deadline must be in the future");
   const assignmentValue = value.assignments;
   if (!Array.isArray(assignmentValue) || assignmentValue.length === 0)
@@ -361,8 +391,15 @@ export function validateTeamworkPlan(
           `assignments[${index}] must declare an evaluation group`,
         );
       }
-      if (item.role_id !== "teammate")
-        throw new Error(`assignments[${index}].role_id must be teammate`);
+      if (item.role_id !== undefined)
+        throw new Error(
+          `assignments[${index}].role_id is retired; teammate is an internal execution type`,
+        );
+      const execution = parseFrozenTeammate(item.execution);
+      const selectionReason = boundedText(
+        item.selection_reason,
+        `assignments[${index}].selection_reason`,
+      );
       const provider = item.provider;
       if (
         provider !== "claude" &&
@@ -385,7 +422,10 @@ export function validateTeamworkPlan(
         `assignments[${index}].brief_path`,
       );
       const scope = boundedText(item.scope, `assignments[${index}].scope`);
-      const lens = boundedText(item.lens, `assignments[${index}].lens`);
+      const lens =
+        item.lens === undefined
+          ? undefined
+          : boundedText(item.lens, `assignments[${index}].lens`);
       const summary = boundedText(
         item.summary,
         `assignments[${index}].summary`,
@@ -428,7 +468,13 @@ export function validateTeamworkPlan(
         throw new Error(
           `assignments[${index}].brief_path must be ${expectedRelative}`,
         );
-      const briefBytes = fs.readFileSync(absoluteBrief);
+      const prepared = options.briefContents?.get(briefPath);
+      if (options.briefContents && prepared === undefined)
+        throw new Error(`missing prepared brief: ${briefPath}`);
+      const briefBytes =
+        prepared === undefined
+          ? fs.readFileSync(absoluteBrief)
+          : Buffer.from(prepared);
       if (briefBytes.byteLength > 64 * 1024)
         throw new Error(
           `brief for assignment '${assignmentId}' exceeds 65536 bytes`,
@@ -441,6 +487,15 @@ export function validateTeamworkPlan(
         throw new Error(
           `brief for assignment '${assignmentId}' must be an object`,
         );
+      if (
+        typeof brief.input !== "string" ||
+        brief.input.trim() === "" ||
+        brief.input.length > 32768 ||
+        brief.input.includes("\0")
+      )
+        throw new Error(
+          "brief.input must be nonempty task text of at most 32768 characters",
+        );
       briefs.set(assignmentId, brief);
       rejectSecrets(brief, `brief for assignment '${assignmentId}'`);
       if (computeTeamworkPlanHash(brief) !== briefDigest)
@@ -448,11 +503,10 @@ export function validateTeamworkPlan(
           `brief.${assignmentId} digest does not match the Teamwork plan`,
         );
       for (const [field, expected] of Object.entries({
-        schema_version: 1,
+        schema_version: 2,
         task_id: taskId,
         batch_id: batchId,
         assignment_id: assignmentId,
-        role_id: "teammate",
         provider,
         summary,
         scope,
@@ -462,6 +516,22 @@ export function validateTeamworkPlan(
         if (brief[field] !== expected)
           throw new Error(`brief.${field} does not match the Teamwork plan`);
       }
+      if (brief.role_id !== undefined)
+        throw new Error("brief.role_id is retired");
+      if (canonicalJson(brief.execution) !== canonicalJson(item.execution))
+        throw new Error("brief.execution does not match the frozen plan");
+      if (brief.selection_reason !== selectionReason)
+        throw new Error(
+          "brief.selection_reason does not match the frozen plan",
+        );
+      if (
+        execution.profile.provider !== provider ||
+        execution.profile.profile !== profile ||
+        execution.profile.model !== model
+      )
+        throw new Error(
+          "assignment provider, profile, or model does not match frozen execution",
+        );
       const briefSourceDigest = digest(
         brief.source_digest,
         `brief.${assignmentId}.source_digest`,
@@ -508,6 +578,9 @@ export function validateTeamworkPlan(
         summary,
         scope,
         lens,
+        execution,
+        selectionReason,
+        taskInput: brief.input,
         briefDigest,
         sourceDigest,
         ...(contextFiles ? { contextFiles } : {}),
@@ -524,6 +597,8 @@ export function validateTeamworkPlan(
       return assignment;
     },
   );
+
+  assertCoordinationMembers(coordinationMode, assignments);
 
   if (coordinationMode === "committee") {
     const groups = new Map<string, TeammateAssignment[]>();
@@ -555,6 +630,8 @@ export function validateTeamworkPlan(
       "lens",
       "brief_path",
       "brief_digest",
+      "execution",
+      "selection_reason",
     ];
     const briefFields = [
       "assignment_id",
@@ -562,6 +639,8 @@ export function validateTeamworkPlan(
       "profile",
       "model",
       "lens",
+      "execution",
+      "selection_reason",
     ];
     const first = members[0];
     if (!first) throw new Error("committee has no assignments");
@@ -606,7 +685,7 @@ export function validateTeamworkPlan(
   )
     throw new Error("requested_capacity must be a positive integer");
   const plan: TeamworkPlan = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     taskId,
     batchId,
     sessionId,
@@ -615,6 +694,7 @@ export function validateTeamworkPlan(
     inputRevision,
     planSummary,
     coordinationMode,
+    coordinationDigest,
     planHash: boundedText(value.plan_hash, "plan_hash"),
     ...(requestedCapacityValue !== undefined
       ? { requestedCapacity: requestedCapacityValue as number }
@@ -803,8 +883,8 @@ export function validateTeammateClaim(
   if (!input || typeof input !== "object" || Array.isArray(input))
     throw new Error("teammate claim must be an object");
   const value = input as Record<string, unknown>;
-  if (value.schema_version !== 1)
-    throw new Error("teammate claim schema_version must be 1");
+  if (value.schema_version !== 2)
+    throw new Error("teammate claim schema_version must be 2");
   for (const key of [
     "task_id",
     "batch_id",
@@ -843,7 +923,7 @@ export function validateTeammateClaim(
   if (!Number.isInteger(value.slot) || (value.slot as number) < 0)
     throw new Error("claim.slot must be non-negative");
   const snapshotKeys = [
-    "role_id",
+    "configuration",
     "provider",
     "profile",
     "model",
@@ -857,8 +937,8 @@ export function validateTeammateClaim(
   const hasSnapshot = snapshotKeys.some((key) => value[key] !== undefined);
   let execution: TeammateExecutionSnapshot | undefined;
   if (hasSnapshot) {
-    if (value.role_id !== "teammate")
-      throw new Error("claim.role_id must be teammate");
+    if (value.role_id !== undefined)
+      throw new Error("claim.role_id is retired");
     const provider = value.provider;
     if (
       provider !== "claude" &&
@@ -881,9 +961,7 @@ export function validateTeammateClaim(
     const reasoningEffort = value.reasoning_effort;
     if (
       reasoningEffort !== undefined &&
-      reasoningEffort !== "medium" &&
-      reasoningEffort !== "high" &&
-      reasoningEffort !== "xhigh"
+      !REASONING_EFFORTS.includes(reasoningEffort as ReasoningEffort)
     ) {
       throw new Error("claim.reasoning_effort is invalid");
     }
@@ -919,10 +997,13 @@ export function validateTeammateClaim(
     }
     execution = {
       roleId: "teammate",
+      configuration: id(value.configuration, "claim.configuration"),
       provider,
       ...(profile ? { profile } : {}),
       ...(model ? { model } : {}),
-      ...(reasoningEffort ? { reasoningEffort } : {}),
+      ...(reasoningEffort
+        ? { reasoningEffort: reasoningEffort as ReasoningEffort }
+        : {}),
       options,
       ...(value.profile_digest === undefined
         ? {}
@@ -938,7 +1019,7 @@ export function validateTeammateClaim(
     };
   }
   const claim: TeammateClaim = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     ...identity,
     planHash,
     ...(briefDigest ? { briefDigest } : {}),
@@ -1020,7 +1101,7 @@ export function writeTeammateClaim(input: {
 }): void {
   const execution = input.launch
     ? {
-        role_id: input.launch.roleId,
+        configuration: input.launch.configuration,
         provider: input.launch.provider,
         ...(input.launch.profile ? { profile: input.launch.profile } : {}),
         ...(input.launch.model ? { model: input.launch.model } : {}),
@@ -1038,7 +1119,7 @@ export function writeTeammateClaim(input: {
     : undefined;
   const claim: TeammateClaim = validateTeammateClaim(
     {
-      schema_version: 1,
+      schema_version: 2,
       task_id: input.identity.taskId,
       batch_id: input.identity.batchId,
       assignment_id: input.identity.assignmentId,
@@ -1077,7 +1158,7 @@ export function writeTeammateClaim(input: {
       status: claim.status,
       ...(claim.execution
         ? {
-            role_id: claim.execution.roleId,
+            configuration: claim.execution.configuration,
             provider: claim.execution.provider,
             ...(claim.execution.profile
               ? { profile: claim.execution.profile }

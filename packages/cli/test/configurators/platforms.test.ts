@@ -446,7 +446,7 @@ describe("configurePlatform", () => {
     expect(fs.existsSync(path.join(skillsRoot, BUNDLED_REFERENCE))).toBe(true);
     expect(
       fs.readFileSync(path.join(skillsRoot, TEAMMATE_REFERENCE), "utf-8"),
-    ).toContain("Teammate Execution Configuration");
+    ).toContain(".trellis/agents/teammate-profiles.json");
     expect(
       fs.existsSync(path.join(skillsRoot, "trellis-start", "SKILL.md")),
     ).toBe(true);

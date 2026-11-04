@@ -131,11 +131,18 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
           turnId: turn.turnId,
         });
       }
-      child.stdin.write(
-        isInterrupt
-          ? adapter.encodeInterruptMessage(interruptText, ctx)
-          : adapter.encodeUserMessage(text, ctx),
-      );
+      if (adapter.deliverMessage)
+        await adapter.deliverMessage(
+          isInterrupt ? interruptText : text,
+          ctx,
+          isInterrupt,
+        );
+      else
+        child.stdin.write(
+          isInterrupt
+            ? adapter.encodeInterruptMessage(interruptText, ctx)
+            : adapter.encodeUserMessage(text, ctx),
+        );
       cursor = ev.seq;
       writeInboxCursor(sessionId, workerName, cursor);
     } catch {

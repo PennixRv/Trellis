@@ -34,6 +34,7 @@ import {
   workerFile,
 } from "./store/paths.js";
 import { parseDuration } from "./wait.js";
+import { readBatchReservations } from "./batch-reservation.js";
 
 /** Built-in default idle-cleanup TTL for spawned teammates (5 minutes). */
 export const DEFAULT_IDLE_TTL_MS = 5 * 60 * 1000;
@@ -307,7 +308,23 @@ export function scanLiveWorkers(
     return [];
   }
 
-  const out: LiveWorker[] = [];
+  const out: LiveWorker[] = readBatchReservations(bucket).flatMap(
+    (reservation) =>
+      Array.from({ length: reservation.capacity }, (_, slot) => ({
+        sessionId: reservation.sessionId,
+        workerId: `batch:${reservation.batchId}:${slot}`,
+        state: {
+          workerId: `batch:${reservation.batchId}:${slot}`,
+          lifecycle: "starting" as const,
+          terminal: false,
+          activity: "idle" as const,
+          pendingMessageCount: 0,
+          inboxPolicy: "explicitOnly" as const,
+          updatedAt: new Date(0).toISOString(),
+          lastSeq: 0,
+        },
+      })),
+  );
   for (const entry of entries) {
     if (entry.startsWith(".")) continue;
     // Stores created before name validation may hold directories with
