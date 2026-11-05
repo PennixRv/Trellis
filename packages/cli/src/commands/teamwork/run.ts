@@ -18,7 +18,10 @@ import { createTeamworkSession } from "./create.js";
 import { teamworkSessionRm } from "./rm.js";
 import { teamworkSessionSend } from "./send.js";
 import { teamworkSessionSpawn } from "./spawn.js";
-import { sessionDir, eventsPath } from "./store/paths.js";
+import { teamworkSessionKill } from "./kill.js";
+import { resolveTeamworkSessionTextBody } from "./text-body.js";
+import { parseTeammateContent, type TeamworkResult } from "./result.js";
+import { sessionDir, eventsPath, workerFile } from "./store/paths.js";
 import { readLastSeq, type TeamworkEvent } from "./store/events.js";
 import { watchEvents } from "./store/watch.js";
 
@@ -38,6 +41,7 @@ export interface RunOptions {
   message?: string;
   textFile?: string;
   stdin?: boolean;
+  json?: boolean;
   /** Per-worker timeout (defaults to 5m if not specified). */
   timeoutMs?: number;
 }
@@ -45,17 +49,44 @@ export interface RunOptions {
 export async function teamworkSessionRun(opts: RunOptions): Promise<void> {
   const name = opts.name ?? `run-${crypto.randomBytes(4).toString("hex")}`;
   const timeoutMs = opts.timeoutMs ?? 5 * 60 * 1000;
-
-  await createTeamworkSession(name, {
-    by: "main",
-    cwd: opts.cwd,
-    ephemeral: true,
-    origin: "run",
-  });
-
+  const result: TeamworkResult = {
+    schemaVersion: 1,
+    kind: "trellis_result",
+    mode: "interactive",
+    association: { sessionId: name },
+    execution: {
+      status: "error",
+      stopped: true,
+      ...(opts.provider ? { provider: opts.provider } : {}),
+      ...(opts.model ? { requestedModel: opts.model } : {}),
+    },
+    reports: [],
+    semanticValidation: "not_run",
+    disposition: "not_applicable",
+  };
   let workerName: string | null = null;
+  let created = false;
   let succeeded = false;
+  let failure: unknown;
+  let finalText: string | undefined;
   try {
+    const text = await resolveTeamworkSessionTextBody(
+      { text: opts.message, textFile: opts.textFile, stdin: opts.stdin },
+      {
+        required: true,
+        missingMessage:
+          "No text provided (use --message, --text-file, or --stdin)",
+        emptyMessage: "Empty message",
+      },
+    );
+    await createTeamworkSession(name, {
+      by: "main",
+      cwd: opts.cwd,
+      ephemeral: true,
+      origin: "run",
+      quiet: true,
+    });
+    created = true;
     // A provider can finish or fail before spawn returns.
     const sinceSeq = await readLastSeq(name);
     const spawned = await teamworkSessionSpawn(name, {
@@ -70,35 +101,92 @@ export async function teamworkSessionRun(opts: RunOptions): Promise<void> {
       timeoutMs,
       files: opts.files,
       jsonls: opts.jsonls,
+      quiet: true,
     });
     workerName = spawned.worker;
+    result.association.worker = workerName;
+    result.execution.provider = spawned.provider ?? opts.provider;
+    result.execution.requestedModel = spawned.model ?? opts.model;
 
     await teamworkSessionSend(name, {
       as: "main",
       to: workerName,
-      text: opts.message,
-      textFile: opts.textFile,
-      stdin: opts.stdin,
+      text,
+      quiet: true,
     });
 
     await waitForDone(name, workerName, timeoutMs, sinceSeq);
-    await printFinalMessage(name, workerName);
-    succeeded = true;
+    result.execution.status = "completed";
+    result.reports.push({
+      association: { worker: workerName },
+      report: null,
+      validation: "failed",
+    });
+    const report = parseTeammateContent(
+      await readFinalMessage(name, workerName),
+    );
+    result.reports[0].report = report;
+    result.reports[0].validation = "passed";
+    finalText = report.answer;
+    succeeded = report.status === "complete";
+  } catch (error) {
+    failure = error;
+    const message = error instanceof Error ? error.message : String(error);
+    result.execution.reason = message;
+    if (result.execution.status !== "completed")
+      result.execution.status = /timeout/i.test(message)
+        ? "timeout"
+        : /killed before done/.test(message)
+          ? "cancelled"
+          : "error";
+    if (result.reports[0]) result.reports[0].error = message;
   } finally {
     if (succeeded) {
       // Clean removal — the Teamwork Session served its purpose.
-      await teamworkSessionRm(name, { force: true });
-    } else {
+      try {
+        await teamworkSessionRm(name, { force: true });
+      } catch (error) {
+        failure = error;
+        succeeded = false;
+        result.execution.status = "uncertain";
+        result.execution.stopped = false;
+        result.execution.reason =
+          error instanceof Error ? error.message : String(error);
+      }
+    }
+    if (!succeeded && created) {
+      if (
+        workerName &&
+        (fs.existsSync(workerFile(name, workerName, "pid")) ||
+          fs.existsSync(workerFile(name, workerName, "worker-pid")))
+      ) {
+        try {
+          await teamworkSessionKill(name, { as: workerName });
+        } catch (error) {
+          result.execution.stopped = false;
+          process.stderr.write(
+            `Teammate stop unconfirmed: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+        }
+      }
       // Failure path: keep the Teamwork Session so the user can inspect events.jsonl,
       // logs, pid state etc. The ephemeral flag remains, so a later
       // `teamwork prune --ephemeral` will still clean it.
       const dir = sessionDir(name);
+      result.diagnosticsPath = dir;
       process.stderr.write(
         `Teamwork Session kept for inspection: ${dir}\n` +
           `(ephemeral — will be removed by \`teamwork prune --ephemeral\`)\n`,
       );
       process.exitCode = 1;
     }
+  }
+  if (!succeeded) process.exitCode = 1;
+  if (opts.json) console.log(JSON.stringify(result));
+  else if (failure) throw failure;
+  else if (finalText !== undefined) {
+    process.stdout.write(finalText);
+    if (!finalText.endsWith("\n")) process.stdout.write("\n");
   }
 }
 
@@ -119,10 +207,16 @@ async function waitForDone(
       sessionId,
       {
         self: "main",
-        from: [workerName],
+        kind: ["done", "error", "killed"],
       },
       { signal: abort.signal, sinceSeq },
     )) {
+      if (
+        ev.by !== workerName &&
+        ev.by !== `supervisor:${workerName}` &&
+        !("worker" in ev && ev.worker === workerName)
+      )
+        continue;
       if (ev.kind === "done") return;
       if (ev.kind === "error") {
         const msg = (ev as { message?: string }).message ?? "(no message)";
@@ -143,12 +237,13 @@ async function waitForDone(
  * Print the worker's final user-visible message. Stdout is reserved for
  * the body so callers can pipe it.
  */
-async function printFinalMessage(
+async function readFinalMessage(
   sessionId: string,
   workerName: string,
-): Promise<void> {
+): Promise<string> {
   const file = eventsPath(sessionId);
-  if (!fs.existsSync(file)) return;
+  if (!fs.existsSync(file))
+    throw new Error("Teammate produced no final message");
   const lines = fs
     .readFileSync(file, "utf-8")
     .split("\n")
@@ -164,8 +259,8 @@ async function printFinalMessage(
   const candidate = events
     .filter((e) => e.kind === "message" && e.by === workerName)
     .pop();
-  if (!candidate) return;
+  if (!candidate) throw new Error("Teammate produced no final message");
   const text = (candidate as { text?: string }).text ?? "";
-  process.stdout.write(text);
-  if (!text.endsWith("\n")) process.stdout.write("\n");
+  if (!text.trim()) throw new Error("Teammate produced an empty final message");
+  return text;
 }

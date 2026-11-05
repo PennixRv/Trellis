@@ -32,12 +32,12 @@ Use the ordinary Teamwork Session commands for a deliberate one-shot or
 interactive discussion:
 
 ```bash
-trellis teamwork run [name] --profile exploration --configuration codex-sol
+trellis teamwork run [name] --profile exploration --configuration codex-sol --stdin --json
 trellis teamwork spawn <name> --profile review --configuration copilot-opus \
   --as reviewer --file .trellis/tasks/in_progress/<task-dir>/prd.md \
   --jsonl .trellis/tasks/in_progress/<task-dir>/research.jsonl
 trellis teamwork send <name> --as <agent> --stdin
-trellis teamwork wait <name> --as <agent> --kind done,turn_finished
+trellis teamwork wait <name> --as <agent> --from reviewer --json
 trellis teamwork interrupt <name> --as <agent> --to <teammate> --stdin
 trellis teamwork kill <name> --as <teammate>
 ```
@@ -52,14 +52,34 @@ execution defaults. `--profile` and `--configuration` select them;
 `--reasoning-effort`, `--provider`, `--model`,
 `--cwd`, `--resume`, `--sandbox`, `--timeout`, and `--warn-before` refine one
 launch. `--file` accepts repeatable paths or globs. `--jsonl` accepts a
-repeatable Trellis JSONL manifest whose entries have `{ "file", "reason" }`.
+repeatable Trellis JSONL manifest whose entries have `{ "file", "reason", "delivery" }`.
 Both forms are resolved relative to the spawn cwd, reject paths outside the
 cwd or configured trusted roots, skip missing entries with a warning, and
-enforce per-file and total-context limits before building the system prompt.
+enforce per-file and total-context limits before building reference data.
+`delivery` defaults to `inline`; `required` supplies a path, digest and an
+instruction to read the complete file before work; `on-demand` supplies a
+path, digest and retrieval condition. Required/on-demand missing files fail
+explicitly. New frozen batches recheck reference bytes before dispatch and
+after completion; changed references require a new plan. This check binds
+source versions, but does not prove the model actually read every byte.
 Legacy generic `--agent <card>` remains available for deliberately custom
 agent cards, but it cannot be combined with professional profile selection.
-Interactive roles return the requested answer; they do not invent batch
+Interactive roles return a schema-2 JSON content report; they do not invent batch
 claims, report paths or attempt identities.
+
+Common/professional role rules and the mode-specific result contract are
+initialization instructions. Codex uses `developerInstructions`; Claude uses
+append-system-prompt. Reference material travels with the first task as data.
+ACP has user blocks only: the role is sent once after a confirmed turn, retained
+for follow-ups, and injected again after recovery or an unsuccessful first
+turn. No JSON transport envelope is serialized into the role/task prose.
+The host may add AGENTS, Skills and memory; `TRELLIS_HOOKS=0` disables Trellis
+hooks, not all host context. No environment or memory isolation is claimed.
+
+All providers automatically allow tool permissions. Codex defaults to
+`danger-full-access` with `approvalPolicy: never`; an explicit user sandbox
+override is still supported. ACP selects the offered allow option and reports
+an error if none exists. Role boundaries remain prompt obligations.
 
 Use `--inbox-policy explicitOnly|broadcastAndExplicit` to control which
 messages are delivered to a teammate. `send --to` selects recipients and
@@ -85,7 +105,12 @@ removal and prune preserve sessions with unresolved batch reservations.
 
 For short independent work, `teamwork run` creates an ephemeral session,
 injects the selected context, sends one prompt, waits for `done`, prints the
-answer, and removes the session. For a managed plan, the coordinator owns
+answer, and removes the session only after a valid complete content report.
+`run --json` returns the common machine envelope and keeps failure diagnostics;
+early supervisor errors/kills terminate the wait without hiding the cause.
+`wait --json --from <one-worker>` binds the final report to `inputSeq` and
+`turnId`; it does not stop the persistent worker. Default event waits retain
+their existing behavior. For a managed plan, the coordinator owns
 claim, dispatch, retry budget, terminal receipt, and reconciliation. An
 uncertain provider action is reconciled instead of being duplicated. Settled
 attempt artifacts may be cleaned according to the plan retention rule; the

@@ -1,12 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
-import { resolveTeamworkSession } from "@pennixrv/trellis-core/teamwork";
+import {
+  resolveTeamworkSession,
+  readCoordinationState,
+} from "@pennixrv/trellis-core/teamwork";
+import { readTeammateReport, type TeamworkPlan } from "./artifact.js";
+import type { TeamworkResult } from "./result.js";
 
 import {
   loadTeamworkPlan,
   runTeamworkCoordinator,
   readPlanFile,
+  type TeamworkReceipt,
 } from "./coordinator.js";
 import { createTeamworkSession } from "./create.js";
 import {
@@ -18,6 +25,7 @@ import { CLI_TEAMMATE_HOST, createCliCoordinatorRuntime } from "./runtime.js";
 import { acquireLock, releaseLock } from "./store/lock.js";
 import { projectDir } from "./store/paths.js";
 import { scanLiveWorkers } from "./guard.js";
+import { readTeamworkEvents } from "./store/events.js";
 import {
   batchReservationPath,
   readBatchReservations,
@@ -29,6 +37,7 @@ export async function teamworkBatch(
   options: {
     task: string;
     preflight?: boolean;
+    json?: boolean;
   },
 ): Promise<void> {
   const cwd = process.cwd();
@@ -70,6 +79,7 @@ export async function teamworkBatch(
       task: options.task,
       by: "main",
       origin: "batch",
+      quiet: true,
     });
   const bucket = projectDir(ref.project);
   const lock = path.join(bucket, ".worker-guard.lock");
@@ -84,6 +94,7 @@ export async function teamworkBatch(
   };
   process.once("SIGINT", onSignal);
   process.once("SIGTERM", onSignal);
+  let output: TeamworkResult | TeamworkReceipt;
   try {
     const receipt = await runTeamworkCoordinator({
       plan: readPlanFile(path.resolve(planPath)),
@@ -153,11 +164,140 @@ export async function teamworkBatch(
         },
       },
     });
-    console.log(JSON.stringify(receipt));
+    if (options.json) {
+      const result = await buildBatchResult(plan, receipt, taskRoot, cwd);
+      output = result;
+      if (result.reports.some((item) => item.validation === "failed"))
+        process.exitCode = 1;
+    } else output = receipt;
     if (receipt.status !== "ALL_ACCEPTED") process.exitCode = 1;
   } finally {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     await runtime.shutdown("batch coordinator finished");
   }
+  console.log(JSON.stringify(output));
+}
+
+/** A view over durable facts and validated artifacts; it does not accept task results. */
+export async function buildBatchResult(
+  plan: TeamworkPlan,
+  receipt: TeamworkReceipt,
+  taskRoot: string,
+  cwd: string,
+): Promise<TeamworkResult> {
+  const projection = await readCoordinationState({
+    sessionId: plan.sessionId,
+    cwd,
+  });
+  const events = await readTeamworkEvents(plan.sessionId);
+  const result: TeamworkResult = {
+    schemaVersion: 1,
+    kind: "trellis_result",
+    mode: "batch",
+    association: {
+      taskId: plan.taskId,
+      batchId: plan.batchId,
+      sessionId: plan.sessionId,
+      planHash: plan.planHash,
+    },
+    execution: {
+      status:
+        receipt.status === "RECONCILIATION_REQUIRED"
+          ? "uncertain"
+          : "completed",
+      stopped: receipt.status !== "RECONCILIATION_REQUIRED",
+    },
+    reports: [],
+    semanticValidation: "not_run",
+    disposition: receipt.status,
+  };
+  for (const assignment of plan.assignments) {
+    const projected = projection.assignments.find(
+      (entry) =>
+        entry.batchId === plan.batchId &&
+        entry.assignmentId === assignment.assignmentId,
+    );
+    const attempt = projection.attempts
+      .filter(
+        (entry) =>
+          entry.batchId === plan.batchId &&
+          entry.assignmentId === assignment.assignmentId,
+      )
+      .sort((a, b) => b.lastSeq - a.lastSeq)[0];
+    const item: TeamworkResult["reports"][number] = {
+      association: { assignmentId: assignment.assignmentId },
+      report: null,
+      validation: "not_run",
+    };
+    result.reports.push(item);
+    const failure = events
+      .filter(
+        (event) =>
+          event.kind === "coordination" &&
+          event.batchId === plan.batchId &&
+          event.assignmentId === assignment.assignmentId &&
+          event.state === "FINAL_FAILED",
+      )
+      .pop();
+    if (
+      failure?.kind === "coordination" &&
+      typeof failure.payload?.reason === "string"
+    )
+      item.error = failure.payload.reason;
+    if (!attempt?.attemptId || !attempt.teammateId) {
+      if (projected?.state === "ACCEPTED") {
+        item.validation = "failed";
+        item.error = "Accepted report has no matching attempt identity";
+      }
+      continue;
+    }
+    item.association.attemptId = attempt.attemptId;
+    item.association.teammateId = attempt.teammateId;
+    const file = path.join(
+      taskRoot,
+      path.dirname(assignment.briefPath),
+      "attempts",
+      attempt.attemptId,
+      "report.json",
+    );
+    try {
+      const report = readTeammateReport({
+        taskRoot,
+        briefPath: assignment.briefPath,
+        attemptId: attempt.attemptId,
+        identity: {
+          taskId: plan.taskId,
+          batchId: plan.batchId,
+          assignmentId: assignment.assignmentId,
+          teammateId: attempt.teammateId,
+          planHash: plan.planHash,
+          phaseId: plan.phaseId,
+          taskRouteRevision: plan.taskRouteRevision,
+          inputRevision: plan.inputRevision,
+        },
+        sourceDigest: assignment.sourceDigest,
+      });
+      if (
+        assignment.execution.launch.reportVersion === 2 &&
+        report.schemaVersion !== 2
+      )
+        throw new Error("Report does not match the frozen result contract");
+      item.report = report.content ?? null;
+      item.validation = report.content ? "passed" : "legacy";
+      item.artifact = {
+        path: file,
+        sha256: crypto
+          .createHash("sha256")
+          .update(fs.readFileSync(file))
+          .digest("hex"),
+      };
+    } catch (error) {
+      // Failed attempts may have been cleaned according to the retention contract.
+      if (projected?.state !== "ACCEPTED" && !fs.existsSync(file)) continue;
+      item.validation = "failed";
+      item.error = error instanceof Error ? error.message : String(error);
+    }
+  }
+  return result;
 }

@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.18",
+  "description": "统一 Teamwork 输入分层与结构化结果，修复单次调用终态与诊断",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Role initialization and mode-specific result contracts are separated from task/reference data. New content reports use schema 2; run, batch and wait provide a normalized machine result. Historical frozen reports remain readable. Tool permissions automatically allow; Codex defaults to no sandbox. Input preflight, supervisor failures, failed-attempt identity, report artifacts and diagnostics are verified.",
+  "migrations": [],
+  "notes": "Run trellis update to refresh Teamwork role cards and Skill references. Agents must request --json; default human/event views remain available. Content shape validation does not perform main-agent semantic acceptance. Existing frozen launches retain their report contract."
+}

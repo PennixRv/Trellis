@@ -7,8 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTeamworkSession } from "../../src/commands/teamwork/create.js";
 import {
   computeTeamworkPlanHash,
+  validateTeamworkPlan,
   type TeammateReport,
 } from "../../src/commands/teamwork/artifact.js";
+import { buildBatchResult } from "../../src/commands/teamwork/batch.js";
 import {
   runTeamworkCoordinator,
   type TeammateDispatchContext,
@@ -141,10 +143,20 @@ function teardown(env: TestEnv): void {
   fs.rmSync(env.tmpDir, { recursive: true, force: true });
 }
 
-function createPlan(taskRoot: string, assignmentIds: string[], maxRetries = 0) {
+function createPlan(
+  taskRoot: string,
+  assignmentIds: string[],
+  maxRetries = 0,
+  legacy = false,
+) {
   const cwd = path.resolve(taskRoot, "../../..");
   installTeammateAssets(cwd);
   const execution = frozenExecution(cwd);
+  if (legacy) {
+    delete execution.launch.reportVersion;
+    execution.launch.instructions = execution.profile.rolePrompt;
+    execution.launch.prompt = execution.profile.rolePrompt;
+  }
   const batchId = "batch-1";
   const deadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const work = assignmentIds.map((assignmentId) => {
@@ -231,7 +243,7 @@ function writeReport(
   );
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   const report: TeammateReport = {
-    schemaVersion: 1,
+    schemaVersion: context.launch.reportVersion ?? 1,
     taskId: context.plan.taskId,
     batchId: context.plan.batchId,
     assignmentId: context.assignment.assignmentId,
@@ -248,6 +260,15 @@ function writeReport(
   fs.writeFileSync(
     reportPath,
     JSON.stringify({
+      ...(report.schemaVersion === 2
+        ? {
+            answer: "Verified the assigned behavior against the cited source.",
+            limitations: [],
+            unresolved:
+              status === "complete" ? [] : ["Assigned check is blocked."],
+            deviations: [],
+          }
+        : {}),
       schema_version: report.schemaVersion,
       task_id: report.taskId,
       batch_id: report.batchId,
@@ -342,6 +363,40 @@ describe("TeamworkSession teammate coordinator", () => {
   });
 
   afterEach(() => teardown(env));
+
+  it("settles historical schema-1 reports without synthesizing schema-2 content", async () => {
+    const plan = createPlan(env.taskRoot, ["legacy"], 0, true);
+    const receipt = await runTeamworkCoordinator({
+      plan,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard,
+      config,
+      runtime: {
+        async dispatch(context) {
+          writeReport(env.taskRoot, context);
+        },
+        async wait() {
+          return { kind: "report", terminal: true };
+        },
+        async continue() {
+          throw new Error("unexpected continuation");
+        },
+      },
+    });
+    expect(receipt.status).toBe("ALL_ACCEPTED");
+    const result = await buildBatchResult(
+      validateTeamworkPlan(plan, env.taskRoot),
+      receipt,
+      env.taskRoot,
+      env.projectDir,
+    );
+    expect(result.reports[0]).toMatchObject({
+      validation: "legacy",
+      report: null,
+    });
+  });
 
   it("rejects missing host proof before guard acquisition or runtime dispatch", async () => {
     const plan = createPlan(env.taskRoot, ["work-a"]);
@@ -479,6 +534,32 @@ describe("TeamworkSession teammate coordinator", () => {
 
     const receipt = await run;
     expect(receipt.status).toBe("ALL_ACCEPTED");
+    const result = await buildBatchResult(
+      validateTeamworkPlan(plan, env.taskRoot),
+      receipt,
+      env.taskRoot,
+      env.projectDir,
+    );
+    expect(result.semanticValidation).toBe("not_run");
+    expect(result.reports).toHaveLength(3);
+    for (const item of result.reports) {
+      expect(item.validation).toBe("passed");
+      expect(item.report?.answer).toContain("Verified");
+      expect(item.artifact?.sha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(fs.existsSync(item.artifact?.path ?? "")).toBe(true);
+    }
+    const damaged = result.reports[0]?.artifact?.path;
+    if (!damaged) throw new Error("Missing report artifact");
+    const original = fs.readFileSync(damaged, "utf8");
+    fs.writeFileSync(damaged, "{}");
+    const invalid = await buildBatchResult(
+      validateTeamworkPlan(plan, env.taskRoot),
+      receipt,
+      env.taskRoot,
+      env.projectDir,
+    );
+    expect(invalid.reports[0]?.validation).toBe("failed");
+    fs.writeFileSync(damaged, original);
     expect(receipt.assignments.map((item) => item.status)).toEqual([
       "ACCEPTED",
       "ACCEPTED",
@@ -1011,6 +1092,16 @@ describe("TeamworkSession teammate coordinator", () => {
       "work-bounded",
     ]);
     expect(dispatched[1].slot).toBe(dispatched[2].slot);
+    const result = await buildBatchResult(
+      validateTeamworkPlan(plan, env.taskRoot),
+      receipt,
+      env.taskRoot,
+      env.projectDir,
+    );
+    expect(result.reports[1]).toMatchObject({
+      association: { attemptId: "work-bounded.attempt.1" },
+      error: "confirmed failure",
+    });
   });
 
   it("refuses to dispatch when the shared guard is contended", async () => {

@@ -11,6 +11,7 @@ import {
   type CoordinationMode,
 } from "./coordination.js";
 import { REASONING_EFFORTS, type ReasoningEffort } from "./profiles.js";
+import { teammateContentSchema, type TeammateContent } from "./result.js";
 
 export type ReportStatus = "complete" | "blocked" | "incomplete" | "error";
 
@@ -64,7 +65,8 @@ export interface TeamworkPlanContext {
 }
 
 export interface TeammateReport {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
+  content?: TeammateContent;
   taskId: string;
   batchId: string;
   assignmentId: string;
@@ -731,8 +733,36 @@ export function validateTeammateReport(
   if (!input || typeof input !== "object" || Array.isArray(input))
     throw new Error("teammate report must be an object");
   const value = input as Record<string, unknown>;
-  if (value.schema_version !== 1)
-    throw new Error("teammate report schema_version must be 1");
+  if (value.schema_version !== 1 && value.schema_version !== 2)
+    throw new Error("teammate report schema_version must be 1 or 2");
+  if (value.schema_version === 2) {
+    const allowed = new Set([
+      ...Object.keys(teammateContentSchema.shape),
+      "task_id",
+      "batch_id",
+      "assignment_id",
+      "attempt_id",
+      "teammate_id",
+      "plan_hash",
+      "phase_id",
+      "task_route_revision",
+      "input_revision",
+      "source_digest",
+    ]);
+    if (Object.keys(value).some((key) => !allowed.has(key)))
+      throw new Error("teammate report contains unknown fields");
+  }
+  const content =
+    value.schema_version === 2
+      ? teammateContentSchema.parse(
+          Object.fromEntries(
+            Object.keys(teammateContentSchema.shape).map((key) => [
+              key,
+              value[key],
+            ]),
+          ),
+        )
+      : undefined;
   for (const key of [
     "task_id",
     "batch_id",
@@ -793,7 +823,8 @@ export function validateTeammateReport(
   if (evidence.length === 0)
     throw new Error("report.evidence must include at least one item");
   const report: TeammateReport = {
-    schemaVersion: 1,
+    schemaVersion: value.schema_version,
+    ...(content ? { content } : {}),
     taskId: identity.taskId,
     batchId: identity.batchId,
     assignmentId: identity.assignmentId,
@@ -1272,10 +1303,20 @@ export function writeTeammateReport(input: {
   sourceDigest: string;
   status: ReportStatus;
   evidence: TeammateReport["evidence"];
+  content?: TeammateContent;
 }): void {
+  if (
+    input.content &&
+    (input.content.status !== input.status ||
+      JSON.stringify(input.content.evidence) !== JSON.stringify(input.evidence))
+  )
+    throw new Error(
+      "report content status/evidence must match the submitted report",
+    );
   const report = validateTeammateReport(
     {
-      schema_version: 1,
+      ...input.content,
+      schema_version: input.content ? 2 : 1,
       task_id: input.identity.taskId,
       batch_id: input.identity.batchId,
       assignment_id: input.identity.assignmentId,
@@ -1300,6 +1341,7 @@ export function writeTeammateReport(input: {
       "report.json",
     ),
     {
+      ...report.content,
       schema_version: report.schemaVersion,
       task_id: report.taskId,
       batch_id: report.batchId,

@@ -13,6 +13,7 @@ import {
 } from "./store/schema.js";
 
 export interface CreateOptions {
+  quiet?: boolean;
   task?: string;
   project?: string;
   labels?: string;
@@ -63,9 +64,10 @@ export async function createTeamworkSession(
     ...(createMode ? { meta: { trellis: { createMode } } } : {}),
   });
 
-  console.log(
-    `Created Teamwork Session '${name}' (${sessionType}) at ${sessionDirFromEvent(name, event.scope as TeamworkSessionScope, opts.cwd)}`,
-  );
+  if (!opts.quiet)
+    console.log(
+      `Created Teamwork Session '${name}' (${sessionType}) at ${sessionDirFromEvent(name, event.scope as TeamworkSessionScope, opts.cwd)}`,
+    );
   if (opts.ephemeral) {
     process.stderr.write(
       "Ephemeral Teamwork Sessions are hidden from `teamwork list`; use `teamwork list --all` or `teamwork prune --ephemeral`\n",

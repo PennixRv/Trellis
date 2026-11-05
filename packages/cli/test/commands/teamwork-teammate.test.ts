@@ -13,7 +13,11 @@ import {
 } from "../../src/commands/teamwork/teammate-adapters.js";
 import { registerTeamworkCommand } from "../../src/commands/teamwork/index.js";
 import { resolveTeammateProfile } from "../../src/commands/teamwork/profiles.js";
-import { buildTeammateLaunchSpec } from "../../src/commands/teamwork/teammate-launch.js";
+import {
+  assertTeammateContextCurrent,
+  buildTeammateLaunchSpec,
+  parseFrozenTeammate,
+} from "../../src/commands/teamwork/teammate-launch.js";
 import { installTeammateAssets } from "../helpers/teammate-assets.js";
 
 const host = {
@@ -172,10 +176,74 @@ describe("teammate adapter contract", () => {
       },
     });
     const originalDigest = launch.contextDigest;
+    expect(launch.capability.evidence).toBe("adapter-contract");
+    expect(() => assertTeammateContextCurrent(launch, cwd)).not.toThrow();
     fs.writeFileSync(path.join(cwd, "evidence.md"), "Changed evidence.\n");
+    expect(() => assertTeammateContextCurrent(launch, cwd)).toThrow(
+      /context changed/,
+    );
     const changed = buildTeammateLaunchSpec({ cwd, profile, host });
     expect(changed.contextDigest).not.toBe(originalDigest);
     fs.rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it.each(["required", "on-demand"])(
+    "freezes %s references without inlining their body",
+    (delivery) => {
+      const cwd = project();
+      try {
+        fs.writeFileSync(
+          path.join(cwd, "context.jsonl"),
+          JSON.stringify({
+            file: "evidence.md",
+            reason: "assigned source",
+            delivery,
+          }),
+        );
+        const profile = resolveTeammateProfile({ cwd });
+        const launch = buildTeammateLaunchSpec({
+          cwd,
+          profile,
+          host,
+          contextManifests: ["context.jsonl"],
+        });
+        expect(launch.context).toContain("evidence.md");
+        expect(launch.context).toContain(delivery);
+        expect(launch.context).not.toContain("Original evidence.");
+        expect(() => assertTeammateContextCurrent(launch, cwd)).not.toThrow();
+        fs.rmSync(path.join(cwd, "evidence.md"));
+        expect(() => assertTeammateContextCurrent(launch, cwd)).toThrow(
+          /missing/,
+        );
+        expect(() =>
+          buildTeammateLaunchSpec({
+            cwd,
+            profile,
+            host,
+            contextManifests: ["context.jsonl"],
+          }),
+        ).toThrow();
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("reads a historical frozen launch without imposing the new report contract", () => {
+    const cwd = project();
+    try {
+      const profile = resolveTeammateProfile({ cwd });
+      const launch = buildTeammateLaunchSpec({ cwd, profile, host });
+      delete launch.reportVersion;
+      launch.instructions = profile.rolePrompt;
+      launch.prompt = profile.rolePrompt;
+      expect(
+        parseFrozenTeammate({ profile, launch }).launch.reportVersion,
+      ).toBeUndefined();
+      expect(() => assertTeammateContextCurrent(launch, cwd)).not.toThrow();
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it("rejects missing or symlinked context and unsupported profile options", () => {

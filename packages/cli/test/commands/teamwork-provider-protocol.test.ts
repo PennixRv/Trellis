@@ -15,6 +15,7 @@ interface Frame {
   id?: number;
   method?: string;
   params?: Record<string, unknown>;
+  result?: unknown;
 }
 const disposers: (() => void)[] = [];
 afterEach(() => {
@@ -130,6 +131,27 @@ describe("real provider transport contracts", () => {
         },
       });
       expect(adapter.isReady(ctx)).toBe(true);
+      fixture.send({
+        jsonrpc: "2.0",
+        id: 700,
+        method: "session/request_permission",
+        params: {
+          sessionId: "session-1",
+          toolCall: { toolCallId: "tool-1", title: "Bounded tool request" },
+          options: [
+            { kind: "reject_once", optionId: "deny", name: "Deny" },
+            { kind: "allow_once", optionId: "allow", name: "Allow" },
+          ],
+        },
+      });
+      await until(() =>
+        fixture.frames.some(
+          (frame) => frame.id === 700 && frame.result !== undefined,
+        ),
+      );
+      expect(fixture.frames.find((frame) => frame.id === 700)?.result).toEqual({
+        outcome: { outcome: "selected", optionId: "allow" },
+      });
       expect(options.map((option) => option.currentValue)).toEqual([
         "chosen",
         "xhigh",
@@ -142,17 +164,11 @@ describe("real provider transport contracts", () => {
       expect(blocks).toEqual([
         {
           type: "text",
-          text: JSON.stringify({
-            kind: "trellis_role_instructions",
-            instructions: "精确角色指令",
-          }),
+          text: "精确角色指令",
         },
         {
           type: "text",
-          text: JSON.stringify({
-            kind: "trellis_task_input",
-            content: '任务数据 "role"\n---',
-          }),
+          text: '任务数据 "role"\n---',
         },
       ]);
       const cancelled = completePrompt;
@@ -175,6 +191,16 @@ describe("real provider transport contracts", () => {
           .flatMap((result) => result.events)
           .filter((event) => event.kind === "error"),
       ).toEqual([]);
+      await until(() => !ctx.turn);
+      await adapter.deliverMessage?.("follow-up", ctx, false);
+      await until(() => promptCount === 3);
+      expect(
+        fixture.frames
+          .filter((frame) => frame.method === "session/prompt")
+          .at(-1)?.params?.prompt,
+      ).toEqual([{ type: "text", text: "follow-up" }]);
+      completePrompt?.({ stopReason: "end_turn" });
+      await until(() => !ctx.turn);
     },
   );
 

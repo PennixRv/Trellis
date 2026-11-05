@@ -8,6 +8,7 @@ import { parseTeamworkSessionScope, parseCsv } from "./store/schema.js";
 import { resolveTeamworkSessionTextBody } from "./text-body.js";
 
 export interface SendOptions {
+  quiet?: boolean;
   as: string;
   text?: string;
   stdin?: boolean;
@@ -42,5 +43,5 @@ export async function teamworkSessionSend(
     ...(deliveryMode !== undefined ? { deliveryMode } : {}),
     origin: "cli",
   });
-  console.log(JSON.stringify(event));
+  if (!opts.quiet) console.log(JSON.stringify(event));
 }

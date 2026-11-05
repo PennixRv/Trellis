@@ -29,10 +29,12 @@ trellis teamwork config --profile architecture --configuration copilot-opus --mo
 
 成员显式覆盖执行值只作用于该成员，不改项目默认。多成员应考虑同 provider 不同模型、跨 provider 同模型或不同专业的收益，填写 `selection_reason`；不强制异构、不自动轮换、不静默 fallback。`architecture + committee` 可以让 2–3 位架构成员分别使用不同配置。
 
-构造器冻结有效执行值、通用加专业角色指令、上下文、模式配置摘要和能力摘要。后续改配置只影响新计划，已有计划执行时不重新解析角色文件。模型不可用、推理强度未被后端声明或选项不支持时明确失败。
+构造器冻结有效执行值、通用加专业角色指令、模式结果合同、上下文、模式配置摘要和能力摘要。能力的 `evidence: adapter-contract` 说明它来自静态适配器合同，不是已安装后端的成功探测。后续改配置只影响新计划，已有计划执行时不重新解析角色文件；新计划的参考文件在派发前后核对冻结摘要。模型不可用、推理强度未被后端声明或选项不支持时明确失败，并保留实际配置协商阶段及后端声明信息。
 
 四种 transport 为 Codex app-server、Claude Code stream-json、Copilot ACP 和 DSH ACP。Copilot 原生 CLI 支持非交互调用；这里选择 ACP 是为了统一会话、配置与取消回执。DSH 使用 `dsh --profile acp`，恢复使用其声明的 `session/resume`；Copilot 使用 `session/load`。安装、账号和真实调用结果须单独核验，fixture 通过不证明某个后端已可用。
 
-Codex 使用 `developerInstructions`，Claude 使用独立的 append-system-prompt；ACP v1 只有用户内容块，Trellis 将角色与任务编码为两个明确区分的块，但不宣称具有独立 system 优先级。不会动态改写 `AGENTS.md` 或注册 provider 原生 persona。
+Codex 使用 `developerInstructions`，Claude 使用独立的 append-system-prompt；ACP v1 只有用户内容块，Trellis 将角色与任务放在两个明确区分的纯文本块，但不宣称具有独立 system 优先级。完整角色在同一会话成功完成一轮后不重复发送，恢复或首次失败后重新建立。参考资料通过任务数据通道发送。不会动态改写 `AGENTS.md` 或注册 provider 原生 persona。
 
 源码、Git、递归委派和隐式历史使用限制是角色义务。宿主能力检查只声明实际运行能力：前台等待、受控产物、transport 和容量；不声称完成文件系统只读或记忆隔离。可用工具与宽权限模式不授予 teammate 编写产品代码的职责。
+
+工具权限自动允许，不设置默认沙箱或工具/路径准入限制。Codex 默认 `danger-full-access`、`approvalPolicy: never`；ACP 自动选择后端提供的允许选项。宿主仍可能附加 AGENTS、Skills 和环境记忆，角色摘要不代表整个有效上下文摘要。

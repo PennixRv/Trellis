@@ -19,7 +19,8 @@ profile/configuration, selection reason, task input, scope, optional lens,
 source digest, acceptance criteria, and an explicit retry budget. The native
 constructor resolves the effective provider/model/effort/options and common
 plus professional instructions, then publishes schema-2 plan and briefs.
-Claims also use schema 2; reports remain schema 1. Do not hand-author frozen
+Claims also use schema 2; new launches freeze `reportVersion: 2`. Historical
+frozen launches without it continue to read schema-1 reports. Do not hand-author frozen
 execution objects, role or capability digests, claims, or plan hashes.
 
 Use the native task lifecycle for task status and acceptance. Teamwork records
@@ -49,7 +50,7 @@ trellis teamwork config --profile review --mode advisor
 trellis teamwork plan <draft.json> --task <task-dir> --output <task-dir>/plan.json --dry-run
 trellis teamwork plan <draft.json> --task <task-dir> --output <task-dir>/plan.json
 trellis teamwork batch <task-dir>/plan.json --task <task-dir> --preflight
-trellis teamwork batch <task-dir>/plan.json --task <task-dir>
+trellis teamwork batch <task-dir>/plan.json --task <task-dir> --json
 ```
 
 The draft is a JSON object with `schema_version: 2`, the binding fields above,
@@ -124,7 +125,7 @@ trellis teamwork create <name> --type chat|forum \
   --task .trellis/tasks/in_progress/<task-dir> --description "bounded discussion"
 trellis teamwork list [--scope project|global] [--all]
 trellis teamwork messages <name> [--raw]
-trellis teamwork wait <name> --as <agent> --kind done,turn_finished
+trellis teamwork wait <name> --as <agent> --from <worker> --json
 trellis teamwork forum <name>
 trellis teamwork thread <name> <thread-key>
 trellis teamwork context list <name> [--thread <thread-key>]
@@ -171,6 +172,30 @@ pass `--yes` to perform the deletion. Never use session cleanup as a task
 archive operation.
 
 ## Result handling
+
+Agent callers always request the machine view: `run --json`, `batch --json`,
+or interactive `wait --json --from <one-worker>`. The common envelope has
+`schemaVersion: 1`, `kind: trellis_result`, `mode`, `association`, `execution`,
+`reports`, `semanticValidation: not_run`, and `disposition`. Execution facts
+are distinct from report validation, model content status, and task acceptance.
+`execution.stopped` describes confirmed process cleanup; a persistent wait
+leaves its worker running. Parse stdout as one JSON object; diagnostics use
+stderr. CLI argument-parser errors may precede this result contract.
+
+Each new content report has `schema_version: 2`, `status` (complete, blocked,
+incomplete, error), nonempty `answer`, nonempty `evidence` entries with
+`id`, `locator`, `summary`, and arrays `limitations`, `unresolved`, `deviations`.
+Interactive replies return this JSON directly, with no report file or invented
+batch identity. Batch reports additionally copy the assigned task, batch,
+assignment, attempt, teammate, plan, phase, route, input and source identities
+into the exact report path. `done` is emitted by the adapter, not by the model.
+
+Batch machine results expose validated report content, association, report path
+and SHA-256. Missing or invalid accepted artifacts fail validation; historical
+schema-1 content is explicitly `legacy`, never synthesized as a valid new
+answer. Retention may remove failed-attempt artifacts. Main-agent semantic
+review checks the answer and evidence against the acceptance criteria; shape
+validation does not perform that review or change native task acceptance.
 
 The coordinator returns `ALL_ACCEPTED`, `SETTLED_WITH_FAILURE`, or
 `RECONCILIATION_REQUIRED`. For `ALL_ACCEPTED`, review every accepted report

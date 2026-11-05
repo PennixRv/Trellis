@@ -42,6 +42,7 @@ import {
 import { teamworkSessionTitleClear, teamworkSessionTitleSet } from "./title.js";
 import { runSupervisor } from "./supervisor.js";
 import { teamworkSessionWait, parseDuration } from "./wait.js";
+import { failedTeamworkResult } from "./result.js";
 import { parseCsv } from "./store/schema.js";
 import { parseInboxPolicy } from "@pennixrv/trellis-core/teamwork";
 
@@ -248,6 +249,7 @@ export function registerTeamworkCommand(program: Command): void {
       "only wake on events targeted to this name (default: own agent)",
     )
     .option("--include-progress", "also wake on progress events")
+    .option("--json", "return one normalized result for a single --from worker")
     .option(
       "--all",
       "wait until each agent in --from has produced a matching event (default: first match wins)",
@@ -264,6 +266,7 @@ export function registerTeamworkCommand(program: Command): void {
         to?: string;
         includeProgress?: boolean;
         all?: boolean;
+        json?: boolean;
       };
       try {
         await teamworkSessionWait(name, {
@@ -277,8 +280,15 @@ export function registerTeamworkCommand(program: Command): void {
           to: opts.to,
           includeProgress: opts.includeProgress,
           all: opts.all,
+          json: opts.json,
         });
       } catch (err) {
+        if (opts.json)
+          console.log(
+            JSON.stringify(
+              failedTeamworkResult("interactive", { sessionId: name }, err),
+            ),
+          );
         console.error(
           chalk.red("Error:"),
           err instanceof Error ? err.message : err,
@@ -496,14 +506,38 @@ export function registerTeamworkCommand(program: Command): void {
     )
     .requiredOption("--task <path>", "current task directory")
     .option(
+      "--json",
+      "return the normalized Teamwork result with report references",
+    )
+    .option(
       "--preflight",
       "read-only validation; creates no files or provider processes",
     )
     .action(
-      async (planPath: string, opts: { task: string; preflight?: boolean }) => {
+      async (
+        planPath: string,
+        opts: { task: string; preflight?: boolean; json?: boolean },
+      ) => {
         try {
           await teamworkBatch(planPath, opts);
         } catch (err) {
+          if (opts.json)
+            console.log(
+              JSON.stringify({
+                schemaVersion: 1,
+                kind: "trellis_result",
+                mode: "batch",
+                association: { planPath },
+                execution: {
+                  status: "error",
+                  stopped: false,
+                  reason: err instanceof Error ? err.message : String(err),
+                },
+                reports: [],
+                semanticValidation: "not_run",
+                disposition: "unknown",
+              }),
+            );
           console.error(
             chalk.red("Error:"),
             err instanceof Error ? err.message : err,
@@ -552,6 +586,10 @@ export function registerTeamworkCommand(program: Command): void {
     .option("--message-file <path>", "read prompt body from file")
     .option("--stdin", "read prompt body from stdin")
     .option(
+      "--json",
+      "return the normalized Teamwork result instead of its answer",
+    )
+    .option(
       "--timeout <duration>",
       "max time to wait for done (e.g. 30s, 5m, 1h; default 5m)",
     )
@@ -570,15 +608,9 @@ export function registerTeamworkCommand(program: Command): void {
         message?: string;
         messageFile?: string;
         stdin?: boolean;
+        json?: boolean;
         timeout?: string;
       };
-      if (opts.provider !== undefined && !isProvider(opts.provider)) {
-        console.error(
-          chalk.red("Error:"),
-          `--provider must be one of: ${listProviders().join(", ")}`,
-        );
-        process.exit(1);
-      }
       try {
         await teamworkSessionRun({
           name,
@@ -595,9 +627,21 @@ export function registerTeamworkCommand(program: Command): void {
           message: opts.message,
           textFile: opts.messageFile,
           stdin: opts.stdin,
+          json: opts.json,
           timeoutMs: parseDuration(opts.timeout),
         });
       } catch (err) {
+        if (opts.json)
+          console.log(
+            JSON.stringify(
+              failedTeamworkResult(
+                "interactive",
+                name ? { sessionId: name } : {},
+                err,
+                true,
+              ),
+            ),
+          );
         console.error(
           chalk.red("Error:"),
           err instanceof Error ? err.message : err,

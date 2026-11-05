@@ -398,20 +398,21 @@ describe("getAllAgents", () => {
     expect(skill).toContain("Teamwork validates and executes a frozen plan");
     expect(skill).toContain("references/teamwork-plan-construction.md");
     expect(skill).toContain("does not select the task phase");
-    expect(skill).toContain("one foreground `teamwork batch` command");
+    expect(skill).toContain("one foreground `teamwork batch --json` command");
     expect(skill).toContain(
       "must not schedule per-assignment waits or retries",
     );
     expect(processes).toContain("same provider process and attempt identity");
     expect(processes).toContain("does not send another provider prompt");
     expect(processes).toContain("does not control a managed `teamwork batch`");
-    expect(teammate).toContain('"status": "complete"');
-    expect(teammate).toContain('"source_digest"');
-    expect(teammate).toContain('"evidence"');
-    expect(teammate).toMatch(/A `blocked` report ends only this\s+assignment/);
-    expect(teammate).toContain("attempts/<attempt-id>/report.json");
-    expect(teammate).toContain("Do not read or use");
-    expect(teammate).toContain("do not claim technical memory");
+    expect(skill).toContain("semanticValidation: not_run");
+    expect(skill).toContain("Tool permissions are automatically allowed");
+    expect(teammate).toContain("CLI 负责调度、FIFO");
+    expect(teammate).toContain(
+      "不读取或使用环境中的个人、历史会话或跨项目记忆",
+    );
+    expect(teammate).toContain("不证明存在文件系统或记忆隔离");
+    expect(teammate).not.toContain("attempts/<attempt-id>/report.json");
   });
 
   it("each agent body starts with `---` frontmatter and a matching name field", () => {

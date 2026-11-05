@@ -51,6 +51,8 @@ export interface SupervisorConfig {
    *  No "initial user prompt" — the teammate stays idle until its first
    *  inbox message arrives. */
   systemPrompt: string;
+  /** Frozen reference data, delivered with the first task rather than instructions. */
+  context?: string;
   /** Extra env vars (TRELLIS_HOOKS=0 etc. are added automatically). */
   env?: Record<string, string>;
   /** Optional model override. */
@@ -526,6 +528,7 @@ export async function runSupervisor(
     signal: abort.signal,
     inboxPolicy: config.inboxPolicy ?? DEFAULT_INBOX_POLICY,
     turnTracker,
+    context: config.context,
   });
 
   // ── adapter handshake (no initial user prompt) ──

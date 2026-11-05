@@ -20,6 +20,8 @@ export interface AcpContext {
   connection?: ClientConnection;
   sessionId?: string;
   instructions: string;
+  instructionsSent: boolean;
+  agentInfo?: { name: string; version: string };
   turn?: Promise<void>;
   text: string;
   generation: number;
@@ -54,7 +56,17 @@ async function configure(
     const option = options.find((entry) => entry.id === key);
     if (!option || !values(option).includes(value as string | boolean))
       throw new Error(
-        `ACP agent does not advertise configuration '${key}=${String(value)}'`,
+        `ACP agent does not advertise configuration '${key}=${String(value)}'; ` +
+          JSON.stringify({
+            stage: "configure",
+            agent: ctx.agentInfo ?? null,
+            advertisedIds: options.map((entry) => entry.id),
+            optionPresent: !!option,
+            currentValue: option?.currentValue ?? null,
+            requestedValueAdvertised: option
+              ? values(option).includes(value as string | boolean)
+              : false,
+          }),
       );
     if (option.currentValue !== value) {
       const response =
@@ -87,22 +99,16 @@ function prompt(ctx: AcpContext, text: string): void {
     .request("session/prompt", {
       sessionId: ctx.sessionId as string,
       prompt: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            kind: "trellis_role_instructions",
-            instructions: ctx.instructions,
-          }),
-        },
-        {
-          type: "text",
-          text: JSON.stringify({ kind: "trellis_task_input", content: text }),
-        },
+        ...(!ctx.instructionsSent && ctx.instructions
+          ? [{ type: "text" as const, text: ctx.instructions }]
+          : []),
+        { type: "text", text },
       ],
     })
     .then((response) => {
       if (generation !== ctx.generation) return;
       if (response.stopReason === "end_turn") {
+        ctx.instructionsSent = true;
         emit(ctx, {
           events: [
             ...(ctx.text
@@ -193,6 +199,7 @@ export function createAcpAdapter(
       return {
         output: new PassThrough(),
         instructions: "",
+        instructionsSent: false,
         text: "",
         generation: 0,
         ready: false,
@@ -268,6 +275,7 @@ export function createAcpAdapter(
         throw new Error(
           `unsupported ACP protocol version ${initialized.protocolVersion}`,
         );
+      ctx.agentInfo = initialized.agentInfo ?? undefined;
       const resumeMethod =
         provider === "dsh" ? "session/resume" : "session/load";
       if (
@@ -299,6 +307,7 @@ export function createAcpAdapter(
       ctx.sessionId = view.resume ?? (session as NewSessionResponse).sessionId;
       if (!ctx.sessionId) throw new Error("ACP session did not return an id");
       ctx.instructions = view.systemPrompt;
+      ctx.instructionsSent = false;
       const options = session.configOptions ?? [];
       const requested = { ...view.options };
       if (view.model) requested.model = view.model;

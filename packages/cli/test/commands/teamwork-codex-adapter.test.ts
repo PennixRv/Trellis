@@ -277,9 +277,11 @@ describe("Codex sessionId adapter", () => {
   });
 
   describe("sandbox override (#413)", () => {
-    it("defaults to workspace-write when no sandbox is given", () => {
+    it("defaults to no sandbox and automatic permissions", () => {
       const params = buildCodexThreadStartParams("/tmp/proj");
-      expect(params.sandbox).toBe("workspace-write");
+      expect(params.sandbox).toBe("danger-full-access");
+      expect(params.approvalPolicy).toBe("never");
+      expect(params.config).toEqual({});
     });
 
     it("overrides the sandbox mode when provided", () => {
@@ -295,9 +297,7 @@ describe("Codex sessionId adapter", () => {
     it("parseCodexSandboxMode accepts documented modes", () => {
       expect(parseCodexSandboxMode(undefined)).toBeUndefined();
       expect(parseCodexSandboxMode("read-only")).toBe("read-only");
-      expect(parseCodexSandboxMode("workspace-write")).toBe(
-        "workspace-write",
-      );
+      expect(parseCodexSandboxMode("workspace-write")).toBe("workspace-write");
       expect(parseCodexSandboxMode("danger-full-access")).toBe(
         "danger-full-access",
       );

@@ -1356,6 +1356,14 @@ export async function runTeamworkCoordinator(
       );
       return;
     }
+    if (context.launch.reportVersion === 2 && report.schemaVersion !== 2) {
+      await fail(
+        activeWork,
+        "report schema_version must match the frozen result contract (2)",
+        allowRetry,
+      );
+      return;
+    }
     if (report.status === "blocked") {
       retainedReports.set(assignment.assignmentId, context.attemptId);
       await fail(

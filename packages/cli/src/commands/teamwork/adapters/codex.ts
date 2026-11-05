@@ -681,7 +681,7 @@ export const CODEX_SANDBOX_MODES: ReadonlySet<CodexSandboxMode> = new Set([
 ]);
 
 /** Validate a `--sandbox` value. Returns `undefined` when unset (caller
- *  falls back to the `workspace-write` default). */
+ *  falls back to the `danger-full-access` default). */
 export function parseCodexSandboxMode(
   v: string | undefined,
 ): CodexSandboxMode | undefined {
@@ -705,18 +705,9 @@ export function buildCodexThreadStartParams(
     cwd,
     // MVP: aggressive permissive defaults to avoid getting stuck mid-turn.
     approvalPolicy: "never",
-    // Default stays workspace-write; callers (`teamwork spawn --sandbox`) may
-    // override to match the user's main-session Codex permissions (#413).
-    sandbox: sandbox ?? "workspace-write",
-    // Disable codex native multi-agent so spawned worker can't recurse into
-    // its own sub-agents (would conflict with Teamwork's collaboration layer
-    // and reproduce issue #234/#237 recursion).
-    config: {
-      features: {
-        multi_agent: false,
-        multi_agent_v2: { enabled: false },
-      },
-    },
+    // Role boundaries are prompt obligations; the caller may explicitly override.
+    sandbox: sandbox ?? "danger-full-access",
+    config: {},
   };
   if (systemPrompt?.trim()) {
     params.developerInstructions = systemPrompt;

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { buildTeamworkInstructions } from "../../src/commands/teamwork/prompt.js";
 import {
   installTeammateAssets,
   frozenExecution,
@@ -23,15 +24,16 @@ import {
 
 const sourceDigest = "a".repeat(64);
 
-it("accepts a report authored from the bundled teammate role example", () => {
+it("accepts a versioned content report under the managed mode contract", () => {
   const role = fs.readFileSync(
     path.resolve(__dirname, "../../src/templates/trellis/agents/teammate.md"),
     "utf8",
   );
-  const example = /```json\s*([\s\S]*?)```/.exec(role)?.[1];
-  if (!example)
-    throw new Error("bundled teammate role must include a JSON report example");
-  const report = JSON.parse(example);
+  const instructions = buildTeamworkInstructions(role, "batch");
+  expect(instructions).toContain("report_path");
+  expect(buildTeamworkInstructions(role, "interactive")).not.toContain(
+    "task_route_revision",
+  );
   const assigned = {
     task_id: "task-1",
     batch_id: "batch-1",
@@ -44,16 +46,22 @@ it("accepts a report authored from the bundled teammate role example", () => {
     input_revision: "3",
     source_digest: sourceDigest,
   };
-  for (const [key, value] of Object.entries(assigned)) {
-    if (key in report) report[key] = value;
-  }
-  report.evidence = [
-    {
-      id: "finding-1",
-      locator: "src/contract.ts",
-      summary: "The assigned contract is consistent.",
-    },
-  ];
+  const report = {
+    ...assigned,
+    schema_version: 2,
+    status: "complete",
+    answer: "The assigned contract is consistent.",
+    limitations: [],
+    unresolved: [],
+    deviations: [],
+    evidence: [
+      {
+        id: "finding-1",
+        locator: "src/contract.ts",
+        summary: "The assigned contract is consistent.",
+      },
+    ],
+  };
   const identity = {
     taskId: assigned.task_id,
     batchId: assigned.batch_id,
@@ -68,6 +76,19 @@ it("accepts a report authored from the bundled teammate role example", () => {
   expect(validateTeammateReport(report, identity, sourceDigest).status).toBe(
     "complete",
   );
+  expect(
+    validateTeammateReport(report, identity, sourceDigest).content?.answer,
+  ).toBe(report.answer);
+  expect(() =>
+    validateTeammateReport({ ...report, answer: "" }, identity, sourceDigest),
+  ).toThrow();
+  expect(() =>
+    validateTeammateReport(
+      { ...report, accepted: true },
+      identity,
+      sourceDigest,
+    ),
+  ).toThrow(/unknown fields/);
 });
 
 function fixture() {

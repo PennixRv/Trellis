@@ -38,7 +38,7 @@
         "delivery_review_and_closeout"
       ],
       "current_phase_id": "task_implementation",
-      "input_revision": "14",
+      "input_revision": "17",
       "phases": {
         "goal_exploration_and_requirements": {
           "status": "accepted",
@@ -90,32 +90,31 @@
         },
         "solution_design_and_convergence": {
           "status": "accepted",
-          "input_revision": "13",
-          "artifact_revision": "28d530d41e88a8625fb1d16fd3cc427bcf1023eb08747f91be5283bc4abb6b5c",
+          "input_revision": "16",
+          "artifact_revision": "671f4cc3ab8705fc8666fdc847d861ccff297cb31e616a171a9006f651f0cbbd",
           "artifact_refs": [
-            "design.md",
-            "implement.md"
+            "teamwork-input-result-remediation.md"
           ],
-          "result_revision": "2",
-          "result_ref": "design.md",
+          "result_revision": "3",
+          "result_ref": "teamwork-input-result-remediation.md",
           "outcome_kind": "implementation_contract",
           "reason": null,
           "evidence_refs": [
-            "execution.md"
+            "teamwork-input-result-remediation.md"
           ],
           "acceptance": {
-            "artifact_revision": "28d530d41e88a8625fb1d16fd3cc427bcf1023eb08747f91be5283bc4abb6b5c",
-            "result_revision": "2",
-            "input_revision": "13",
+            "artifact_revision": "671f4cc3ab8705fc8666fdc847d861ccff297cb31e616a171a9006f651f0cbbd",
+            "result_revision": "3",
+            "input_revision": "16",
             "task_route_revision": "1",
             "evidence_refs": [
-              "execution.md"
+              "teamwork-input-result-remediation.md"
             ]
           }
         },
         "task_implementation": {
           "status": "active",
-          "input_revision": "14",
+          "input_revision": "17",
           "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
           "artifact_refs": [],
           "result_revision": "0",
@@ -140,19 +139,21 @@
       },
       "route_dependency_admission": null,
       "implementation_authorization": {
-        "contract_ref": "design.md",
-        "contract_revision": "dd6bd1a6086a87ead3f5c7d3c6ad374a5790d096821cbffb95fa8bd61a85e65a",
-        "approval_ref": "execution.md",
+        "contract_ref": "teamwork-input-result-remediation.md",
+        "contract_revision": "671f4cc3ab8705fc8666fdc847d861ccff297cb31e616a171a9006f651f0cbbd",
+        "approval_ref": "teamwork-input-result-remediation.md",
         "task_route_revision": "1"
       },
       "closeout_disposition": null,
       "skip_records": {},
       "return_record": {
         "from": "task_implementation",
-        "to": "goal_exploration_and_requirements",
-        "reason": "落实用户已审查并明确授权的 Teamwork 完整配置与四后端实施补充合同",
+        "to": "solution_design_and_convergence",
+        "return_kind": "contract_change",
+        "authorization_retained": false,
+        "reason": "按用户要求收敛 Teamwork 输入与结果审查增量，复用已定范围与授权，登记增量合同",
         "evidence_refs": [
-          "execution.md"
+          "teamwork-input-result-remediation.md"
         ],
         "task_route_revision": "1"
       }

@@ -1,5 +1,12 @@
 # 执行记录
 
+## 2026-11-05：Teamwork 输入与结果整改实施
+
+- 原生阶段接受及授权后，W1、输入分层、schema-2 内容报告、run/batch/wait 统一机器视图、静态能力来源标记、参考摘要核对、自动允许及无沙箱已落源码。Skill、四份 references、公共/研究角色和规范同步。合同保持冻结，后续进度写本记录。
+- Teamwork 234 项及 TypeScript/ESLint/构建通过；batch 输出正文、持久路径、SHA-256及损坏报告检测定向通过。全量首次 Core 423/1 跳过，CLI 2295/2 跳过且旧模板文字断言 1 项失败，已按新结构修正待复验。先前 11 项 coordinator 失败由旧 schema-1 测试夹具造成，已修复，生产仍强制新 launch 的 schema-2 报告。
+- 真实 Codex/Copilot one-shot 同算式均返回统一信封、校验通过、结果 16；持续会话各两轮分别返回 16、5，并绑定 inputSeq/turnId，均原生回收，无本轮残留会话。仅为真实机制验证，不委派产品审查或修复。新 managed batch 验证、正式发布和重装尚待完成。
+- 两仓授权合同摘要逐字恢复并复核；工具错误与历史无法回溯的首次 Copilot 能力异常见根侧 execution，不据成功复跑销项。docs-site 沿既有 PRD/execution 承接 Beta 中英文公开合同及新发布说明，不创建手写 task.json。
+
 ## 2026-11-05：工作流返工与原生生命周期恢复
 
 - 承接根侧已确认的两层调整及完整实施、发布重装授权；实施合同见 `research/workflow-recovery-implementation.md`。没有使用 Teamwork teammate，没有实施原长期任务的暂缓业务动作。
@@ -243,3 +250,14 @@ CLI 全套测试首轮发现 profiles 子目录安装漏建，已修复；之后
 - 保护基线根仓 3560、本仓 1488 份 task/spec/workspace/handoff 文件无新增、删除或移动，除本 execution.md 主动补记外全部一致；根侧后续明确追加审查及交付记录。两仓原生布局迁移预览为空，任务分布仍为根仓 0/2/366/1、本仓 1/15/232/3。根 ownership 仍 consumed／generation 12，来源摘要 `65036215a7e59dad83eab100a0303b331226c0abe58c16d9ca2236ed4915d23e` 不变；没有刷新旧包、阶段或 pending action。
 - 全本地组合检查 19/19、自测 11/11、独立 handoff 三模块通过。发布途中 offline 唯一失败项是尚未固定的新 gitlink；固定后已在组合检查通过，最终现场收尾 gitlink 再由根侧复验。新增回归合计 31 项，包括阶段 9 项和两层锁各 11 项；总量为 Core 422 通过／1 跳过，CLI 2234 通过／2 跳过。
 - 两仓本轮共 4 份快照先逐份 verify，再原生预览及全清；根仓删除 2 份／218 文件／1,991,555 字节，本仓 2 份／736 文件／5,059,905 字节，无 protected 或 failed。六处既有现场回读 backup list 均为 []，未删除任务、交接或其他 owner 数据。中断后的 lock.recovery 保留供显式核验是当前恢复边界；未运行全部宿主、Mintlify 页面渲染或未核验的 managed batch adapter，不关闭长期父任务。
+
+### 2026-11-05：Teamwork 输入与结果整改实施及真实验证
+
+- 在既有任务和分支实施，原生接受的增量合同为 `teamwork-input-result-remediation.md`，保持其冻结摘要。用户已决定默认文本兼容、代理显式使用 `--json`；不启用沙箱或权限硬限制，自动允许工具请求，以提示词约束角色。FIFO、期限、容量、重试、取消、报告接受均由 CLI 控制。
+- 修复输入校验晚于启动、supervisor 失败事件遗漏、失败清理和退出确认；公共角色、模式合同、当轮任务与参考资料分层。ACP 初始化成功后不重复整份角色，恢复时重建；Codex 继续使用 developer 通道，ACP 如实保留 user 通道限制。参考资料支持 inline/required/on-demand，batch 在派发前及终态后核验冻结来源摘要。
+- 新内容报告 schema 2 包含状态、回答、证据、限制、未解决项和偏离；`run/batch/wait --json` 共用 `trellis_result` 信封，区分执行终态、格式校验及主代理语义接受，后者明确 `not_run`。batch 返回报告身份、路径、摘要和正文，失败也保留 attempt 关联。旧冻结合同及 schema 1 继续可读，不能冒充新格式已通过。角色卡、五个平台 Skill、规范和 Beta 双语文档同步。
+- 双后端各完成真实 one-shot，均返回可解析信封、回答 16 并清理临时会话；各自持久会话完成两轮 16→5，inputSeq/turnId 正确绑定，之后原生回收。最新容量为 1 的真实 batch `result-contract-trace-20261105`（plan hash `46119443b76f4d5d240b861512b5866149da3c10be174f1ea811193fe619d59a`）返回 `ALL_ACCEPTED`，Codex/Copilot 各一次、零重试，均为 schema 2、回答 16、进程退出确认。两报告 SHA-256 分别为 `2f6c4c588ef63eb76bb798019a1f0055e42ce8ce507b8d75219254da582bdc88`、`c971f4f17e69177dc3b84ea730e8999d551ec9fa53e3eba38bd3cad6a9ffe72b`。
+- 失败现场保留：首批外层超时后原生恢复返回 `RECONCILIATION_REQUIRED`，不自动重派；用户提示可能查看了现场并要求重试。新批次一次出现 Codex 终态但缺报告、Copilot 成功；另一批在期限内无终态，CLI 确认取消并阻止后续 FIFO 派发。此前 runtime 丢弃 message/progress，导致不能还原当时原因，已修复为原生事件留痕并增加回归。重试成功不证明历史失败外因已定位，首个 Copilot 能力宣告异常同样保留证据限制。运行态不提交 Git。
+- 全量 Core 423 通过／1 条件跳过，CLI 2297 通过／2 条件跳过；随后仅追加 runtime 诊断专项测试，结果另记。ESLint、类型检查、构建通过；文档 677 文件 lint、共享导航和定向格式检查通过；清单连续性及 packed CLI 精确依赖通过。GitNexus 提交前检查为 62 文件、122 符号、62 流程、critical；索引滞后限制保留，结合当前调用方和真实链路验收。
+- 调查与操作错误均保留：早期检索 shell 引号、错误路径/锚点、响应结构误判、docs-site 不存在 workflow.md、从错误目录运行 prettier 已分别修正。曾将进度追加到冻结合同，立即恢复原字节和已接受摘要，进度改记本文件。`safe_commit.py` 实际是内部模块而非独立 CLI，直接执行导致标准库 types 被同目录模块遮蔽；后续按其真实 Python API 精确暂存，不扩大到整个任务树。一次补记使用错误标题锚点失败，未修改文件，改为已读取的唯一末尾锚点。
+- 源码与文档检查完成，beta.18 正式发布、真实重装及两仓生成资产核验尚待下面的实际回执；不预先宣称交付完成，不关闭长期父任务。

@@ -5,6 +5,7 @@ import path from "node:path";
 import { z } from "zod";
 
 import { assembleContext } from "./context-loader.js";
+import { buildTeamworkInstructions } from "./prompt.js";
 import {
   assertTeammateHostCapability,
   getTeammateAdapter,
@@ -26,6 +27,8 @@ export interface TeammateWritePolicy {
 }
 
 export interface TeammateCapabilitySnapshot {
+  /** Static adapter contract, not a successful probe of the installed backend. */
+  evidence?: "adapter-contract";
   transport: TeammateAdapterContract["transport"];
   supportsContinuation: true;
   supportsInterrupt: true;
@@ -46,6 +49,8 @@ export interface TeammateCapabilitySnapshot {
 }
 
 export interface TeammateLaunchSpec {
+  /** Absent on historical frozen plans. */
+  reportVersion?: 2;
   roleId: "teammate";
   provider: ResolvedTeammateProfile["provider"];
   profile?: string;
@@ -68,6 +73,7 @@ export interface TeammateLaunchSpec {
 const sha256 = z.string().regex(/^[a-f0-9]{64}$/);
 const frozenLaunchSchema = z
   .object({
+    reportVersion: z.literal(2).optional(),
     roleId: z.literal("teammate"),
     provider: frozenProfileSchema.shape.provider,
     profile: z.string().optional(),
@@ -89,6 +95,7 @@ const frozenLaunchSchema = z
     contextDigest: sha256,
     capability: z
       .object({
+        evidence: z.literal("adapter-contract").optional(),
         transport: z.enum(["claude-cli", "codex-app-server", "acp"]),
         supportsContinuation: z.literal(true),
         supportsInterrupt: z.literal(true),
@@ -145,7 +152,9 @@ export function parseFrozenTeammate(input: unknown): {
       throw new Error(`frozen execution ${field} does not match profile`);
   if (
     canonical(profile.options) !== canonical(launch.options) ||
-    profile.rolePrompt !== launch.instructions
+    (launch.reportVersion === 2
+      ? buildTeamworkInstructions(profile.rolePrompt, "batch")
+      : profile.rolePrompt) !== launch.instructions
   )
     throw new Error(
       "frozen execution instructions or options do not match profile",
@@ -271,6 +280,7 @@ export function buildTeammateLaunchSpec(input: {
     recursiveDelegation: "disabled",
   };
   const capability = {
+    evidence: "adapter-contract" as const,
     transport: adapter.transport,
     supportsContinuation: true as const,
     supportsInterrupt: true as const,
@@ -298,6 +308,7 @@ export function buildTeammateLaunchSpec(input: {
   };
   return {
     roleId: "teammate",
+    reportVersion: 2,
     configuration: input.profile.configuration,
     provider: input.profile.provider,
     ...(input.profile.profile ? { profile: input.profile.profile } : {}),
@@ -309,10 +320,13 @@ export function buildTeammateLaunchSpec(input: {
     ...(input.profile.profileDigest
       ? { profileDigest: input.profile.profileDigest }
       : {}),
-    prompt: [input.profile.rolePrompt, assembled.prompt]
+    prompt: [
+      buildTeamworkInstructions(input.profile.rolePrompt, "batch"),
+      assembled.prompt,
+    ]
       .filter(Boolean)
       .join("\n\n---\n\n"),
-    instructions: input.profile.rolePrompt,
+    instructions: buildTeamworkInstructions(input.profile.rolePrompt, "batch"),
     context: assembled.prompt,
     rolePath: input.profile.rolePath,
     contextPaths: assembled.paths,
@@ -321,4 +335,30 @@ export function buildTeammateLaunchSpec(input: {
     contextDigest,
     capability: capabilitySnapshot,
   };
+}
+
+/** Frozen references must still name the same bytes when read by a worker. */
+export function assertTeammateContextCurrent(
+  launch: TeammateLaunchSpec,
+  cwd: string,
+): void {
+  if (launch.reportVersion !== 2) return;
+  const actual = hash(
+    launch.contextPaths
+      .map(
+        (file) =>
+          `${file}\0${fs.readFileSync(requireRegularFile(cwd, file, "teammate context file"), "utf8")}`,
+      )
+      .concat(
+        launch.contextManifests.map(
+          (manifest) =>
+            `manifest\0${manifest}\0${fs.readFileSync(requireRegularFile(cwd, manifest, "teammate context manifest"), "utf8")}`,
+        ),
+      )
+      .join("\0"),
+  );
+  if (actual !== launch.contextDigest)
+    throw new Error(
+      "Frozen teammate context changed; construct a new plan before dispatch",
+    );
 }

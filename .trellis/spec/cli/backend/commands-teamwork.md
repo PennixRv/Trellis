@@ -121,7 +121,34 @@ professional profiles owns a role-card path and 2–3 named execution candidates
 there is no silent provider/model fallback or context-window tuning. Common and
 professional instructions, evidence, effective execution values and digests are
 frozen by `plan.ts`. Execution does not reread mutable project role files.
-Claims use schema 2 and configuration identity; reports retain schema 1.
+Claims use schema 2 and configuration identity. New launches freeze
+`reportVersion: 2`; their content reports require answer, evidence, limitations,
+unresolved items and deviations. Historical launches without this version keep
+their schema-1 report contract. Never synthesize a new valid answer from a
+legacy report.
+
+Agent callers use `run --json`, `batch --json`, or
+`wait --json --from <one-worker>`. All return one `trellis_result` envelope
+separating execution facts, content validation, model status and disposition.
+Semantic validation remains `not_run` until the main agent reviews it through
+the task workflow. Persistent results bind replies to `inputSeq`/`turnId`;
+batch results expose verified content, artifact paths and SHA-256. Cleanup
+must not invalidate returned content. Human run text and event waits remain
+compatible views; diagnostics must not pollute machine stdout.
+
+Initialization instructions contain role rules and the mode result contract.
+Reference data travels with task input. Manifest `delivery` is `inline`
+(default), `required` (read fully before work), or `on-demand`; references
+carry paths, reasons and hashes. New batch dispatch and completion recheck
+frozen reference bytes without claiming proof that the model read them.
+ACP sends plain role/task blocks, retaining rules after a successful turn and
+reestablishing them after recovery. ACP user blocks do not gain system priority.
+Capability `evidence: adapter-contract` is static, not a live backend probe.
+
+Tool permissions are automatically allowed. Codex defaults to no sandbox
+(`danger-full-access`, `approvalPolicy: never`); explicit user overrides remain
+available. Tool availability, AGENTS, Skills and ambient memory depend on the
+host. Prompt obligations do not prove technical read-only or memory isolation.
 
 The constructor validates before publication, including prepared brief size,
 secret checks, committee equivalence, symlink ancestors, current task revisions

@@ -24,6 +24,7 @@ import { appendEvent } from "../store/events.js";
 import { workerFile } from "../store/paths.js";
 import { watchEvents } from "../store/watch.js";
 import type { TurnTracker } from "./turns.js";
+import { buildTaskInput } from "../prompt.js";
 
 type Child = ChildProcessByStdio<Writable, Readable, Readable>;
 
@@ -37,6 +38,7 @@ export interface InboxWatcherArgs {
   /** Inbox delivery policy. Defaults to `explicitOnly` (legacy behavior). */
   inboxPolicy?: InboxPolicy;
   turnTracker?: TurnTracker;
+  context?: string;
 }
 
 export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
@@ -45,6 +47,7 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
   // Resume from persisted cursor: first-time spawn → 0 (read full backlog);
   // respawn after kill → last forwarded seq (no replay).
   let cursor = readInboxCursor(sessionId, workerName);
+  let contextSent = false;
 
   for await (const ev of watchEvents(
     sessionId,
@@ -85,11 +88,14 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
         await sleep(25);
       }
       if (!adapter.isReady(ctx)) {
-        // never became ready; advance the cursor anyway so we don't
-        // re-attempt this exact event on next start.
-        cursor = ev.seq;
-        writeInboxCursor(sessionId, workerName, cursor);
-        continue;
+        if (signal.aborted) return;
+        await appendEvent(sessionId, {
+          kind: "error",
+          by: `supervisor:${workerName}`,
+          message:
+            "task delivery failed: provider did not become ready before the delivery deadline",
+        });
+        return;
       }
     }
 
@@ -131,21 +137,29 @@ export async function runInboxWatcher(args: InboxWatcherArgs): Promise<void> {
           turnId: turn.turnId,
         });
       }
+      const input =
+        args.context && !contextSent
+          ? buildTaskInput(isInterrupt ? interruptText : text, args.context)
+          : isInterrupt
+            ? interruptText
+            : text;
       if (adapter.deliverMessage)
-        await adapter.deliverMessage(
-          isInterrupt ? interruptText : text,
-          ctx,
-          isInterrupt,
-        );
+        await adapter.deliverMessage(input, ctx, isInterrupt);
       else
         child.stdin.write(
           isInterrupt
-            ? adapter.encodeInterruptMessage(interruptText, ctx)
-            : adapter.encodeUserMessage(text, ctx),
+            ? adapter.encodeInterruptMessage(input, ctx)
+            : adapter.encodeUserMessage(input, ctx),
         );
+      contextSent = true;
       cursor = ev.seq;
       writeInboxCursor(sessionId, workerName, cursor);
-    } catch {
+    } catch (error) {
+      await appendEvent(sessionId, {
+        kind: "error",
+        by: `supervisor:${workerName}`,
+        message: `task delivery failed: ${error instanceof Error ? error.message : String(error)}`,
+      }).catch(() => undefined);
       if (turn) {
         args.turnTracker?.finish();
         await appendEvent(sessionId, {

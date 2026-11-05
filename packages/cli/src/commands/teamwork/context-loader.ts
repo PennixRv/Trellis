@@ -15,12 +15,14 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 interface ContextBlock {
   path: string; // display path (relative to cwd if possible)
   source: "file" | "jsonl";
   reason?: string;
   content: string;
+  delivery?: "inline" | "required" | "on-demand";
 }
 
 const MAX_PER_FILE_BYTES = 1_000_000; // 1MB hard cap per file
@@ -126,7 +128,12 @@ export function assembleContext(
     for (const line of iterFileLines(jailedJsonl)) {
       const t = line.trim();
       if (!t) continue;
-      let obj: { file?: string; reason?: string; _example?: unknown };
+      let obj: {
+        file?: string;
+        reason?: string;
+        delivery?: "inline" | "required" | "on-demand";
+        _example?: unknown;
+      };
       try {
         obj = JSON.parse(t) as typeof obj;
       } catch {
@@ -137,12 +144,23 @@ export function assembleContext(
       }
       if (obj._example !== undefined) continue;
       if (!obj.file) continue;
+      if (
+        obj.delivery !== undefined &&
+        !["inline", "required", "on-demand"].includes(obj.delivery)
+      )
+        throw new Error(`invalid context delivery mode in ${jsonlPath}`);
       const jailed = jailedRealpath(
         path.resolve(cwd, obj.file),
         cwd,
         trustedRoots,
       );
-      if (!jailed) continue;
+      if (!jailed) {
+        if (obj.delivery && obj.delivery !== "inline")
+          throw new Error(
+            `referenced context path is unavailable: ${obj.file}`,
+          );
+        continue;
+      }
       const block = readFileBlock(
         jailed,
         cwd,
@@ -150,7 +168,9 @@ export function assembleContext(
         obj.reason,
         trustedRoots,
       );
-      if (block) blocks.push(block);
+      if (block) blocks.push({ ...block, delivery: obj.delivery });
+      else if (obj.delivery && obj.delivery !== "inline")
+        throw new Error(`referenced context file is unavailable: ${obj.file}`);
     }
   }
 
@@ -372,5 +392,8 @@ function formatBlock(b: ContextBlock): string {
     b.source === "jsonl" && safeReason
       ? `# Context: ${safePath}\n# Reason: ${safeReason}`
       : `# Context: ${safePath}`;
-  return `${header}\n\n${b.content.trimEnd()}`;
+  const sha256 = crypto.createHash("sha256").update(b.content).digest("hex");
+  if (b.delivery && b.delivery !== "inline")
+    return `${header}\nDelivery: ${b.delivery}; SHA-256: ${sha256}\n${b.delivery === "required" ? "工作前完整读取并核对版本，结果中说明读取限制。" : "需要时读取并核对版本。"} 文件内容未内联；无法读取或版本不匹配时报告阻断。`;
+  return `${header}\nDelivery: inline; SHA-256: ${sha256}\n\n${b.content.trimEnd()}`;
 }

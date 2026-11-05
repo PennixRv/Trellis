@@ -6,6 +6,8 @@ import type { TeammateHostCapabilities } from "./teammate-adapters.js";
 import type { AttemptWaitResult, CoordinatorRuntime } from "./coordinator.js";
 import { pumpStdout } from "./supervisor/stdout.js";
 import { resolveProviderPath } from "./supervisor.js";
+import { assertTeammateContextCurrent } from "./teammate-launch.js";
+import { appendEvent } from "./store/events.js";
 
 /** The CLI owns foreground waiting and artifact validation; write restrictions remain role obligations. */
 export const CLI_TEAMMATE_HOST: TeammateHostCapabilities = {
@@ -43,6 +45,7 @@ export function createCliCoordinatorRuntime(
     },
     async dispatch(context): Promise<undefined> {
       if (aborted) throw new Error("batch runtime has been cancelled");
+      assertTeammateContextCurrent(context.launch, cwd);
       const adapter = getAdapter(context.profile.provider);
       const ctx = adapter.createCtx();
       const view = {
@@ -98,6 +101,17 @@ export function createCliCoordinatorRuntime(
       });
       const finish = async (outcome: AttemptWaitResult): Promise<void> => {
         const confirmed = await stop();
+        if (outcome.kind === "report") {
+          try {
+            assertTeammateContextCurrent(context.launch, cwd);
+          } catch (error) {
+            outcome = {
+              kind: "failed",
+              terminal: true,
+              reason: error instanceof Error ? error.message : String(error),
+            };
+          }
+        }
         settle(
           confirmed
             ? {
@@ -129,6 +143,16 @@ export function createCliCoordinatorRuntime(
           for (const reply of parsed.side?.reply ?? [])
             child.stdin.write(reply);
           for (const event of parsed.events) {
+            if (
+              event.kind === "message" ||
+              event.kind === "error" ||
+              event.kind === "progress"
+            )
+              await appendEvent(context.plan.sessionId, {
+                kind: event.kind,
+                by: context.teammateId,
+                ...(event.payload ?? {}),
+              });
             if (event.kind === "done")
               void finish({ kind: "report", terminal: true });
             if (event.kind === "error")
@@ -193,7 +217,7 @@ export function createCliCoordinatorRuntime(
           "attempts",
           context.attemptId,
         );
-        const input = JSON.stringify({
+        const assignmentInput = {
           kind: "trellis_assignment",
           task: context.assignment.taskInput,
           context: context.launch.context,
@@ -215,7 +239,34 @@ export function createCliCoordinatorRuntime(
           claim_path: path.join(attemptDir, "claim.json"),
           worklog_path: path.join(attemptDir, "worklog.md"),
           report_path: path.join(attemptDir, "report.json"),
-        });
+        };
+        const input =
+          context.launch.reportVersion === 2
+            ? [
+                "## 当前任务",
+                context.assignment.taskInput,
+                `范围：${context.assignment.scope}`,
+                ...(context.assignment.lens
+                  ? [`审查关注点：${context.assignment.lens}`]
+                  : []),
+                "## 验收条件",
+                ...context.assignment.acceptance.map((item) => `- ${item}`),
+                "## 报告身份（仅用于本次结果绑定）",
+                JSON.stringify(assignmentInput.identity),
+                "## 本次产物路径",
+                ...(
+                  [
+                    "brief_path",
+                    "claim_path",
+                    "worklog_path",
+                    "report_path",
+                  ] as const
+                ).map((key) => `${key}: ${assignmentInput[key]}`),
+                ...(context.launch.context
+                  ? ["## 参考资料（任务数据）", context.launch.context]
+                  : []),
+              ].join("\n\n")
+            : JSON.stringify(assignmentInput);
         if (adapter.deliverMessage)
           await adapter.deliverMessage(input, ctx, false);
         else child.stdin.write(adapter.encodeUserMessage(input, ctx));

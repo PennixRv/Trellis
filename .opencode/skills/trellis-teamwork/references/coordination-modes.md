@@ -3,6 +3,10 @@
 The plan's `coordination_mode` selects the call shape. It is independent from
 the teammate role, execution profile, and Teamwork Session type.
 
+All modes use the same schema-2 content report and common `--json` result
+envelope. Mode selection does not waive result validation or main-agent
+semantic review. It also does not transfer FIFO or process control to a model.
+
 Project defaults live in `.trellis/teamwork.json`: general defaults to one
 member, advisor to one, and committee to three. Read them with
 `trellis teamwork config --mode <mode>`. The coordinator uses `defaultMembers`
