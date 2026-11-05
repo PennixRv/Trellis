@@ -85,16 +85,35 @@ capacity without launching a provider; `processProbe: not_run` means accounts,
 models and transport have not been tested by that command. Actual dispatch
 negotiates provider model and effort and fails explicitly if unsupported.
 
-The foreground CLI owns dispatch, waiting, report acceptance, retries, process
-shutdown and the terminal receipt. Do not add a second scheduler or retry
-loop. `run` and `spawn` operate interactive sessions and do not bypass batch
+Invoke one foreground `trellis teamwork batch` command and wait for its
+receipt. The CLI owns FIFO admission, capacity, provider waits, retries,
+cancellation, report acceptance, and settlement. The main agent does not
+schedule per-assignment waits or retries. A timeout continuation waits on the
+same provider process under the frozen batch deadline; it does not send another
+provider prompt or consume a full-attempt retry. At the batch deadline, the CLI
+closes admission, marks undispatched FIFO work `FINAL_FAILED`, then cancels and
+drains active attempts. Confirmed outcomes settle as `SETTLED_WITH_FAILURE`;
+unconfirmed process exit requires reconciliation.
+
+A valid `blocked` report with evidence ends only that assignment as
+`FINAL_FAILED`; the CLI continues with the remaining FIFO work and preserves
+the blocker report. Missing reports may use the assignment's declared retry
+budget. A truncated report or report storage error is uncertain and requires
+reconciliation. Other incomplete or rejected reports may retry only within the
+declared attempt budget.
+
+`run` and `spawn` operate interactive sessions and do not bypass batch
 reconciliation. A restart returns a durable terminal receipt or
 `RECONCILIATION_REQUIRED`; it never silently replays an uncertain attempt.
-Capacity reservations survive a coordinator crash because a dead coordinator
-does not prove its provider processes exited. Do not delete an unresolved
-reservation to make another batch fit; inspect ownership and terminal evidence.
-An unreadable or conflicting recovery state also retains the reservation and
-original evidence; it does not authorize a replacement dispatch.
+Before returning a recovered terminal receipt, the CLI checks the frozen plan,
+all assignment dispositions, terminal attempt and teammate facts, capacity
+leases, projection issues, and the exact receipt event. It may reconstruct a
+missing receipt only from consistent terminal facts. Capacity reservations
+survive a coordinator crash because a dead coordinator does not prove its
+provider processes exited. Do not delete an unresolved reservation to make
+another batch fit; inspect ownership and terminal evidence. An unreadable or
+conflicting recovery state retains the reservation and original evidence; it
+does not authorize a replacement dispatch.
 
 ## Teamwork Session and forum commands
 
@@ -154,8 +173,13 @@ archive operation.
 ## Result handling
 
 The coordinator returns `ALL_ACCEPTED`, `SETTLED_WITH_FAILURE`, or
-`RECONCILIATION_REQUIRED`. A terminal receipt is a runtime fact. The main task
-then reviews reports against the phase contract, records durable evidence in
-the task-owned artifact, and uses the task's native acceptance gate before
-advancing. A formal session handoff is an independent, lower-priority
-continuity artifact and does not represent a phase transition.
+`RECONCILIATION_REQUIRED`. For `ALL_ACCEPTED`, review every accepted report
+against the phase contract, record the evidence in the task-owned artifact, and
+use the native task acceptance gate before advancing. For
+`SETTLED_WITH_FAILURE`, review the failure reports and blockers, do not accept
+or advance the phase, and decide the next task-level action through the native
+workflow. For `RECONCILIATION_REQUIRED`, stop dispatch, retry, and cleanup;
+preserve the reported runtime evidence and reservation for explicit
+reconciliation. A receipt is a runtime fact, not phase acceptance. A formal
+session handoff is an independent, lower-priority continuity artifact and does
+not represent a phase transition.

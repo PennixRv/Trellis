@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.17",
+  "description": "区分合同内返工与合同变更，恢复终态任务的受控重开",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Execution rework preserves verified unchanged implementation authorization. New implementation contracts require a nonempty acceptance coverage table. Completed and cancelled tasks can explicitly reopen into planning, preserving terminal history and discarding stale runtime and authorization.",
+  "migrations": [],
+  "notes": "Run trellis update to refresh task scripts, the native workflow and phase Skills. Existing acceptance and authorization remain valid; new acceptance or authorization requires the coverage table. Reopen and phase return remain separate operations."
+}

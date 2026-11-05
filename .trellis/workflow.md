@@ -30,11 +30,18 @@ python3 ./.trellis/scripts/task.py validate <task>
 python3 ./.trellis/scripts/task.py start <task>
 python3 ./.trellis/scripts/task.py complete <task>
 python3 ./.trellis/scripts/task.py cancel <task> --reason "<reason>" --evidence-ref <reference>
+python3 ./.trellis/scripts/task.py reopen <task> --reason "<reason>" --evidence-ref <reference>
 ```
 
 使用 `phase artifact`、`accept`、`skip`、`wait`、`block`、`resume`、`return`、`route` 和 `authorize` 执行对应的阶段操作。准确参数以 `task.py --help` 为准。跳过阶段必须提供理由和证据；目标探索与需求核对阶段不可省略。
 
 只有阶段路线已到达获准的实施入口时，`task.py start` 才会将任务从 `planning` 改为 `in_progress`。分析任务可在交付审查与现场收尾阶段后仍处于 `planning` 时完成。`complete` 将任务移入 `completed/YYYY-MM/<task>`，`cancel` 将任务移入 `cancelled/<task>`，并在同一事务中清除任务的运行时会话指针。
+
+工作流阶段回流与原生任务生命周期恢复分别操作。`completed` 或 `cancelled` 任务需要在原线程继续时，先用 `reopen` 恢复到 `planning`，保留终态事实、取消原因和恢复证据，清除旧运行态、实施授权和依赖准入；工作流阶段保持原记录。随后用 `phase return` 回到最早受影响阶段。实现任务重新接受合同、取得新的实施授权并核验准入后，才由 `start` 进入 `in_progress`。`phase return` 不能直接修改终态任务。
+
+`phase return` 默认采用 `contract_change`，使受影响阶段接受和实施授权失效。合同不变的局部实施或证据返工可显式使用 `--return-kind execution_rework`，目标限于实施或交付阶段，可重入当前阶段；CLI 核验需求、已接受合同、授权摘要、路线 revision 和已声明依赖准入仍有效后，保留授权，清理目标阶段及下游的接受事实。不能以此修改目标、合同或绕过待决依赖。普通局部修复可直接在当前活动阶段完成，无需为了记录进展而回流。
+
+新接受的 `implementation_contract`（以及省略设计阶段时新授权的合同）必须包含 `## 验收覆盖` 表，表头固定为 `接受条件 | 工作包 | Owner | 验证入口 | 交付证据 | 停止条件`，至少一行且各单元格非空。CLI 负责结构检查，阶段 Skill 负责逐条核对已接受条件的语义覆盖。既有接受和授权不会因本次升级自动失效；再次接受或授权时执行新检查。
 
 旧布局须先预览 `task.py migrate-layout`，核对后执行 `task.py migrate-layout --apply`；旧 `archive/YYYY-MM` 中已完成的任务保留原月份，其他任务按真实状态放置。迁移会同步 JSON/JSONL 机器引用、会话指针和运行态索引，保留任务身份与父子关系，不重授历史授权。未完成事务会阻止普通任务命令，须用 `task.py migrate-layout --recover` 恢复；输入被外部改动时停止并保留现场。路径或产物内容改变导致接受证据失效时，须经原生阶段接受或 continuity 核对重新收敛。
 

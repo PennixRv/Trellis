@@ -4,6 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseTaskWorkflowState } from "@pennixrv/trellis-core/task";
+import { createHash } from "node:crypto";
+
+const COVERAGE =
+  "\n## 验收覆盖\n\n| 接受条件 | 工作包 | Owner | 验证入口 | 交付证据 | 停止条件 |\n| --- | --- | --- | --- | --- | --- |\n| scoped behavior | implement | cli | integration tests | test receipt | failed check |\n";
 
 const TEMPLATE_SCRIPTS = path.resolve(
   __dirname,
@@ -59,7 +63,7 @@ function setupRepo(root: string): void {
   fs.cpSync(TEMPLATE_SCRIPTS, scriptsDir, { recursive: true });
   const taskDir = taskDirectory(root, TASK);
   fs.mkdirSync(taskDir, { recursive: true });
-  fs.writeFileSync(path.join(taskDir, "prd.md"), "# Requirements\n");
+  fs.writeFileSync(path.join(taskDir, "prd.md"), "# Requirements\n" + COVERAGE);
   fs.writeFileSync(
     path.join(taskDir, "task.json"),
     JSON.stringify({
@@ -251,7 +255,10 @@ function prepareImplementationContract(root: string): string {
     "prd.md",
   );
   const designPath = path.join(taskDirectory(root, TASK), "design.md");
-  fs.writeFileSync(designPath, "# Accepted implementation contract\n");
+  fs.writeFileSync(
+    designPath,
+    "# Accepted implementation contract\n" + COVERAGE,
+  );
   accept(
     root,
     SOLUTION_DESIGN_AND_CONVERGENCE,
@@ -309,7 +316,8 @@ function linkChildTask(root: string, admissionState = "ready"): string {
   fs.mkdirSync(childDir, { recursive: true });
   fs.writeFileSync(
     path.join(childDir, "prd.md"),
-    "# Child implementation contract\nImplement the scoped change.\n",
+    "# Child implementation contract\nImplement the scoped change.\n" +
+      COVERAGE,
   );
   const childTask = JSON.parse(
     fs.readFileSync(path.join(taskDirectory(root), "task.json"), "utf-8"),
@@ -427,6 +435,303 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
+  it("retains authorization for execution rework and invalidates it for contract change", () => {
+    prepareImplementationContract(root);
+    authorizeImplementation(root, "design.md");
+    const authorization = readState(root).implementation_authorization;
+    accept(root, TASK_IMPLEMENTATION, "verified");
+    accept(root, DELIVERY_REVIEW_AND_CLOSEOUT, "delivery_ready", [
+      "--closeout-disposition",
+      "delivery_ready",
+    ]);
+    runOk(
+      root,
+      "phase",
+      "return",
+      TASK,
+      "--expected-route-revision",
+      "1",
+      "--return-kind",
+      "execution_rework",
+      "--target-phase",
+      TASK_IMPLEMENTATION,
+      "--reason",
+      "Repair behavior within the unchanged contract",
+      "--evidence-ref",
+      "review:local-defect",
+    );
+    expect(readState(root).implementation_authorization).toEqual(authorization);
+    expect(readState(root).current_phase_id).toBe(TASK_IMPLEMENTATION);
+    expect(
+      readState(root).phases[DELIVERY_REVIEW_AND_CLOSEOUT].acceptance,
+    ).toBeNull();
+    expect(readState(root).return_record).toMatchObject({
+      return_kind: "execution_rework",
+      authorization_retained: true,
+    });
+    runOk(
+      root,
+      "phase",
+      "return",
+      TASK,
+      "--expected-route-revision",
+      "1",
+      "--target-phase",
+      SOLUTION_DESIGN_AND_CONVERGENCE,
+      "--reason",
+      "Contract needs a new behavior",
+      "--evidence-ref",
+      "review:contract-change",
+    );
+    expect(readState(root).implementation_authorization).toBeNull();
+  });
+
+  it.each(["requirements", "contract", "admission", "authorization", "target"])(
+    "rejects execution rework with invalid %s without changing state",
+    (invalid) => {
+      prepareImplementationContract(root);
+      authorizeImplementation(root, "design.md");
+      if (invalid === "requirements")
+        fs.appendFileSync(
+          path.join(taskDirectory(root), "prd.md"),
+          "Changed goal\n",
+        );
+      if (invalid === "contract")
+        fs.appendFileSync(
+          path.join(taskDirectory(root), "design.md"),
+          "Changed contract\n",
+        );
+      if (invalid === "admission")
+        runOk(
+          root,
+          "phase",
+          "admission",
+          TASK,
+          "--expected-route-revision",
+          "1",
+          "--dependency",
+          "git",
+          "--admission-state",
+          "blocked",
+          "--evidence-ref",
+          "check:blocked",
+        );
+      if (invalid === "authorization") {
+        const taskPath = path.join(taskDirectory(root), "task.json");
+        const task = JSON.parse(fs.readFileSync(taskPath, "utf-8"));
+        task.meta.task_workflow.implementation_authorization = null;
+        fs.writeFileSync(taskPath, JSON.stringify(task));
+      }
+      const before = readState(root);
+      const result = runTask(
+        root,
+        "phase",
+        "return",
+        TASK,
+        "--expected-route-revision",
+        "1",
+        "--return-kind",
+        "execution_rework",
+        "--target-phase",
+        invalid === "target"
+          ? SOLUTION_DESIGN_AND_CONVERGENCE
+          : TASK_IMPLEMENTATION,
+        "--reason",
+        "Attempt rework",
+        "--evidence-ref",
+        "review:defect",
+      );
+      expect(result.status).toBe(1);
+      expect(readState(root)).toEqual(before);
+    },
+  );
+
+  it("requires nonempty acceptance coverage before accepting an implementation contract", () => {
+    const contract = prepareImplementationContract(root);
+    runOk(
+      root,
+      "phase",
+      "return",
+      TASK,
+      "--expected-route-revision",
+      "1",
+      "--target-phase",
+      SOLUTION_DESIGN_AND_CONVERGENCE,
+      "--reason",
+      "Review coverage",
+      "--evidence-ref",
+      "review:coverage",
+    );
+    for (const content of [
+      "# Contract\n",
+      COVERAGE.replace("| scoped behavior |", "|  |"),
+    ]) {
+      fs.writeFileSync(contract, content);
+      const revision = setArtifact(
+        root,
+        SOLUTION_DESIGN_AND_CONVERGENCE,
+        "design.md",
+      );
+      const result = runTask(
+        root,
+        "phase",
+        "accept",
+        TASK,
+        "--expected-route-revision",
+        "1",
+        "--artifact-revision",
+        revision,
+        "--result-ref",
+        "design.md",
+        "--outcome-kind",
+        "implementation_contract",
+        "--evidence-ref",
+        "review:coverage",
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("TASK_PHASE_COVERAGE_REQUIRED");
+    }
+    fs.writeFileSync(contract, "# Contract\n" + COVERAGE);
+    accept(
+      root,
+      SOLUTION_DESIGN_AND_CONVERGENCE,
+      "implementation_contract",
+      [],
+      "design.md",
+    );
+  });
+
+  it.each(["completed", "cancelled"])(
+    "reopens %s into planning, preserving history and discarding old runtime and authorization",
+    (status) => {
+      prepareImplementationContract(root);
+      authorizeImplementation(root, "design.md");
+      const original = taskDirectory(root);
+      const terminal =
+        status === "completed"
+          ? path.join(root, ".trellis/tasks/completed/2026-11", TASK)
+          : path.join(root, ".trellis/tasks/cancelled", TASK);
+      const task = JSON.parse(
+        fs.readFileSync(path.join(original, "task.json"), "utf-8"),
+      );
+      task.status = status;
+      task.completedAt = status === "completed" ? "2026-11-05" : null;
+      task.meta.task_cancellation = {
+        reason: "Temporary withdrawal",
+        evidence_refs: ["user:withdraw"],
+      };
+      const cancellation = task.meta.task_cancellation;
+      fs.writeFileSync(path.join(original, "task.json"), JSON.stringify(task));
+      fs.mkdirSync(path.dirname(terminal), { recursive: true });
+      fs.renameSync(original, terminal);
+      const oldRef = path.relative(root, terminal);
+      const key = createHash("sha256").update(oldRef).digest("hex");
+      const runtimeFiles = [
+        path.join(root, ".trellis/.runtime/sessions/stale.json"),
+        ...["continuity", "task-ownership"].map((folder) =>
+          path.join(root, ".trellis/.runtime", folder, key + ".json"),
+        ),
+      ];
+      for (const file of runtimeFiles) {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({ current_task: oldRef }));
+      }
+      expect(
+        runTask(
+          root,
+          "phase",
+          "return",
+          TASK,
+          "--expected-route-revision",
+          "1",
+          "--target-phase",
+          SOLUTION_DESIGN_AND_CONVERGENCE,
+          "--reason",
+          "Review again",
+          "--evidence-ref",
+          "user:reopen",
+        ).stderr,
+      ).toContain("TASK_PHASE_TASK_TERMINAL");
+      runOk(
+        root,
+        "reopen",
+        TASK,
+        "--reason",
+        "Continue the same review",
+        "--evidence-ref",
+        "user:reopen",
+      );
+      const reopened = JSON.parse(
+        fs.readFileSync(path.join(taskDirectory(root), "task.json"), "utf-8"),
+      );
+      expect(reopened.status).toBe("planning");
+      expect(reopened.id).toBe(task.id);
+      expect(reopened.completedAt).toBeNull();
+      expect(reopened.meta.task_cancellation).toEqual(cancellation);
+      expect(reopened.meta.task_lifecycle_recoveries).toEqual([
+        expect.objectContaining({
+          from_status: status,
+          to_status: "planning",
+          reason: "Continue the same review",
+          terminal_cancellation: cancellation,
+        }),
+      ]);
+      expect(reopened.meta.task_workflow.current_phase_id).toBe(
+        TASK_IMPLEMENTATION,
+      );
+      expect(
+        reopened.meta.task_workflow.implementation_authorization,
+      ).toBeNull();
+      expect(runtimeFiles.every((file) => !fs.existsSync(file))).toBe(true);
+      expect(fs.existsSync(terminal)).toBe(false);
+      runOk(root, "start", TASK);
+      expect(
+        JSON.parse(
+          fs.readFileSync(path.join(taskDirectory(root), "task.json"), "utf-8"),
+        ).status,
+      ).toBe("planning");
+      expect(
+        runTask(
+          root,
+          "reopen",
+          TASK,
+          "--reason",
+          "Repeat",
+          "--evidence-ref",
+          "user:reopen",
+        ).stderr,
+      ).toContain("TASK_PHASE_REOPEN_INVALID_STATUS");
+      runOk(
+        root,
+        "phase",
+        "return",
+        TASK,
+        "--expected-route-revision",
+        "1",
+        "--target-phase",
+        SOLUTION_DESIGN_AND_CONVERGENCE,
+        "--reason",
+        "Review new implementation contract",
+        "--evidence-ref",
+        "user:reopen",
+      );
+      accept(
+        root,
+        SOLUTION_DESIGN_AND_CONVERGENCE,
+        "implementation_contract",
+        [],
+        "design.md",
+      );
+      authorizeImplementation(root, "design.md", "user:new-approval");
+      runOk(root, "start", TASK);
+      expect(
+        JSON.parse(
+          fs.readFileSync(path.join(taskDirectory(root), "task.json"), "utf-8"),
+        ).status,
+      ).toBe("in_progress");
+    },
+  );
+
   it("binds dependency admission to the current route and clears it when implementation artifacts change", () => {
     const designPath = prepareImplementationContract(root);
     authorizeImplementation(
@@ -496,7 +801,10 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     "returns an accepted implementation contract to %s before authorization",
     (target) => {
       const designPath = prepareImplementationContract(root);
-      fs.writeFileSync(designPath, "# Revised implementation contract\n");
+      fs.writeFileSync(
+        designPath,
+        "# Revised implementation contract\n" + COVERAGE,
+      );
       runOk(
         root,
         "phase",
@@ -1571,7 +1879,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     "rejects %s when an authorized contract changes on a route without design",
     (action) => {
       const contractPath = path.join(taskDirectory(root, TASK), "contract.md");
-      fs.writeFileSync(contractPath, "# Authorized scope\n");
+      fs.writeFileSync(contractPath, "# Authorized scope\n" + COVERAGE);
       runOk(
         root,
         "phase",
@@ -1962,6 +2270,33 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     );
     expect(completedTask.status).toBe("completed");
     expect(completedTask.meta.task_workflow.closeout_disposition).toBe("no_go");
+    runOk(
+      root,
+      "reopen",
+      TASK,
+      "--reason",
+      "Review conclusion was incomplete",
+      "--evidence-ref",
+      "user:reopen",
+    );
+    expect(readState(root).current_phase_id).toBeNull();
+    runOk(
+      root,
+      "phase",
+      "return",
+      TASK,
+      "--expected-route-revision",
+      "1",
+      "--target-phase",
+      SOLUTION_DESIGN_AND_CONVERGENCE,
+      "--reason",
+      "Complete the analysis",
+      "--evidence-ref",
+      "user:reopen",
+    );
+    expect(readState(root).current_phase_id).toBe(
+      SOLUTION_DESIGN_AND_CONVERGENCE,
+    );
   });
 
   it("requires confirmed Delivery Review and On-Site Closeout Phase before cancellation", () => {
@@ -2218,6 +2553,32 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       "The user withdrew the task",
       "--evidence-ref",
       "prd.md",
+    );
+    runOk(
+      root,
+      "reopen",
+      TASK,
+      "--reason",
+      "The user resumed the task",
+      "--evidence-ref",
+      "user:resume",
+    );
+    runOk(
+      root,
+      "phase",
+      "return",
+      TASK,
+      "--expected-route-revision",
+      "2",
+      "--target-phase",
+      GOAL_EXPLORATION_AND_REQUIREMENTS,
+      "--reason",
+      "Confirm requirements again",
+      "--evidence-ref",
+      "user:resume",
+    );
+    expect(readState(root).current_phase_id).toBe(
+      GOAL_EXPLORATION_AND_REQUIREMENTS,
     );
   });
 

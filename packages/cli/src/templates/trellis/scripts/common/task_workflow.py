@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import copy
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -445,6 +446,31 @@ def _show(state: dict) -> int:
     return 0
 
 
+def _require_acceptance_coverage(task_dir: Path, contract_ref: str) -> None:
+    _artifact_digest(task_dir, [contract_ref])
+    lines = (task_dir / contract_ref).read_text(encoding="utf-8").splitlines()
+    heading = next((index for index, line in enumerate(lines) if line.strip() == "## 验收覆盖"), None)
+    headers = ["接受条件", "工作包", "Owner", "验证入口", "交付证据", "停止条件"]
+    if heading is not None:
+        section = []
+        for line in lines[heading + 1:]:
+            if line.startswith("#"):
+                break
+            if line.strip():
+                section.append(line.strip())
+        rows = [line.strip("|").split("|") for line in section if line.startswith("|") and line.endswith("|")]
+        rows = [[cell.strip() for cell in row] for row in rows]
+        if (
+            len(rows) >= 3
+            and rows[0] == headers
+            and len(rows[1]) == len(headers)
+            and all(re.fullmatch(r":?-{3,}:?", cell) for cell in rows[1])
+            and all(len(row) == len(headers) and all(row) for row in rows[2:])
+        ):
+            return
+    raise TaskWorkflowError("TASK_PHASE_COVERAGE_REQUIRED", "implementation contract requires ## 验收覆盖 with nonempty rows: " + " | ".join(headers))
+
+
 def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -> int:
     action = args.phase_action
     child_dispositions: dict[str, str] = {}
@@ -531,6 +557,8 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
             raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "Solution Design and Convergence Phase must remain active for pending_user_decision or deferred; accept implementation_contract, analysis_conclusion, or no_go")
         if result_ref not in record["artifact_refs"]:
             raise TaskWorkflowError("TASK_PHASE_RESULT_NOT_BOUND", "--result-ref must be included in the current phase artifact refs")
+        if current == PHASE_IDS[2] and outcome == "implementation_contract":
+            _require_acceptance_coverage(task_dir, result_ref)
         if current == PHASE_IDS[3]:
             authorization = state.get("implementation_authorization")
             if not isinstance(authorization, dict) or authorization.get("task_route_revision") != state["task_route_revision"]:
@@ -568,17 +596,38 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
             _advance(state, current)
     elif action == "return":
         target = _required_text(args.target_phase, "--target-phase")
+        return_kind = args.return_kind
+        execution_rework = return_kind == "execution_rework"
         if target not in state["phase_ids"] or (
             state["phase_ids"].index(target) >= state["phase_ids"].index(current)
-            and not ((reviewed_delivery or accepted_design_return) and target == current)
+            and not ((reviewed_delivery or accepted_design_return or execution_rework) and target == current)
         ):
             raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "return target must be an earlier phase in the current route")
         reason = _required_text(args.reason, "--reason")
         evidence = _refs(args.evidence_ref, "--evidence-ref", required=True)
+        authorization = state.get("implementation_authorization")
+        admission = state.get("route_dependency_admission")
+        if execution_rework:
+            if current not in PHASE_IDS[3:] or target not in PHASE_IDS[3:]:
+                raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "execution_rework is limited to implementation and delivery phases")
+            candidate = copy.deepcopy(data)
+            candidate_state = candidate["meta"]["task_workflow"]
+            _invalidate_from(candidate_state, target, keep_first=True)
+            candidate_state["implementation_authorization"] = authorization
+            _require_current_accepted_artifacts(task_dir, candidate_state)
+            candidate_state["current_phase_id"] = PHASE_IDS[3]
+            candidate_state["phases"][PHASE_IDS[3]]["status"] = "active"
+            if not implementation_start_ready(candidate, task_dir):
+                raise TaskWorkflowError("TASK_PHASE_IMPLEMENTATION_NOT_AUTHORIZED", "execution_rework requires the unchanged authorized implementation contract")
+            if admission is not None and (admission.get("admission_state") != "ready" or admission.get("task_route_revision") != state["task_route_revision"]):
+                raise TaskWorkflowError("TASK_PHASE_ADMISSION_REQUIRED", "execution_rework requires current ready dependency admission")
         state["input_revision"] = _increment(state["input_revision"])
         _invalidate_from(state, target, keep_first=True)
+        if execution_rework:
+            state["implementation_authorization"] = authorization
+            state["route_dependency_admission"] = admission
         state["phases"][target]["input_revision"] = state["input_revision"]
-        state["return_record"] = {"from": current, "to": target, "reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
+        state["return_record"] = {"from": current, "to": target, "return_kind": return_kind, "authorization_retained": execution_rework, "reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
     elif action == "route":
         phases = _validate_route(args.phase_ids)
         task_kind = args.task_kind if args.task_kind is not None else state["task_kind"]
@@ -690,6 +739,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
                 raise TaskWorkflowError("TASK_PHASE_STALE_ARTIFACT", "Solution Design and Convergence Phase implementation contract changed after acceptance; refresh and accept the current artifact before authorization")
         elif contract_ref not in state.get("skip_records", {}).get(PHASE_IDS[2], {}).get("evidence_refs", []):
             raise TaskWorkflowError("TASK_PHASE_CONTRACT_NOT_ACCEPTED", "when Solution Design and Convergence Phase is omitted, the implementation contract must be among its route evidence")
+        _require_acceptance_coverage(task_dir, contract_ref)
         state["implementation_authorization"] = {"contract_ref": contract_ref, "contract_revision": _artifact_digest(task_dir, [contract_ref]), "approval_ref": approval_ref, "task_route_revision": state["task_route_revision"]}
         if current == PHASE_IDS[2]:
             _advance(state, current)
@@ -1005,6 +1055,56 @@ def cmd_cancel_task(args: argparse.Namespace) -> int:
             clear_task_from_sessions(str(task_dir), repo_root)
             records_cleared = clear_task_runtime_records(repo_root, task_dir.relative_to(repo_root).as_posix())
             print(json.dumps({"status": data["status"], "task_cancellation": meta["task_cancellation"], "runtime_records_cleared": records_cleared}, ensure_ascii=False))
+            return 0
+    except TaskWorkflowError as error:
+        print(f"{error.code}: {error}", file=sys.stderr)
+        return 1
+
+
+def cmd_reopen_task(args: argparse.Namespace) -> int:
+    try:
+        task_dir = _task_dir(args.task_dir)
+        with _task_lock(task_dir):
+            data, meta = _load(task_dir)
+            previous_status = data.get("status")
+            if previous_status not in {"completed", "cancelled"}:
+                raise TaskWorkflowError("TASK_PHASE_REOPEN_INVALID_STATUS", "only completed or cancelled tasks can be reopened")
+            reason = _required_text(args.reason, "--reason")
+            evidence = _refs(args.evidence_ref, "--evidence-ref", required=True)
+            _assert_delegated_resources_closed(task_dir, data)
+            recoveries = meta.setdefault("task_lifecycle_recoveries", [])
+            if not isinstance(recoveries, list) or any(not isinstance(record, dict) for record in recoveries):
+                raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "task lifecycle recovery history is malformed")
+            recovery = {
+                "from_status": previous_status,
+                "to_status": "planning",
+                "reason": reason,
+                "evidence_refs": evidence,
+                "reopened_at": datetime.now(timezone.utc).isoformat(),
+                "terminal_completed_at": data.get("completedAt"),
+                "terminal_cancellation": copy.deepcopy(meta.get("task_cancellation")),
+            }
+            state = meta.get("task_workflow")
+            if state is not None:
+                state = _state(meta)
+                state["implementation_authorization"] = None
+                state["route_dependency_admission"] = None
+                state["closeout_disposition"] = None
+            recoveries.append(recovery)
+            data["status"] = "planning"
+            data["completedAt"] = None
+            from .task_move import relocate_task
+            from .active_task import clear_task_from_sessions
+            from .task_continuity import clear_task_runtime_records
+
+            repo_root = get_repo_root()
+            # Relocation rewrites runtime paths; terminal runtime must be discarded first.
+            for runtime_dir in (task_dir, repo_root / ".trellis/tasks/planning" / task_dir.name):
+                clear_task_from_sessions(str(runtime_dir), repo_root)
+                if not clear_task_runtime_records(repo_root, runtime_dir.relative_to(repo_root).as_posix()):
+                    raise TaskWorkflowError("TASK_PHASE_RUNTIME_CLEANUP_FAILED", "could not discard terminal task runtime; task remains terminal")
+            task_dir = relocate_task(repo_root, task_dir, data)
+            print(json.dumps({"status": "planning", "task_lifecycle_recovery": recovery, "runtime_records_cleared": True}, ensure_ascii=False))
             return 0
     except TaskWorkflowError as error:
         print(f"{error.code}: {error}", file=sys.stderr)

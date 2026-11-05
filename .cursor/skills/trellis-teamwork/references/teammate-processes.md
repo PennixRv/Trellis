@@ -7,18 +7,26 @@ evidence, path, secret, and symlink rules. The teammate writes only its
 current attempt artifacts. It does not modify product source, Git state, task
 status, or another teammate's artifacts.
 
-After a timeout, the same attempt may receive a continuation. A confirmed
-execution or acceptance failure may consume that assignment's explicit retry
-budget and create a new attempt identity. An uncertain command, changed host
-identity, or unconfirmed cancellation enters reconciliation and is not
-automatically duplicated. Reconciliation is a runtime outcome; the task
-coordinator decides whether a later task phase needs a return.
+When a managed batch runtime wait yields before the frozen deadline, the CLI
+may continue waiting on the same provider process and attempt identity. This
+continuation does not send another provider prompt, extend the deadline, or
+consume the full-attempt retry budget. The CLI keeps other active slots moving
+while that wait is pending. At the deadline it closes FIFO admission and
+cancels active attempts. A confirmed execution or acceptance failure may
+consume the assignment's explicit retry budget and create a new attempt
+identity. A `blocked` report with evidence ends only that assignment and does
+not stop later FIFO work. An uncertain command, changed host identity,
+incomplete report write, or unconfirmed cancellation enters reconciliation and
+is not automatically duplicated. Reconciliation is a runtime outcome; the
+task coordinator decides whether a later task phase needs a return.
 
-When a live Teamwork wait returns a host continuation, resume only that
-continuation until it resolves, times out, or errors. Do not run another
-host action meanwhile, including another wait, shell command, or status/message
-query. An empty transport slice does not mean the wait has completed. Run
-diagnostics only after the continuation returns and diagnosis is needed.
+For an interactive Teamwork Session `wait` invoked as a host tool, resume only
+that host continuation until it resolves, times out, or errors. Do not run
+another host action meanwhile, including another wait, shell command, or
+status/message query. An empty transport slice does not mean the wait has
+completed. Run diagnostics only after the continuation returns and diagnosis
+is needed. This host-tool rule does not control a managed `teamwork batch`:
+that foreground CLI call owns the batch lifecycle and returns one receipt.
 
 Use the ordinary Teamwork Session commands for a deliberate one-shot or
 interactive discussion:

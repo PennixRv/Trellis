@@ -35,21 +35,23 @@ describe("task phase identifiers", () => {
       current_phase_id: TASK_PHASE_IDS[0],
       input_revision: "1",
       phases: Object.fromEntries(
-        [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2], TASK_PHASE_IDS[4]].map((phaseId, index) => [
-          phaseId,
-          {
-            status: index === 0 ? "active" : "not_started",
-            input_revision: "1",
-            artifact_revision: artifactRevision,
-            result_revision: "0",
-            artifact_refs: [],
-            result_ref: null,
-            outcome_kind: null,
-            reason: null,
-            evidence_refs: [],
-            acceptance: null,
-          },
-        ]),
+        [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2], TASK_PHASE_IDS[4]].map(
+          (phaseId, index) => [
+            phaseId,
+            {
+              status: index === 0 ? "active" : "not_started",
+              input_revision: "1",
+              artifact_revision: artifactRevision,
+              result_revision: "0",
+              artifact_refs: [],
+              result_ref: null,
+              outcome_kind: null,
+              reason: null,
+              evidence_refs: [],
+              acceptance: null,
+            },
+          ],
+        ),
       ),
       implementation_authorization: null,
       closeout_disposition: null,
@@ -70,20 +72,36 @@ describe("task phase identifiers", () => {
       admission_state: "ready",
       evidence_refs: ["runtime-receipt.json"],
     };
-    expect(parseTaskWorkflowState({ ...state, route_dependency_admission: admission }))
-      .toMatchObject({ route_dependency_admission: admission });
+    expect(
+      parseTaskWorkflowState({
+        ...state,
+        route_dependency_admission: admission,
+      }),
+    ).toMatchObject({ route_dependency_admission: admission });
     for (const invalid of [
       { ...admission, admission_state: "available" },
-      { ...admission, dependencies: ["provider-transport", "provider-transport"] },
+      {
+        ...admission,
+        dependencies: ["provider-transport", "provider-transport"],
+      },
       { ...admission, evidence_refs: [" "] },
     ]) {
-      expect(() => parseTaskWorkflowState({ ...state, route_dependency_admission: invalid }))
-        .toThrow(/route_dependency_admission is invalid/);
+      expect(() =>
+        parseTaskWorkflowState({
+          ...state,
+          route_dependency_admission: invalid,
+        }),
+      ).toThrow(/route_dependency_admission is invalid/);
     }
     const analysisRouteWithImplementation = {
       ...state,
       task_kind: "analysis",
-      phase_ids: [TASK_PHASE_IDS[0], TASK_PHASE_IDS[2], TASK_PHASE_IDS[3], TASK_PHASE_IDS[4]],
+      phase_ids: [
+        TASK_PHASE_IDS[0],
+        TASK_PHASE_IDS[2],
+        TASK_PHASE_IDS[3],
+        TASK_PHASE_IDS[4],
+      ],
       phases: {
         ...state.phases,
         [TASK_PHASE_IDS[3]]: {
@@ -100,12 +118,16 @@ describe("task phase identifiers", () => {
         },
       },
     };
-    expect(() => parseTaskWorkflowState(analysisRouteWithImplementation)).toThrow(
+    expect(() =>
+      parseTaskWorkflowState(analysisRouteWithImplementation),
+    ).toThrow(
       /analysis tasks cannot include the Task Implementation and Test Verification Phase/,
     );
     expect(() =>
       parseTaskWorkflowState({ ...state, phase_ids: [TASK_PHASE_IDS[2]] }),
-    ).toThrow(/begin with Goal Exploration and Requirements Confirmation Phase/);
+    ).toThrow(
+      /begin with Goal Exploration and Requirements Confirmation Phase/,
+    );
     expect(() =>
       parseTaskWorkflowState({
         ...state,
@@ -119,7 +141,10 @@ describe("task phase identifiers", () => {
       task_route_revision: "1",
     };
     expect(
-      parseTaskWorkflowState({ ...state, implementation_authorization: authorization }),
+      parseTaskWorkflowState({
+        ...state,
+        implementation_authorization: authorization,
+      }),
     ).toMatchObject({ implementation_authorization: authorization });
     expect(() =>
       parseTaskWorkflowState({
@@ -130,7 +155,10 @@ describe("task phase identifiers", () => {
     expect(() =>
       parseTaskWorkflowState({
         ...state,
-        implementation_authorization: { ...authorization, contract_revision: undefined },
+        implementation_authorization: {
+          ...authorization,
+          contract_revision: undefined,
+        },
       }),
     ).toThrow(/implementation_authorization is invalid/);
     expect(() =>
@@ -160,7 +188,12 @@ describe("task phase identifiers", () => {
     };
     const confirmedSkipState = {
       ...state,
-      phase_ids: [TASK_PHASE_IDS[0], TASK_PHASE_IDS[1], TASK_PHASE_IDS[2], TASK_PHASE_IDS[4]],
+      phase_ids: [
+        TASK_PHASE_IDS[0],
+        TASK_PHASE_IDS[1],
+        TASK_PHASE_IDS[2],
+        TASK_PHASE_IDS[4],
+      ],
       phases: { ...state.phases, [TASK_PHASE_IDS[1]]: skippedPhase },
       skip_records: {
         [TASK_PHASE_IDS[1]]: {
@@ -170,7 +203,9 @@ describe("task phase identifiers", () => {
         },
       },
     };
-    expect(parseTaskWorkflowState(confirmedSkipState)).toEqual(confirmedSkipState);
+    expect(parseTaskWorkflowState(confirmedSkipState)).toEqual(
+      confirmedSkipState,
+    );
 
     const returnRecord = {
       from: TASK_PHASE_IDS[2],
@@ -180,8 +215,29 @@ describe("task phase identifiers", () => {
       task_route_revision: "1",
     };
     expect(
-      parseTaskWorkflowState({ ...state, return_record: returnRecord }).return_record,
+      parseTaskWorkflowState({ ...state, return_record: returnRecord })
+        .return_record,
     ).toEqual(returnRecord);
+    const rework = {
+      ...returnRecord,
+      from: TASK_PHASE_IDS[4],
+      to: TASK_PHASE_IDS[3],
+      return_kind: "execution_rework",
+      authorization_retained: true,
+    };
+    expect(
+      parseTaskWorkflowState({ ...state, return_record: rework }).return_record,
+    ).toEqual(rework);
+    for (const invalid of [
+      { ...rework, return_kind: "unknown" },
+      { ...rework, authorization_retained: false },
+      { ...rework, to: TASK_PHASE_IDS[2] },
+      { ...rework, return_kind: "contract_change" },
+    ]) {
+      expect(() =>
+        parseTaskWorkflowState({ ...state, return_record: invalid }),
+      ).toThrow(/rework semantics/);
+    }
   });
 
   it("requires accepted Goal Exploration and Requirements Confirmation Phase to retain evidence for its current artifact revision", () => {

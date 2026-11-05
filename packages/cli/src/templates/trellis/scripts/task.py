@@ -14,6 +14,7 @@ Usage:
     python3 task.py workflow <id>|--clear       # Set/clear per-task workflow selection
     python3 task.py phase <action> <task-dir>    # Read/update task phase workflow state
     python3 task.py cancel <task-dir> --reason <text> --evidence-ref <ref>  # Cancel task lifecycle
+    python3 task.py reopen <task-dir> --reason <text> --evidence-ref <ref>  # Restore terminal task to planning
     python3 task.py set-branch <dir> <branch>   # Set git branch
     python3 task.py set-base-branch <dir> <branch>  # Set PR target branch
     python3 task.py set-scope <dir> <scope>     # Set scope for PR title
@@ -79,6 +80,7 @@ from common.task_context import (
 from common.task_workflow import (
     TaskWorkflowError,
     cmd_cancel_task,
+    cmd_reopen_task,
     cmd_complete_task,
     cmd_delegate_start,
     cmd_phase,
@@ -779,6 +781,7 @@ def main() -> int:
     p_phase.add_argument("--route-reason", help="Reason when initialization omits one or more phases")
     p_phase.add_argument("--route-evidence-ref", action="append", help="Evidence supporting an abbreviated initial route")
     p_phase.add_argument("--target-phase", help="Earlier phase to revisit, or first affected phase for route change")
+    p_phase.add_argument("--return-kind", choices=("contract_change", "execution_rework"), default="contract_change", help="Contract change invalidates authorization; execution rework retains a verified unchanged contract")
     p_phase.add_argument("--artifact-ref", action="append", help="Task-relative file in the current phase output")
     p_phase.add_argument("--artifact-revision", help="Current artifact_revision required for acceptance")
     p_phase.add_argument("--result-ref", help="Task result artifact reference")
@@ -802,6 +805,11 @@ def main() -> int:
     p_cancel.add_argument("task_dir", help="Task directory or task name")
     p_cancel.add_argument("--reason", required=True, help="Why the task is cancelled")
     p_cancel.add_argument("--evidence-ref", action="append", required=True, help="Task-relative cancellation evidence")
+
+    p_reopen = subparsers.add_parser("reopen", help="Recover a terminal task to planning without implementation authorization")
+    p_reopen.add_argument("task_dir", help="Task directory or task name")
+    p_reopen.add_argument("--reason", required=True, help="Why the same task must continue")
+    p_reopen.add_argument("--evidence-ref", action="append", required=True, help="Recovery decision evidence")
 
     # set-branch
     p_branch = subparsers.add_parser("set-branch", help="Set git branch")
@@ -880,6 +888,7 @@ def main() -> int:
         "delegate-start": cmd_delegate_start,
         "complete": cmd_complete_task,
         "cancel": cmd_cancel_task,
+        "reopen": cmd_reopen_task,
         "set-branch": cmd_set_branch,
         "set-base-branch": cmd_set_base_branch,
         "set-scope": cmd_set_scope,
