@@ -261,3 +261,14 @@ CLI 全套测试首轮发现 profiles 子目录安装漏建，已修复；之后
 - 全量 Core 423 通过／1 条件跳过，CLI 2297 通过／2 条件跳过；随后仅追加 runtime 诊断专项测试，结果另记。ESLint、类型检查、构建通过；文档 677 文件 lint、共享导航和定向格式检查通过；清单连续性及 packed CLI 精确依赖通过。GitNexus 提交前检查为 62 文件、122 符号、62 流程、critical；索引滞后限制保留，结合当前调用方和真实链路验收。
 - 调查与操作错误均保留：早期检索 shell 引号、错误路径/锚点、响应结构误判、docs-site 不存在 workflow.md、从错误目录运行 prettier 已分别修正。曾将进度追加到冻结合同，立即恢复原字节和已接受摘要，进度改记本文件。`safe_commit.py` 实际是内部模块而非独立 CLI，直接执行导致标准库 types 被同目录模块遮蔽；后续按其真实 Python API 精确暂存，不扩大到整个任务树。一次补记使用错误标题锚点失败，未修改文件，改为已读取的唯一末尾锚点。
 - 源码与文档检查完成，beta.18 正式发布、真实重装及两仓生成资产核验尚待下面的实际回执；不预先宣称交付完成，不关闭长期父任务。
+
+### beta.18 正式交付回执
+
+- 修复提交 `b55117d1`，docs-site `b2e4c0d` 已先行推送。原生 `pnpm release:beta` 在既有 `v0.7.1` 生成并推送 `v0.7.1-beta.18`，标签提交 `bc5f70438b98cc2bd1f04ff99c4c4605dd68b987`。发布流程及提交 Hook 全量通过：Core 423 通过／1 条件跳过，CLI 2299 通过／2 条件跳过。没有跳过 Hook、改写标签或本地 npm publish。
+- [Actions 41993465492](https://github.com/PennixRv/Trellis/actions/runs/41993465492) 首次 completed/success，包含类型、构建、测试、打包精确依赖及公共 npm 验证。双包 beta 均为 `0.7.1-beta.18`，latest 保持 `0.7.1`；CLI 精确依赖同版本 Core。公共 npm 曾暂时 404，等 CI 和 registry 确认后才安装，没有重发。
+- 原生交互 `pennix update trellis-cli --version 0.7.1-beta.18 --json` 返回 changed，候选和结果归档 SHA-256 均为 `c5d7261950889584f0a57eabed087507d58a59d6f723dc629dc66a8d197ba3bb`；实际安装 CLI/Core 均 beta.18。本轮修改的 18 个运行时模块构建产物与实际安装逐字节一致。相关 CLI/Skills/Extra 的 Pennix check 均 match/keep；全局退出码 1 来自无关既有组件状态，不作全局通过声明。
+- 两仓经原生 dry-run、已授权 `--skip-all` 和 `workflow --template native` 升至 beta.18；根仓 64 项平台资产仅保留批准的 `.codex/config.toml`，本仓六平台 372 项／去重 320 文件全部匹配，公共角色与 research 卡在两仓和安装包逐字节一致。最终预览无待更新项，仅有根专用配置及本仓既有 `.trellis/config.yaml`、`.trellis/.gitignore`。未生成 `.new` 残留。
+- 更新保护基线为根仓 3610、本仓 1523 份 spec/task/workspace/handoff 及专用配置文件；更新前后无变化。本轮之后只主动追加交付记录，冻结合同原生摘要仍与接受记录一致。父任务和本任务继续既有实施阶段，不推进其他 pending action。
+- 按已有两仓备份全清授权，3 个完整快照逐份 verify、预览后经原生 prune 删除：根仓 1 份／116 文件／1,030,514 字节，本仓 2 份／750 文件／5,251,433 字节，合计 866 文件／6,281,947 字节，无 protected 或 failed，两仓回读均 []。文件大小合计不代表底层物理块回收。失败 batch 的运行态和历史任务不在此次清理范围。
+- 操作边界补记：第一次源码提交的 55 秒外层期限在 Hook 测试期间结束，核对未提交、无遗留进程后扩大期限重试成功；冻结合同用原生带路径摘要核验通过。`gh` 未指定 repo 时解析到上游，已改为 `--repo PennixRv/Trellis`；`gh run watch` 的查询超时不改变 CI，随后回查成功。一次 Pennix 结果筛选误把键控 components 当作带 id 的列表，改按真实键读取确认。上述均未伪造成产品错误或跳过发布门。
+- 本轮可复现故障已修复并验证；历史首次能力宣告异常、旧批次外层超时及缺报告外因仍缺少当时完整证据，不因最新 ALL_ACCEPTED 宣称已定位。未运行 Mintlify 页面渲染、全部宿主或非 Linux 进程清理验收，不扩大本轮通过范围。
