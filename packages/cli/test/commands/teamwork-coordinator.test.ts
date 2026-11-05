@@ -10,11 +10,20 @@ import {
   validateTeamworkPlan,
   type TeammateReport,
 } from "../../src/commands/teamwork/artifact.js";
-import { buildBatchResult } from "../../src/commands/teamwork/batch.js";
+import {
+  buildBatchResult,
+  teamworkBatch,
+  cleanupTeamworkAttemptEvidence,
+} from "../../src/commands/teamwork/batch.js";
+import { writeBatchReservation } from "../../src/commands/teamwork/batch-reservation.js";
+import { projectDir } from "../../src/commands/teamwork/store/paths.js";
 import {
   runTeamworkCoordinator,
+  reconcileTeamworkBatch,
   type TeammateDispatchContext,
 } from "../../src/commands/teamwork/coordinator.js";
+import { constructTeamworkRetry } from "../../src/commands/teamwork/plan.js";
+import { readCoordinationConfig } from "../../src/commands/teamwork/coordination.js";
 import {
   readCoordinationState,
   recordCoordinationEvent,
@@ -363,6 +372,209 @@ describe("TeamworkSession teammate coordinator", () => {
   });
 
   afterEach(() => teardown(env));
+
+  it("requires associated exit evidence before retiring an uncertain batch", async () => {
+    const raw = createPlan(env.taskRoot, ["work-a"], 0);
+    const plan = validateTeamworkPlan(raw, env.taskRoot);
+    await runTeamworkCoordinator({
+      plan: raw,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard,
+      config,
+      runtime: {
+        dispatch: vi.fn(),
+        wait: async () => ({
+          kind: "reconciliation",
+          reason: "lost provider handle",
+        }),
+        continue: vi.fn(),
+      },
+    });
+    const request = {
+      plan,
+      cwd: env.projectDir,
+      reason: "verified provider termination",
+    };
+    expect(await reconcileTeamworkBatch(request)).toMatchObject({
+      status: "blocked",
+    });
+    await expect(
+      reconcileTeamworkBatch({ ...request, execute: true }),
+    ).rejects.toThrow(/preserve its lease/);
+    await recordCoordinationEvent({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+      by: "main",
+      batchId: plan.batchId,
+      entity: "attempt",
+      action: "process_exited",
+      attemptId: "work-a.attempt.0",
+      planHash: plan.planHash,
+      idempotencyKey: "fixture-exit",
+    });
+    expect(await reconcileTeamworkBatch(request)).toEqual({
+      status: "ready",
+      blockers: [],
+    });
+    expect(
+      await reconcileTeamworkBatch({ ...request, execute: true }),
+    ).toMatchObject({ status: "SETTLED_WITH_FAILURE" });
+    expect(
+      await reconcileTeamworkBatch({ ...request, execute: true }),
+    ).toMatchObject({ status: "SETTLED_WITH_FAILURE" });
+    const state = await readCoordinationState({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+    });
+    expect(state.leases).toHaveLength(0);
+    expect(state.issues).toEqual([]);
+  });
+
+  it("publishes an idempotent linked retry round containing only failed work", async () => {
+    const raw = createPlan(env.taskRoot, ["work-a", "work-b"], 0);
+    raw.coordination_digest = readCoordinationConfig(
+      env.projectDir,
+    ).configDigest;
+    raw.plan_hash = computeTeamworkPlanHash(raw);
+    const file = path.join(env.taskRoot, "original-plan.json");
+    fs.writeFileSync(file, JSON.stringify(raw));
+    await runTeamworkCoordinator({
+      plan: raw,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard,
+      config,
+      runtime: {
+        async dispatch(context) {
+          if (context.assignment.assignmentId === "work-a")
+            writeReport(env.taskRoot, context);
+        },
+        async wait(context) {
+          return context.assignment.assignmentId === "work-a"
+            ? { kind: "report", terminal: true }
+            : { kind: "failed", terminal: true, reason: "failed work" };
+        },
+        continue: vi.fn(),
+      },
+    });
+    const request = {
+      planPath: file,
+      cwd: env.projectDir,
+      taskRoot: env.taskRoot,
+      output: path.join(env.taskRoot, "retry.json"),
+      batch: "retry-1",
+      assignments: "work-b",
+      deadline: new Date(Date.now() + 60000).toISOString(),
+      approvalRef: "user-retry-1",
+    };
+    const retry = await constructTeamworkRetry(request);
+    expect(
+      (retry.assignments as Record<string, unknown>[]).map(
+        (entry) => entry.assignment_id,
+      ),
+    ).toEqual(["work-b"]);
+    expect(retry.retry_of).toMatchObject({
+      batch_id: "batch-1",
+      approval_ref: "user-retry-1",
+    });
+    expect(await constructTeamworkRetry(request)).toEqual(retry);
+    await expect(
+      constructTeamworkRetry({ ...request, assignments: "work-a" }),
+    ).rejects.toThrow(/not a settled failure/);
+    const original = validateTeamworkPlan(raw, env.taskRoot);
+    const preview = await cleanupTeamworkAttemptEvidence(
+      original,
+      env.taskRoot,
+      env.projectDir,
+    );
+    expect(preview.files).toHaveLength(1);
+    const artifactPath = preview.files[0];
+    if (!artifactPath) throw new Error("Expected retained report artifact");
+    await expect(
+      cleanupTeamworkAttemptEvidence(
+        original,
+        env.taskRoot,
+        env.projectDir,
+        "wrong-preview",
+      ),
+    ).rejects.toThrow(/preview changed/);
+    expect(fs.existsSync(path.join(env.taskRoot, artifactPath))).toBe(true);
+    expect(
+      (
+        await cleanupTeamworkAttemptEvidence(
+          original,
+          env.taskRoot,
+          env.projectDir,
+          preview.digest,
+        )
+      ).status,
+    ).toBe("removed");
+    expect(fs.existsSync(path.join(env.taskRoot, artifactPath))).toBe(false);
+  });
+
+  it("counts other durable batch reservations before starting a provider", async () => {
+    const raw = createPlan(env.taskRoot, ["work-a"], 0);
+    raw.coordination_digest = readCoordinationConfig(
+      env.projectDir,
+    ).configDigest;
+    raw.plan_hash = computeTeamworkPlanHash(raw);
+    const file = path.join(env.taskRoot, "plan.json");
+    fs.writeFileSync(file, JSON.stringify(raw));
+    const ref = resolveTeamworkSession({
+      sessionId: "parallel",
+      cwd: env.projectDir,
+    });
+    writeBatchReservation(projectDir(ref.project), {
+      schemaVersion: 1,
+      sessionId: "another",
+      batchId: "reserved",
+      planHash: "f".repeat(64),
+      capacity: 8,
+      ownerPid: process.pid,
+    });
+    await expect(
+      teamworkBatch(file, { task: env.taskRoot, json: true }),
+    ).rejects.toThrow(/remaining live teammate budget/);
+    expect(
+      (
+        await readCoordinationState({
+          sessionId: "parallel",
+          cwd: env.projectDir,
+        })
+      ).attempts,
+    ).toHaveLength(0);
+  });
+
+  it("settles a launch preflight failure without dispatching or retaining leases", async () => {
+    const dispatch = vi.fn(async () => undefined);
+    const receipt = await runTeamworkCoordinator({
+      plan: createPlan(env.taskRoot, ["work-a", "work-b"]),
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard,
+      config,
+      runtime: {
+        prepare() {
+          throw new Error("frozen context changed");
+        },
+        dispatch,
+        wait: vi.fn(),
+        continue: vi.fn(),
+      },
+    });
+    expect(receipt.status).toBe("SETTLED_WITH_FAILURE");
+    expect(dispatch).not.toHaveBeenCalled();
+    const projection = await readCoordinationState({
+      sessionId: "parallel",
+      cwd: env.projectDir,
+    });
+    expect(projection.leases).toHaveLength(0);
+    expect(projection.attempts).toHaveLength(0);
+  });
 
   it("settles historical schema-1 reports without synthesizing schema-2 content", async () => {
     const plan = createPlan(env.taskRoot, ["legacy"], 0, true);
@@ -745,7 +957,7 @@ describe("TeamworkSession teammate coordinator", () => {
           "report.json",
         ),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("settles a blocked report and continues the remaining FIFO assignments", async () => {
@@ -842,6 +1054,20 @@ describe("TeamworkSession teammate coordinator", () => {
       "work-a.attempt.1",
     ]);
     expect(dispatched[0].slot).toBe(dispatched[1].slot);
+    const result = await buildBatchResult(
+      validateTeamworkPlan(plan, env.taskRoot),
+      receipt,
+      env.taskRoot,
+      env.projectDir,
+    );
+    expect(result.reports).toHaveLength(1);
+    expect(result.reports[0]?.association.attemptId).toBe("work-a.attempt.1");
+    expect(result.attempts?.map((item) => item.association.attemptId)).toEqual([
+      "work-a.attempt.0",
+      "work-a.attempt.1",
+    ]);
+    expect(result.attempts?.[0]?.validation).toBe("failed");
+    expect(result.attempts?.[1]?.validation).toBe("passed");
   });
 
   it("keeps generated identities within the protocol limit for maximum-length assignment ids", async () => {
@@ -1100,7 +1326,7 @@ describe("TeamworkSession teammate coordinator", () => {
     );
     expect(result.reports[1]).toMatchObject({
       association: { attemptId: "work-bounded.attempt.1" },
-      error: "confirmed failure",
+      error: expect.stringContaining("confirmed failure"),
     });
   });
 
@@ -1616,7 +1842,7 @@ describe("TeamworkSession teammate coordinator", () => {
     fs.renameSync(events, `${events}.saved`);
     fs.mkdirSync(events);
     await expect(runTeamworkCoordinator(input)).rejects.toThrow();
-    expect(batchGuard.acquire).toHaveBeenCalledTimes(2);
+    expect(batchGuard.acquire).toHaveBeenCalledTimes(1);
     expect(batchGuard.release).not.toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(fs.existsSync(`${events}.saved`)).toBe(true);

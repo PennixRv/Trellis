@@ -13,18 +13,21 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const downloadTemplateMock = vi.fn(async (_source: string, options: { dir: string }) => {
-  fs.mkdirSync(options.dir, { recursive: true });
-  fs.writeFileSync(path.join(options.dir, "marker.txt"), "content");
-  return {};
-});
+const downloadTemplateMock = vi.fn(
+  async (_source: string, options: { dir: string }) => {
+    fs.mkdirSync(options.dir, { recursive: true });
+    fs.writeFileSync(path.join(options.dir, "marker.txt"), "content");
+    return {};
+  },
+);
 
 vi.mock("giget", () => ({
   downloadTemplate: (...args: [string, { dir: string }]) =>
     downloadTemplateMock(...args),
 }));
 
-const { downloadWithStrategy } = await import("../../src/utils/template-fetcher.js");
+const { downloadWithStrategy } =
+  await import("../../src/utils/template-fetcher.js");
 
 describe("downloadWithStrategy — #383 preferOffline removed", () => {
   afterEach(() => {
@@ -35,7 +38,7 @@ describe("downloadWithStrategy — #383 preferOffline removed", () => {
     const destDir = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-dl-"));
     fs.rmSync(destDir, { recursive: true, force: true });
 
-    await downloadWithStrategy("gh:org/repo/spec", destDir, "skip");
+    await downloadWithStrategy("gh:org/repo/spec", destDir, "skip", null);
 
     expect(downloadTemplateMock).toHaveBeenCalledTimes(1);
     const options = downloadTemplateMock.mock.calls[0][1];
@@ -48,7 +51,7 @@ describe("downloadWithStrategy — #383 preferOffline removed", () => {
     const destDir = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-dl-"));
     fs.writeFileSync(path.join(destDir, "existing.txt"), "old");
 
-    await downloadWithStrategy("gh:org/repo/spec", destDir, "overwrite");
+    await downloadWithStrategy("gh:org/repo/spec", destDir, "overwrite", null);
 
     expect(downloadTemplateMock).toHaveBeenCalledTimes(1);
     const options = downloadTemplateMock.mock.calls[0][1];
@@ -61,7 +64,7 @@ describe("downloadWithStrategy — #383 preferOffline removed", () => {
     const destDir = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-dl-"));
     fs.writeFileSync(path.join(destDir, "existing.txt"), "old");
 
-    await downloadWithStrategy("gh:org/repo/spec", destDir, "append");
+    await downloadWithStrategy("gh:org/repo/spec", destDir, "append", null);
 
     expect(downloadTemplateMock).toHaveBeenCalledTimes(1);
     const options = downloadTemplateMock.mock.calls[0][1];

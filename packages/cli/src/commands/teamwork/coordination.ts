@@ -51,14 +51,16 @@ const configSchema = z
       .strict(),
     resources: z
       .object({
-        max_live_teammates: z.number().int().positive(),
+        max_live_teammates: z.number().int().nonnegative(),
         non_batch_reserved: z.number().int().nonnegative(),
       })
       .strict(),
   })
   .strict()
   .refine(
-    (c) => c.resources.non_batch_reserved < c.resources.max_live_teammates,
+    (c) =>
+      c.resources.max_live_teammates === 0 ||
+      c.resources.non_batch_reserved < c.resources.max_live_teammates,
     "reserved capacity must be below the live budget",
   );
 
@@ -125,6 +127,7 @@ export function resolveCoordination(
   defaultMembers: number;
   maxConcurrency: number;
   configDigest: string;
+  snapshot: ReturnType<typeof readCoordinationConfig>["config"];
 } {
   const { config, configDigest } = readCoordinationConfig(cwd);
   const selected = mode ?? config.default_mode;
@@ -133,7 +136,59 @@ export function resolveCoordination(
     defaultMembers: config.modes[selected].default_members,
     maxConcurrency: config.modes[selected].max_concurrency,
     configDigest,
+    snapshot: config,
   };
+}
+
+/** Resource policy may tighten after freezing; semantic defaults may not drift. */
+export function assertFrozenCoordination(
+  cwd: string,
+  digest: string,
+  snapshot?: unknown,
+  runtime?: {
+    mode: CoordinationMode;
+    maxConcurrency: number;
+    guard?: { maxLiveTeammates: number; nonBatchReserved: number };
+  },
+): void {
+  const current = readCoordinationConfig(cwd);
+  const live = (value: number): number => (value === 0 ? Infinity : value);
+  if (
+    snapshot &&
+    runtime &&
+    (runtime.maxConcurrency >
+      configSchema.parse(snapshot).modes[runtime.mode].max_concurrency ||
+      (runtime.guard &&
+        (live(runtime.guard.maxLiveTeammates) >
+          live(configSchema.parse(snapshot).resources.max_live_teammates) ||
+          runtime.guard.nonBatchReserved <
+            configSchema.parse(snapshot).resources.non_batch_reserved)))
+  )
+    throw new Error(
+      "Runtime override expands frozen capacity policy; construct a new plan",
+    );
+  if (current.configDigest === digest) return;
+  if (!snapshot)
+    throw new Error(
+      "Frozen coordination configuration changed; construct a new plan",
+    );
+  const frozen = configSchema.parse(snapshot);
+  const next = current.config;
+  if (
+    next.default_mode !== frozen.default_mode ||
+    COORDINATION_MODES.some(
+      (mode) =>
+        next.modes[mode].default_members !==
+          frozen.modes[mode].default_members ||
+        next.modes[mode].max_concurrency > frozen.modes[mode].max_concurrency,
+    ) ||
+    live(next.resources.max_live_teammates) >
+      live(frozen.resources.max_live_teammates) ||
+    next.resources.non_batch_reserved < frozen.resources.non_batch_reserved
+  )
+    throw new Error(
+      "Frozen coordination configuration changed or resource policy expanded; construct a new plan",
+    );
 }
 
 export function assertCoordinationMembers(

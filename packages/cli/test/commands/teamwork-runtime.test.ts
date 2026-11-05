@@ -1,11 +1,15 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkerChild } from "../../src/commands/teamwork/adapters/index.js";
 import { createCliCoordinatorRuntime } from "../../src/commands/teamwork/runtime.js";
 import type { TeammateDispatchContext } from "../../src/commands/teamwork/coordinator.js";
+import { readCoordinationConfig } from "../../src/commands/teamwork/coordination.js";
 
 const { spawnMock, appendEventMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -20,9 +24,27 @@ vi.mock("../../src/commands/teamwork/supervisor.js", () => ({
   resolveProviderPath: () => ({ command: "claude", prefixArgs: [] }),
 }));
 
-afterEach(() => vi.resetAllMocks());
+const temporary: string[] = [];
+afterEach(() => {
+  vi.resetAllMocks();
+  for (const root of temporary.splice(0))
+    fs.rmSync(root, { recursive: true, force: true });
+});
 
 describe("CLI Teamwork coordinator runtime", () => {
+  it("closes admission when policy changes after reservation", () => {
+    const runtime = createCliCoordinatorRuntime(
+      "/tmp",
+      "/tmp/task",
+      "stale-policy",
+    );
+    expect(() =>
+      runtime.prepare?.({
+        plan: { coordinationMode: "general" },
+      } as TeammateDispatchContext),
+    ).toThrow(/policy changed/);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
   it("continues waiting on the same process without resending work or extending the deadline", async () => {
     const child = Object.assign(new EventEmitter(), {
       stdin: new PassThrough(),
@@ -45,6 +67,8 @@ describe("CLI Teamwork coordinator runtime", () => {
         phaseId: "decision_space_construction_and_merging",
         taskRouteRevision: "1",
         inputRevision: "1",
+        coordinationMode: "general",
+        coordinationDigest: readCoordinationConfig("/tmp").configDigest,
       },
       assignment: {
         assignmentId: "work-runtime-test",
@@ -95,6 +119,8 @@ describe("CLI Teamwork coordinator runtime", () => {
         plan: {
           sessionId: "diagnostic-session",
           deadline: new Date(Date.now() + 5000).toISOString(),
+          coordinationMode: "general",
+          coordinationDigest: readCoordinationConfig("/tmp").configDigest,
         },
         assignment: { briefPath: "brief.json" },
         attemptId: "diagnostic-attempt",
@@ -102,8 +128,15 @@ describe("CLI Teamwork coordinator runtime", () => {
         profile: { provider: "claude", options: {} },
         launch: { instructions: "Read-only review.", context: "" },
       } as unknown as TeammateDispatchContext;
-      const runtime = createCliCoordinatorRuntime("/tmp", "/tmp/task");
+      const taskRoot = fs.mkdtempSync(
+        path.join(os.tmpdir(), "trellis-stderr-"),
+      );
+      temporary.push(taskRoot);
+      const attemptRoot = path.join(taskRoot, "attempts", "diagnostic-attempt");
+      fs.mkdirSync(attemptRoot, { recursive: true });
+      const runtime = createCliCoordinatorRuntime("/tmp", taskRoot);
       await runtime.dispatch(context);
+      child.stderr.write("x".repeat(70000) + "provider authentication failed");
       child.stdout.write(
         JSON.stringify({
           type: "assistant",
@@ -145,6 +178,13 @@ describe("CLI Teamwork coordinator runtime", () => {
           }),
         );
       expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+      const diagnostic = path.join(attemptRoot, "provider-stderr.log");
+      expect(fs.statSync(diagnostic).size).toBe(64 * 1024);
+      expect(fs.readFileSync(diagnostic, "utf8")).toContain(
+        "provider authentication failed",
+      );
+      if (process.platform !== "win32")
+        expect(fs.statSync(diagnostic).mode & 0o777).toBe(0o600);
       await runtime.shutdown("test complete");
     },
   );

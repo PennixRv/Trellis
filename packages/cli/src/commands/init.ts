@@ -52,13 +52,11 @@ import {
   type SpecRegistryConfig,
 } from "../utils/registry-config.js";
 import {
-  fetchTemplateIndex,
   probeRegistryIndex,
   downloadTemplateById,
   downloadRegistryDirect,
   parseRegistrySource,
   TIMEOUTS,
-  TEMPLATE_INDEX_URL,
   type SpecTemplate,
   type TemplateStrategy,
   type RegistrySource,
@@ -337,7 +335,21 @@ function writeTaskSkeleton(
   prdContent: string,
 ): boolean {
   const taskDir = path.join(cwd, PATHS.TASKS, "planning", taskName);
-  if (fs.existsSync(taskDir)) return true; // idempotent
+  const tasksRoot = path.join(cwd, PATHS.TASKS);
+  const completedRoot = path.join(tasksRoot, "completed");
+  const candidates = ["planning", "in_progress", "cancelled"].map((status) =>
+    path.join(tasksRoot, status, taskName),
+  );
+  if (fs.existsSync(completedRoot))
+    for (const month of fs.readdirSync(completedRoot, { withFileTypes: true }))
+      if (month.isDirectory() && /^\d{4}-\d{2}$/.test(month.name))
+        candidates.push(path.join(completedRoot, month.name, taskName));
+  const existing = candidates.filter((candidate) => fs.existsSync(candidate));
+  if (existing.length > 1)
+    throw new Error(
+      `Ambiguous existing task ${taskName}; reconcile task layout before initialization`,
+    );
+  if (existing.length === 1) return true;
 
   try {
     fs.mkdirSync(taskDir, { recursive: true });
@@ -413,7 +425,7 @@ function getBootstrapPrdContent(
 **You (the AI) are running this task. The developer does not read this file.**
 
 The developer just ran \`trellis init\` on this project for the first time.
-\`.trellis/\` now exists with empty spec scaffolding, and this bootstrap task
+\`.trellis/\` now contains indexes and general thinking guides, not validated project conventions. This bootstrap task
 exists under \`.trellis/tasks/\`. When they want to work on it, they should start
 this task from a session that provides Trellis session identity.
 
@@ -445,7 +457,6 @@ ${checklistMarkdown}
 | File | What to document |
 |------|------------------|
 | \`.trellis/spec/backend/directory-structure.md\` | Where different file types go (routes, services, utils) |
-| \`.trellis/spec/backend/database-guidelines.md\` | ORM, migrations, query patterns, naming conventions |
 | \`.trellis/spec/backend/error-handling.md\` | How errors are caught, logged, and returned |
 | \`.trellis/spec/backend/logging-guidelines.md\` | Log levels, format, what to log |
 | \`.trellis/spec/backend/quality-guidelines.md\` | Code review standards, testing requirements |
@@ -475,6 +486,14 @@ best practices. Customize only if something clearly doesn't fit this project.
 ---
 
 ## How to fill the spec
+
+Use \`trellis-spec-bootstrap\` to derive applicable package/layer guidelines
+from the actual source. The tables are candidate topics, not files that must
+all exist. Omit irrelevant layers and technologies; create database or framework
+guidelines only when the project actually uses them. Follow the project's
+language rules, preserve existing custom specs, and cite concrete source paths.
+For a new project without source, record only confirmed boundaries and add
+examples as implementation supplies evidence. Do not invent existing patterns.
 
 ### Step 1: Import from existing convention files first (preferred)
 
@@ -1237,6 +1256,11 @@ export async function init(options: InitOptions): Promise<void> {
     // Parse custom registry source early (needed by both monorepo + single-repo flows)
     let registry: RegistrySource | undefined;
     let registrySourceForConfig: string | undefined;
+    if (options.template && !options.registry) {
+      throw new Error(
+        "--template requires an explicit --registry; default spec initialization uses source-backed bootstrap",
+      );
+    }
     if (options.registry) {
       try {
         registry = parseRegistrySource(options.registry);
@@ -1341,7 +1365,7 @@ export async function init(options: InitOptions): Promise<void> {
           remoteSpecPackages = new Set<string>();
 
           // Per-package template selection (unless -y mode: all use blank spec)
-          if (!options.yes && !options.template) {
+          if (!options.yes && !options.template && registry) {
             for (const pkg of detected) {
               const { specSource } = await inquirer.prompt<{
                 specSource: string;
@@ -1369,7 +1393,12 @@ export async function init(options: InitOptions): Promise<void> {
                   chalk.blue(`📦 Select template for ${pkg.name}...`),
                 );
                 // Fetch templates if not already done
-                const templates = await fetchTemplateIndex();
+                const probe = await probeRegistryIndex(
+                  `${registry.rawBaseUrl}/index.json`,
+                  registry,
+                );
+                if (probe.error) throw probe.error;
+                const templates = probe.templates;
                 const specTemplates = templates
                   .filter((t) => t.type === "spec")
                   .map((t) => ({
@@ -1394,7 +1423,7 @@ export async function init(options: InitOptions): Promise<void> {
                     templateId,
                     templateStrategy,
                     templates.find((t) => t.id === templateId),
-                    undefined,
+                    registry,
                     destDir,
                   );
 
@@ -1495,9 +1524,7 @@ export async function init(options: InitOptions): Promise<void> {
     let registryBackend: RegistryBackend | undefined;
 
     // Determine the index URL based on registry
-    const indexUrl = registry
-      ? `${registry.rawBaseUrl}/index.json`
-      : TEMPLATE_INDEX_URL;
+    const indexUrl = registry ? `${registry.rawBaseUrl}/index.json` : "";
 
     if (monorepoPackages) {
       // Monorepo: template selection already handled above
@@ -1521,10 +1548,10 @@ export async function init(options: InitOptions): Promise<void> {
         }
         fetchedTemplates = probeResult.templates;
       }
-    } else if (!options.yes) {
+    } else if (!options.yes && registry) {
       // Interactive mode: show template selection
       const timeoutSec = TIMEOUTS.INDEX_FETCH_MS / 1000;
-      const sourceLabel = registry ? registry.gigetSource : TEMPLATE_INDEX_URL;
+      const sourceLabel = registry.gigetSource;
       console.log(
         chalk.gray(`   Fetching available templates from ${sourceLabel}`),
       );
@@ -1536,18 +1563,11 @@ export async function init(options: InitOptions): Promise<void> {
         );
       }, 1000);
       process.stdout.write(chalk.gray(`   Loading... 0s/${timeoutSec}s`));
-      let templates: SpecTemplate[];
-      let registryProbeNotFound = false;
-      let registryProbeError: Error | undefined;
-      if (registry) {
-        const probeResult = await probeRegistryIndex(indexUrl, registry);
-        templates = probeResult.templates;
-        registryProbeNotFound = probeResult.isNotFound;
-        registryProbeError = probeResult.error;
-        registryBackend = probeResult.backend;
-      } else {
-        templates = await fetchTemplateIndex(indexUrl);
-      }
+      const probeResult = await probeRegistryIndex(indexUrl, registry);
+      const templates = probeResult.templates;
+      const registryProbeNotFound = probeResult.isNotFound;
+      const registryProbeError = probeResult.error;
+      registryBackend = probeResult.backend;
       clearInterval(ticker);
       // Clear the loading line
       process.stdout.write("\r\x1b[2K");

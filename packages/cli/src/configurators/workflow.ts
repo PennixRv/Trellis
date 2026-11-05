@@ -19,19 +19,8 @@ import {
   agentProgressIndexContent,
   // Backend structure (multi-doc)
   backendIndexContent,
-  backendDirectoryStructureContent,
-  backendDatabaseGuidelinesContent,
-  backendLoggingGuidelinesContent,
-  backendQualityGuidelinesContent,
-  backendErrorHandlingContent,
   // Frontend structure (multi-doc)
   frontendIndexContent,
-  frontendDirectoryStructureContent,
-  frontendTypeSafetyContent,
-  frontendHookGuidelinesContent,
-  frontendComponentGuidelinesContent,
-  frontendQualityGuidelinesContent,
-  frontendStateManagementContent,
   // Guides structure
   guidesIndexContent,
   guidesCrossLayerThinkingGuideContent,
@@ -208,20 +197,10 @@ async function writeBackendDocs(specBase: string): Promise<void> {
   ensureDir(backendDir);
   const docs: DocDefinition[] = [
     { name: "index.md", content: backendIndexContent },
-    {
-      name: "directory-structure.md",
-      content: backendDirectoryStructureContent,
-    },
-    {
-      name: "database-guidelines.md",
-      content: backendDatabaseGuidelinesContent,
-    },
-    { name: "logging-guidelines.md", content: backendLoggingGuidelinesContent },
-    { name: "quality-guidelines.md", content: backendQualityGuidelinesContent },
-    { name: "error-handling.md", content: backendErrorHandlingContent },
   ];
   for (const doc of docs) {
-    await writeFile(path.join(backendDir, doc.name), doc.content);
+    const target = path.join(backendDir, doc.name);
+    if (!fs.existsSync(target)) await writeFile(target, doc.content);
   }
 }
 
@@ -233,24 +212,10 @@ async function writeFrontendDocs(specBase: string): Promise<void> {
   ensureDir(frontendDir);
   const docs: DocDefinition[] = [
     { name: "index.md", content: frontendIndexContent },
-    {
-      name: "directory-structure.md",
-      content: frontendDirectoryStructureContent,
-    },
-    { name: "type-safety.md", content: frontendTypeSafetyContent },
-    { name: "hook-guidelines.md", content: frontendHookGuidelinesContent },
-    {
-      name: "component-guidelines.md",
-      content: frontendComponentGuidelinesContent,
-    },
-    {
-      name: "quality-guidelines.md",
-      content: frontendQualityGuidelinesContent,
-    },
-    { name: "state-management.md", content: frontendStateManagementContent },
   ];
   for (const doc of docs) {
-    await writeFile(path.join(frontendDir, doc.name), doc.content);
+    const target = path.join(frontendDir, doc.name);
+    if (!fs.existsSync(target)) await writeFile(target, doc.content);
   }
 }
 
@@ -293,7 +258,8 @@ async function createSpecTemplates(
     },
   ];
   for (const doc of guidesDocs) {
-    await writeFile(path.join(guidesDir, doc.name), doc.content);
+    const target = path.join(guidesDir, doc.name);
+    if (!fs.existsSync(target)) await writeFile(target, doc.content);
   }
 
   if (packages && packages.length > 0) {

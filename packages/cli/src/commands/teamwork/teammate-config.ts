@@ -117,7 +117,7 @@ export function resolveTeammateRuntimeConfig(
     diagnostics.push(
       resolved.legacy
         ? "Legacy YAML capacity is active; migrate to .trellis/teamwork.json schema 2."
-        : "Legacy YAML capacity keys are ignored by teamwork.json schema 2; remove them with trellis update.",
+        : "Legacy YAML capacity keys are ignored by teamwork.json schema 2; review trellis update output and merge custom config.yaml manually if needed.",
     );
   if (resolved.legacy && resolved.source !== "built-in")
     diagnostics.push(
@@ -150,7 +150,6 @@ export function resolveTeammateRuntimeConfig(
           ? legacyLive
           : resolved.config.resources.max_live_teammates,
       "teamwork.teammate_guard.max_live_teammates",
-      true,
     ) ?? DEFAULT_CONFIG.guard.maxLiveTeammates;
   const nonBatchReserved =
     integer(
@@ -168,13 +167,22 @@ export function resolveTeammateRuntimeConfig(
     diagnostics,
     sourceDigest: crypto
       .createHash("sha256")
-      .update(content + resolved.configDigest)
+      .update(
+        content +
+          resolved.configDigest +
+          JSON.stringify({
+            maxConcurrency,
+            maxLiveTeammates,
+            nonBatchReserved,
+          }),
+      )
       .digest("hex"),
   };
 }
 
 export function effectiveTeammateCapacity(input: {
   requested?: number;
+  assignmentCount?: number;
   config: TeammateRuntimeConfig;
   verifiedHostCap: number;
 }): number {
@@ -186,7 +194,6 @@ export function effectiveTeammateCapacity(input: {
   integer(
     input.config.guard.maxLiveTeammates,
     "teamwork.teammate_guard.max_live_teammates",
-    true,
   );
   integer(
     input.config.guard.nonBatchReserved,
@@ -196,7 +203,10 @@ export function effectiveTeammateCapacity(input: {
   integer(requested, "batch.requested_capacity", true);
   integer(input.verifiedHostCap, "verified_host_cap", true);
   const availableGuard =
-    input.config.guard.maxLiveTeammates - input.config.guard.nonBatchReserved;
+    input.config.guard.maxLiveTeammates === 0
+      ? Infinity
+      : input.config.guard.maxLiveTeammates -
+        input.config.guard.nonBatchReserved;
   if (availableGuard <= 0) {
     throw new Error(
       "teamwork.teammate_guard has no capacity after non-batch reservations",
@@ -215,5 +225,7 @@ export function effectiveTeammateCapacity(input: {
       `requested teammate capacity ${input.requested} exceeds verified limit ${capacity}`,
     );
   }
-  return capacity;
+  if (input.assignmentCount !== undefined)
+    integer(input.assignmentCount, "batch.assignment_count", true);
+  return Math.min(capacity, input.assignmentCount ?? capacity);
 }

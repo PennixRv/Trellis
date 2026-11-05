@@ -298,7 +298,7 @@ def _load_owner(path: Path) -> dict | None:
     if record is None:
         return None
     required = {"schema_version", "task_id", "task_path", "package_id", "package_digest", "generation", "status", "source_session_id", "target_session_id", "continuity_digest", "route"}
-    if not required.issubset(record) or set(record) - required - {"target_continuity_digest"} or record.get("schema_version") != 1 or not isinstance(record.get("generation"), int):
+    if not required.issubset(record) or set(record) - required - {"target_continuity_digest", "recovery_history"} or record.get("schema_version") != 1 or not isinstance(record.get("generation"), int):
         raise ContinuityError("TASK_TRANSFER_WITHHELD", "ownership record has an invalid shape")
     if "target_continuity_digest" in record and (not isinstance(record["target_continuity_digest"], str) or not PACKAGE_DIGEST_RE.fullmatch(record["target_continuity_digest"])):
         raise ContinuityError("TASK_TRANSFER_WITHHELD", "target continuity digest is invalid")
@@ -400,11 +400,36 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                     operation == "claim" and record["status"] == "sealed"
                     and args.expected_continuity_digest == current_digest
                 )
-                if operation != "release" and current_digest != record.get("target_continuity_digest", record["continuity_digest"]) and not recovered_claim:
+                if operation not in {"release", "recover"} and current_digest != record.get("target_continuity_digest", record["continuity_digest"]) and not recovered_claim:
                     raise ContinuityError("TASK_TRANSFER_STALE_CONTINUITY", "task continuity changed during ownership transfer")
                 if operation != "release" and _route_snapshot(data) != record["route"]:
                     raise ContinuityError("TASK_TRANSFER_STALE_ROUTE", "task phase, route, input, or implementation authorization changed")
                 context_key, current_path = _direct_pointer(root)
+                if operation == "recover":
+                    if record["status"] not in {"claiming", "claimed", "recovery_required"} or not isinstance(args.reason, str) or not args.reason.strip() or args.expected_continuity_digest != current_digest:
+                        raise ContinuityError("TASK_TRANSFER_INVALID_TRANSITION", "explicit recovery requires a pending target, a reason, and the current projection digest")
+                    if current_path not in {None, record["task_path"]}:
+                        raise ContinuityError("TASK_TRANSFER_WITHHELD", "recovery session already has another active task")
+                    from .task_workflow import _assert_delegated_resources_closed
+                    try:
+                        _assert_delegated_resources_closed(task_dir, data)
+                    except TaskWorkflowError as error:
+                        raise ContinuityError("TASK_TRANSFER_RECOVERY_REQUIRED", str(error)) from error
+                    teammates_dir = task_dir / "teammates"
+                    if any(teammates_dir.rglob("queue.json")) or any(teammates_dir.rglob("claim.json")):
+                        raise ContinuityError("TASK_TRANSFER_RECOVERY_REQUIRED", "managed teamwork runtime artifacts remain; reconcile the original batch first")
+                    record.setdefault("recovery_history", []).append({"generation": record["generation"], "status": record["status"], "target_session_id": record["target_session_id"], "requested_by": context_key, "reason": args.reason})
+                    record.update({"status": "recovery_required", "generation": record["generation"] + 1, "target_continuity_digest": current_digest})
+                    if not write_json(path, record):
+                        raise ContinuityError("TASK_TRANSFER_WRITE_FAILED", "could not fence the previous generation before recovery")
+                    for session in {record["source_session_id"], record["target_session_id"]} - {None}:
+                        if not clear_active_task_if_matches(root, session, record["task_path"]):
+                            raise ContinuityError("TASK_TRANSFER_RECOVERY_REQUIRED", "a prior session pointer changed; preserve the current generation")
+                    record.update({"status": "ready", "target_session_id": None})
+                    if not write_json(path, record):
+                        raise ContinuityError("TASK_TRANSFER_WRITE_FAILED", "could not persist explicit recovery")
+                    print(json.dumps(record, ensure_ascii=False, sort_keys=True))
+                    return 0
                 if operation in {"seal", "retire"}:
                     if context_key != record["source_session_id"] or current_path not in {record["task_path"], None}:
                         raise ContinuityError("TASK_TRANSFER_WITHHELD", "source session no longer owns the current task")
@@ -497,7 +522,8 @@ def add_continuity_commands(subparsers) -> None:
     capture.add_argument("--expected-source-digest", required=True, help="Current captured digest, or absent")
 
     transfer = subparsers.add_parser("transfer", help="Transfer task ownership between direct sessions")
-    transfer.add_argument("transfer_action", choices=("status", "quiesce", "seal", "retire", "claim", "consume", "release"))
+    transfer.add_argument("transfer_action", choices=("status", "quiesce", "seal", "retire", "claim", "consume", "release", "recover"))
+    transfer.add_argument("--reason", help="Explicit recovery reason")
     transfer.add_argument("--task-id", required=True)
     transfer.add_argument("--task-path", required=True)
     transfer.add_argument("--package-id", help="Required with --package-digest for mutations or package-bound status")

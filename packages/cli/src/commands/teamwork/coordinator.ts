@@ -37,6 +37,7 @@ import {
 } from "./teammate-config.js";
 import type { resolveTeammateProfile } from "./profiles.js";
 import { type TeammateLaunchSpec } from "./teammate-launch.js";
+import { readProcessIdentity } from "./process-identity.js";
 
 export type AttemptWaitResult =
   | { kind: "report"; terminal: true; providerSessionId?: string }
@@ -80,6 +81,7 @@ export interface TeammateGuard {
 }
 
 export interface CoordinatorRuntime {
+  prepare?(context: TeammateDispatchContext): void;
   dispatch(
     context: TeammateDispatchContext,
   ): Promise<undefined | { providerSessionId?: string }>;
@@ -428,7 +430,8 @@ async function recoverExistingBatch(input: {
       (event) =>
         event.kind === "coordination" &&
         event.batchId === input.plan.batchId &&
-        event.action === "receipt_recorded",
+        event.action === "receipt_recorded" &&
+        event.payload?.status !== "RECONCILIATION_REQUIRED",
     );
     if (
       receipts.length > 1 ||
@@ -630,10 +633,34 @@ export async function runTeamworkCoordinator(
     resolveTeammateRuntimeConfig(cwd, process.env, plan.coordinationMode);
   const capacity = effectiveTeammateCapacity({
     requested: plan.requestedCapacity,
+    assignmentCount: plan.assignments.length,
     config,
     verifiedHostCap: input.host.verifiedHostCap,
   });
   const by = input.by ?? "main";
+  const existing = await readCoordinationState({
+    sessionId: plan.sessionId,
+    cwd,
+  });
+  const settled = existing.batches.find(
+    (batch) => batch.batchId === plan.batchId,
+  );
+  if (
+    settled &&
+    ["ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(settled.state)
+  ) {
+    let terminal = false;
+    try {
+      terminalReceiptFromProjection(plan, existing);
+      terminal = true;
+    } catch {
+      // Inconsistent terminal facts still require the protected recovery path.
+    }
+    if (terminal) {
+      const recovered = await recoverExistingBatch({ plan, cwd, by, capacity });
+      if (recovered) return recovered;
+    }
+  }
   const batchStates = new Map<string, CoordinationState>();
   const assignmentStates = new Map<string, CoordinationState>();
   const attemptStates = new Map<string, CoordinationState>();
@@ -757,7 +784,6 @@ export async function runTeamworkCoordinator(
     Promise<{ slot: number; result: AttemptWaitResult }>
   >();
   const final = new Map<string, "ACCEPTED" | "FINAL_FAILED">();
-  const retainedReports = new Map<string, string>();
   const retryCounts: Record<string, number> = {};
   let admissionClosed = false;
 
@@ -854,6 +880,7 @@ export async function runTeamworkCoordinator(
       profile,
       launch,
     };
+    input.runtime.prepare?.(context);
     await appendTransition({
       sessionId: plan.sessionId,
       by,
@@ -1307,7 +1334,6 @@ export async function runTeamworkCoordinator(
     });
     await release(activeWork);
     final.set(assignment.assignmentId, "ACCEPTED");
-    retainedReports.set(assignment.assignmentId, context.attemptId);
   }
 
   async function complete(
@@ -1367,7 +1393,6 @@ export async function runTeamworkCoordinator(
       return;
     }
     if (report.status === "blocked") {
-      retainedReports.set(assignment.assignmentId, context.attemptId);
       await fail(
         activeWork,
         `teammate reported blocked: ${report.evidence[0]?.summary ?? "blocker evidence missing"}`,
@@ -1475,7 +1500,6 @@ export async function runTeamworkCoordinator(
     const cleanupFailures = cleanupSettledTeamworkArtifacts({
       taskRoot: input.taskRoot,
       assignments: plan.assignments,
-      retainedReports,
     });
     if (cleanupFailures.length > 0) {
       return reconcile(
@@ -1551,12 +1575,26 @@ export async function runTeamworkCoordinator(
         );
         return;
       }
-      const assignment = pending.shift();
+      const assignment = pending[0];
       if (!assignment) return;
       const retryCount = retryCounts[assignment.assignmentId] ?? 0;
       let slot = 0;
       while (active.has(slot)) slot += 1;
-      await dispatch(slot, assignment, retryCount);
+      try {
+        await dispatch(slot, assignment, retryCount);
+        pending.shift();
+      } catch (error) {
+        if (
+          !assignmentStates.has(assignment.assignmentId) ||
+          assignmentStates.get(assignment.assignmentId) === "QUEUED"
+        ) {
+          await failPending(
+            `launch preflight failed before dispatch: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return;
+        }
+        throw error;
+      }
     }
   }
 
@@ -1791,7 +1829,8 @@ export async function assertTeamworkReceiptDurable(
     (event) =>
       event.kind === "coordination" &&
       event.batchId === plan.batchId &&
-      event.action === "receipt_recorded",
+      event.action === "receipt_recorded" &&
+      event.payload?.status !== "RECONCILIATION_REQUIRED",
   );
   if (
     receipts.length !== 1 ||
@@ -1800,4 +1839,274 @@ export async function assertTeamworkReceiptDurable(
     throw new Error(
       `batch '${plan.batchId}' has no matching durable receipt event`,
     );
+}
+
+/** Retire uncertain work only from associated terminal or process-birth evidence. */
+export async function reconcileTeamworkBatch(input: {
+  plan: TeamworkPlan;
+  cwd: string;
+  execute?: boolean;
+  reason?: string;
+}): Promise<
+  TeamworkReceipt | { status: "ready" | "blocked"; blockers: string[] }
+> {
+  const { plan, cwd } = input;
+  const projection = await readCoordinationState({
+    sessionId: plan.sessionId,
+    cwd,
+  });
+  const batch = projection.batches.find(
+    (entry) => entry.batchId === plan.batchId,
+  );
+  if (batch?.planHash !== plan.planHash)
+    throw new Error("Batch does not match the frozen plan");
+  const events = await readTeamworkEvents({ sessionId: plan.sessionId, cwd });
+  const resolving = events.some(
+    (event) =>
+      event.kind === "coordination" &&
+      event.batchId === plan.batchId &&
+      event.action === "reconciliation_resolved",
+  );
+  if (["ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(batch.state)) {
+    const receipt = terminalReceiptFromProjection(plan, projection);
+    if (input.execute) {
+      const recovered = await recoverExistingBatch({
+        plan,
+        cwd,
+        by: "main",
+        capacity: receipt.capacity,
+      });
+      if (!recovered)
+        throw new Error("Settled batch disappeared during reconciliation");
+      return recovered;
+    }
+    return receipt;
+  }
+  if (
+    batch.state !== "RECONCILIATION_REQUIRED" &&
+    !(resolving && batch.state === "SETTLING")
+  )
+    throw new Error(
+      "Recover the original batch into RECONCILIATION_REQUIRED first",
+    );
+  const attempts = projection.attempts.filter(
+    (entry) => entry.batchId === plan.batchId,
+  );
+  const blockers = projection.issues.filter(
+    (issue) => !issue.includes(": reconciliation required"),
+  );
+  for (const attempt of attempts) {
+    if (attempt.terminal) continue;
+    const facts = events.filter(
+      (event) =>
+        event.kind === "coordination" &&
+        event.batchId === plan.batchId &&
+        event.attemptId === attempt.attemptId &&
+        event.planHash === plan.planHash,
+    );
+    if (
+      facts.some(
+        (event) =>
+          event.kind === "coordination" && event.action === "process_exited",
+      )
+    )
+      continue;
+    const started = facts
+      .filter(
+        (event) =>
+          event.kind === "coordination" && event.action === "process_started",
+      )
+      .pop();
+    const pid =
+      started?.kind === "coordination" ? started.payload?.pid : undefined;
+    const birth =
+      started?.kind === "coordination"
+        ? started.payload?.processIdentity
+        : undefined;
+    let exited = false;
+    if (
+      typeof pid === "number" &&
+      Number.isSafeInteger(pid) &&
+      pid > 0 &&
+      typeof birth === "string" &&
+      birth.startsWith(`${pid}:`)
+    ) {
+      const current = readProcessIdentity(pid);
+      if (current) exited = current !== birth;
+      else {
+        try {
+          process.kill(pid, 0);
+        } catch (error) {
+          exited = (error as NodeJS.ErrnoException).code === "ESRCH";
+        }
+      }
+    }
+    if (!exited)
+      blockers.push(
+        `Attempt ${attempt.attemptId} lacks confirmed process exit; preserve its lease`,
+      );
+  }
+  if (!input.execute)
+    return { status: blockers.length ? "blocked" : "ready", blockers };
+  if (blockers.length) throw new Error(blockers.join("; "));
+  if (!input.reason?.trim())
+    throw new Error("Reconciliation requires an explicit disposition reason");
+  const by = "main";
+  for (const attempt of attempts) {
+    await recordCoordinationEvent({
+      sessionId: plan.sessionId,
+      cwd,
+      by,
+      batchId: plan.batchId,
+      entity: "attempt",
+      action: "terminal_observed",
+      attemptId: attempt.attemptId,
+      teammateId: attempt.teammateId,
+      terminal: true,
+      reason: input.reason,
+      idempotencyKey: `${plan.batchId}:reconciled-terminal:${attempt.attemptId}`,
+    });
+    if (!["FINAL_FAILED", "REPORT_SUBMITTED"].includes(attempt.state))
+      await appendTransition({
+        sessionId: plan.sessionId,
+        cwd,
+        by,
+        batchId: plan.batchId,
+        entity: "attempt",
+        id: attempt.attemptId,
+        attemptId: attempt.attemptId,
+        assignmentId: attempt.assignmentId,
+        teammateId: attempt.teammateId,
+        retryCount: attempt.retryCount,
+        state: "FINAL_FAILED",
+        terminal: true,
+        states: new Map([[attempt.attemptId, attempt.state]]),
+        transitionKey: "reconcile",
+      });
+    const teammate = projection.teammates.find(
+      (entry) =>
+        entry.batchId === plan.batchId &&
+        entry.teammateId === attempt.teammateId,
+    );
+    if (teammate && !["FAILED", "REPORT_SUBMITTED"].includes(teammate.state))
+      await appendTransition({
+        sessionId: plan.sessionId,
+        cwd,
+        by,
+        batchId: plan.batchId,
+        entity: "teammate",
+        id: teammate.teammateId,
+        teammateId: teammate.teammateId,
+        attemptId: attempt.attemptId,
+        state: "FAILED",
+        terminal: true,
+        states: new Map([[teammate.teammateId, teammate.state]]),
+        transitionKey: "reconcile",
+      });
+  }
+  for (const assignment of projection.assignments.filter(
+    (entry) => entry.batchId === plan.batchId,
+  )) {
+    if (!["ACCEPTED", "FINAL_FAILED"].includes(assignment.state))
+      await appendTransition({
+        sessionId: plan.sessionId,
+        cwd,
+        by,
+        batchId: plan.batchId,
+        entity: "assignment",
+        id: assignment.assignmentId,
+        assignmentId: assignment.assignmentId,
+        attemptId: assignment.attemptId,
+        teammateId: assignment.teammateId,
+        retryCount: assignment.retryCount,
+        state: "FINAL_FAILED",
+        states: new Map([[assignment.assignmentId, assignment.state]]),
+        transitionKey: "reconcile",
+        payload: { reason: input.reason },
+      });
+  }
+  for (const lease of projection.leases.filter(
+    (entry) => entry.batchId === plan.batchId,
+  ))
+    await recordCoordinationEvent({
+      sessionId: plan.sessionId,
+      cwd,
+      by,
+      batchId: plan.batchId,
+      entity: "attempt",
+      action: "lease_released",
+      leaseId: lease.leaseId,
+      protected: false,
+      reason: input.reason,
+      idempotencyKey: `${plan.batchId}:reconciled-release:${lease.leaseId}`,
+    });
+  const accepted = projection.assignments
+    .filter((entry) => entry.batchId === plan.batchId)
+    .every((entry) => entry.state === "ACCEPTED");
+  const states = new Map<string, CoordinationState>([
+    [plan.batchId, batch.state],
+  ]);
+  await recordCoordinationEvent({
+    sessionId: plan.sessionId,
+    cwd,
+    by,
+    batchId: plan.batchId,
+    entity: "batch",
+    action: "reconciliation_resolved",
+    reason: input.reason,
+    idempotencyKey: `${plan.batchId}:reconciled`,
+  });
+  if (batch.state !== "SETTLING")
+    await appendTransition({
+      sessionId: plan.sessionId,
+      cwd,
+      by,
+      batchId: plan.batchId,
+      entity: "batch",
+      id: plan.batchId,
+      state: "SETTLING",
+      states,
+      transitionKey: "reconcile",
+    });
+  await appendTransition({
+    sessionId: plan.sessionId,
+    cwd,
+    by,
+    batchId: plan.batchId,
+    entity: "batch",
+    id: plan.batchId,
+    state: accepted ? "ALL_ACCEPTED" : "SETTLED_WITH_FAILURE",
+    states,
+    transitionKey: "reconcile",
+  });
+  const receipt = terminalReceiptFromProjection(
+    plan,
+    await readCoordinationState({ sessionId: plan.sessionId, cwd }),
+  );
+  await appendAction({
+    sessionId: plan.sessionId,
+    cwd,
+    by,
+    batchId: plan.batchId,
+    entity: "batch",
+    action: "receipt_recorded",
+    id: `${plan.batchId}:${receipt.status}`,
+    payload: { ...receipt },
+  });
+  await assertTeamworkReceiptDurable(plan, receipt, cwd);
+  return receipt;
+}
+
+/** Read settled facts without admitting work or consulting current resource policy. */
+export async function readSettledTeamworkReceipt(
+  plan: TeamworkPlan,
+  cwd: string,
+): Promise<TeamworkReceipt | undefined> {
+  const state = await readCoordinationState({ sessionId: plan.sessionId, cwd });
+  const batch = state.batches.find((entry) => entry.batchId === plan.batchId);
+  if (!batch || !["ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(batch.state))
+    return undefined;
+  const receipt = terminalReceiptFromProjection(plan, state);
+  await assertTeamworkReceiptDurable(plan, receipt, cwd);
+  return receipt;
 }

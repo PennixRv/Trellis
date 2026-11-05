@@ -147,6 +147,33 @@ describe("init() integration", () => {
     ).toBe(true);
   });
 
+  it.each(["in_progress", "cancelled", "completed/2026-11"])(
+    "reinit preserves bootstrap task and custom specs under %s",
+    async (status) => {
+      const fetch = vi.fn().mockRejectedValue(new Error("offline"));
+      vi.stubGlobal("fetch", fetch);
+      await init({ yes: true, codex: true, user: "tester" });
+      const tasks = path.join(tmpDir, PATHS.TASKS);
+      const original = path.join(tasks, "planning/00-bootstrap-guidelines");
+      const moved = path.join(tasks, status, "00-bootstrap-guidelines");
+      fs.mkdirSync(path.dirname(moved), { recursive: true });
+      fs.renameSync(original, moved);
+      fs.writeFileSync(path.join(moved, "prd.md"), "existing task evidence");
+      const index = path.join(tmpDir, ".trellis/spec/backend/index.md");
+      fs.mkdirSync(path.dirname(index), { recursive: true });
+      fs.writeFileSync(index, "custom source-backed conventions");
+      await init({ yes: true, codex: true, user: "tester", force: true });
+      expect(fs.existsSync(original)).toBe(false);
+      expect(fs.readFileSync(path.join(moved, "prd.md"), "utf8")).toBe(
+        "existing task evidence",
+      );
+      expect(fs.readFileSync(index, "utf8")).toBe(
+        "custom source-backed conventions",
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   it("#1a writes .gitattributes with the journal merge=union rule (#415)", async () => {
     await init({ yes: true });
 

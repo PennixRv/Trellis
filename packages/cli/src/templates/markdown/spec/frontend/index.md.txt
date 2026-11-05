@@ -1,39 +1,7 @@
-# Frontend Development Guidelines
+# 前端开发规范索引
 
-> Best practices for frontend development in this project.
+此文件是项目规范的入口，尚未建立源码约定。
 
----
+在首次实施前使用 `trellis-spec-bootstrap`，核对本项目实际源码、包边界和验证入口，只建立适用且有证据的规范，并在这里添加链接。不要预设框架、状态库、Hook 或组件模式，也不要生成没有源码依据的占位规范。
 
-## Overview
-
-This directory contains guidelines for frontend development. Fill in each file with your project's specific conventions.
-
----
-
-## Guidelines Index
-
-| Guide | Description | Status |
-|-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | To fill |
-| [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | To fill |
-| [State Management](./state-management.md) | Local state, global state, server state | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
-
----
-
-## How to Fill These Guidelines
-
-For each guideline file:
-
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
-
-The goal is to help AI assistants and new team members understand how YOUR project works.
-
----
-
-**Language**: All documentation should be written in **English**.
+`trellis-before-dev` 按当前修改读取相关规范；`trellis-update-spec` 将已验证、可复用的约定增量写回。保留项目已有的自定义内容和语言要求，不为初始化重写规范。

@@ -83,6 +83,8 @@ from common.task_workflow import (
     cmd_reopen_task,
     cmd_complete_task,
     cmd_delegate_start,
+    cmd_delegate_bind,
+    cmd_delegate_reconcile,
     cmd_phase,
     implementation_start_ready,
 )
@@ -268,11 +270,11 @@ def cmd_start(args: argparse.Namespace) -> int:
             run_task_hooks("after_start", task_json_path, repo_root)
         return 0
 
+    if task_json_path.is_file():
+        task_json_path = _record_start_state(task_json_path, repo_root)
+        task_dir = task_json_path.parent.relative_to(repo_root).as_posix()
     active = set_active_task(task_dir, repo_root)
     if active:
-        if task_json_path.is_file():
-            task_json_path = _record_start_state(task_json_path, repo_root)
-
         print(colored(f"✓ Current task set to: {task_json_path.parent.relative_to(repo_root).as_posix()}", Colors.GREEN))
         print(f"Source: {active.source}")
         print()
@@ -797,6 +799,14 @@ def main() -> int:
 
     p_delegate = subparsers.add_parser("delegate-start", help="Start an authorized child task in a Paseo worktree")
     p_delegate.add_argument("child_task", help="Linked child task directory or name")
+    p_delegate_bind = subparsers.add_parser("delegate-bind", help="Freeze a linked child contract within current parent authorization")
+    p_delegate_bind.add_argument("child_task")
+    p_delegate_bind.add_argument("--result-path", help="Assigned artifact under .trellis/delegated-results/")
+    p_delegate_reconcile = subparsers.add_parser("delegate-reconcile", help="Inspect or explicitly retire a verified delegated execution")
+    p_delegate_reconcile.add_argument("child_task")
+    p_delegate_reconcile.add_argument("--execute", action="store_true")
+    p_delegate_reconcile.add_argument("--reason")
+    p_delegate_reconcile.add_argument("--approval-ref")
 
     add_continuity_commands(subparsers)
 
@@ -886,6 +896,8 @@ def main() -> int:
         "workflow": cmd_workflow,
         "phase": cmd_phase,
         "delegate-start": cmd_delegate_start,
+        "delegate-bind": cmd_delegate_bind,
+        "delegate-reconcile": cmd_delegate_reconcile,
         "complete": cmd_complete_task,
         "cancel": cmd_cancel_task,
         "reopen": cmd_reopen_task,
@@ -912,6 +924,9 @@ def main() -> int:
                 return commands[args.command](args)
             show_usage()
             return 1
+    except TaskWorkflowError as error:
+        print(f"{error.code}: {error}", file=sys.stderr)
+        return 1
     except (ValueError, OSError) as error:
         print(f"TASK_LAYOUT_WITHHELD: {error}", file=sys.stderr)
         return 1

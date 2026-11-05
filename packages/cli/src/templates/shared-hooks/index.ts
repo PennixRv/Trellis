@@ -25,6 +25,7 @@ export interface HookScript {
 }
 
 export type SharedHookName =
+  | "guard-teamwork-wait.py"
   | "session-start.py"
   | "inject-shell-session-context.py"
   | "inject-workflow-state.py"
@@ -116,6 +117,7 @@ export const SHARED_HOOKS_BY_PLATFORM: Record<
     "inject-subagent-context.py",
   ],
   codex: [
+    "guard-teamwork-wait.py",
     "inject-workflow-state.py",
     "inject-subagent-context.py",
     "inject-spec-context.py",

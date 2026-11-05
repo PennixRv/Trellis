@@ -2510,7 +2510,7 @@ export async function update(options: UpdateOptions): Promise<void> {
             console.log(
               chalk.bgGreen.black.bold(" 💡 RECOMMENDED ") +
                 chalk.green.bold(
-                  " Run with --migrate to complete the migration",
+                  " Review the migration report and use --migrate for supported migrations",
                 ),
             );
           }
@@ -3006,7 +3006,7 @@ export async function update(options: UpdateOptions): Promise<void> {
             );
             console.log(
               chalk.gray(
-                "   This will remove legacy files and apply all changes.",
+                "   Retired artifacts may require an explicit cleanup; --migrate does not remove every legacy file.",
               ),
             );
             console.log("");

@@ -1,6 +1,6 @@
 /**
  * Resolve a list of `--file` / `--jsonl` specs into the concatenated context
- * string to be embedded in the teammate's system prompt.
+ * task reference content, separate from the teammate's stable role instructions.
  *
  * --file <path-or-glob>     direct file inclusion (glob expanded via fs.globSync)
  * --jsonl <path>            parse a Trellis jsonl manifest where each line is
@@ -181,10 +181,8 @@ export function assembleContext(
   // Use Buffer.byteLength so multi-byte (CJK / emoji etc.) content isn't
   // undercounted vs. its on-the-wire size. The user is paying tokens by
   // bytes, not characters.
-  const totalBytes = blocks.reduce(
-    (n, b) => n + Buffer.byteLength(b.content, "utf-8"),
-    0,
-  );
+  const prompt = blocks.map(formatBlock).join("\n\n---\n\n");
+  const totalBytes = Buffer.byteLength(prompt, "utf-8");
   if (totalBytes > WARN_TOTAL_BYTES) {
     process.stderr.write(
       `[teamwork spawn] warning: context is ${Math.round(totalBytes / 1024)}KB across ${blocks.length} files — large system prompt may exceed model context\n`,
@@ -192,7 +190,7 @@ export function assembleContext(
   }
 
   return {
-    prompt: blocks.map(formatBlock).join("\n\n---\n\n"),
+    prompt,
     paths: blocks.map((b) => b.path),
     manifests: manifestPaths,
   };

@@ -44,7 +44,9 @@ export interface TeamworkResult {
     validation: "passed" | "failed" | "legacy" | "not_run";
     error?: string;
     artifact?: { path: string; sha256: string };
+    worklogPath?: string;
   }[];
+  attempts?: TeamworkResult["reports"];
   semanticValidation: "not_run";
   disposition: string;
   diagnosticsPath?: string;

@@ -233,20 +233,23 @@ def _phase(state: dict, phase_id: str | None = None) -> tuple[str, dict]:
     return current, record
 
 
-def _require_current_requirements_confirmation(task_dir: Path, state: dict) -> None:
-    if PHASE_IDS[0] not in state["phase_ids"]:
-        return
+def _is_withdrawal_route(state: dict) -> bool:
     requirements = state["phases"].get(PHASE_IDS[0], {})
     withdrawal = state.get("return_record")
     skip_records = state.get("skip_records")
     skipped_requirements = skip_records.get(PHASE_IDS[0]) if isinstance(skip_records, dict) else None
-    if (
+    return (
         state["phase_ids"] == [PHASE_IDS[0], PHASE_IDS[4]]
-        and state.get("current_phase_id") == PHASE_IDS[4]
+        and state.get("current_phase_id") in {PHASE_IDS[4], None}
         and isinstance(requirements, dict)
-        and requirements.get("status") == "skipped"
-        and isinstance(skipped_requirements, dict)
-        and skipped_requirements.get("task_route_revision") == state.get("task_route_revision")
+        and (
+            requirements.get("status") == "accepted"
+            or (
+                requirements.get("status") == "skipped"
+                and isinstance(skipped_requirements, dict)
+                and skipped_requirements.get("task_route_revision") == state.get("task_route_revision")
+            )
+        )
         and isinstance(withdrawal, dict)
         and isinstance(withdrawal.get("from"), str)
         and withdrawal["from"] in PHASE_ID_SET
@@ -254,7 +257,14 @@ def _require_current_requirements_confirmation(task_dir: Path, state: dict) -> N
         and withdrawal.get("task_route_revision") == state.get("task_route_revision")
         and isinstance(withdrawal.get("evidence_refs"), list)
         and bool(withdrawal["evidence_refs"])
-    ):
+    )
+
+
+def _require_current_requirements_confirmation(task_dir: Path, state: dict) -> None:
+    if PHASE_IDS[0] not in state["phase_ids"]:
+        return
+    requirements = state["phases"].get(PHASE_IDS[0], {})
+    if requirements.get("status") == "skipped" and _is_withdrawal_route(state):
         return
     acceptance = requirements.get("acceptance") if isinstance(requirements, dict) else None
     if (
@@ -569,8 +579,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
             if outcome != args.closeout_disposition:
                 raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "Delivery Review and On-Site Closeout Phase outcome must match --closeout-disposition")
             if args.closeout_disposition == "cancelled":
-                withdrawal = state.get("return_record")
-                if not isinstance(withdrawal, dict) or withdrawal.get("to") != PHASE_IDS[4] or not withdrawal.get("evidence_refs"):
+                if not _is_withdrawal_route(state):
                     raise TaskWorkflowError("TASK_PHASE_USER_CONFIRMATION_REQUIRED", "cancellation closeout requires a user-confirmed route to Delivery Review and On-Site Closeout Phase")
             child_dispositions = _validate_child_dispositions(
                 task_dir, data, args.closeout_disposition, args.child_disposition
@@ -608,7 +617,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         authorization = state.get("implementation_authorization")
         admission = state.get("route_dependency_admission")
         if execution_rework:
-            if current not in PHASE_IDS[3:] or target not in PHASE_IDS[3:]:
+            if current not in PHASE_IDS[3:] or target not in PHASE_IDS[3:] or PHASE_IDS[3] not in state["phase_ids"]:
                 raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "execution_rework is limited to implementation and delivery phases")
             candidate = copy.deepcopy(data)
             candidate_state = candidate["meta"]["task_workflow"]
@@ -800,6 +809,56 @@ def _paseo_list(args: list[str], cwd: Path, code: str) -> list[dict]:
     return value
 
 
+def _delegation_binding(repo_root: Path, child_dir: Path, child_data: dict, result_path: str) -> dict:
+    if not isinstance(result_path, str) or Path(result_path).is_absolute() or ".." in Path(result_path).parts or not result_path.startswith(".trellis/delegated-results/"):
+        raise TaskWorkflowError("TASK_DELEGATE_CONTRACT_INVALID", "result path must stay under .trellis/delegated-results/")
+    try:
+        contract_path = (child_dir / "prd.md").resolve(strict=True)
+        contract_path.relative_to(child_dir.resolve())
+        role_path = (repo_root / ".trellis/agents/delegated-worktree-primary-agent.md").resolve(strict=True)
+        role_path.relative_to((repo_root / ".trellis/agents").resolve())
+        if not contract_path.is_file() or not role_path.is_file() or contract_path.stat().st_size + role_path.stat().st_size > 1048576:
+            raise ValueError("delegated contract and role must be regular files within the size budget")
+        contract = contract_path.read_bytes()
+        role = role_path.read_bytes()
+    except (OSError, ValueError) as error:
+        raise TaskWorkflowError("TASK_DELEGATE_CONTRACT_INVALID", str(error)) from error
+    if not contract.strip() or not role.strip():
+        raise TaskWorkflowError("TASK_DELEGATE_CONTRACT_INVALID", "child PRD and delegated role must be nonempty")
+    return {
+        "contract_sha256": hashlib.sha256(contract).hexdigest(),
+        "role_sha256": hashlib.sha256(role).hexdigest(),
+        "branch": _required_text(child_data.get("branch"), "child branch"),
+        "base_commit": _git_output(["rev-parse", "--verify", "--end-of-options", f"{_required_text(child_data.get('base_branch'), 'child base_branch')}^{{commit}}"], repo_root),
+        "result_path": result_path,
+    }
+
+
+def cmd_delegate_bind(args: argparse.Namespace) -> int:
+    try:
+        repo_root = get_repo_root().resolve()
+        child_dir = _task_dir(args.child_task)
+        child, _ = _load(child_dir)
+        if not isinstance(child.get("parent"), str) or not child["parent"].strip():
+            raise TaskWorkflowError("TASK_DELEGATE_PARENT_LINK_INVALID", "child task has no parent link")
+        parent_dir = _task_dir(child["parent"])
+        parent, meta = _load(parent_dir)
+        if child_dir.name not in parent.get("children", []) or not implementation_start_ready(parent, parent_dir):
+            raise TaskWorkflowError("TASK_DELEGATE_IMPLEMENTATION_NOT_AUTHORIZED", "bind only a linked child within current parent implementation authorization")
+        state = _state(meta)
+        authorization = state["implementation_authorization"]
+        result_path = args.result_path or f".trellis/delegated-results/{child_dir.name}.md"
+        binding = _delegation_binding(repo_root, child_dir, child, result_path)
+        binding.update({"authorization_ref": authorization["approval_ref"], "parent_contract_revision": authorization["contract_revision"], "task_route_revision": state["task_route_revision"]})
+        meta.setdefault("delegation_authorizations", {})[child_dir.name] = binding
+        _save(parent_dir / FILE_TASK_JSON, parent)
+        print(json.dumps(binding, ensure_ascii=False))
+        return 0
+    except TaskWorkflowError as error:
+        print(f"{error.code}: {error}", file=sys.stderr)
+        return 1
+
+
 def cmd_delegate_start(args: argparse.Namespace) -> int:
     try:
         repo_root = get_repo_root().resolve()
@@ -873,6 +932,7 @@ def cmd_delegate_start(args: argparse.Namespace) -> int:
                 raise TaskWorkflowError("TASK_DELEGATE_PASEO_UNAVAILABLE", f"could not run Paseo: {error}") from error
             if version.returncode != 0:
                 raise TaskWorkflowError("TASK_DELEGATE_PASEO_UNAVAILABLE", (version.stderr or version.stdout).strip() or "Paseo CLI preflight failed")
+            _paseo_list(["agent", "ls", "--all", "--global", "--background", "--json"], repo_root, "TASK_DELEGATE_PASEO_UNAVAILABLE")
             role_path = repo_root / ".trellis" / "agents" / "delegated-worktree-primary-agent.md"
             try:
                 role = role_path.read_text(encoding="utf-8")
@@ -883,6 +943,16 @@ def cmd_delegate_start(args: argparse.Namespace) -> int:
             if not isinstance(authorization, dict) or not isinstance(authorization.get("approval_ref"), str):
                 raise TaskWorkflowError("TASK_DELEGATE_AUTHORIZATION_INVALID", "current implementation authorization is invalid")
             contract_digest = hashlib.sha256(contract_bytes).hexdigest()
+            bindings = parent_meta.get("delegation_authorizations", {})
+            binding = bindings.get(child_dir.name) if isinstance(bindings, dict) else None
+            if not isinstance(binding, dict):
+                raise TaskWorkflowError("TASK_DELEGATE_CONTRACT_NOT_BOUND", "freeze this child through delegate-bind before dispatch")
+            actual = _delegation_binding(repo_root, child_dir, child_data, binding.get("result_path", ""))
+            if any(binding.get(key) != value for key, value in actual.items()) or actual["contract_sha256"] != contract_digest or actual["role_sha256"] != hashlib.sha256(role.encode("utf-8")).hexdigest() or binding.get("authorization_ref") != authorization["approval_ref"] or binding.get("parent_contract_revision") != authorization["contract_revision"] or binding.get("task_route_revision") != state["task_route_revision"]:
+                raise TaskWorkflowError("TASK_DELEGATE_STALE_CONTRACT", "child PRD, role, Git base, output path, or parent authorization changed; review and bind the child again")
+            prompt_bytes = len((role + contract).encode("utf-8"))
+            if prompt_bytes > (24000 if os.name == "nt" else 96000):
+                raise TaskWorkflowError("TASK_DELEGATE_PROMPT_TOO_LARGE", "delegated prompt exceeds the native Paseo argv budget; narrow the contract before creating resources")
             previous = child_meta.get("delegated_worktree_execution_record")
             reuse_workspace = False
             workspace_id = None
@@ -906,7 +976,7 @@ def cmd_delegate_start(args: argparse.Namespace) -> int:
                 previous_worktree = Path(previous_worktree_path).expanduser().resolve()
                 agents = _paseo_list([
                     "agent", "ls", "--all", "--global", "--background", "--json",
-                    "--label", f"trellis.task_id={child_dir.name}",
+                    "--label", f"trellis.task_id={previous.get('label_task_id', child_dir.name)}",
                 ], repo_root, "TASK_DELEGATE_RECONCILIATION_REQUIRED")
                 for agent in agents:
                     agent_id = agent.get("id")
@@ -957,9 +1027,14 @@ def cmd_delegate_start(args: argparse.Namespace) -> int:
                 "workspace_id": workspace_id,
                 "worktree_path": str(worktree) if worktree else None,
                 "agent_id": None,
+                "label_task_id": child_dir.name,
+                "role_sha256": actual["role_sha256"],
+                "result_path": actual["result_path"],
                 "status": "starting",
                 "started_at": datetime.now(timezone.utc).isoformat(),
             }
+            if previous is not None:
+                child_meta.setdefault("delegated_worktree_execution_history", []).append(previous)
             child_meta["delegated_worktree_execution_record"] = record
             _save(child_dir / FILE_TASK_JSON, child_data)
 
@@ -1000,6 +1075,7 @@ def cmd_delegate_start(args: argparse.Namespace) -> int:
                     "the parent authorization and Git baseline are execution metadata. Do not accept task phases or change task lifecycle state.\n\n"
                     f"Parent task: {parent_dir.name}\nParent route revision: {state['task_route_revision']}\n"
                     f"Authorized contract: prd.md\nBranch: {branch}\nBase commit: {base_commit}\n\n"
+                    f"Assigned result artifact: {actual['result_path']}\n"
                     f"{role}\n\n## Child task prd.md\n{contract}"
                 )
                 agent = _paseo_json([
@@ -1132,8 +1208,7 @@ def task_closeout_readiness(data: dict, disposition: str) -> str | None:
     if state.get("closeout_disposition") != disposition:
         return f"Delivery Review and On-Site Closeout Phase disposition is {state.get('closeout_disposition')}; expected {disposition}"
     if disposition == "cancelled":
-        withdrawal = state.get("return_record")
-        if not isinstance(withdrawal, dict) or withdrawal.get("to") != PHASE_IDS[4] or not withdrawal.get("evidence_refs"):
+        if not _is_withdrawal_route(state):
             return "cancellation requires a user-confirmed route to Delivery Review and On-Site Closeout Phase"
     return None
 
@@ -1183,6 +1258,67 @@ def _validate_child_dispositions(
     return choices
 
 
+def cmd_delegate_reconcile(args: argparse.Namespace) -> int:
+    try:
+        root = get_repo_root().resolve()
+        task_dir = _task_dir(args.child_task)
+        data, meta = _load(task_dir)
+        record = meta.get("delegated_worktree_execution_record")
+        if not isinstance(record, dict):
+            raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "no valid delegated execution mapping")
+        if record.get("status") == "retired" and isinstance(record.get("closure_evidence"), dict):
+            print(json.dumps(record, ensure_ascii=False))
+            return 0
+        label = record.get("label_task_id", task_dir.name)
+        agents = _paseo_list(["agent", "ls", "--all", "--global", "--background", "--json", "--label", f"trellis.task_id={label}"], root, "TASK_DELEGATE_RECONCILIATION_REQUIRED")
+        if any(agent.get("status") != "closed" for agent in agents):
+            raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", "a delegated Paseo agent is still active or unknown")
+        agent_id = record.get("agent_id")
+        if agent_id and not any(agent.get("id") == agent_id for agent in agents):
+            raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "recorded agent is not available; preserve its mapping until native closure evidence is available")
+        worktree_path = record.get("worktree_path")
+        workspace_id = record.get("workspace_id")
+        workspaces = _paseo_list(["workspace", "ls", "--background", "--json"], root, "TASK_DELEGATE_RECONCILIATION_REQUIRED")
+        workspace = next((row for row in workspaces if row.get("workspaceId") == workspace_id), None) if workspace_id else None
+        if workspace and (not isinstance(worktree_path, str) or Path(workspace.get("cwd", "")).resolve() != Path(worktree_path).resolve()):
+            raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "workspace mapping does not match")
+        head = None
+        if isinstance(worktree_path, str) and Path(worktree_path).is_dir():
+            worktree = Path(worktree_path).resolve()
+            common = Path(_git_output(["rev-parse", "--git-common-dir"], worktree))
+            common = (common if common.is_absolute() else worktree / common).resolve()
+            expected_common = Path(_git_output(["rev-parse", "--git-common-dir"], root))
+            expected_common = (expected_common if expected_common.is_absolute() else root / expected_common).resolve()
+            if common != expected_common or _git_output(["branch", "--show-current"], worktree) != record.get("branch"):
+                raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "worktree does not belong to the recorded repository and branch")
+            dirty = _git_output(["status", "--porcelain", "--untracked-files=all"], worktree)
+            allowed = "?? " + record.get("result_path", "")
+            if any(line != allowed for line in dirty.splitlines()):
+                raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "worktree contains unintegrated changes; preserve and integrate them before retiring")
+            head = _git_output(["rev-parse", "HEAD"], worktree)
+            if run_git(["merge-base", "--is-ancestor", head, "HEAD"], cwd=root)[0] != 0:
+                raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "worktree commits are not integrated into the coordinator checkout")
+        elif workspace:
+            raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "workspace still exists but its worktree cannot be inspected")
+        elif not agent_id:
+            branch = record.get("branch")
+            if not isinstance(branch, str) or run_git(["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=root)[0] != 1:
+                raise TaskWorkflowError("TASK_DELEGATE_RECONCILIATION_REQUIRED", "incomplete mapping still has an unresolved branch")
+        evidence = {"agent_ids": [agent.get("id") for agent in agents], "workspace_id": workspace_id, "head": head, "checked_at": datetime.now(timezone.utc).isoformat()}
+        if not args.execute:
+            print(json.dumps({"status": "ready", "evidence": evidence}, ensure_ascii=False))
+            return 0
+        reason = _required_text(args.reason, "--reason")
+        approval_ref = _required_text(args.approval_ref, "--approval-ref")
+        record.update({"status": "retired", "closure_evidence": {**evidence, "reason": reason, "approval_ref": approval_ref}})
+        _save(task_dir / FILE_TASK_JSON, data)
+        print(json.dumps(record, ensure_ascii=False))
+        return 0
+    except TaskWorkflowError as error:
+        print(f"{error.code}: {error}", file=sys.stderr)
+        return 1
+
+
 def _assert_delegated_resources_closed(task_dir: Path, data: dict) -> None:
     children = data.get("children", [])
     if not isinstance(children, list):
@@ -1195,17 +1331,23 @@ def _assert_delegated_resources_closed(task_dir: Path, data: dict) -> None:
 def _assert_delegated_record_closed(task_id: str, record) -> None:
     if record is None:
         return
+    if isinstance(record, dict) and record.get("status") == "retired" and isinstance(record.get("closure_evidence"), dict):
+        return
     agent_id = record.get("agent_id") if isinstance(record, dict) else None
     if not isinstance(agent_id, str) or not agent_id.strip():
         raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated execution status is unknown for {task_id}; preserve the current state")
     agents = _paseo_list(
-        ["agent", "ls", "--all", "--global", "--background", "--json", "--label", f"trellis.task_id={task_id}"],
+        ["agent", "ls", "--all", "--global", "--background", "--json", "--label", f"trellis.task_id={record.get('label_task_id', task_id)}"],
         get_repo_root(),
         "TASK_PHASE_RESOURCE_ACTIVE",
     )
     agent = next((item for item in agents if item.get("id") == agent_id), None)
     if agent is None or agent.get("status") != "closed":
         raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated Paseo agent for {task_id} is not confirmed closed; preserve the current state")
+    worktree_path = record.get("worktree_path")
+    if isinstance(worktree_path, str) and Path(worktree_path).is_dir():
+        if _git_output(["status", "--porcelain", "--untracked-files=all", "--", ".trellis/tasks", ".trellis/.runtime"], Path(worktree_path)):
+            raise TaskWorkflowError("TASK_DELEGATE_TASK_FACTS_CHANGED", "delegated worktree changed protected task facts; preserve evidence and exclude those changes before integration")
 
 
 def cmd_complete_task(args: argparse.Namespace) -> int:

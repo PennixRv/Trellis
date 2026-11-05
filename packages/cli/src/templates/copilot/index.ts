@@ -5,7 +5,7 @@
  *
  * Directory structure:
  *   copilot/
- *   ├── prompts/         # Slash-command prompts → .github/prompts/*.prompt.md
+ *   Slash-command prompts come from common/commands via the configurator.
  *   ├── hooks/           # Hook scripts → .github/copilot/hooks/
  *   ├── hooks.json       # Hooks config → .github/hooks/trellis.json
  *   └── copilot-instructions.md → .github/copilot-instructions.md
@@ -41,11 +41,6 @@ export interface HookTemplate {
   content: string;
 }
 
-export interface PromptTemplate {
-  name: string;
-  content: string;
-}
-
 export function getAllHooks(): HookTemplate[] {
   const hooks: HookTemplate[] = [];
 
@@ -65,20 +60,4 @@ export function getHooksConfig(): string {
 
 export function getCopilotInstructions(): string {
   return readTemplate("copilot-instructions.md");
-}
-
-export function getAllPrompts(): PromptTemplate[] {
-  const prompts: PromptTemplate[] = [];
-
-  for (const file of listFiles("prompts")) {
-    if (!file.endsWith(".prompt.md")) {
-      continue;
-    }
-    prompts.push({
-      name: file.slice(0, -".prompt.md".length),
-      content: readTemplate(`prompts/${file}`),
-    });
-  }
-
-  return prompts;
 }

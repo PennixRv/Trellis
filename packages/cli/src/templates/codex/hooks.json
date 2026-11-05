@@ -37,6 +37,16 @@
     ],
     "PreToolUse": [
       {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{PYTHON_CMD}} -X utf8 .codex/hooks/guard-teamwork-wait.py",
+            "timeout": 15
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {

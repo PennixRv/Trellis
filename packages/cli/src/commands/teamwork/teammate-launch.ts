@@ -5,6 +5,7 @@ import path from "node:path";
 import { z } from "zod";
 
 import { assembleContext } from "./context-loader.js";
+import { resolveTrustedRoots } from "./context-trust.js";
 import { buildTeamworkInstructions } from "./prompt.js";
 import {
   assertTeammateHostCapability,
@@ -185,19 +186,32 @@ function requireRegularFile(
   candidate: string,
   field: string,
 ): string {
-  const root = path.resolve(cwd);
-  const resolved = path.resolve(root, candidate);
-  const relative = path.relative(root, resolved);
-  if (relative.startsWith("..") || path.isAbsolute(relative))
-    throw new Error(`${field} must stay within the project root: ${candidate}`);
-  let current = root;
-  for (const part of relative.split(path.sep).filter(Boolean)) {
-    current = path.join(current, part);
-    if (!fs.existsSync(current))
-      throw new Error(`${field} is missing: ${candidate}`);
-    if (fs.lstatSync(current).isSymbolicLink())
-      throw new Error(`${field} must not contain symlinks: ${candidate}`);
+  const root = fs.realpathSync(cwd);
+  const absolute = path.resolve(cwd, candidate);
+  let checked = path.parse(absolute).root;
+  for (const segment of absolute.slice(checked.length).split(path.sep)) {
+    checked = path.join(checked, segment);
+    let stat: fs.Stats;
+    try {
+      stat = fs.lstatSync(checked);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT")
+        throw new Error(`${field} is missing: ${candidate}`);
+      throw error;
+    }
+    if (stat.isSymbolicLink())
+      throw new Error(`${field} must not traverse a symlink: ${candidate}`);
   }
+  const resolved = fs.realpathSync(absolute);
+  if (
+    ![root, ...resolveTrustedRoots(cwd)].some(
+      (trusted) =>
+        resolved === trusted || resolved.startsWith(trusted + path.sep),
+    )
+  )
+    throw new Error(
+      `${field} must stay within the project root or explicitly trusted roots: ${candidate}`,
+    );
   const stat = fs.lstatSync(resolved);
   if (!stat.isFile())
     throw new Error(`${field} must be a regular file: ${candidate}`);
@@ -238,7 +252,12 @@ export function buildTeammateLaunchSpec(input: {
   for (const manifest of contextManifests)
     requireRegularFile(input.cwd, manifest, "teammate context manifest");
 
-  const assembled = assembleContext(input.cwd, contextFiles, contextManifests);
+  const assembled = assembleContext(
+    input.cwd,
+    contextFiles,
+    contextManifests,
+    resolveTrustedRoots(input.cwd),
+  );
   for (const file of contextFiles)
     assertReturnedPath(
       assembled.paths,

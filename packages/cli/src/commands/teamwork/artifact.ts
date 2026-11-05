@@ -50,6 +50,13 @@ export interface TeamworkPlan {
   planSummary: string;
   coordinationMode: CoordinationMode;
   coordinationDigest: string;
+  coordinationSnapshot?: unknown;
+  retryOf?: {
+    batchId: string;
+    planHash: string;
+    assignmentIds: string[];
+    approvalRef: string;
+  };
   planHash: string;
   requestedCapacity?: number;
   assignments: TeammateAssignment[];
@@ -191,7 +198,7 @@ function relativePathList(value: unknown, field: string): string[] | undefined {
   return result;
 }
 
-function safePath(root: string, candidate: string): string {
+export function safePath(root: string, candidate: string): string {
   const absoluteRoot = path.resolve(root);
   const lexical = path.resolve(root, candidate);
   const relative = path.relative(absoluteRoot, lexical);
@@ -680,6 +687,32 @@ export function validateTeamworkPlan(
   if (new Set(protectedTargets).size !== protectedTargets.length)
     throw new Error("protected_targets must not contain duplicates");
   const requestedCapacityValue = value.requested_capacity;
+  let retryOf: TeamworkPlan["retryOf"];
+  if (value.retry_of !== undefined) {
+    const retry = value.retry_of as Record<string, unknown>;
+    const assignmentIds = retry?.assignment_ids;
+    if (
+      !retry ||
+      typeof retry !== "object" ||
+      !Array.isArray(assignmentIds) ||
+      assignmentIds.length !== assignments.length ||
+      new Set(assignmentIds).size !== assignments.length ||
+      assignments.some((entry) => !assignmentIds.includes(entry.assignmentId))
+    )
+      throw new Error(
+        "Retry lineage must contain the exact selected assignment set",
+      );
+    retryOf = {
+      batchId: id(retry.batch_id, "retry_of.batch_id"),
+      planHash: digest(retry.plan_hash, "retry_of.plan_hash"),
+      assignmentIds: assignmentIds.map((entry) =>
+        id(entry, "retry_of.assignment_ids"),
+      ),
+      approvalRef: boundedText(retry.approval_ref, "retry_of.approval_ref"),
+    };
+    if (retryOf.batchId === batchId)
+      throw new Error("Retry must use a new batch identity");
+  }
   if (
     requestedCapacityValue !== undefined &&
     (!Number.isInteger(requestedCapacityValue) ||
@@ -697,6 +730,10 @@ export function validateTeamworkPlan(
     planSummary,
     coordinationMode,
     coordinationDigest,
+    ...(retryOf ? { retryOf } : {}),
+    ...(value.coordination_snapshot
+      ? { coordinationSnapshot: value.coordination_snapshot }
+      : {}),
     planHash: boundedText(value.plan_hash, "plan_hash"),
     ...(requestedCapacityValue !== undefined
       ? { requestedCapacity: requestedCapacityValue as number }
@@ -1526,7 +1563,6 @@ export function readTeammateReport(input: {
 export function cleanupSettledTeamworkArtifacts(input: {
   taskRoot: string;
   assignments: TeamworkPlan["assignments"];
-  retainedReports: ReadonlyMap<string, string>;
 }): string[] {
   const failures: string[] = [];
   for (const assignment of input.assignments) {
@@ -1551,14 +1587,8 @@ export function cleanupSettledTeamworkArtifacts(input: {
           input.taskRoot,
           path.join(attemptsDir, attemptId),
         );
-        const keepReport =
-          input.retainedReports.get(assignment.assignmentId) === attemptId;
-        const transientFiles = [
-          "claim.json",
-          "disposition.json",
-          "worklog.md",
-          ...(keepReport ? [] : ["report.json"]),
-        ];
+        // Keep every attempt's evidence until an explicit native cleanup.
+        const transientFiles = ["claim.json", "disposition.json"];
         for (const fileName of transientFiles) {
           const filePath = safePath(
             input.taskRoot,

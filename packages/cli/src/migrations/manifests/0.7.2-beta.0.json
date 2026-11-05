@@ -1,0 +1,11 @@
+{
+  "version": "0.7.2-beta.0",
+  "description": "收敛 fork 全面审查：Teamwork 恢复、证据、容量、委派与多宿主资产",
+  "breaking": true,
+  "recommendMigrate": true,
+  "changelog": "保留全部尝试证据并提供显式清理；修复实际容量和冻结配置核验；增加证据驱动 reconcile 与失败子集 retry；增加 Codex 等待护栏；补齐委派合同绑定、退役和 ownership recover；修复多宿主阶段提示、受管文件备份及跨生命周期初始化；退休隐式 Marketplace spec 来源，保留显式 registry；修复 npm 异步重试。",
+  "migrationGuide": "使用 beta 渠道精确升级到 0.7.2-beta.0，并运行 trellis update。保持用户自定义 spec 和 config；schema-2 项目忽略退休 YAML 容量键，需按实际冲突合并。默认初始化仅提供规范索引、指南和基于源码的 bootstrap；预制规范必须明确指定 --registry。原计划和旧 schema 报告兼容读取；需要本轮冻结配置和重试合同的新批次请通过 plan 构造器生成。保留全部 attempt 报告和 worklog，清理须使用 cleanup-artifacts 的预览摘要。",
+  "aiInstructions": "不要覆盖自定义规范或重开旧终态批次。使用原生 reconcile/retry/cleanup-artifacts/delegate-bind/delegate-reconcile/transfer recover；未知进程保持围栏。CLI 控制 FIFO，主代理静默续接同一等待句柄；Hook 不保证阻止普通模型消息或宿主唤醒。",
+  "migrations": [],
+  "notes": "保持 beta 渠道，0.7.2-beta.0 高于 stable 0.7.1；latest 标签保持不变。"
+}

@@ -1,8 +1,7 @@
 /**
  * Remote template fetcher for Trellis CLI
  *
- * Fetches spec templates from the official marketplace:
- * https://github.com/mindfold-ai/marketplace
+ * Fetches spec templates only from an explicitly selected registry.
  */
 
 import { randomUUID } from "node:crypto";
@@ -15,11 +14,6 @@ import { toPosix } from "./posix.js";
 // =============================================================================
 // Constants
 // =============================================================================
-
-export const TEMPLATE_INDEX_URL =
-  "https://raw.githubusercontent.com/mindfold-ai/marketplace/main/index.json";
-
-const TEMPLATE_REPO = "gh:mindfold-ai/marketplace";
 
 /** Map template type to installation path */
 const INSTALL_PATHS: Record<string, string> = {
@@ -407,31 +401,6 @@ function withTimeout<T>(
 // =============================================================================
 // Fetch Template Index
 // =============================================================================
-
-/**
- * Fetch available templates from the remote index
- * Returns empty array on network error or timeout (allows fallback to blank)
- *
- * @param indexUrl - URL to fetch index.json from (defaults to official marketplace)
- */
-export async function fetchTemplateIndex(
-  indexUrl?: string,
-): Promise<SpecTemplate[]> {
-  try {
-    const url = indexUrl ?? TEMPLATE_INDEX_URL;
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(TIMEOUTS.INDEX_FETCH_MS),
-    });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const index: TemplateIndex = (await res.json()) as TemplateIndex;
-    return index.templates;
-  } catch {
-    // Network error or timeout - return empty array, caller will fallback to blank
-    return [];
-  }
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -851,17 +820,6 @@ async function probeRegistryIndexGit(
   }
 }
 
-/**
- * Find a template by ID from the index
- */
-export async function findTemplate(
-  templateId: string,
-  indexUrl?: string,
-): Promise<SpecTemplate | null> {
-  const templates = await fetchTemplateIndex(indexUrl);
-  return templates.find((t) => t.id === templateId) ?? null;
-}
-
 // =============================================================================
 // Download Template
 // =============================================================================
@@ -881,8 +839,7 @@ export function getInstallPath(cwd: string, templateType: string): string {
  *                       OR a full giget source (e.g., "gh:myorg/myrepo/my-spec")
  * @param destDir - Destination directory
  * @param strategy - How to handle existing directory: skip, overwrite, or append
- * @param repoSource - Optional giget repo source override. When set, templatePath is
- *                     treated as relative to this repo. When not set, uses TEMPLATE_REPO.
+ * @param repoSource - Explicit giget repo source. templatePath is relative to it.
  *                     Pass null to use templatePath as a full giget source directly.
  * @returns true if template was downloaded, false if skipped
  */
@@ -890,13 +847,13 @@ export async function downloadWithStrategy(
   templatePath: string,
   destDir: string,
   strategy: TemplateStrategy,
-  repoSource?: string | null,
+  repoSource: string | null,
 ): Promise<boolean> {
   // Build the giget download source
   const gigetSource =
     repoSource === null
       ? templatePath // templatePath is already a full giget source
-      : `${repoSource ?? TEMPLATE_REPO}/${templatePath}`;
+      : `${repoSource}/${templatePath}`;
 
   const exists = fs.existsSync(destDir);
 
@@ -1128,8 +1085,7 @@ function resolveRegistryBackend(
  * @param templateId - Template ID from the index
  * @param strategy - How to handle existing directory
  * @param template - Optional pre-fetched SpecTemplate to avoid double-fetch
- * @param registry - Optional registry source (parsed). When set, uses the registry's
- *                   repo as the giget source instead of the default TEMPLATE_REPO.
+ * @param registry - Explicit registry source; missing registry is rejected.
  * @returns Object with success status and message
  */
 export async function downloadTemplateById(
@@ -1141,6 +1097,11 @@ export async function downloadTemplateById(
   destDirOverride?: string,
   registryBackend?: RegistryBackend,
 ): Promise<{ success: boolean; message: string; skipped?: boolean }> {
+  if (!registry)
+    return {
+      success: false,
+      message: "A spec template requires an explicit registry source",
+    };
   // Use pre-fetched template or find from index
   let resolved = template;
   let backend = registryBackend;
@@ -1171,8 +1132,6 @@ export async function downloadTemplateById(
         };
       }
       resolved = probeResult.templates.find((t) => t.id === templateId);
-    } else {
-      resolved = (await findTemplate(templateId, indexUrl)) ?? undefined;
     }
   }
   if (!resolved) {
@@ -1220,8 +1179,6 @@ export async function downloadTemplateById(
           downloadWithStrategy(fullSource, destDir, strategy, null),
         );
       }
-    } else {
-      await downloadWithStrategy(resolved.path, destDir, strategy);
     }
     return {
       success: true,

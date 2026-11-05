@@ -272,3 +272,14 @@ CLI 全套测试首轮发现 profiles 子目录安装漏建，已修复；之后
 - 按已有两仓备份全清授权，3 个完整快照逐份 verify、预览后经原生 prune 删除：根仓 1 份／116 文件／1,030,514 字节，本仓 2 份／750 文件／5,251,433 字节，合计 866 文件／6,281,947 字节，无 protected 或 failed，两仓回读均 []。文件大小合计不代表底层物理块回收。失败 batch 的运行态和历史任务不在此次清理范围。
 - 操作边界补记：第一次源码提交的 55 秒外层期限在 Hook 测试期间结束，核对未提交、无遗留进程后扩大期限重试成功；冻结合同用原生带路径摘要核验通过。`gh` 未指定 repo 时解析到上游，已改为 `--repo PennixRv/Trellis`；`gh run watch` 的查询超时不改变 CI，随后回查成功。一次 Pennix 结果筛选误把键控 components 当作带 id 的列表，改按真实键读取确认。上述均未伪造成产品错误或跳过发布门。
 - 本轮可复现故障已修复并验证；历史首次能力宣告异常、旧批次外层超时及缺报告外因仍缺少当时完整证据，不因最新 ALL_ACCEPTED 宣称已定位。未运行 Mintlify 页面渲染、全部宿主或非 Linux 进程清理验收，不扩大本轮通过范围。
+
+### 0.7.2-beta.0 fork 全面审查整改（发布前验收）
+
+- 依据原生已接受及授权的 `research/fork-review-remediation.md` 实施，四项 Grill 决策不变。全部发现、候选、误判更正、修复方法和验收写回根任务 `research/fork-review-20261105/review-findings.md` 的逐项表；未知历史资源不靠超时或缺失记录放行。
+- Teamwork 闭合全部 attempt 证据保留及显式清理、实际 assignment 容量和其他批次预留、冻结策略、启动前检查、持久进程事实、安全 reconcile、失败子集 retry、可信引用、64KiB 私有 stderr 以及 Codex 前台等待投影和工具 Hook。CLI 继续独占 FIFO/监控/重试/结算；普通模型发言及未接入 Hook 的工具不是强制隔离范围。
+- 生命周期与委派闭合合法撤回、analysis 返工拒绝、解绑资源检查与回滚、委派合同绑定/安全退役、结构化错误、指针顺序和显式 transfer recover；统一布局锁原已存在，不新增第二把锁或平行状态存储。
+- 多宿主及分发闭合 Pi/OMP/共享 Hook、Copilot 死模板归并、单文件备份、跨生命周期 skeleton、隐式 Marketplace spec 退休和 npm 异步重试。自定义规范及显式 registry 保留。
+- 本轮 CLI 109 文件、2330 通过/2 跳过；Core 25 文件、423 通过/1 跳过；两包 lint、typecheck、build、文档 lint 通过；Python 84 文件 0 error、72 warning。四份 Python 模板与 dogfood 字节一致；根只读组合验收 11/11。未重新派发审查队伍，未运行真实 Claude CLI、Mintlify 渲染或所有非 Linux 宿主。
+- docs-site `6231be7` 已推送。目标 `0.7.2-beta.0` 尚未占用，原生 create-manifest 生成迁移说明；原生同步 bump patch 先将双包置为未发布的 0.7.1 计算起点，再由正常 release beta 生成 0.7.2-beta.0，不发布或重建稳定标签，latest 不变。
+- 操作失败已核对：错误检索路径、根目录缺 package.json、错误包级 prettier 入口、语义补丁上下文不匹配均未形成隐藏改动；真实入口纠正后通过。`common/safe_commit.py` 是内部模块，直接当 CLI 会发生 types 导入遮蔽，本轮再次误用，改回其原生 Python API 精确暂存，不作为产品缺陷修改。
+- 此处只记录发布前证据；实际 CI、npm、重装、两仓资产更新及提交另记。两个长期主任务保持实施中，不因本轮增量交付关闭整个主任务 v2。

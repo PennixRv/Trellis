@@ -981,6 +981,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       path.join(roleDir, "delegated-worktree-primary-agent.md"),
     );
     const baseCommit = createGitBaseline(root);
+    runOk(root, "delegate-bind", childId);
     const paseo = installPaseoStub(root);
 
     const result = runTaskWithEnv(
@@ -1026,14 +1027,111 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       .map((line) => JSON.parse(line) as { args: string[] });
     expect(calls.map((call) => call.args[0])).toEqual([
       "--version",
+      "agent",
       "workspace",
       "run",
     ]);
-    expect(calls[2]?.args.at(-1)).toContain("# Child implementation contract");
-    expect(calls[2]?.args.at(-1)).toContain(
+    expect(calls[3]?.args.at(-1)).toContain("# Child implementation contract");
+    expect(calls[3]?.args.at(-1)).toContain(
       "sole task-specific implementation contract",
     );
+    const env = {
+      PATH: `${paseo.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+      PASEO_TEST_REPO: root,
+      PASEO_TEST_CALLS: paseo.callsFile,
+    };
+    const live = runTaskWithEnv(
+      root,
+      { ...env, PASEO_TEST_AGENT_STATUS: "running" },
+      "delegate-reconcile",
+      childId,
+    );
+    expect(live.status).toBe(1);
+    expect(live.stderr).toContain("TASK_PHASE_RESOURCE_ACTIVE");
+    const preview = runTaskWithEnv(root, env, "delegate-reconcile", childId);
+    expect(preview.status, preview.stderr).toBe(0);
+    expect(JSON.parse(preview.stdout).status).toBe("ready");
+    fs.writeFileSync(
+      path.join(record.worktree_path, "unintegrated.txt"),
+      "preserve me",
+    );
+    const dirty = runTaskWithEnv(
+      root,
+      env,
+      "delegate-reconcile",
+      childId,
+      "--execute",
+      "--reason",
+      "reviewed",
+      "--approval-ref",
+      "user:close",
+    );
+    expect(dirty.status).toBe(1);
+    expect(dirty.stderr).toContain("unintegrated changes");
+    fs.unlinkSync(path.join(record.worktree_path, "unintegrated.txt"));
+    const retired = runTaskWithEnv(
+      root,
+      env,
+      "delegate-reconcile",
+      childId,
+      "--execute",
+      "--reason",
+      "reviewed clean baseline",
+      "--approval-ref",
+      "user:close",
+    );
+    expect(retired.status, retired.stderr).toBe(0);
+    expect(JSON.parse(retired.stdout)).toMatchObject({
+      status: "retired",
+      closure_evidence: { approval_ref: "user:close" },
+    });
+    expect(fs.existsSync(record.worktree_path)).toBe(true);
   });
+
+  it.each(["prd", "role"])(
+    "rejects frozen delegated %s drift before creating a workspace",
+    (kind) => {
+      prepareImplementationContract(root);
+      authorizeImplementation(root, "design.md");
+      const child = linkChildTask(root);
+      const role = path.join(
+        root,
+        ".trellis/agents/delegated-worktree-primary-agent.md",
+      );
+      fs.mkdirSync(path.dirname(role), { recursive: true });
+      fs.writeFileSync(role, "bounded delegated role");
+      createGitBaseline(root);
+      runOk(root, "delegate-bind", child);
+      fs.appendFileSync(
+        kind === "prd" ? path.join(taskDirectory(root, child), "prd.md") : role,
+        " changed",
+      );
+      const paseo = installPaseoStub(root);
+      const result = runTaskWithEnv(
+        root,
+        {
+          PATH: `${paseo.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+          PASEO_TEST_REPO: root,
+          PASEO_TEST_CALLS: paseo.callsFile,
+        },
+        "delegate-start",
+        child,
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("TASK_DELEGATE_STALE_CONTRACT");
+      expect(fs.existsSync(path.join(root, ".paseo-worktrees", child))).toBe(
+        false,
+      );
+      expect(
+        JSON.parse(
+          fs.readFileSync(
+            path.join(taskDirectory(root, child), "task.json"),
+            "utf8",
+          ),
+        ).meta.delegated_worktree_execution_record,
+      ).toBeUndefined();
+    },
+  );
 
   it("preserves an uncertain run and reuses or rebuilds resources only after reconciliation and fresh authorization", () => {
     const designPath = prepareImplementationContract(root);
@@ -1059,6 +1157,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       PASEO_TEST_CALLS: paseo.callsFile,
       PASEO_TEST_FAIL_RUN: "1",
     };
+    runOk(root, "delegate-bind", childId);
 
     const failed = runTaskWithEnv(root, env, "delegate-start", childId);
     expect(failed.status, failed.stderr).toBe(1);
@@ -1094,6 +1193,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       path.relative(taskDirectory(root, TASK), designPath),
       "user-message:retry-approved",
     );
+    runOk(root, "delegate-bind", childId);
     const retryEnv: NodeJS.ProcessEnv = { ...env };
     delete retryEnv.PASEO_TEST_FAIL_RUN;
     const activeAgent = runTaskWithEnv(
@@ -1161,6 +1261,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       path.relative(taskDirectory(root, TASK), designPath),
       "user-message:retry-after-cleanup-approved",
     );
+    runOk(root, "delegate-bind", childId);
     execFileSync("git", ["worktree", "remove", "--force", retriedWorktree], {
       cwd: root,
     });
@@ -2083,6 +2184,59 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("TASK_PHASE_STALE_ARTIFACT");
     expect(fs.readFileSync(taskPath, "utf-8")).toBe(before);
+  });
+
+  it("rejects execution rework on an analysis route without an implementation phase", () => {
+    runOk(
+      root,
+      "phase",
+      "init",
+      TASK,
+      "--task-kind",
+      "analysis",
+      "--complexity",
+      "simple",
+      "--project-context",
+      "existing",
+      "--phase-ids",
+      [GOAL_EXPLORATION_AND_REQUIREMENTS, DELIVERY_REVIEW_AND_CLOSEOUT].join(
+        ",",
+      ),
+      "--route-reason",
+      "Bounded analysis",
+      "--route-evidence-ref",
+      "prd.md",
+    );
+    accept(root, GOAL_EXPLORATION_AND_REQUIREMENTS, "accepted", [
+      "--evidence-ref",
+      "user-message:confirmed",
+    ]);
+    const before = fs.readFileSync(
+      path.join(taskDirectory(root), "task.json"),
+      "utf8",
+    );
+    const result = runTask(
+      root,
+      "phase",
+      "return",
+      TASK,
+      "--expected-route-revision",
+      "1",
+      "--target-phase",
+      DELIVERY_REVIEW_AND_CLOSEOUT,
+      "--return-kind",
+      "execution_rework",
+      "--reason",
+      "Repeat analysis",
+      "--evidence-ref",
+      "prd.md",
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("TASK_PHASE_INVALID_TRANSITION");
+    expect(result.stderr).not.toContain("Traceback");
+    expect(
+      fs.readFileSync(path.join(taskDirectory(root), "task.json"), "utf8"),
+    ).toBe(before);
   });
 
   it("invalidates Goal Exploration and Requirements Confirmation Phase when its bound artifact changes", () => {
@@ -3381,8 +3535,46 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     expect(replacementWriteBeforeConsume.stderr).toContain(
       "TASK_TRANSFER_ACTIVE",
     );
+    const digest = JSON.parse(
+      runOkAs(root, "replacement-session", "continuity", "show"),
+    ).source_digest;
+    const recovered = runTaskAs(
+      root,
+      "recovery-session",
+      "transfer",
+      "recover",
+      ...packageArgs,
+      "--expected-generation",
+      "5",
+      "--expected-continuity-digest",
+      digest,
+      "--explicit-user-request",
+      "--reason",
+      "target unavailable before consume",
+    );
+    expect(recovered.status, recovered.stdout + recovered.stderr).toBe(0);
+    expect(JSON.parse(recovered.stdout)).toMatchObject({
+      status: "ready",
+      generation: 6,
+      target_session_id: null,
+    });
     expect(
-      JSON.parse(transfer("replacement-session", "consume", 5)).status,
+      runTaskAs(
+        root,
+        "replacement-session",
+        "transfer",
+        "consume",
+        ...packageArgs,
+        "--expected-generation",
+        "5",
+        "--explicit-user-request",
+      ).stdout,
+    ).toContain("TASK_TRANSFER_STALE_GENERATION");
+    expect(JSON.parse(transfer("replacement-session", "claim", 6)).status).toBe(
+      "claimed",
+    );
+    expect(
+      JSON.parse(transfer("replacement-session", "consume", 7)).status,
     ).toBe("consumed");
     expect(
       JSON.parse(runOkAs(root, "replacement-session", "current", "--json"))

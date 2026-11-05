@@ -1087,10 +1087,8 @@ describe("regression: task lifecycle overwrite and collision safety", () => {
         const r = runTask("remove-subtask", parentName, childName);
         expect(r.status).not.toBe(0);
         expect(r.stderr).toContain("Failed to write child task.json");
-        expect(r.stderr).toContain("half-written");
-        // The message must match reality: the parent side did land, so the
-        // child is the one still holding a stale parent reference.
-        expect(readTaskJson(parentName).children).toEqual([]);
+        expect(r.stderr).toContain("restored");
+        expect(readTaskJson(parentName).children).toEqual([childName]);
         expect(readTaskJson(childName).parent).toBe(parentName);
       } finally {
         fs.chmodSync(taskDir(childName), 0o755);
@@ -9230,7 +9228,7 @@ describe("regression: cli_adapter platform support (beta.9, beta.13, beta.16)", 
     // reference the deleted subcommand.
     const pkgRoot = path.resolve(__dirname, "..");
     const copilotStart = fs.readFileSync(
-      path.join(pkgRoot, "src/templates/copilot/prompts/start.prompt.md"),
+      path.join(pkgRoot, "src/templates/common/commands/continue.md"),
       "utf-8",
     );
     expect(copilotStart).not.toContain("task.py init-context");

@@ -20,6 +20,7 @@ import {
   validateTeamworkPlan,
   validateTeammateDisposition,
   validateTeammateReport,
+  cleanupSettledTeamworkArtifacts,
 } from "../../src/commands/teamwork/artifact.js";
 
 const sourceDigest = "a".repeat(64);
@@ -216,6 +217,49 @@ function addPairedWork(
 }
 
 describe("TeamworkSession teammate artifacts", () => {
+  it("keeps reports and worklogs for every settled attempt, including invalid reports", () => {
+    const { root, plan } = fixture();
+    try {
+      const validated = validateTeamworkPlan(plan, root);
+      const assignment = validated.assignments[0];
+      const base = path.dirname(path.join(root, assignment.briefPath));
+      fs.writeFileSync(path.join(base, "queue.json"), "{}");
+      for (const id of ["work-1.attempt.0", "work-1.attempt.1"]) {
+        const dir = path.join(base, "attempts", id);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(
+          path.join(dir, "report.json"),
+          "invalid diagnostic report",
+        );
+        fs.writeFileSync(path.join(dir, "worklog.md"), "attempt evidence");
+        fs.writeFileSync(path.join(dir, "claim.json"), "{}");
+      }
+      expect(
+        cleanupSettledTeamworkArtifacts({
+          taskRoot: root,
+          assignments: validated.assignments,
+        }),
+      ).toEqual([]);
+      expect(fs.existsSync(path.join(base, "queue.json"))).toBe(false);
+      for (const id of ["work-1.attempt.0", "work-1.attempt.1"]) {
+        expect(
+          fs.readFileSync(
+            path.join(base, "attempts", id, "report.json"),
+            "utf8",
+          ),
+        ).toBe("invalid diagnostic report");
+        expect(
+          fs.readFileSync(
+            path.join(base, "attempts", id, "worklog.md"),
+            "utf8",
+          ),
+        ).toBe("attempt evidence");
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("binds the immutable plan hash to the brief source digest", () => {
     const { root, plan } = fixture();
     expect(validateTeamworkPlan(plan, root).assignments[0].sourceDigest).toBe(

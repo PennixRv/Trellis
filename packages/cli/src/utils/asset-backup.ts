@@ -114,7 +114,9 @@ function assetPath(relative: string): boolean {
   return (
     !PROTECTED.test(relative) &&
     (relative === "AGENTS.md" ||
-      ALL_MANAGED_DIRS.some((dir) => relative.startsWith(`${dir}/`)))
+      ALL_MANAGED_DIRS.some(
+        (entry) => relative === entry || relative.startsWith(`${entry}/`),
+      ))
   );
 }
 
@@ -339,8 +341,7 @@ export function listAssetBackups(root: string): BackupInventoryItem[] {
           backup.update === "pending" ||
           backup.restore?.status === "restoring"
         )
-          item.problem =
-            "Unresolved update or restore; inspect before cleanup.";
+          item.problem = `Unresolved update or restore; inspect before cleanup. To recover explicitly: trellis backup restore ${id} --replace-modified`;
         else item.kind = "complete";
       } else if (LEGACY_ID.test(id)) {
         const names = fs.readdirSync(location);

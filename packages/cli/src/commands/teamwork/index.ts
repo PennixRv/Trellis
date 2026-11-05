@@ -15,9 +15,15 @@ import {
   COORDINATION_MODES,
   type CoordinationMode,
 } from "./coordination.js";
-import { constructTeamworkPlan } from "./plan.js";
+import { constructTeamworkPlan, constructTeamworkRetry } from "./plan.js";
 import { CLI_TEAMMATE_HOST } from "./runtime.js";
-import { teamworkBatch } from "./batch.js";
+import {
+  teamworkBatch,
+  teamworkReconcile,
+  cleanupTeamworkAttemptEvidence,
+} from "./batch.js";
+import { readPlanFile } from "./coordinator.js";
+import { validateTeamworkPlan } from "./artifact.js";
 import { resolveTeammateRuntimeConfig } from "./teammate-config.js";
 import {
   teamworkSessionContextAdd,
@@ -550,6 +556,94 @@ export function registerTeamworkCommand(program: Command): void {
           );
           process.exit(1);
         }
+      },
+    );
+
+  teamwork
+    .command("cleanup-artifacts <plan>")
+    .description(
+      "Preview settled attempt evidence cleanup; delete only with the matching preview digest",
+    )
+    .requiredOption("--task <path>", "owning task directory")
+    .option("--confirm <digest>", "confirm the exact current preview digest")
+    .action(
+      async (file: string, options: { task: string; confirm?: string }) => {
+        const taskRoot = path.resolve(options.task);
+        const plan = validateTeamworkPlan(
+          readPlanFile(path.resolve(file)),
+          taskRoot,
+          undefined,
+          { allowExpired: true },
+        );
+        console.log(
+          JSON.stringify(
+            await cleanupTeamworkAttemptEvidence(
+              plan,
+              taskRoot,
+              process.cwd(),
+              options.confirm,
+            ),
+          ),
+        );
+      },
+    );
+
+  teamwork
+    .command("reconcile <plan>")
+    .description(
+      "Preview or explicitly retire an uncertain batch after verifying process exit",
+    )
+    .requiredOption("--task <path>", "original task directory")
+    .option(
+      "--execute",
+      "record verified disposition and release the original capacity reservation",
+    )
+    .option(
+      "--reason <text>",
+      "explicit disposition reason, required with --execute",
+    )
+    .action(teamworkReconcile);
+
+  teamwork
+    .command("retry <plan>")
+    .description(
+      "Publish a linked retry round for selected failed assignments; never rerun accepted work",
+    )
+    .requiredOption("--task <path>", "original task directory")
+    .requiredOption("--output <path>", "new retry plan inside the task")
+    .requiredOption("--batch <id>", "new retry batch identity")
+    .requiredOption(
+      "--assignments <ids>",
+      "comma-separated failed assignment ids",
+    )
+    .requiredOption("--deadline <iso>", "new round deadline")
+    .requiredOption(
+      "--approval-ref <text>",
+      "explicit authorization for this retry round",
+    )
+    .action(
+      async (
+        planPath: string,
+        options: {
+          task: string;
+          output: string;
+          batch: string;
+          assignments: string;
+          deadline: string;
+          approvalRef: string;
+        },
+      ) => {
+        console.log(
+          JSON.stringify(
+            await constructTeamworkRetry({
+              ...options,
+              cwd: process.cwd(),
+              taskRoot: path.resolve(options.task),
+              output: path.resolve(options.output),
+              planPath: path.resolve(planPath),
+            }),
+          ),
+        );
       },
     );
 

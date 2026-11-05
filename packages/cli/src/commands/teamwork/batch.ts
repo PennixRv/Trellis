@@ -6,13 +6,25 @@ import {
   resolveTeamworkSession,
   readCoordinationState,
 } from "@pennixrv/trellis-core/teamwork";
-import { readTeammateReport, type TeamworkPlan } from "./artifact.js";
+import {
+  readTeammateReport,
+  validateTeamworkPlan,
+  safePath,
+  type TeamworkPlan,
+} from "./artifact.js";
+import { assertFrozenCoordination } from "./coordination.js";
+import {
+  recordForegroundWait,
+  clearForegroundWait,
+} from "./foreground-wait.js";
 import type { TeamworkResult } from "./result.js";
 
 import {
   loadTeamworkPlan,
   runTeamworkCoordinator,
   readPlanFile,
+  reconcileTeamworkBatch,
+  readSettledTeamworkReceipt,
   type TeamworkReceipt,
 } from "./coordinator.js";
 import { createTeamworkSession } from "./create.js";
@@ -42,7 +54,30 @@ export async function teamworkBatch(
 ): Promise<void> {
   const cwd = process.cwd();
   const taskRoot = path.resolve(options.task);
+  const candidate = validateTeamworkPlan(
+    readPlanFile(path.resolve(planPath)),
+    taskRoot,
+    undefined,
+    { allowExpired: true },
+  );
+  const settled = await readSettledTeamworkReceipt(candidate, cwd);
+  if (settled && !options.preflight) {
+    console.log(
+      JSON.stringify(
+        options.json
+          ? await buildBatchResult(candidate, settled, taskRoot, cwd)
+          : settled,
+      ),
+    );
+    if (settled.status !== "ALL_ACCEPTED") process.exitCode = 1;
+    return;
+  }
   const plan = loadTeamworkPlan(path.resolve(planPath), taskRoot);
+  assertFrozenCoordination(
+    cwd,
+    plan.coordinationDigest,
+    plan.coordinationSnapshot,
+  );
   const config = resolveTeammateRuntimeConfig(
     cwd,
     process.env,
@@ -53,8 +88,19 @@ export async function teamworkBatch(
   const capacity = effectiveTeammateCapacity({
     config,
     requested: plan.requestedCapacity,
+    assignmentCount: plan.assignments.length,
     verifiedHostCap: CLI_TEAMMATE_HOST.verifiedHostCap,
   });
+  assertFrozenCoordination(
+    cwd,
+    plan.coordinationDigest,
+    plan.coordinationSnapshot,
+    {
+      mode: plan.coordinationMode,
+      maxConcurrency: config.teammate.maxConcurrency,
+      guard: config.guard,
+    },
+  );
   for (const assignment of plan.assignments)
     assertTeammateHostCapability(
       assignment.provider,
@@ -95,7 +141,11 @@ export async function teamworkBatch(
     plan.sessionId,
     plan.batchId,
   );
-  const runtime = createCliCoordinatorRuntime(cwd, taskRoot);
+  const runtime = createCliCoordinatorRuntime(
+    cwd,
+    taskRoot,
+    config.sourceDigest,
+  );
   const onSignal = (): void => {
     void runtime.shutdown("batch coordinator interrupted");
   };
@@ -114,7 +164,8 @@ export async function teamworkBatch(
         async acquire(): Promise<void> {
           await acquireLock(lock);
           try {
-            const previous = readBatchReservations(bucket).find(
+            const reservations = readBatchReservations(bucket);
+            const previous = reservations.find(
               (item) =>
                 item.sessionId === plan.sessionId &&
                 item.batchId === plan.batchId,
@@ -137,14 +188,26 @@ export async function teamworkBatch(
             }
             const live = scanLiveWorkers({ projectKey: ref.project }).filter(
               (worker) =>
-                !(
-                  worker.sessionId === plan.sessionId &&
-                  worker.workerId.startsWith(`batch:${plan.batchId}:`)
+                !reservations.some(
+                  (reservation) =>
+                    worker.sessionId === reservation.sessionId &&
+                    worker.workerId.startsWith(`batch:${reservation.batchId}:`),
                 ),
             );
+            const reserved = reservations
+              .filter(
+                (entry) =>
+                  entry.sessionId !== plan.sessionId ||
+                  entry.batchId !== plan.batchId,
+              )
+              .reduce((sum, entry) => sum + entry.capacity, 0);
             if (
-              live.length + capacity + config.guard.nonBatchReserved >
-              config.guard.maxLiveTeammates
+              config.guard.maxLiveTeammates > 0 &&
+              live.length +
+                reserved +
+                capacity +
+                config.guard.nonBatchReserved >
+                config.guard.maxLiveTeammates
             )
               throw new Error(
                 "batch capacity exceeds the remaining live teammate budget",
@@ -157,6 +220,12 @@ export async function teamworkBatch(
               capacity,
               ownerPid: process.pid,
             });
+            try {
+              recordForegroundWait(cwd, plan);
+            } catch (error) {
+              fs.rmSync(reservationFile, { force: true });
+              throw error;
+            }
           } finally {
             releaseLock(lock);
           }
@@ -165,6 +234,7 @@ export async function teamworkBatch(
           await acquireLock(lock);
           try {
             fs.unlinkSync(reservationFile);
+            clearForegroundWait(cwd, plan);
           } finally {
             releaseLock(lock);
           }
@@ -184,6 +254,147 @@ export async function teamworkBatch(
     await runtime.shutdown("batch coordinator finished");
   }
   console.log(JSON.stringify(output));
+}
+
+export async function teamworkReconcile(
+  planPath: string,
+  options: { task: string; execute?: boolean; reason?: string },
+): Promise<void> {
+  const cwd = process.cwd();
+  const plan = validateTeamworkPlan(
+    readPlanFile(path.resolve(planPath)),
+    path.resolve(options.task),
+    undefined,
+    { allowExpired: true },
+  );
+  const ref = resolveTeamworkSession({ sessionId: plan.sessionId, cwd });
+  const bucket = projectDir(ref.project);
+  const lock = path.join(bucket, ".worker-guard.lock");
+  await acquireLock(lock);
+  try {
+    const reservation = readBatchReservations(bucket).find(
+      (entry) =>
+        entry.sessionId === plan.sessionId && entry.batchId === plan.batchId,
+    );
+    if (reservation) {
+      if (reservation.planHash !== plan.planHash)
+        throw new Error("Capacity reservation does not match the frozen plan");
+      try {
+        process.kill(reservation.ownerPid, 0);
+        throw new Error(
+          "Batch coordinator is still alive; use the original invocation",
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+      }
+    }
+    const result = await reconcileTeamworkBatch({
+      plan,
+      cwd,
+      execute: options.execute,
+      reason: options.reason,
+    });
+    if (
+      options.execute &&
+      result.status !== "blocked" &&
+      result.status !== "ready"
+    ) {
+      const reservationFile = batchReservationPath(
+        bucket,
+        plan.sessionId,
+        plan.batchId,
+      );
+      if (fs.existsSync(reservationFile)) fs.unlinkSync(reservationFile);
+      clearForegroundWait(cwd, plan);
+    }
+    console.log(JSON.stringify(result));
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+/** Explicit preview/confirm deletion of settled attempt evidence; never automatic retention. */
+export async function cleanupTeamworkAttemptEvidence(
+  plan: TeamworkPlan,
+  taskRoot: string,
+  cwd: string,
+  confirm?: string,
+): Promise<{ status: "preview" | "removed"; digest: string; files: string[] }> {
+  if (!(await readSettledTeamworkReceipt(plan, cwd)))
+    throw new Error("Only durably settled batch evidence can be cleaned");
+  const ref = resolveTeamworkSession({ sessionId: plan.sessionId, cwd });
+  const bucket = projectDir(ref.project);
+  const lock = path.join(bucket, ".worker-guard.lock");
+  await acquireLock(lock);
+  try {
+    if (
+      readBatchReservations(bucket).some(
+        (entry) =>
+          entry.sessionId === plan.sessionId && entry.batchId === plan.batchId,
+      )
+    )
+      throw new Error(
+        "Batch still has a capacity reservation; reconcile it first",
+      );
+    const projection = await readCoordinationState({
+      sessionId: plan.sessionId,
+      cwd,
+    });
+    const files: string[] = [];
+    const fingerprints: unknown[] = [];
+    for (const attempt of projection.attempts.filter(
+      (entry) => entry.batchId === plan.batchId,
+    )) {
+      const assignment = plan.assignments.find(
+        (entry) => entry.assignmentId === attempt.assignmentId,
+      );
+      if (
+        !assignment ||
+        !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(attempt.attemptId)
+      )
+        throw new Error("Invalid settled attempt identity");
+      for (const name of ["report.json", "worklog.md", "provider-stderr.log"]) {
+        const relative = path.join(
+          path.dirname(assignment.briefPath),
+          "attempts",
+          attempt.attemptId,
+          name,
+        );
+        const file = safePath(taskRoot, relative);
+        if (!fs.existsSync(file)) continue;
+        const stat = fs.lstatSync(file);
+        if (!stat.isFile())
+          throw new Error("Attempt evidence must be a regular file");
+        files.push(relative);
+        fingerprints.push([
+          relative,
+          stat.dev,
+          stat.ino,
+          stat.size,
+          stat.mtimeMs,
+          stat.ctimeMs,
+        ]);
+      }
+    }
+    const digest = crypto
+      .createHash("sha256")
+      .update(JSON.stringify([plan.planHash, fingerprints]))
+      .digest("hex");
+    if (confirm !== undefined) {
+      if (confirm !== digest)
+        throw new Error(
+          "Cleanup preview changed; inspect a fresh preview before confirming",
+        );
+      for (const file of files) fs.unlinkSync(safePath(taskRoot, file));
+    }
+    return {
+      status: confirm === undefined ? "preview" : "removed",
+      digest,
+      files,
+    };
+  } finally {
+    releaseLock(lock);
+  }
 }
 
 /** A view over durable facts and validated artifacts; it does not accept task results. */
@@ -207,6 +418,13 @@ export async function buildBatchResult(
       batchId: plan.batchId,
       sessionId: plan.sessionId,
       planHash: plan.planHash,
+      ...(plan.retryOf
+        ? {
+            parentBatchId: plan.retryOf.batchId,
+            parentPlanHash: plan.retryOf.planHash,
+            approvalRef: plan.retryOf.approvalRef,
+          }
+        : {}),
     },
     execution: {
       status:
@@ -216,6 +434,7 @@ export async function buildBatchResult(
       stopped: receipt.status !== "RECONCILIATION_REQUIRED",
     },
     reports: [],
+    attempts: [],
     semanticValidation: "not_run",
     disposition: receipt.status,
   };
@@ -225,85 +444,96 @@ export async function buildBatchResult(
         entry.batchId === plan.batchId &&
         entry.assignmentId === assignment.assignmentId,
     );
-    const attempt = projection.attempts
+    const attempts = projection.attempts
       .filter(
         (entry) =>
           entry.batchId === plan.batchId &&
           entry.assignmentId === assignment.assignmentId,
       )
-      .sort((a, b) => b.lastSeq - a.lastSeq)[0];
-    const item: TeamworkResult["reports"][number] = {
-      association: { assignmentId: assignment.assignmentId },
-      report: null,
-      validation: "not_run",
-    };
-    result.reports.push(item);
-    const failure = events
-      .filter(
-        (event) =>
-          event.kind === "coordination" &&
-          event.batchId === plan.batchId &&
-          event.assignmentId === assignment.assignmentId &&
-          event.state === "FINAL_FAILED",
-      )
-      .pop();
-    if (
-      failure?.kind === "coordination" &&
-      typeof failure.payload?.reason === "string"
-    )
-      item.error = failure.payload.reason;
-    if (!attempt?.attemptId || !attempt.teammateId) {
-      if (projected?.state === "ACCEPTED") {
-        item.validation = "failed";
-        item.error = "Accepted report has no matching attempt identity";
-      }
-      continue;
-    }
-    item.association.attemptId = attempt.attemptId;
-    item.association.teammateId = attempt.teammateId;
-    const file = path.join(
-      taskRoot,
-      path.dirname(assignment.briefPath),
-      "attempts",
-      attempt.attemptId,
-      "report.json",
-    );
-    try {
-      const report = readTeammateReport({
-        taskRoot,
-        briefPath: assignment.briefPath,
-        attemptId: attempt.attemptId,
-        identity: {
-          taskId: plan.taskId,
-          batchId: plan.batchId,
-          assignmentId: assignment.assignmentId,
-          teammateId: attempt.teammateId,
-          planHash: plan.planHash,
-          phaseId: plan.phaseId,
-          taskRouteRevision: plan.taskRouteRevision,
-          inputRevision: plan.inputRevision,
-        },
-        sourceDigest: assignment.sourceDigest,
-      });
-      if (
-        assignment.execution.launch.reportVersion === 2 &&
-        report.schemaVersion !== 2
-      )
-        throw new Error("Report does not match the frozen result contract");
-      item.report = report.content ?? null;
-      item.validation = report.content ? "passed" : "legacy";
-      item.artifact = {
-        path: file,
-        sha256: crypto
-          .createHash("sha256")
-          .update(fs.readFileSync(file))
-          .digest("hex"),
+      .sort((a, b) => a.lastSeq - b.lastSeq);
+    for (const [index, attempt] of (attempts.length
+      ? attempts
+      : [undefined]
+    ).entries()) {
+      const item: TeamworkResult["reports"][number] = {
+        association: { assignmentId: assignment.assignmentId },
+        report: null,
+        validation: "not_run",
       };
-    } catch (error) {
-      // Failed attempts may have been cleaned according to the retention contract.
-      if (projected?.state !== "ACCEPTED" && !fs.existsSync(file)) continue;
-      item.validation = "failed";
-      item.error = error instanceof Error ? error.message : String(error);
+      result.attempts?.push(item);
+      if (index === Math.max(0, attempts.length - 1)) result.reports.push(item);
+      const failure = events
+        .filter(
+          (event) =>
+            event.kind === "coordination" &&
+            event.batchId === plan.batchId &&
+            event.assignmentId === assignment.assignmentId &&
+            (!attempt || event.attemptId === attempt.attemptId) &&
+            event.state === "FINAL_FAILED",
+        )
+        .pop();
+      if (
+        failure?.kind === "coordination" &&
+        typeof failure.payload?.reason === "string"
+      )
+        item.error = failure.payload.reason;
+      if (!attempt?.attemptId || !attempt.teammateId) {
+        if (projected?.state === "ACCEPTED") {
+          item.validation = "failed";
+          item.error = "Accepted report has no matching attempt identity";
+        }
+        continue;
+      }
+      item.association.attemptId = attempt.attemptId;
+      item.association.teammateId = attempt.teammateId;
+      const file = path.join(
+        taskRoot,
+        path.dirname(assignment.briefPath),
+        "attempts",
+        attempt.attemptId,
+        "report.json",
+      );
+      item.worklogPath = path.join(path.dirname(file), "worklog.md");
+      try {
+        const report = readTeammateReport({
+          taskRoot,
+          briefPath: assignment.briefPath,
+          attemptId: attempt.attemptId,
+          identity: {
+            taskId: plan.taskId,
+            batchId: plan.batchId,
+            assignmentId: assignment.assignmentId,
+            teammateId: attempt.teammateId,
+            planHash: plan.planHash,
+            phaseId: plan.phaseId,
+            taskRouteRevision: plan.taskRouteRevision,
+            inputRevision: plan.inputRevision,
+          },
+          sourceDigest: assignment.sourceDigest,
+        });
+        if (
+          assignment.execution.launch.reportVersion === 2 &&
+          report.schemaVersion !== 2
+        )
+          throw new Error("Report does not match the frozen result contract");
+        item.report = report.content ?? null;
+        item.validation = report.content ? "passed" : "legacy";
+        item.artifact = {
+          path: file,
+          sha256: crypto
+            .createHash("sha256")
+            .update(fs.readFileSync(file))
+            .digest("hex"),
+        };
+      } catch (error) {
+        item.validation = "failed";
+        item.error = [
+          item.error,
+          error instanceof Error ? error.message : String(error),
+        ]
+          .filter(Boolean)
+          .join("; ");
+      }
     }
   }
   return result;

@@ -109,6 +109,21 @@ describe("asset snapshots", () => {
     expect(listAssetBackups(root)).toEqual([]);
   });
 
+  it.each([".github/copilot-instructions.md", ".snow/SNOW.md"])(
+    "includes and restores the managed single-file asset %s",
+    (relative) => {
+      write(relative, "original instructions");
+      saveHashes(root, { [relative]: "hash" });
+      expect(assetBackupScope(root)).toContain(relative);
+      const backup = createAssetBackup(root, "update", [relative]);
+      write(relative, "updated instructions");
+      bindAssetUpdate(root, backup.id);
+      const plan = planAssetRestore(root, backup.id);
+      restoreAssetBackup(root, backup.id, { yes: true, review: plan.review });
+      expect(read(relative)).toBe("original instructions");
+    },
+  );
+
   it("rejects corrupt payloads, unknown schemas, foreign identity, and scope tampering", () => {
     const backup = createAssetBackup(root, "manual", [workflow]);
     const file = manifest(backup.id);

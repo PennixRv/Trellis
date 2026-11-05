@@ -63,21 +63,17 @@ function runHook(
   script: string,
   platformEnvVar: string,
 ): { stdout: string; status: number | null } {
-  const r = spawnSync(
-    "python3",
-    [path.join(SHARED_HOOKS, script)],
-    {
+  const r = spawnSync("python3", [path.join(SHARED_HOOKS, script)], {
+    cwd: tmp,
+    encoding: "utf-8",
+    input: JSON.stringify({
+      hook_event_name: "userPromptSubmit",
       cwd: tmp,
-      encoding: "utf-8",
-      input: JSON.stringify({
-        hook_event_name: "userPromptSubmit",
-        cwd: tmp,
-        session_id: "test-session",
-        prompt: "hi",
-      }),
-      env: { ...process.env, [platformEnvVar]: tmp },
-    },
-  );
+      session_id: "test-session",
+      prompt: "hi",
+    }),
+    env: { ...process.env, [platformEnvVar]: tmp },
+  });
   return { stdout: r.stdout, status: r.status };
 }
 
@@ -107,6 +103,38 @@ describeFn("Kiro hook output branch", () => {
     // Plain text — NOT the Claude-style JSON envelope.
     expect(stdout).not.toContain("hookSpecificOutput");
     expect(stdout).not.toContain("additionalContext");
+  });
+
+  it("reports malformed native workflow records instead of falling back to lifecycle", () => {
+    const directory = path.join(tmp, ".trellis/tasks/in_progress/task");
+    fs.mkdirSync(directory, { recursive: true });
+    const script = `import importlib.util,json,types\nfrom pathlib import Path\nspec=importlib.util.spec_from_file_location('workflow_hook',${JSON.stringify(path.join(SHARED_HOOKS, "inject-workflow-state.py"))})\nm=importlib.util.module_from_spec(spec)\nspec.loader.exec_module(m)\nm._resolve_active_task=lambda *args:types.SimpleNamespace(task_path=${JSON.stringify(directory)},stale=False,source='fixture')\nprint(json.dumps(m.get_active_task(Path(${JSON.stringify(tmp)}),{})))`;
+    for (const workflow of [
+      null,
+      {},
+      { current_phase_id: "task_implementation", phases: {} },
+    ]) {
+      fs.writeFileSync(
+        path.join(directory, "task.json"),
+        JSON.stringify({
+          id: "task",
+          status: "in_progress",
+          meta: { task_workflow: workflow },
+        }),
+      );
+      const result = spawnSync("python3", ["-c", script], { encoding: "utf8" });
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(result.stdout)[1]).toBe("task_error");
+    }
+    fs.writeFileSync(
+      path.join(directory, "task.json"),
+      JSON.stringify({ id: "task", status: "in_progress", meta: {} }),
+    );
+    expect(
+      JSON.parse(
+        spawnSync("python3", ["-c", script], { encoding: "utf8" }).stdout,
+      )[1],
+    ).toBe("in_progress");
   });
 
   it("inject-workflow-state.py keeps JSON envelope for non-Kiro (isolation)", () => {

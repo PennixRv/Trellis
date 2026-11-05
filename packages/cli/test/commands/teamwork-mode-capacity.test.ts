@@ -3,7 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { installTeammateAssets } from "../helpers/teammate-assets.js";
-import { resolveCoordination } from "../../src/commands/teamwork/coordination.js";
+import {
+  resolveCoordination,
+  assertFrozenCoordination,
+} from "../../src/commands/teamwork/coordination.js";
 import {
   resolveTeammateRuntimeConfig,
   effectiveTeammateCapacity,
@@ -47,6 +50,32 @@ describe("unified mode capacity policy", () => {
     );
     expect(resolveTeammateGuardConfig({ cwd, env: {} }).maxLiveWorkers).toBe(8);
   });
+
+  it("reserves only actual assignments without relaxing explicit policy limits", () => {
+    const config = resolveTeammateRuntimeConfig(cwd, {});
+    expect(
+      effectiveTeammateCapacity({
+        config,
+        verifiedHostCap: 32,
+        assignmentCount: 1,
+      }),
+    ).toBe(1);
+    expect(
+      effectiveTeammateCapacity({
+        config,
+        verifiedHostCap: 32,
+        assignmentCount: 12,
+      }),
+    ).toBe(8);
+    expect(() =>
+      effectiveTeammateCapacity({
+        config,
+        verifiedHostCap: 32,
+        requested: 9,
+        assignmentCount: 1,
+      }),
+    ).toThrow(/exceeds verified limit/);
+  });
   it("shares a configured live budget across interactive and managed entry points", () => {
     const file = path.join(cwd, ".trellis/teamwork.json");
     const json = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -69,9 +98,70 @@ describe("unified mode capacity policy", () => {
     expect(config.teammate.maxConcurrency).toBe(2);
     expect(config.diagnostics?.join(" ")).toContain("explicitly overrides");
   });
+  it("uses zero consistently to disable only the shared live budget", () => {
+    const file = path.join(cwd, ".trellis/teamwork.json");
+    const json = JSON.parse(fs.readFileSync(file, "utf8"));
+    json.resources.max_live_teammates = 0;
+    fs.writeFileSync(file, JSON.stringify(json));
+    const config = resolveTeammateRuntimeConfig(cwd, {});
+    expect(resolveTeammateGuardConfig({ cwd, env: {} }).maxLiveWorkers).toBe(0);
+    expect(
+      effectiveTeammateCapacity({
+        config,
+        verifiedHostCap: 32,
+        assignmentCount: 12,
+      }),
+    ).toBe(8);
+    expect(
+      effectiveTeammateCapacity({
+        config,
+        verifiedHostCap: 2,
+        assignmentCount: 12,
+      }),
+    ).toBe(2);
+  });
   it("rejects damaged policy rather than falling back", () => {
     fs.writeFileSync(path.join(cwd, ".trellis/teamwork.json"), "{");
     expect(() => resolveTeammateRuntimeConfig(cwd, {})).toThrow();
     expect(() => resolveTeammateGuardConfig({ cwd, env: {} })).toThrow();
+  });
+  it("rejects environment expansion of the frozen shared budget", () => {
+    const frozen = resolveCoordination(cwd);
+    expect(() =>
+      assertFrozenCoordination(cwd, frozen.configDigest, frozen.snapshot, {
+        mode: "general",
+        maxConcurrency: 8,
+        guard: { maxLiveTeammates: 0, nonBatchReserved: 0 },
+      }),
+    ).toThrow(/expands frozen/);
+    expect(resolveTeammateRuntimeConfig(cwd, {}).sourceDigest).not.toBe(
+      resolveTeammateRuntimeConfig(cwd, {
+        TRELLIS_TEAMWORK_TEAMMATE_MAX_CONCURRENCY: "2",
+      }).sourceDigest,
+    );
+  });
+  it("allows only stricter resource policy after freezing", () => {
+    const frozen = resolveCoordination(cwd);
+    const file = path.join(cwd, ".trellis/teamwork.json");
+    const json = JSON.parse(fs.readFileSync(file, "utf8"));
+    json.resources.max_live_teammates = 4;
+    fs.writeFileSync(file, JSON.stringify(json));
+    expect(() =>
+      assertFrozenCoordination(cwd, frozen.configDigest, frozen.snapshot),
+    ).not.toThrow();
+    json.modes.general.default_members = 2;
+    fs.writeFileSync(file, JSON.stringify(json));
+    expect(() =>
+      assertFrozenCoordination(cwd, frozen.configDigest, frozen.snapshot),
+    ).toThrow(/construct a new plan/);
+    json.modes.general.default_members = 1;
+    json.resources.max_live_teammates = 0;
+    fs.writeFileSync(file, JSON.stringify(json));
+    expect(() =>
+      assertFrozenCoordination(cwd, frozen.configDigest, frozen.snapshot),
+    ).toThrow(/expanded/);
+    expect(() => assertFrozenCoordination(cwd, frozen.configDigest)).toThrow(
+      /changed/,
+    );
   });
 });

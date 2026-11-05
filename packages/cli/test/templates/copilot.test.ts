@@ -2,12 +2,23 @@ import { describe, expect, it } from "vitest";
 import { collectPlatformTemplates } from "../../src/configurators/index.js";
 import {
   getAllHooks,
-  getAllPrompts,
   getHooksConfig,
 } from "../../src/templates/copilot/index.js";
 
 const EXPECTED_HOOK_NAMES = ["session-start.py"];
 const EMPTY_EXCEPT_PASS_RE = /except[^\n]*:\n\s*pass\s*$/m;
+
+function getAllPrompts() {
+  return [...(collectPlatformTemplates("copilot") ?? [])]
+    .filter(
+      ([file]) =>
+        file.startsWith(".github/prompts/") && file.endsWith(".prompt.md"),
+    )
+    .map(([file, content]) => ({
+      name: file.slice(".github/prompts/".length, -".prompt.md".length),
+      content,
+    }));
+}
 
 describe("copilot getAllHooks", () => {
   it("returns the expected hook set", () => {
@@ -94,10 +105,10 @@ describe("copilot getHooksConfig", () => {
 });
 
 describe("copilot getAllPrompts", () => {
-  it("includes start/finish-work prompts for slash commands", () => {
+  it("includes continue/finish-work prompts for slash commands", () => {
     const prompts = getAllPrompts();
     const names = prompts.map((p) => p.name);
-    expect(names).toContain("start");
+    expect(names).toContain("continue");
     expect(names).toContain("finish-work");
   });
 
@@ -107,25 +118,27 @@ describe("copilot getAllPrompts", () => {
     }
   });
 
-  it("loads prompt names from local copilot prompts directory", () => {
+  it("tests the common command prompts actually installed", () => {
     const names = getAllPrompts()
       .map((p) => p.name)
       .sort();
-    expect(names[0]).toBe("before-dev");
-    expect(names).toContain("start");
-    expect(names).toContain("update-spec");
+    expect(names).toContain("finish-work");
+    expect(names).toContain("continue");
+    expect(names).not.toContain("brainstorm");
     expect(names).not.toContain("parallel");
   });
 
   it("routes the start prompt and intake Skill through the current phase model", () => {
     const prompts = getAllPrompts();
     const start =
-      prompts.find((prompt) => prompt.name === "start")?.content ?? "";
+      prompts.find((prompt) => prompt.name === "continue")?.content ?? "";
     const intake = collectPlatformTemplates("copilot")?.get(
       ".github/skills/trellis-request-intake/SKILL.md",
     );
-    expect(start).toContain("current `<workflow-state>` breadcrumb");
-    expect(start).toContain("trellis-goal-exploration-and-requirements");
+    expect(start).toContain("phase route are authoritative");
+    expect(start).toContain(
+      "Goal Exploration and Requirements Confirmation Phase",
+    );
     expect(start).not.toContain("trellis-brainstorm");
     expect(start).not.toContain("Phase 2 step 2.1");
     expect(start).not.toContain("This platform has no session-start hook");

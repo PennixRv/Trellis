@@ -1202,7 +1202,23 @@ function workflowBreadcrumb(root: string, key: string | null): string {
         header = `Task: ${id} (${status})`;
         lookup = status;
       }
-    } catch {}
+      const meta = d.meta as JsonObject | undefined;
+      if (isObj(meta) && "task_workflow" in meta) {
+        const state = meta.task_workflow;
+        const routed = isObj(state) && Array.isArray(state.phase_ids) ? state.phase_ids : [];
+        const phase = isObj(state) && str(state.current_phase_id === null ? routed.at(-1) : state.current_phase_id);
+        const phases = isObj(state) && isObj(state.phases) ? state.phases : null;
+        const record = phase && phases?.[phase];
+        if (phase && isObj(record) && str(record.status)) {
+          lookup = phase;
+          header += `; phase=${phase}; state=${str(record.status) ?? "unknown"}`;
+        } else {
+          lookup = "task_error";
+        }
+      }
+    } catch {
+      lookup = "task_error";
+    }
   }
   const body = templates[lookup] ?? "Refer to workflow.md for current step.";
   return `<workflow-state>\n${header}\n${body}\n</workflow-state>`;

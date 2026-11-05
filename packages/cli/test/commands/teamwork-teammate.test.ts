@@ -229,6 +229,45 @@ describe("teammate adapter contract", () => {
     },
   );
 
+  it("freezes explicitly trusted external references and rejects them after trust is withdrawn", () => {
+    const cwd = project();
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-trusted-"));
+    try {
+      const evidence = path.join(external, "evidence.md");
+      fs.writeFileSync(evidence, "trusted external evidence");
+      fs.writeFileSync(
+        path.join(cwd, ".trellis/config.yaml"),
+        `teamwork:\n  trusted_context_dirs:\n    - ${external}\n`,
+      );
+      fs.writeFileSync(
+        path.join(cwd, "context.jsonl"),
+        JSON.stringify({
+          file: evidence,
+          reason: "explicit external evidence",
+          delivery: "required",
+        }),
+      );
+      const launch = buildTeammateLaunchSpec({
+        cwd,
+        profile: resolveTeammateProfile({ cwd }),
+        host,
+        contextManifests: ["context.jsonl"],
+      });
+      expect(() => assertTeammateContextCurrent(launch, cwd)).not.toThrow();
+      expect(launch.context).not.toContain("trusted external evidence");
+      fs.writeFileSync(
+        path.join(cwd, ".trellis/config.yaml"),
+        "teamwork: {}\n",
+      );
+      expect(() => assertTeammateContextCurrent(launch, cwd)).toThrow(
+        /trusted roots/,
+      );
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+      fs.rmSync(external, { recursive: true, force: true });
+    }
+  });
+
   it("reads a historical frozen launch without imposing the new report contract", () => {
     const cwd = project();
     try {

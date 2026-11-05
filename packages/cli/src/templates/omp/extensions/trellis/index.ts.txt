@@ -81,7 +81,7 @@ function parseTeamworkTrustSection(content: string): { trustedDirs: string[]; au
       const trimmed = line.trimEnd();
       if (trimmed.trim().startsWith("#")) continue;
 
-      if (/^channel:\s*$/.test(trimmed)) {
+      if (/^teamwork:\s*$/.test(trimmed)) {
          inChannel = true;
          inList = false;
          continue;

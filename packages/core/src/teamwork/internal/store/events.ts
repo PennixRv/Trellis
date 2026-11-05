@@ -3,12 +3,7 @@ import fsp from "node:fs/promises";
 
 import { withLock } from "./lock.js";
 import { redactDiagnostic } from "./diagnostics.js";
-import {
-  sessionDir,
-  eventsPath,
-  lockPath,
-  seqSidecarPath,
-} from "./paths.js";
+import { sessionDir, eventsPath, lockPath, seqSidecarPath } from "./paths.js";
 import { reconcileSeq, truncateIncompleteTail, writeSidecar } from "./seq.js";
 import type {
   TeamworkSessionType,
@@ -233,23 +228,20 @@ export type InterruptOutcome =
 /** Why a message could not be delivered to a targeted worker. */
 export type UndeliverableReason = "worker-terminal" | "worker-unknown";
 
-export interface UndeliverableTeamworkEvent
-  extends BaseTeamworkEvent<"undeliverable"> {
+export interface UndeliverableTeamworkEvent extends BaseTeamworkEvent<"undeliverable"> {
   targetWorker: string;
   messageSeq: number;
   reason: UndeliverableReason;
 }
 
-export interface InterruptRequestedTeamworkEvent
-  extends BaseTeamworkEvent<"interrupt_requested"> {
+export interface InterruptRequestedTeamworkEvent extends BaseTeamworkEvent<"interrupt_requested"> {
   worker: string;
   turnId?: string;
   reason?: InterruptReason;
   message?: string;
 }
 
-export interface TurnStartedTeamworkEvent
-  extends BaseTeamworkEvent<"turn_started"> {
+export interface TurnStartedTeamworkEvent extends BaseTeamworkEvent<"turn_started"> {
   worker: string;
   /**
    * Durable link to the Teamwork Session `message` event seq that initiated this
@@ -260,16 +252,14 @@ export interface TurnStartedTeamworkEvent
   turnId?: string;
 }
 
-export interface TurnFinishedTeamworkEvent
-  extends BaseTeamworkEvent<"turn_finished"> {
+export interface TurnFinishedTeamworkEvent extends BaseTeamworkEvent<"turn_finished"> {
   worker: string;
   inputSeq?: number;
   turnId?: string;
   outcome?: "done" | "error" | "aborted";
 }
 
-export interface InterruptedTeamworkEvent
-  extends BaseTeamworkEvent<"interrupted"> {
+export interface InterruptedTeamworkEvent extends BaseTeamworkEvent<"interrupted"> {
   worker: string;
   turnId?: string;
   reason?: InterruptReason;
@@ -286,15 +276,18 @@ export type SupervisorWarningReason = "approaching_timeout";
  * Not part of {@link MEANINGFUL_EVENT_KINDS} so plain `wait` does not
  * wake on it; explicit `--kind supervisor_warning` does match.
  */
-export interface SupervisorWarningTeamworkEvent
-  extends BaseTeamworkEvent<"supervisor_warning"> {
+export interface SupervisorWarningTeamworkEvent extends BaseTeamworkEvent<"supervisor_warning"> {
   worker: string;
   reason: SupervisorWarningReason;
   timeout_ms: number;
   remaining_ms: number;
 }
 
-export type CoordinationEntity = "batch" | "assignment" | "attempt" | "teammate";
+export type CoordinationEntity =
+  | "batch"
+  | "assignment"
+  | "attempt"
+  | "teammate";
 
 export type CoordinationBatchState =
   | "PREPARED"
@@ -348,10 +341,12 @@ export type CoordinationAction =
   | "receipt_recorded"
   | "lease_acquired"
   | "lease_released"
-  | "reconciliation_required";
+  | "reconciliation_required"
+  | "reconciliation_resolved"
+  | "process_started"
+  | "process_exited";
 
-export interface CoordinationTeamworkEvent
-  extends BaseTeamworkEvent<"coordination"> {
+export interface CoordinationTeamworkEvent extends BaseTeamworkEvent<"coordination"> {
   action: CoordinationAction;
   entity: CoordinationEntity;
   batchId: string;
@@ -631,7 +626,5 @@ export async function readTeamworkEvents(
   }
 
   // limit only: latest N events in ascending seq order.
-  return limit !== undefined
-    ? all.slice(Math.max(0, all.length - limit))
-    : all;
+  return limit !== undefined ? all.slice(Math.max(0, all.length - limit)) : all;
 }

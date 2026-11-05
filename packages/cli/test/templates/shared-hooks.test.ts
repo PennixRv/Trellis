@@ -13,6 +13,7 @@ import {
 
 const ALL_HOOK_FILES = [
   "session-start.py",
+  "guard-teamwork-wait.py",
   "inject-shell-session-context.py",
   "inject-workflow-state.py",
   "inject-subagent-context.py",
@@ -99,10 +100,7 @@ describe("shared-hooks capability table", () => {
   // instead of silently shipping a script nothing calls. Never hard-code the
   // platform list here; that is the failure mode this test exists to prevent.
   describe("shared hooks are registered in each platform's own hook config", () => {
-    function registrationsOf(
-      platform: string,
-      hook: SharedHookName,
-    ): string[] {
+    function registrationsOf(platform: string, hook: SharedHookName): string[] {
       const tool = resolveCliFlag(platform);
       if (!tool) {
         throw new Error(
@@ -230,7 +228,9 @@ describe("shared-hooks capability table", () => {
     expect(content).toContain("<trellis-workflow>");
     expect(content).toContain("Task context order");
     expect(content).toContain("jsonl entries -> `prd.md`");
-    expect(content).toContain("task lifecycle status and artifact presence do not identify the business phase");
+    expect(content).toContain(
+      "task lifecycle status and artifact presence do not identify the business phase",
+    );
     expect(content).toContain("trellis-goal-exploration-and-requirements");
     expect(content).not.toContain("trellis-brainstorm");
     expect(content).not.toContain("complex task must add");

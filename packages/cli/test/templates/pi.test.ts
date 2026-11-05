@@ -169,11 +169,7 @@ function loadMaxThinkingInternals(
 
 export { buildPiArgs, resolveRunCfg, splitModelThinking };
 `;
-  return evaluateExtension<MaxThinkingInternals>(
-    source,
-    process.cwd(),
-    {},
-  );
+  return evaluateExtension<MaxThinkingInternals>(source, process.cwd(), {});
 }
 
 function createMinimalTrellisRoot(): string {
@@ -269,9 +265,7 @@ describe("pi templates", () => {
 
     // Schema must declare the three dispatch modes and the thinking enum so the LLM
     // can pick a valid mode and override thinking per call.
-    expect(extension).toContain(
-      'enum: ["single", "parallel", "chain"]',
-    );
+    expect(extension).toContain('enum: ["single", "parallel", "chain"]');
     expect(extension).toContain(
       'enum: ["off", "minimal", "low", "medium", "high", "xhigh", "max"]',
     );
@@ -493,6 +487,61 @@ describe("pi templates", () => {
     );
   });
 
+  it("uses the native phase breadcrumb and refuses malformed phase state", () => {
+    const root = createMinimalTrellisRoot();
+    const { workflowBreadcrumbForTest } = loadExtensionInternals(root);
+    const taskDir = join(root, ".trellis", "tasks", "phase-test");
+    mkdirSync(taskDir, { recursive: true });
+    mkdirSync(join(root, ".trellis", ".runtime", "sessions"), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(root, ".trellis", ".runtime", "sessions", "pi-phase.json"),
+      JSON.stringify({ current_task: "tasks/phase-test" }),
+    );
+    writeFileSync(
+      join(root, ".trellis", "workflow.md"),
+      "[workflow-state:task_implementation]\nNATIVE IMPLEMENTATION\n[/workflow-state:task_implementation]\n[workflow-state:task_error]\nREPAIR TASK\n[/workflow-state:task_error]\n",
+    );
+    const task = {
+      id: "phase-test",
+      status: "in_progress",
+      meta: {
+        task_workflow: {
+          current_phase_id: "task_implementation",
+          phases: { task_implementation: { status: "active" } },
+        },
+      },
+    };
+    writeFileSync(join(taskDir, "task.json"), JSON.stringify(task));
+    expect(workflowBreadcrumbForTest(root, "pi-phase")).toContain(
+      "NATIVE IMPLEMENTATION",
+    );
+    writeFileSync(
+      join(taskDir, "task.json"),
+      JSON.stringify({
+        ...task,
+        meta: {
+          task_workflow: {
+            current_phase_id: null,
+            phase_ids: ["task_implementation"],
+            phases: { task_implementation: { status: "accepted" } },
+          },
+        },
+      }),
+    );
+    expect(workflowBreadcrumbForTest(root, "pi-phase")).toContain(
+      "state=accepted",
+    );
+    writeFileSync(
+      join(taskDir, "task.json"),
+      JSON.stringify({ ...task, meta: { task_workflow: {} } }),
+    );
+    expect(workflowBreadcrumbForTest(root, "pi-phase")).toContain(
+      "REPAIR TASK",
+    );
+  });
+
   it("delivers task context changes as persisted messages, not systemPrompt churn", () => {
     const root = createMinimalTrellisRoot();
     const { trellisExtension } = loadExtensionInternals(root);
@@ -543,7 +592,13 @@ describe("pi templates", () => {
       recursive: true,
     });
     writeFileSync(
-      join(root, ".trellis", ".runtime", "sessions", "pi_pi-unit-task-update.json"),
+      join(
+        root,
+        ".trellis",
+        ".runtime",
+        "sessions",
+        "pi_pi-unit-task-update.json",
+      ),
       JSON.stringify({ current_task: "tasks/07-07-cache-fix" }),
     );
 
@@ -643,7 +698,9 @@ describe("pi templates", () => {
         { type: "before_agent_start", systemPrompt: "BASE" },
         ctx,
       ) as { systemPrompt?: string; message?: { content?: string } };
-      expect(beforeAgentStart.systemPrompt).not.toContain("FOREIGN TASK CONTENT");
+      expect(beforeAgentStart.systemPrompt).not.toContain(
+        "FOREIGN TASK CONTENT",
+      );
       expect(beforeAgentStart.message?.content).not.toContain(
         "FOREIGN TASK CONTENT",
       );
@@ -860,7 +917,9 @@ fallbackModels:
     const { buildPiArgs } = loadExtensionInternals();
 
     // model + thinking → composes "model:thinking" suffix when not already present
-    expect(buildPiArgs({ model: "anthropic/claude-sonnet-4", thinking: "high" })).toEqual([
+    expect(
+      buildPiArgs({ model: "anthropic/claude-sonnet-4", thinking: "high" }),
+    ).toEqual([
       "--mode",
       "json",
       "-p",
@@ -921,7 +980,15 @@ fallbackModels:
       fallbackModels: [],
     };
     const dogfoodExtension = readFileSync(
-      join(process.cwd(), "..", "..", ".pi", "extensions", "trellis", "index.ts"),
+      join(
+        process.cwd(),
+        "..",
+        "..",
+        ".pi",
+        "extensions",
+        "trellis",
+        "index.ts",
+      ),
       "utf-8",
     );
 
@@ -1089,167 +1156,180 @@ fallbackModels:
   });
 
   describe("permission-forwarding parent session (#610)", () => {
-  function writeHeartbeat(
-    sessionDir: string,
-    sessionId: string,
-    pid: number,
-    updatedAt: number,
-    fileName?: string,
-  ): void {
-    const dir = join(sessionDir, "permission-forwarding", "serving");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      join(dir, fileName ?? `${encodeURIComponent(sessionId)}.json`),
-      JSON.stringify({ sessionId, pid, updatedAt }),
-    );
-  }
+    function writeHeartbeat(
+      sessionDir: string,
+      sessionId: string,
+      pid: number,
+      updatedAt: number,
+      fileName?: string,
+    ): void {
+      const dir = join(sessionDir, "permission-forwarding", "serving");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, fileName ?? `${encodeURIComponent(sessionId)}.json`),
+        JSON.stringify({ sessionId, pid, updatedAt }),
+      );
+    }
 
-  it("prefers the serving heartbeat id over a live ctx id and stale PI_SESSION_ID", () => {
-    const sessionDir = mkdtempSync(join(tmpdir(), "trellis-pi-610-serving-"));
-    writeHeartbeat(sessionDir, "serving-session", process.pid, 200);
-    writeHeartbeat(sessionDir, "older-serving", process.pid, 100, "older.json");
-    writeHeartbeat(sessionDir, "other-process", process.pid + 1, 999);
+    it("prefers the serving heartbeat id over a live ctx id and stale PI_SESSION_ID", () => {
+      const sessionDir = mkdtempSync(join(tmpdir(), "trellis-pi-610-serving-"));
+      writeHeartbeat(sessionDir, "serving-session", process.pid, 200);
+      writeHeartbeat(
+        sessionDir,
+        "older-serving",
+        process.pid,
+        100,
+        "older.json",
+      );
+      writeHeartbeat(sessionDir, "other-process", process.pid + 1, 999);
 
-    try {
-      const { servingSessionId, parentSessionIdForChild, currentSessionId } =
-        loadExtensionInternals(process.cwd(), {
+      try {
+        const { servingSessionId, parentSessionIdForChild, currentSessionId } =
+          loadExtensionInternals(process.cwd(), {
+            PI_CODING_AGENT_SESSION_DIR: sessionDir,
+            PI_SESSION_ID: "stale-env-id",
+          });
+
+        expect(servingSessionId()).toBe("serving-session");
+        expect(
+          currentSessionId({
+            sessionManager: { getSessionId: () => "live-forked-id" },
+          }),
+        ).toBe("live-forked-id");
+        expect(
+          parentSessionIdForChild({
+            sessionManager: { getSessionId: () => "live-forked-id" },
+          }),
+        ).toBe("serving-session");
+      } finally {
+        rmSync(sessionDir, { recursive: true, force: true });
+      }
+    });
+
+    it("falls back to ctx then env when no serving heartbeat exists", () => {
+      const sessionDir = mkdtempSync(
+        join(tmpdir(), "trellis-pi-610-fallback-"),
+      );
+
+      try {
+        const withCtx = loadExtensionInternals(process.cwd(), {
           PI_CODING_AGENT_SESSION_DIR: sessionDir,
           PI_SESSION_ID: "stale-env-id",
         });
+        expect(
+          withCtx.parentSessionIdForChild({
+            sessionManager: { getSessionId: () => "ctx-session" },
+          }),
+        ).toBe("ctx-session");
 
-      expect(servingSessionId()).toBe("serving-session");
-      expect(
-        currentSessionId({
-          sessionManager: { getSessionId: () => "live-forked-id" },
-        }),
-      ).toBe("live-forked-id");
-      expect(
-        parentSessionIdForChild({
-          sessionManager: { getSessionId: () => "live-forked-id" },
-        }),
-      ).toBe("serving-session");
-    } finally {
-      rmSync(sessionDir, { recursive: true, force: true });
-    }
-  });
-
-  it("falls back to ctx then env when no serving heartbeat exists", () => {
-    const sessionDir = mkdtempSync(join(tmpdir(), "trellis-pi-610-fallback-"));
-
-    try {
-      const withCtx = loadExtensionInternals(process.cwd(), {
-        PI_CODING_AGENT_SESSION_DIR: sessionDir,
-        PI_SESSION_ID: "stale-env-id",
-      });
-      expect(
-        withCtx.parentSessionIdForChild({
-          sessionManager: { getSessionId: () => "ctx-session" },
-        }),
-      ).toBe("ctx-session");
-
-      const envOnly = loadExtensionInternals(process.cwd(), {
-        PI_CODING_AGENT_SESSION_DIR: sessionDir,
-        PI_SESSION_ID: "stale-env-id",
-      });
-      expect(envOnly.parentSessionIdForChild()).toBe("stale-env-id");
-    } finally {
-      rmSync(sessionDir, { recursive: true, force: true });
-    }
-  });
-
-  it("strips inherited PI_SESSION_ID and always marks the child as a subagent", () => {
-    const { buildChildEnv } = loadExtensionInternals(process.cwd(), {
-      PI_SESSION_ID: "parent-session",
-      PI_SESSIONID: "parent-session-alt",
-      PATH: "/usr/bin",
+        const envOnly = loadExtensionInternals(process.cwd(), {
+          PI_CODING_AGENT_SESSION_DIR: sessionDir,
+          PI_SESSION_ID: "stale-env-id",
+        });
+        expect(envOnly.parentSessionIdForChild()).toBe("stale-env-id");
+      } finally {
+        rmSync(sessionDir, { recursive: true, force: true });
+      }
     });
 
-    const withParent = buildChildEnv("pi_ctx", "serving-session");
-    expect(withParent.TRELLIS_SUBAGENT_CHILD).toBe("1");
-    expect(withParent.PI_SUBAGENT_CHILD).toBe("1");
-    expect(withParent.TRELLIS_CONTEXT_ID).toBe("pi_ctx");
-    expect(withParent.PI_SUBAGENT_PARENT_SESSION).toBe("serving-session");
-    expect(withParent.PI_SESSION_ID).toBeUndefined();
-    expect(withParent.PI_SESSIONID).toBeUndefined();
-
-    const noParent = buildChildEnv(null, null);
-    expect(noParent.PI_SUBAGENT_CHILD).toBe("1");
-    expect(noParent.PI_SUBAGENT_PARENT_SESSION).toBeUndefined();
-    expect(noParent.TRELLIS_CONTEXT_ID).toBeUndefined();
-  });
-
-  it("injects serving parent env into the spawned headless pi process", async () => {
-    const hostRoot = createMinimalTrellisRoot();
-    const sessionRoot = createMinimalTrellisRoot();
-    const sessionDir = mkdtempSync(join(tmpdir(), "trellis-pi-610-spawn-"));
-    const agentDir = join(sessionRoot, ".pi", "agents");
-    const fakeCli = join(sessionRoot, "fake-pi.cjs");
-    const capturedEnv = join(sessionRoot, "child-env.json");
-    mkdirSync(agentDir, { recursive: true });
-    writeFileSync(
-      join(agentDir, "trellis-implement.md"),
-      "---\nname: trellis-implement\n---\nImplement the task.\n",
-    );
-    writeHeartbeat(sessionDir, "serving-heartbeat-id", process.pid, Date.now());
-    writeFileSync(
-      fakeCli,
-      [
-        'const { writeFileSync } = require("node:fs");',
-        `writeFileSync(${JSON.stringify(capturedEnv)}, JSON.stringify({`,
-        "  PI_SUBAGENT_CHILD: process.env.PI_SUBAGENT_CHILD,",
-        "  PI_SUBAGENT_PARENT_SESSION: process.env.PI_SUBAGENT_PARENT_SESSION,",
-        "  TRELLIS_SUBAGENT_CHILD: process.env.TRELLIS_SUBAGENT_CHILD,",
-        "  PI_SESSION_ID: process.env.PI_SESSION_ID ?? null,",
-        "  PI_SESSIONID: process.env.PI_SESSIONID ?? null,",
-        "}));",
-        'process.stdout.write(JSON.stringify({ message: { role: "assistant", content: [{ type: "text", text: "fake child ok" }] } }) + "\\n");',
-        "",
-      ].join("\n"),
-    );
-
-    try {
-      const { trellisExtension } = loadExtensionInternals(hostRoot, {
-        TRELLIS_PI_CLI_JS: fakeCli,
-        PI_CODING_AGENT_SESSION_DIR: sessionDir,
-        PI_SESSION_ID: "stale-parent-id",
+    it("strips inherited PI_SESSION_ID and always marks the child as a subagent", () => {
+      const { buildChildEnv } = loadExtensionInternals(process.cwd(), {
+        PI_SESSION_ID: "parent-session",
+        PI_SESSIONID: "parent-session-alt",
+        PATH: "/usr/bin",
       });
-      let registeredTool: RegisteredPiTool | undefined;
-      trellisExtension({
-        registerTool(tool) {
-          registeredTool = tool as RegisteredPiTool;
-        },
-        getThinkingLevel: () => "low",
-      });
-      expect(registeredTool).toBeDefined();
-      if (!registeredTool)
-        throw new Error("trellis_subagent was not registered");
 
-      const result = await registeredTool.execute(
-        "permission-forward-test",
-        { agent: "trellis-implement", prompt: "Implement the task" },
-        undefined,
-        undefined,
-        {
-          cwd: sessionRoot,
-          sessionManager: { getSessionId: () => "live-forked-id" },
-        },
+      const withParent = buildChildEnv("pi_ctx", "serving-session");
+      expect(withParent.TRELLIS_SUBAGENT_CHILD).toBe("1");
+      expect(withParent.PI_SUBAGENT_CHILD).toBe("1");
+      expect(withParent.TRELLIS_CONTEXT_ID).toBe("pi_ctx");
+      expect(withParent.PI_SUBAGENT_PARENT_SESSION).toBe("serving-session");
+      expect(withParent.PI_SESSION_ID).toBeUndefined();
+      expect(withParent.PI_SESSIONID).toBeUndefined();
+
+      const noParent = buildChildEnv(null, null);
+      expect(noParent.PI_SUBAGENT_CHILD).toBe("1");
+      expect(noParent.PI_SUBAGENT_PARENT_SESSION).toBeUndefined();
+      expect(noParent.TRELLIS_CONTEXT_ID).toBeUndefined();
+    });
+
+    it("injects serving parent env into the spawned headless pi process", async () => {
+      const hostRoot = createMinimalTrellisRoot();
+      const sessionRoot = createMinimalTrellisRoot();
+      const sessionDir = mkdtempSync(join(tmpdir(), "trellis-pi-610-spawn-"));
+      const agentDir = join(sessionRoot, ".pi", "agents");
+      const fakeCli = join(sessionRoot, "fake-pi.cjs");
+      const capturedEnv = join(sessionRoot, "child-env.json");
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(
+        join(agentDir, "trellis-implement.md"),
+        "---\nname: trellis-implement\n---\nImplement the task.\n",
+      );
+      writeHeartbeat(
+        sessionDir,
+        "serving-heartbeat-id",
+        process.pid,
+        Date.now(),
+      );
+      writeFileSync(
+        fakeCli,
+        [
+          'const { writeFileSync } = require("node:fs");',
+          `writeFileSync(${JSON.stringify(capturedEnv)}, JSON.stringify({`,
+          "  PI_SUBAGENT_CHILD: process.env.PI_SUBAGENT_CHILD,",
+          "  PI_SUBAGENT_PARENT_SESSION: process.env.PI_SUBAGENT_PARENT_SESSION,",
+          "  TRELLIS_SUBAGENT_CHILD: process.env.TRELLIS_SUBAGENT_CHILD,",
+          "  PI_SESSION_ID: process.env.PI_SESSION_ID ?? null,",
+          "  PI_SESSIONID: process.env.PI_SESSIONID ?? null,",
+          "}));",
+          'process.stdout.write(JSON.stringify({ message: { role: "assistant", content: [{ type: "text", text: "fake child ok" }] } }) + "\\n");',
+          "",
+        ].join("\n"),
       );
 
-      expect(result.content[0]?.text).toBe("fake child ok");
-      expect(JSON.parse(readFileSync(capturedEnv, "utf-8"))).toEqual({
-        PI_SUBAGENT_CHILD: "1",
-        PI_SUBAGENT_PARENT_SESSION: "serving-heartbeat-id",
-        TRELLIS_SUBAGENT_CHILD: "1",
-        PI_SESSION_ID: null,
-        PI_SESSIONID: null,
-      });
-    } finally {
-      rmSync(hostRoot, { recursive: true, force: true });
-      rmSync(sessionRoot, { recursive: true, force: true });
-      rmSync(sessionDir, { recursive: true, force: true });
-    }
+      try {
+        const { trellisExtension } = loadExtensionInternals(hostRoot, {
+          TRELLIS_PI_CLI_JS: fakeCli,
+          PI_CODING_AGENT_SESSION_DIR: sessionDir,
+          PI_SESSION_ID: "stale-parent-id",
+        });
+        let registeredTool: RegisteredPiTool | undefined;
+        trellisExtension({
+          registerTool(tool) {
+            registeredTool = tool as RegisteredPiTool;
+          },
+          getThinkingLevel: () => "low",
+        });
+        expect(registeredTool).toBeDefined();
+        if (!registeredTool)
+          throw new Error("trellis_subagent was not registered");
+
+        const result = await registeredTool.execute(
+          "permission-forward-test",
+          { agent: "trellis-implement", prompt: "Implement the task" },
+          undefined,
+          undefined,
+          {
+            cwd: sessionRoot,
+            sessionManager: { getSessionId: () => "live-forked-id" },
+          },
+        );
+
+        expect(result.content[0]?.text).toBe("fake child ok");
+        expect(JSON.parse(readFileSync(capturedEnv, "utf-8"))).toEqual({
+          PI_SUBAGENT_CHILD: "1",
+          PI_SUBAGENT_PARENT_SESSION: "serving-heartbeat-id",
+          TRELLIS_SUBAGENT_CHILD: "1",
+          PI_SESSION_ID: null,
+          PI_SESSIONID: null,
+        });
+      } finally {
+        rmSync(hostRoot, { recursive: true, force: true });
+        rmSync(sessionRoot, { recursive: true, force: true });
+        rmSync(sessionDir, { recursive: true, force: true });
+      }
+    });
   });
-});
 
   it("shellQuote single-quotes values and escapes embedded single quotes", () => {
     const { shellQuote } = loadExtensionInternals();
@@ -1270,7 +1350,15 @@ fallbackModels:
 
   it("forwards permission asks to the serving parent session (#610)", () => {
     const dogfoodExtension = readFileSync(
-      join(process.cwd(), "..", "..", ".pi", "extensions", "trellis", "index.ts"),
+      join(
+        process.cwd(),
+        "..",
+        "..",
+        ".pi",
+        "extensions",
+        "trellis",
+        "index.ts",
+      ),
       "utf-8",
     );
 
@@ -1441,9 +1529,7 @@ describe("pi extension: context injection limits (issue #441)", () => {
       mkdirSync(join(root, ".trellis"), { recursive: true });
       writeConfig(
         root,
-        ["context_injection:", "  max_artifact_bytes: not-a-number"].join(
-          "\n",
-        ),
+        ["context_injection:", "  max_artifact_bytes: not-a-number"].join("\n"),
       );
       const { readContextInjectionLimits } = loadExtensionInternals();
       expect(readContextInjectionLimits(root).max_artifact_bytes).toBe(65536);
@@ -1512,13 +1598,11 @@ describe("pi extension: context injection limits (issue #441)", () => {
     it("does not misclassify legitimate multi-byte UTF-8 content as binary", () => {
       const root = createRoot();
       const taskDir = activateTask(root, "task-utf8-not-binary");
-      const multiByteContent =
-        "emoji: 🎉🚀 cjk: 中文测试 bmp: café naïve\n";
+      const multiByteContent = "emoji: 🎉🚀 cjk: 中文测试 bmp: café naïve\n";
       writeFileSync(join(root, "multibyte.md"), multiByteContent, "utf-8");
       writeFileSync(
         join(taskDir, "implement.jsonl"),
-        JSON.stringify({ file: "multibyte.md", reason: "unicode spec" }) +
-          "\n",
+        JSON.stringify({ file: "multibyte.md", reason: "unicode spec" }) + "\n",
         "utf-8",
       );
       writeConfig(root, "");
@@ -1557,7 +1641,11 @@ describe("pi extension: context injection limits (issue #441)", () => {
     it("truncates an oversized jsonl-referenced file at max_file_bytes with a notice", () => {
       const root = createRoot();
       const taskDir = activateTask(root, "task-oversize");
-      writeFileSync(join(root, "big.txt"), "A".repeat(2 * 1024 * 1024), "utf-8");
+      writeFileSync(
+        join(root, "big.txt"),
+        "A".repeat(2 * 1024 * 1024),
+        "utf-8",
+      );
       writeFileSync(
         join(taskDir, "implement.jsonl"),
         JSON.stringify({ file: "big.txt", reason: "big" }) + "\n",

@@ -146,7 +146,7 @@ async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function retry(label, fn) {
+export async function retry(label, fn) {
   // npm publication can take longer than the original 50-second window to
   // reach the public registry. Keep the verification bound while allowing
   // the normal propagation delay observed in CI.
@@ -154,7 +154,7 @@ async function retry(label, fn) {
   let lastError;
   for (let i = 1; i <= attempts; i += 1) {
     try {
-      return fn();
+      return await fn();
     } catch (err) {
       lastError = err;
       if (i === attempts) break;
@@ -311,7 +311,7 @@ async function verifyNpm({ packageFilter }) {
         npmViewJSON(`${pkg.name}@${v.cliVersion} version`),
       );
       if (version !== v.cliVersion) {
-        fail(
+        throw new Error(
           `${pkg.name}@${v.cliVersion} is not visible on the public npm registry.`,
         );
       }
@@ -319,7 +319,7 @@ async function verifyNpm({ packageFilter }) {
         npmViewJSON(`${pkg.name}@${tag} version`),
       );
       if (taggedVersion !== v.cliVersion) {
-        fail(
+        throw new Error(
           `${pkg.name}@${tag} resolves to ${taggedVersion ?? "nothing"}, expected ${v.cliVersion}.`,
         );
       }
@@ -379,5 +379,5 @@ async function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main();
+  main().catch((error) => fail(error instanceof Error ? error.message : String(error)));
 }

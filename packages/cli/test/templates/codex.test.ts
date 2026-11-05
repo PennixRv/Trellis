@@ -102,13 +102,16 @@ describe("codex native sub-agent hooks", () => {
       ".codex/hooks/inject-spec-context.py",
     );
 
-    expect(config.hooks.PreToolUse).toHaveLength(1);
-    expect(config.hooks.PreToolUse[0]?.matcher).toBe("Edit|Write");
-    expect(config.hooks.PreToolUse[0]?.hooks[0]).toMatchObject({
+    expect(config.hooks.PreToolUse).toHaveLength(2);
+    expect(config.hooks.PreToolUse[0]?.hooks[0]?.command).toContain(
+      "guard-teamwork-wait.py",
+    );
+    expect(config.hooks.PreToolUse[1]?.matcher).toBe("Edit|Write");
+    expect(config.hooks.PreToolUse[1]?.hooks[0]).toMatchObject({
       timeout: 15,
       additionalContextLimit: 0,
     });
-    expect(config.hooks.PreToolUse[0]?.hooks[0]?.command).toContain(
+    expect(config.hooks.PreToolUse[1]?.hooks[0]?.command).toContain(
       ".codex/hooks/inject-spec-context.py",
     );
   });
@@ -116,7 +119,9 @@ describe("codex native sub-agent hooks", () => {
 
 describe("codex SessionStart phase guidance", () => {
   it("does not infer the business phase from lifecycle status or artifact presence", () => {
-    const content = getAllHooks().find((hook) => hook.name === "session-start.py")?.content ?? "";
+    const content =
+      getAllHooks().find((hook) => hook.name === "session-start.py")?.content ??
+      "";
     expect(content).toContain("current per-turn workflow-state");
     expect(content).toContain("do not identify the business phase");
     expect(content).toContain("trellis-goal-exploration-and-requirements");

@@ -133,8 +133,8 @@ const TEAMMATE_TRANSITIONS: Record<string, readonly string[]> = {
   RUNNING: ["REPORT_SUBMITTED", "FAILED", "TIMEOUT_YIELDED"],
   REPORT_SUBMITTED: ["FAILED", "FINAL_FAILED"],
   FAILED: [],
-  TIMEOUT_YIELDED: ["WAITING_FOR_MAIN_COMMAND"],
-  WAITING_FOR_MAIN_COMMAND: ["RUNNING"],
+  TIMEOUT_YIELDED: ["WAITING_FOR_MAIN_COMMAND", "FAILED"],
+  WAITING_FOR_MAIN_COMMAND: ["RUNNING", "FAILED"],
 };
 
 function transitionTable(
@@ -163,7 +163,10 @@ export function isCoordinationAction(
     value === "receipt_recorded" ||
     value === "lease_acquired" ||
     value === "lease_released" ||
-    value === "reconciliation_required"
+    value === "reconciliation_required" ||
+    value === "reconciliation_resolved" ||
+    value === "process_started" ||
+    value === "process_exited"
   );
 }
 
@@ -231,6 +234,7 @@ export function reduceCoordinationState(
   const commands: string[] = [];
   const receipts: string[] = [];
   const issues: string[] = [];
+  const reconciliations = new Map<string, string>();
 
   for (const event of events) {
     if (!isCoordinationEvent(event)) continue;
@@ -334,10 +338,13 @@ export function reduceCoordinationState(
       continue;
     }
     if (event.action === "reconciliation_required") {
-      issues.push(
+      reconciliations.set(
+        event.batchId,
         `${event.seq}: reconciliation required${event.reason ? `: ${event.reason}` : ""}`,
       );
     }
+    if (event.action === "reconciliation_resolved")
+      reconciliations.delete(event.batchId);
     if (event.action !== "state_transition") continue;
     const id = idFor(event);
     if (!id || !event.state) {
@@ -446,7 +453,7 @@ export function reduceCoordinationState(
     claims,
     commands,
     receipts,
-    issues,
+    issues: [...issues, ...reconciliations.values()],
     lastSeq: events.reduce((max, event) => Math.max(max, event.seq), 0),
   };
 }

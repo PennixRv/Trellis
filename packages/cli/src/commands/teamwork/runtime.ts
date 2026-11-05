@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
 
 import { getAdapter, type WorkerChild } from "./adapters/index.js";
 import type { TeammateHostCapabilities } from "./teammate-adapters.js";
@@ -8,6 +9,11 @@ import { pumpStdout } from "./supervisor/stdout.js";
 import { resolveProviderPath } from "./supervisor.js";
 import { assertTeammateContextCurrent } from "./teammate-launch.js";
 import { appendEvent } from "./store/events.js";
+import { recordCoordinationEvent } from "@pennixrv/trellis-core/teamwork";
+import { readProcessIdentity } from "./process-identity.js";
+import { assertFrozenCoordination } from "./coordination.js";
+import { resolveTeammateRuntimeConfig } from "./teammate-config.js";
+import { safePath } from "./artifact.js";
 
 /** The CLI owns foreground waiting and artifact validation; write restrictions remain role obligations. */
 export const CLI_TEAMMATE_HOST: TeammateHostCapabilities = {
@@ -20,7 +26,7 @@ export const CLI_TEAMMATE_HOST: TeammateHostCapabilities = {
 };
 
 interface ActiveProcess {
-  child: WorkerChild;
+  child?: WorkerChild;
   result: Promise<AttemptWaitResult>;
   stop: () => Promise<boolean>;
   cancel: (reason: string) => Promise<void>;
@@ -33,10 +39,35 @@ export interface CliCoordinatorRuntime extends CoordinatorRuntime {
 export function createCliCoordinatorRuntime(
   cwd: string,
   taskRoot: string,
+  expectedConfigDigest?: string,
 ): CliCoordinatorRuntime {
   const active = new Map<string, ActiveProcess>();
   let aborted = false;
   const runtime: CliCoordinatorRuntime = {
+    prepare(context): void {
+      const config = resolveTeammateRuntimeConfig(
+        cwd,
+        process.env,
+        context.plan.coordinationMode,
+      );
+      if (expectedConfigDigest && config.sourceDigest !== expectedConfigDigest)
+        throw new Error(
+          "Runtime policy changed after batch admission; pending assignments cannot start",
+        );
+      assertFrozenCoordination(
+        cwd,
+        context.plan.coordinationDigest,
+        context.plan.coordinationSnapshot,
+        {
+          mode: context.plan.coordinationMode,
+          maxConcurrency: config.teammate.maxConcurrency,
+          guard: config.guard,
+        },
+      );
+      assertTeammateContextCurrent(context.launch, cwd);
+      const adapter = getAdapter(context.profile.provider);
+      resolveProviderPath(adapter.provider, cwd);
+    },
     async shutdown(reason): Promise<void> {
       aborted = true;
       await Promise.all(
@@ -45,7 +76,20 @@ export function createCliCoordinatorRuntime(
     },
     async dispatch(context): Promise<undefined> {
       if (aborted) throw new Error("batch runtime has been cancelled");
-      assertTeammateContextCurrent(context.launch, cwd);
+      try {
+        runtime.prepare?.(context);
+      } catch (error) {
+        active.set(context.attemptId, {
+          result: Promise.resolve({
+            kind: "failed",
+            terminal: true,
+            reason: `provider not started: ${error instanceof Error ? error.message : String(error)}`,
+          }),
+          stop: async () => true,
+          cancel: async () => undefined,
+        });
+        return;
+      }
       const adapter = getAdapter(context.profile.provider);
       const ctx = adapter.createCtx();
       const view = {
@@ -101,6 +145,61 @@ export function createCliCoordinatorRuntime(
       });
       const finish = async (outcome: AttemptWaitResult): Promise<void> => {
         const confirmed = await stop();
+        if (confirmed && child.pid) {
+          try {
+            await recordCoordinationEvent({
+              sessionId: context.plan.sessionId,
+              cwd,
+              by: "main",
+              batchId: context.plan.batchId,
+              entity: "attempt",
+              action: "process_exited",
+              attemptId: context.attemptId,
+              teammateId: context.teammateId,
+              planHash: context.plan.planHash,
+              payload: { pid: child.pid },
+              idempotencyKey: `${context.plan.batchId}:exit:${context.attemptId}`,
+            });
+          } catch {
+            settle({
+              kind: "reconciliation",
+              reason:
+                "provider exited but its durable process fact could not be recorded",
+            });
+            return;
+          }
+        }
+        if (stderrTail.length) {
+          try {
+            const diagnostic = safePath(
+              taskRoot,
+              path.join(
+                path.dirname(context.assignment.briefPath),
+                "attempts",
+                context.attemptId,
+                "provider-stderr.log",
+              ),
+            );
+            const directory = path.dirname(diagnostic);
+            if (
+              fs.lstatSync(directory).isDirectory() &&
+              !fs.lstatSync(directory).isSymbolicLink()
+            )
+              fs.writeFileSync(diagnostic, stderrTail, {
+                mode: 0o600,
+                flag: "wx",
+              });
+          } catch (error) {
+            if (
+              !["EEXIST", "ENOENT"].includes(
+                (error as NodeJS.ErrnoException).code ?? "",
+              )
+            )
+              console.error(
+                "[teamwork] Could not retain provider stderr diagnostic",
+              );
+          }
+        }
         if (outcome.kind === "report") {
           try {
             assertTeammateContextCurrent(context.launch, cwd);
@@ -133,7 +232,12 @@ export function createCliCoordinatorRuntime(
         closed = true;
         resolveClosed();
       });
-      child.stderr.resume();
+      let stderrTail = Buffer.alloc(0);
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderrTail = Buffer.concat([stderrTail, Buffer.from(chunk)]).subarray(
+          -64 * 1024,
+        );
+      });
       const drained = pumpStdout(
         adapter.output?.(child, ctx) ?? child.stdout,
         async (line) => {
@@ -187,6 +291,23 @@ export function createCliCoordinatorRuntime(
           finish({ kind: "cancelled", terminal: true, reason }),
       });
       try {
+        if (child.pid)
+          await recordCoordinationEvent({
+            sessionId: context.plan.sessionId,
+            cwd,
+            by: "main",
+            batchId: context.plan.batchId,
+            entity: "attempt",
+            action: "process_started",
+            attemptId: context.attemptId,
+            teammateId: context.teammateId,
+            planHash: context.plan.planHash,
+            payload: {
+              pid: child.pid,
+              processIdentity: readProcessIdentity(child.pid),
+            },
+            idempotencyKey: `${context.plan.batchId}:process:${context.attemptId}`,
+          });
         if (adapter.handshake) {
           let timer: ReturnType<typeof setTimeout> | undefined;
           try {

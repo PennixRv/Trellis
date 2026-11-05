@@ -40,6 +40,7 @@ describe("downloadWithStrategy overwrite: temp-first swap", () => {
       "some/path",
       destDir,
       "overwrite",
+      "gh:example/specs",
     );
 
     expect(result).toBe(true);
@@ -56,7 +57,12 @@ describe("downloadWithStrategy overwrite: temp-first swap", () => {
     );
 
     await expect(
-      downloadWithStrategy("some/path", destDir, "overwrite"),
+      downloadWithStrategy(
+        "some/path",
+        destDir,
+        "overwrite",
+        "gh:example/specs",
+      ),
     ).rejects.toThrow(/timed out/);
 
     // The user's spec must survive a failed overwrite — the operation they

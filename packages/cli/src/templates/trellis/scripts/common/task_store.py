@@ -17,6 +17,7 @@ Provides:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -1244,6 +1245,10 @@ def cmd_remove_subtask(args: argparse.Namespace) -> int:
             print("Error: A cancelled parent can unlink only a child recorded as independently continuing in its accepted closeout.", file=sys.stderr)
             return 1
 
+    if parent_data.get("status") != "cancelled":
+        from .task_workflow import _assert_delegated_record_closed
+        _assert_delegated_record_closed(child_dir.name, child_data.get("meta", {}).get("delegated_worktree_execution_record"))
+    original_parent = json.loads(json.dumps(parent_data))
     # Remove child from parent's children list
     parent_children = _ensure_children_list(parent_data)
     child_dir_name = child_dir.name
@@ -1263,8 +1268,8 @@ def cmd_remove_subtask(args: argparse.Namespace) -> int:
     if not write_json(child_json_path, child_data):
         print(colored(f"Error: Failed to write child task.json: {child_json_path}", Colors.RED), file=sys.stderr)
         print(
-            f"Unlink is half-written: {parent_json_path} no longer lists "
-            f"'{child_dir.name}', but the child still records the parent.",
+            "Parent link restored." if write_json(parent_json_path, original_parent) else
+            f"Recovery required: could not restore the parent link in {parent_json_path}.",
             file=sys.stderr,
         )
         return 1

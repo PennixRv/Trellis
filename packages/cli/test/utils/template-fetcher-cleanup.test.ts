@@ -50,7 +50,12 @@ describe("downloadWithStrategy temp-dir cleanup", () => {
   it("overwrite: a failed temp cleanup does not mask the successful download", async () => {
     failTempDirCleanup();
     await expect(
-      downloadWithStrategy("some/template", destDir, "overwrite"),
+      downloadWithStrategy(
+        "some/template",
+        destDir,
+        "overwrite",
+        "gh:example/specs",
+      ),
     ).resolves.toBe(true);
     // The swap itself still happened.
     expect(fs.readFileSync(path.join(destDir, "file.md"), "utf-8")).toBe(
@@ -62,7 +67,12 @@ describe("downloadWithStrategy temp-dir cleanup", () => {
   it("append: a failed temp cleanup does not mask the successful download", async () => {
     failTempDirCleanup();
     await expect(
-      downloadWithStrategy("some/template", destDir, "append"),
+      downloadWithStrategy(
+        "some/template",
+        destDir,
+        "append",
+        "gh:example/specs",
+      ),
     ).resolves.toBe(true);
     // append keeps existing files and adds missing ones.
     expect(fs.readFileSync(path.join(destDir, "old.md"), "utf-8")).toBe(
