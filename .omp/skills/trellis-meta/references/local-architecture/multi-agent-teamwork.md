@@ -27,12 +27,12 @@ The storage root defaults to `~/.trellis/teamwork`; `TRELLIS_TEAMWORK_ROOT` over
 
 ## Configuration
 
-The project configuration supports `teamwork.teammate.max_concurrency` and `teamwork.teammate_guard.idle_timeout`, `max_live_teammates`, and `non_batch_reserved`. Defaults and CLI overrides are defined by the current Trellis CLI; read `packages/cli/src/commands/teamwork/teammate-config.ts` before changing them.
+The schema-2 `.trellis/teamwork.json` owns mode member defaults, mode concurrency limits, and the shared live-process budget and reservation. Defaults are members 1/3/3, concurrency 8/3/3, live budget 8, and reservation 0. YAML retains `teamwork.teammate_guard.idle_timeout`; legacy YAML capacity applies only before schema-2 migration and is otherwise ignored with diagnostics. Runtime `maxConcurrency` is a resolved value, not an independent configuration. Read `coordination.ts` and `teammate-config.ts` before changing this policy.
 
 `teamwork config` resolves project defaults. `teamwork plan` freezes profile,
 configuration, instructions and evidence into schema-2 plan/brief artifacts;
 `teamwork batch --task` connects the foreground coordinator to Codex app-server,
-Claude CLI, Copilot ACP or DSH ACP. Claims are schema 2, reports schema 1.
+Claude CLI, Copilot ACP or DSH ACP. Claims and content reports are schema 2.
 An unresolved batch keeps a durable project capacity reservation, including
 after coordinator exit. The guard and session cleanup preserve that evidence.
 Role read-only and history-use requirements are behavioral contracts; runtime

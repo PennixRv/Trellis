@@ -38,7 +38,7 @@
         "delivery_review_and_closeout"
       ],
       "current_phase_id": "task_implementation",
-      "input_revision": "17",
+      "input_revision": "21",
       "phases": {
         "goal_exploration_and_requirements": {
           "status": "accepted",
@@ -90,31 +90,31 @@
         },
         "solution_design_and_convergence": {
           "status": "accepted",
-          "input_revision": "16",
-          "artifact_revision": "671f4cc3ab8705fc8666fdc847d861ccff297cb31e616a171a9006f651f0cbbd",
+          "input_revision": "20",
+          "artifact_revision": "5b657735a0ecffd6b21575ed19b8a475a413709ab542ffb477e8ea5abdfcfac8",
           "artifact_refs": [
-            "teamwork-input-result-remediation.md"
+            "research/teamwork-capacity-remediation.md"
           ],
-          "result_revision": "3",
-          "result_ref": "teamwork-input-result-remediation.md",
+          "result_revision": "4",
+          "result_ref": "research/teamwork-capacity-remediation.md",
           "outcome_kind": "implementation_contract",
           "reason": null,
           "evidence_refs": [
-            "teamwork-input-result-remediation.md"
+            "research/teamwork-capacity-remediation.md"
           ],
           "acceptance": {
-            "artifact_revision": "671f4cc3ab8705fc8666fdc847d861ccff297cb31e616a171a9006f651f0cbbd",
-            "result_revision": "3",
-            "input_revision": "16",
+            "artifact_revision": "5b657735a0ecffd6b21575ed19b8a475a413709ab542ffb477e8ea5abdfcfac8",
+            "result_revision": "4",
+            "input_revision": "20",
             "task_route_revision": "1",
             "evidence_refs": [
-              "teamwork-input-result-remediation.md"
+              "research/teamwork-capacity-remediation.md"
             ]
           }
         },
         "task_implementation": {
           "status": "active",
-          "input_revision": "17",
+          "input_revision": "21",
           "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
           "artifact_refs": [],
           "result_revision": "0",
@@ -139,9 +139,9 @@
       },
       "route_dependency_admission": null,
       "implementation_authorization": {
-        "contract_ref": "teamwork-input-result-remediation.md",
-        "contract_revision": "671f4cc3ab8705fc8666fdc847d861ccff297cb31e616a171a9006f651f0cbbd",
-        "approval_ref": "teamwork-input-result-remediation.md",
+        "contract_ref": "research/teamwork-capacity-remediation.md",
+        "contract_revision": "5b657735a0ecffd6b21575ed19b8a475a413709ab542ffb477e8ea5abdfcfac8",
+        "approval_ref": "research/teamwork-capacity-remediation.md",
         "task_route_revision": "1"
       },
       "closeout_disposition": null,
@@ -151,9 +151,9 @@
         "to": "solution_design_and_convergence",
         "return_kind": "contract_change",
         "authorization_retained": false,
-        "reason": "按用户要求收敛 Teamwork 输入与结果审查增量，复用已定范围与授权，登记增量合同",
+        "reason": "用户批准容量配置与 advisor 模式增量并要求实施发布重装和后续审查",
         "evidence_refs": [
-          "teamwork-input-result-remediation.md"
+          "research/teamwork-capacity-remediation.md"
         ],
         "task_route_revision": "1"
       }

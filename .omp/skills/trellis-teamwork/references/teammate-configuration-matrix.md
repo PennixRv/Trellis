@@ -7,8 +7,10 @@
 | `.trellis/agents/teammate-profiles.json`，schema 2 | `default_profile`；每个 profile 的 `role`、`default_configuration` 和 2–3 套命名 `configurations` |
 | `.trellis/agents/teammate.md` | 通用角色、只读职责和结果合同 |
 | `.trellis/agents/profiles/<profile>.md` | 精确专业角色卡；普通 Markdown，通过 Trellis 注入，不注册宿主原生角色 |
-| `.trellis/teamwork.json`，schema 1 | `default_mode` 及三种模式的 `default_members` |
-| `.trellis/config.yaml` 的 `teamwork.*` | 并发和进程容量限制 |
+| `.trellis/teamwork.json`，schema 2 | `default_mode`；各模式的 `default_members`、`max_concurrency`；`resources` 中的共享进程预算与非 batch 预留 |
+| `.trellis/config.yaml` 的 `teamwork.teammate_guard.idle_timeout` | 空闲清理；旧容量键仅在未迁移到 schema 2 时兼容读取 |
+
+默认成员数为 general 1、advisor 3、committee 3；默认并发上限分别为 8、3、3，共享存活进程预算为 8，非 batch 预留为 0。成员数用于构造计划，不要求同时运行；有效并发还受显式请求、共享预算和宿主能力约束。schema 2 不再叠加旧 YAML 容量上限，兼容读取和环境覆盖均在 `capacityPolicy.diagnostics` 中说明。`capacityPolicy` 是解析结果，不是另一套配置。
 
 每套执行配置包含 `provider`、`model`，可选 `reasoning_effort` 和适配器支持的 `options`。上下文长度沿用 provider 默认，不配置 token 或预算机制。`teammate` 是内部执行者类型，公开计划不填写 `role_id`；`lens` 只表示成员的“本次关注点”。
 
