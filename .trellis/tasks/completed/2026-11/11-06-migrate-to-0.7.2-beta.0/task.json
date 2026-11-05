@@ -1,0 +1,117 @@
+{
+  "id": "migrate-to-0.7.2-beta.0",
+  "name": "migrate-to-0.7.2-beta.0",
+  "title": "Migrate to v0.7.2-beta.0",
+  "description": "Breaking change migration from v0.7.1-beta.19 to v0.7.2-beta.0",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "migration",
+  "package": null,
+  "priority": "P1",
+  "creator": "trellis-update",
+  "assignee": "penn",
+  "createdAt": "2026-11-05",
+  "completedAt": "2026-11-06",
+  "branch": null,
+  "base_branch": null,
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "analysis",
+      "complexity": "simple",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "5",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "8b80a25c2394382e27ed3de2cc33c0e9a6fb3817c233e8485cdfd27dc9860e0b",
+          "artifact_refs": [
+            "migration-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "migration-review.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "migration-review.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "8b80a25c2394382e27ed3de2cc33c0e9a6fb3817c233e8485cdfd27dc9860e0b",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "migration-review.md"
+            ]
+          }
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "8b80a25c2394382e27ed3de2cc33c0e9a6fb3817c233e8485cdfd27dc9860e0b",
+          "artifact_refs": [
+            "migration-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "migration-review.md",
+          "outcome_kind": "delivery_ready",
+          "reason": null,
+          "evidence_refs": [
+            "migration-review.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "8b80a25c2394382e27ed3de2cc33c0e9a6fb3817c233e8485cdfd27dc9860e0b",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "migration-review.md"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": null,
+      "closeout_disposition": "delivery_ready",
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "原生更新迁移检查，实施已由主任务授权完成，仅核验结果",
+          "evidence_refs": [
+            "migration-review.md"
+          ],
+          "task_route_revision": "1"
+        },
+        "solution_design_and_convergence": {
+          "reason": "原生更新迁移检查，实施已由主任务授权完成，仅核验结果",
+          "evidence_refs": [
+            "migration-review.md"
+          ],
+          "task_route_revision": "1"
+        },
+        "task_implementation": {
+          "reason": "原生更新迁移检查，实施已由主任务授权完成，仅核验结果",
+          "evidence_refs": [
+            "migration-review.md"
+          ],
+          "task_route_revision": "1"
+        }
+      },
+      "return_record": null
+    }
+  }
+}

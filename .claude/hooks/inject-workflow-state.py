@@ -194,8 +194,11 @@ def get_active_task(
     status = data.get("status", "")
     if not isinstance(status, str) or not status:
         return task_dir.name, "task_error", active.source, None
-    phase_workflow = data.get("meta", {}).get("task_workflow") if isinstance(data.get("meta"), dict) else None
-    if isinstance(phase_workflow, dict):
+    meta = data.get("meta")
+    if isinstance(meta, dict) and "task_workflow" in meta:
+        phase_workflow = meta["task_workflow"]
+        if not isinstance(phase_workflow, dict):
+            return task_id, "task_error", active.source, None
         phase_id = phase_workflow.get("current_phase_id")
         phases = phase_workflow.get("phases")
         if phase_id is None:
@@ -204,7 +207,9 @@ def get_active_task(
         phase = phases.get(phase_id) if isinstance(phases, dict) and isinstance(phase_id, str) else None
         if isinstance(phase_id, str) and isinstance(phase, dict):
             phase_status = phase.get("status")
-            return task_id, phase_id, active.source, phase_status if isinstance(phase_status, str) else None
+            if isinstance(phase_status, str) and phase_status:
+                return task_id, phase_id, active.source, phase_status
+        return task_id, "task_error", active.source, None
     return task_id, status, active.source, None
 
 

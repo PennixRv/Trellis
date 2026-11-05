@@ -472,7 +472,7 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
     if task_status == "planning":
         next_bits = [
             "Follow the current per-turn workflow-state; task lifecycle status and artifact presence do not identify the business phase",
-            "If no phase route is initialized, load `trellis-goal-exploration-and-requirements` and confirm the requirements baseline before initializing the route",
+            "If no phase route is initialized, initialize it through Trellis CLI, load `trellis-goal-exploration-and-requirements`, and obtain user confirmation for the recorded requirements artifact before advancing",
         ]
         if not jsonl_ready:
             next_bits.append("curate task context manifests only when a dispatched agent needs them")

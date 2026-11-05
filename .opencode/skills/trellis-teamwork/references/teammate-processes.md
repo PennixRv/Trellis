@@ -87,8 +87,10 @@ messages are delivered to a teammate. `send --to` selects recipients and
 target validation. The runtime records the injected files, manifest paths,
 provider identity, and terminal event in the session log.
 
-The guard resolves CLI flags, then environment variables, then
-`teamwork.teammate_guard` in `.trellis/config.yaml`, then built-in defaults.
+The live budget and mode capacity come from schema-2 `.trellis/teamwork.json`;
+explicit CLI flags and environment overrides may tighten the frozen policy.
+Legacy `.trellis/config.yaml` teammate keys are ignored with diagnostics;
+the separate idle timeout remains a process-lifecycle setting.
 `--idle-timeout` cleans a continuously idle teammate; `--max-live-teammates`
 limits live processes. A value of `0` disables the corresponding guard. An
 idle teammate is not cleaned while it is in a turn. `interrupt` requests a
@@ -113,8 +115,30 @@ early supervisor errors/kills terminate the wait without hiding the cause.
 their existing behavior. For a managed plan, the coordinator owns
 claim, dispatch, retry budget, terminal receipt, and reconciliation. An
 uncertain provider action is reconciled instead of being duplicated. Settled
-attempt artifacts may be cleaned according to the plan retention rule; the
+attempt reports and worklogs, including rejected attempts, remain until explicit
+native cleanup; the result includes every attempt index. The
 Teamwork Session event log follows its own lifecycle.
+
+`teamwork cleanup-artifacts <plan> --task <task-dir>` previews the exact retained
+report/worklog/stderr files of a durably settled batch. Only an explicit repeat
+with `--confirm <preview-digest>` deletes those files; a changed preview or an
+unresolved reservation is rejected. Read and accept needed evidence before
+cleanup. Session removal alone does not delete task-owned attempt evidence.
+
+Use `teamwork reconcile <original-plan> --task <task-dir>` to preview recovery
+after coordinator loss. `--execute --reason <disposition>` only settles when
+native process-exit facts or process birth identity prove termination. A missing
+PID, absent report, or dead coordinator alone is insufficient. This command
+preserves accepted assignments and releases only the original batch's leases.
+It does not restart providers or accept task results.
+
+After a durable failed settlement and explicit bounded retry approval, construct
+`teamwork retry <original-plan> --task <task-dir> --output <new-plan> --batch <new-id>
+--assignments <failed-id,...> --deadline <ISO-time> --approval-ref <approval>`.
+Only failed assignments enter the new plan; frozen inputs and parent lineage
+are retained. Repeating the same output is idempotent. Execute the new plan
+normally; the original terminal result remains unchanged. A recovered subset
+does not retroactively accept the original committee evaluation.
 
 For a stalled process, inspect `teamwork list`,
 `teamwork messages <session> --raw --no-progress`, the provider log, and the

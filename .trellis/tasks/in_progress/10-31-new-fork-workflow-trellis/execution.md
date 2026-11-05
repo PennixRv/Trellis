@@ -283,3 +283,12 @@ CLI 全套测试首轮发现 profiles 子目录安装漏建，已修复；之后
 - docs-site `6231be7` 已推送。目标 `0.7.2-beta.0` 尚未占用，原生 create-manifest 生成迁移说明；原生同步 bump patch 先将双包置为未发布的 0.7.1 计算起点，再由正常 release beta 生成 0.7.2-beta.0，不发布或重建稳定标签，latest 不变。
 - 操作失败已核对：错误检索路径、根目录缺 package.json、错误包级 prettier 入口、语义补丁上下文不匹配均未形成隐藏改动；真实入口纠正后通过。`common/safe_commit.py` 是内部模块，直接当 CLI 会发生 types 导入遮蔽，本轮再次误用，改回其原生 Python API 精确暂存，不作为产品缺陷修改。
 - 此处只记录发布前证据；实际 CI、npm、重装、两仓资产更新及提交另记。两个长期主任务保持实施中，不因本轮增量交付关闭整个主任务 v2。
+
+### 0.7.2-beta.0 发布重装回执
+
+- 修复提交 `72602291`，版本标签 `v0.7.2-beta.0` 指向 `1164dd9a4f9a889d6d2caba6ffad8c9dc0e4db7a`，均已推送 `origin/v0.7.1` 并验证标签祖先关系；docs-site `6231be7` 已推送。原生 release 的外层在版本提交阶段超时，回读无进程/锁/版本提交/标签/远端发布，仅版本文件已暂存；没有再次 bump，原生可续接提交通过全部 Hook 后沿原脚本 tag/push/fetch/祖先校验继续。
+- [CI 42063839317](https://github.com/PennixRv/Trellis/actions/runs/42063839317) 第一次发布步骤成功，公共 npm 18 次 E404 后失败；包随后实际可见，原生 verify-npm 确认双包和 beta 标签后重跑失败 job，第二次 completed/success，未改标签或本地重发。latest 仍为 0.7.1，packed CLI 精确依赖 Core 0.7.2-beta.0。
+- `pennix update trellis-cli --version 0.7.2-beta.0 --json` 原生交互确认后返回 changed，归档 SHA-256 `c043b6a86c3e0d34fe68f45ad431ac06110f6efd17ea3bdd76918b8ac4cb91c1`。实际安装 CLI/Core 均 0.7.2-beta.0；本轮 12 个 Teamwork 运行模块构建字节与安装一致，Pennix 对 trellis-cli 检查为 match/keep。全局 check exit 1 来自其他组件，未宣称全局通过。
+- 两仓原生 dry-run 后 `update --create-new`、逐份 sidecar 处置及 `workflow --template native` 完成，项目版本均 0.7.2-beta.0，无待更新/新增模板。根专有禁用代理设置、本仓包声明保留；仅接受 `.task-phase.lock` 忽略项。三份 sidecar 均有精确处置并删除，无 `.new` 残留。两份自动生成的迁移核对任务经原生 analysis 路线、需求接受、交付接受和 complete 收尾，不接管长期主任务指针。
+- 更新保护基线根 3636、Trellis 1524 文件；更新未改这些内容，主动变更仅根审查报告和本仓连续性规范表述，之后追加交付记录。自定义 config、既有 task/workspace/handoff 保持。组合门此时 10/11，唯一差异是根 gitlink 尚未固定新提交，待根提交后复检；不是源码回归。
+- 本轮恢复操作的真实错误保留：迁移 closeout outcome 初次误用 accepted 被原生拒绝，改用 delivery_ready；artifact 返回为短回执，汇总误读为完整 state，核对真实接口后续接；两次假定旧脚本/历史任务路径 ENOENT 和一次假定全局 Core 为同级包的 ENOENT 均纠正，Core 由安装 CLI 的真实模块解析确认。未改写状态文件或模拟成功回执。
