@@ -1,5 +1,14 @@
 # 执行记录
 
+## 2026-11-05：工作流返工与原生生命周期恢复
+
+- 承接根侧已确认的两层调整及完整实施、发布重装授权；实施合同见 `research/workflow-recovery-implementation.md`。没有使用 Teamwork teammate，没有实施原长期任务的暂缓业务动作。
+- 工作流层增加显式 `execution_rework`：保持路线及有效授权，重新核验需求、合同摘要、已接受上游产物和已声明依赖准入，撤销目标实施/交付阶段及下游接受；默认 `contract_change` 继续失效授权。新接受/授权的实施合同增加固定验收覆盖表结构门禁，方案 Skill 负责逐条语义覆盖。Core 的可选返工字段与解析同步，保留旧记录兼容。
+- 原生生命周期增加独立 `reopen`：`completed`/`cancelled` 仅恢复到 `planning`，保留 identity、取消事实及追加式恢复记录，清理旧会话、continuity、ownership、准入和授权。仍拒绝终态直接 `phase return`；重新接受合同、授权及 `start` 才能回到 `in_progress`。复用既有目录迁移事务，未修改共享迁移实现。
+- 阶段、目录和模板局部验证 78 项通过；完整 Core 423 项通过/1 条件跳过，CLI 2270 项通过/2 条件跳过。构建、ESLint、TypeScript 通过；Python 静态检查 0 errors/72 项既有 warnings；中英文发布文档 lint、导航及迁移清单连续性通过。首次全量仅发现 2 项生成脚本未更新的 parity 失败，原生更新后完整通过。
+- 源码提交 `6169cce5`，原生 `release:beta` 的版本提交与标签 `43ae8cb8` / `v0.7.1-beta.17` 已推送。docs-site `8db00b6` 已推送既有分支。发布工作流为 https://github.com/PennixRv/Trellis/actions/runs/41963391434；npm 发布、精确重装与两仓最终验收由根侧执行记录保存。
+- 源码仓使用原生 update 更新 30 次文件变更（首次 29 项、帮助说明补记后 1 项），保留已确认的 `.trellis/config.yaml` 与 `.trellis/.gitignore`；native workflow 校验一致，无 `.new` 候选。GitNexus 索引落后 4 个提交，提交前检查 HIGH，涉及 42 文件、30 索引符号和 6 流程；结合当前源码调用方、SDK 调用方和完整回归核验，未把未知调用图视为无影响。未运行全部宿主或 Mintlify 页面渲染。
+
 ## 2026-11-04：Teamwork beta.15 交付与现场验收
 
 源码在既有 `v0.7.1` 完成并推送：主要实现 `67dcc5c1a31dd4e70b2cb4ed86174aa2812f2ea7`，恢复读取失败保护及 beta.15 为 `ddd32335eb8cec347fc2a36258903ebc9c0fad3a`。docs-site 既有 `codex/chinese-user-templates` 已更新中英 Beta 指南、changelog 和导航，最终文档提交 `27c0d42`。未创建分支或 worktree。
