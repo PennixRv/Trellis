@@ -1,0 +1,9 @@
+{
+  "version": "0.7.1-beta.19",
+  "description": "Centralize Teamwork capacity policy and enable multi-advisor consultations",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Mode capacity defaults 8/3/3, member defaults 1/3/3, shared budget 8; schema-2 policy with diagnosed legacy/environment compatibility; advisor supports 1–3 assignments.",
+  "migrations": [],
+  "notes": "Run trellis update for generated schema-2 policy and Skills. Review customized schema-1 policy before migrating; historical plans remain unchanged."
+}

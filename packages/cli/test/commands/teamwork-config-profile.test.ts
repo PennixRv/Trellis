@@ -45,6 +45,18 @@ function project() {
     path.join(root, ".trellis", "config.yaml"),
     "teamwork:\n  teammate:\n    max_concurrency: 3\n  teammate_guard:\n    max_live_teammates: 4\n    non_batch_reserved: 1\n",
   );
+  fs.writeFileSync(
+    path.join(root, ".trellis/teamwork.json"),
+    JSON.stringify({
+      schema_version: 1,
+      default_mode: "general",
+      modes: {
+        general: { default_members: 1 },
+        advisor: { default_members: 1 },
+        committee: { default_members: 3 },
+      },
+    }),
+  );
   return root;
 }
 
@@ -87,7 +99,7 @@ describe("TeamworkSession teammate config and profiles", () => {
       "sessionId:\n  teammate:\n    max_concurrency: 3\n  teammate_guard:\n    max_live_teammates: 4\n    non_batch_reserved: 1\n",
     );
     expect(resolveTeammateRuntimeConfig(root, {}).teammate.maxConcurrency).toBe(
-      1,
+      8,
     );
     fs.rmSync(root, { recursive: true, force: true });
   });

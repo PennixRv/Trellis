@@ -625,7 +625,9 @@ export async function runTeamworkCoordinator(
     );
     frozenLaunches.set(assignment.assignmentId, assignment.execution);
   }
-  const config = input.config ?? resolveTeammateRuntimeConfig(cwd);
+  const config =
+    input.config ??
+    resolveTeammateRuntimeConfig(cwd, process.env, plan.coordinationMode);
   const capacity = effectiveTeammateCapacity({
     requested: plan.requestedCapacity,
     config,

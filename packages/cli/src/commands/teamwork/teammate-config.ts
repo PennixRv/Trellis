@@ -3,6 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { DIR_NAMES } from "../../constants/paths.js";
+import {
+  DEFAULT_TEAMWORK_CONFIG,
+  readCoordinationConfig,
+  type CoordinationMode,
+} from "./coordination.js";
 
 export interface TeammateConfig {
   maxConcurrency: number;
@@ -17,11 +22,18 @@ export interface TeammateRuntimeConfig {
   teammate: TeammateConfig;
   guard: TeammateGuardConfig;
   sourceDigest?: string;
+  source?: string;
+  diagnostics?: string[];
 }
 
 const DEFAULT_CONFIG: TeammateRuntimeConfig = {
-  teammate: { maxConcurrency: 1 },
-  guard: { maxLiveTeammates: 6, nonBatchReserved: 0 },
+  teammate: {
+    maxConcurrency: DEFAULT_TEAMWORK_CONFIG.modes.general.max_concurrency,
+  },
+  guard: {
+    maxLiveTeammates: DEFAULT_TEAMWORK_CONFIG.resources.max_live_teammates,
+    nonBatchReserved: DEFAULT_TEAMWORK_CONFIG.resources.non_batch_reserved,
+  },
 };
 
 function integer(
@@ -74,19 +86,59 @@ function yamlInteger(
 export function resolveTeammateRuntimeConfig(
   cwd = process.cwd(),
   env: NodeJS.ProcessEnv = process.env,
+  mode?: CoordinationMode,
 ): TeammateRuntimeConfig {
   const configPath = path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml");
   let content = "";
   try {
     content = fs.readFileSync(configPath, "utf8");
-  } catch {
-    // Built-in defaults are intentionally conservative.
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
+  const resolved = readCoordinationConfig(cwd);
+  const selected = mode ?? resolved.config.default_mode;
+  const legacyConcurrency = yamlInteger(content, "teammate", "max_concurrency");
+  const legacyLive = yamlInteger(
+    content,
+    "teammate_guard",
+    "max_live_teammates",
+  );
+  const legacyReserved = yamlInteger(
+    content,
+    "teammate_guard",
+    "non_batch_reserved",
+  );
+  const diagnostics: string[] = [];
+  if (
+    legacyConcurrency !== undefined ||
+    legacyLive !== undefined ||
+    legacyReserved !== undefined
+  )
+    diagnostics.push(
+      resolved.legacy
+        ? "Legacy YAML capacity is active; migrate to .trellis/teamwork.json schema 2."
+        : "Legacy YAML capacity keys are ignored by teamwork.json schema 2; remove them with trellis update.",
+    );
+  if (resolved.legacy && resolved.source !== "built-in")
+    diagnostics.push(
+      "Legacy teamwork.json schema 1; update to schema 2 for mode-specific capacity.",
+    );
+  for (const key of [
+    "TRELLIS_TEAMWORK_TEAMMATE_MAX_CONCURRENCY",
+    "TRELLIS_TEAMWORK_MAX_LIVE_TEAMMATES",
+    "TRELLIS_TEAMWORK_TEAMMATE_RESERVED",
+  ])
+    if (env[key])
+      diagnostics.push(
+        `${key} explicitly overrides the project capacity policy.`,
+      );
   const maxConcurrency =
     integer(
       env.TRELLIS_TEAMWORK_TEAMMATE_MAX_CONCURRENCY
         ? Number(env.TRELLIS_TEAMWORK_TEAMMATE_MAX_CONCURRENCY)
-        : yamlInteger(content, "teammate", "max_concurrency"),
+        : resolved.legacy && legacyConcurrency !== undefined
+          ? legacyConcurrency
+          : resolved.config.modes[selected].max_concurrency,
       "teamwork.teammate.max_concurrency",
       true,
     ) ?? DEFAULT_CONFIG.teammate.maxConcurrency;
@@ -94,7 +146,9 @@ export function resolveTeammateRuntimeConfig(
     integer(
       env.TRELLIS_TEAMWORK_MAX_LIVE_TEAMMATES
         ? Number(env.TRELLIS_TEAMWORK_MAX_LIVE_TEAMMATES)
-        : yamlInteger(content, "teammate_guard", "max_live_teammates"),
+        : resolved.legacy && legacyLive !== undefined
+          ? legacyLive
+          : resolved.config.resources.max_live_teammates,
       "teamwork.teammate_guard.max_live_teammates",
       true,
     ) ?? DEFAULT_CONFIG.guard.maxLiveTeammates;
@@ -102,20 +156,20 @@ export function resolveTeammateRuntimeConfig(
     integer(
       env.TRELLIS_TEAMWORK_TEAMMATE_RESERVED
         ? Number(env.TRELLIS_TEAMWORK_TEAMMATE_RESERVED)
-        : yamlInteger(content, "teammate_guard", "non_batch_reserved"),
+        : resolved.legacy && legacyReserved !== undefined
+          ? legacyReserved
+          : resolved.config.resources.non_batch_reserved,
       "teamwork.teammate_guard.non_batch_reserved",
     ) ?? DEFAULT_CONFIG.guard.nonBatchReserved;
   return {
     teammate: { maxConcurrency },
     guard: { maxLiveTeammates, nonBatchReserved },
-    ...(content
-      ? {
-          sourceDigest: crypto
-            .createHash("sha256")
-            .update(content)
-            .digest("hex"),
-        }
-      : {}),
+    source: resolved.source,
+    diagnostics,
+    sourceDigest: crypto
+      .createHash("sha256")
+      .update(content + resolved.configDigest)
+      .digest("hex"),
   };
 }
 

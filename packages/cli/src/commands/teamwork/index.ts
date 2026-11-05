@@ -18,6 +18,7 @@ import {
 import { constructTeamworkPlan } from "./plan.js";
 import { CLI_TEAMMATE_HOST } from "./runtime.js";
 import { teamworkBatch } from "./batch.js";
+import { resolveTeammateRuntimeConfig } from "./teammate-config.js";
 import {
   teamworkSessionContextAdd,
   teamworkSessionContextDelete,
@@ -110,6 +111,11 @@ export function registerTeamworkCommand(program: Command): void {
             professional_role_path: profile.professionalRolePath,
             coordination: resolveCoordination(
               process.cwd(),
+              options.mode as CoordinationMode | undefined,
+            ),
+            capacityPolicy: resolveTeammateRuntimeConfig(
+              process.cwd(),
+              process.env,
               options.mode as CoordinationMode | undefined,
             ),
           }),

@@ -47,6 +47,22 @@ as waiting, artifact output, transport, and capacity. Native delegation and
 implicit-history restrictions remain role obligations; do not publish unproven
 memory-isolation or provider-feature claims in the host proof.
 
+## Capacity policy
+
+`.trellis/teamwork.json` schema 2 is the project capacity policy: mode defaults
+are members 1/3/3 and concurrency 8/3/3 (general/advisor/committee), with shared
+live budget 8 and non-batch reservation 0. Advisor accepts 1–3 assignments;
+committee retains 2–3 distinct lenses. Member defaults do not create assignments.
+`maxConcurrency` and `capacityPolicy` are resolved runtime output, not additional
+policy files. Effective capacity respects the selected mode, explicit request,
+shared resources and verified host capability. Existing batch reservations and
+interactive workers continue to share admission control.
+
+Schema 1 and missing JSON preserve legacy YAML capacity compatibility. Schema 2
+ignores YAML capacity keys with explicit diagnostics; YAML retains idle cleanup.
+Environment overrides are diagnosed. Invalid JSON fails closed in batch and
+interactive guard resolution. Do not silently fall back from damaged policy.
+
 ## Core and CLI boundary
 
 `@pennixrv/trellis-core/teamwork` owns:

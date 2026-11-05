@@ -102,7 +102,7 @@ max_journal_lines: 2000
 #
 # `idle_timeout: 0` disables idle cleanup (teammates can sit idle forever
 # unless explicitly killed or given `--timeout`).
-# `max_live_teammates: 0` disables the spawn-time budget check.
+# Capacity policy lives in .trellis/teamwork.json (schema 2).
 #
 # `trusted_context_dirs` extends the `--file`/`--jsonl`/`--agent` containment
 # check beyond the teammate cwd — useful when `.trellis/tasks` or
@@ -115,13 +115,10 @@ max_journal_lines: 2000
 teamwork:
   teammate_guard:
     idle_timeout: 5m
-    max_live_teammates: 6
-    non_batch_reserved: 0
+    # Capacity and shared live budget live in .trellis/teamwork.json.
   # trusted_context_dirs:
   #   - /work/user/trellis_workspace
   # auto_trust_trellis_symlinks: false
-  teammate:
-    max_concurrency: 1
 
 #-------------------------------------------------------------------------------
 # Codex (dispatch behavior)

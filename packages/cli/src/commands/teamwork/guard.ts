@@ -35,12 +35,13 @@ import {
 } from "./store/paths.js";
 import { parseDuration } from "./wait.js";
 import { readBatchReservations } from "./batch-reservation.js";
+import { readCoordinationConfig } from "./coordination.js";
 
 /** Built-in default idle-cleanup TTL for spawned teammates (5 minutes). */
 export const DEFAULT_IDLE_TTL_MS = 5 * 60 * 1000;
 
 /** Built-in default live-teammate budget per project/scope. */
-export const DEFAULT_MAX_LIVE_TEAMMATES = 6;
+export const DEFAULT_MAX_LIVE_TEAMMATES = 8;
 
 /** Env var override for the idle-cleanup TTL. */
 export const ENV_IDLE_TIMEOUT = "TRELLIS_TEAMWORK_IDLE_TIMEOUT";
@@ -70,7 +71,7 @@ export interface ResolveGuardOptions {
  * Resolve the effective guard policy. Precedence:
  *   1. CLI flag (`flag*Ms` / `flagMaxLiveWorkers`)
  *   2. environment variable
- *   3. `.trellis/config.yaml` `teamwork.teammate_guard`
+ *   3. `.trellis/teamwork.json` resources (legacy YAML before migration)
  *   4. built-in default constant
  */
 export function resolveTeammateGuardConfig(
@@ -79,6 +80,7 @@ export function resolveTeammateGuardConfig(
   const cwd = opts.cwd ?? process.cwd();
   const env = opts.env ?? process.env;
   const fromConfig = loadTeammateGuardConfig(cwd);
+  const coordination = readCoordinationConfig(cwd);
 
   const idleTimeoutMs = pickNonNegativeMs(
     opts.flagIdleTimeoutMs,
@@ -89,7 +91,9 @@ export function resolveTeammateGuardConfig(
   const maxLiveWorkers = pickNonNegativeInt(
     opts.flagMaxLiveWorkers,
     parseEnvInt(env[ENV_MAX_LIVE_TEAMMATES], ENV_MAX_LIVE_TEAMMATES),
-    fromConfig?.maxLiveWorkers,
+    coordination.legacy
+      ? fromConfig?.maxLiveWorkers
+      : coordination.config.resources.max_live_teammates,
     DEFAULT_MAX_LIVE_TEAMMATES,
   );
 
@@ -660,7 +664,7 @@ export function formatBudgetOverflowError(args: {
     `  trellis teamwork kill <sessionId> --as <teammate>`,
     "Or override per spawn:",
     `  trellis teamwork spawn ... --max-live-teammates ${live.length + 1}`,
-    "Or raise the default in .trellis/config.yaml under teamwork.teammate_guard.max_live_teammates.",
+    "Or raise resources.max_live_teammates in .trellis/teamwork.json (schema 2).",
   ].join("\n");
   return [header, rows, hint].join("\n");
 }

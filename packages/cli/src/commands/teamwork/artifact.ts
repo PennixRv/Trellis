@@ -343,8 +343,8 @@ export function validateTeamworkPlan(
   const assignmentValue = value.assignments;
   if (!Array.isArray(assignmentValue) || assignmentValue.length === 0)
     throw new Error("Teamwork plan assignments must be non-empty");
-  if (coordinationMode === "advisor" && assignmentValue.length !== 1)
-    throw new Error("advisor mode requires exactly one assignment");
+  if (coordinationMode === "advisor" && assignmentValue.length > 3)
+    throw new Error("advisor mode requires one to three assignments");
   if (
     coordinationMode === "committee" &&
     (assignmentValue.length < 2 || assignmentValue.length > 3)

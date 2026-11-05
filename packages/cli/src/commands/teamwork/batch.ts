@@ -43,7 +43,13 @@ export async function teamworkBatch(
   const cwd = process.cwd();
   const taskRoot = path.resolve(options.task);
   const plan = loadTeamworkPlan(path.resolve(planPath), taskRoot);
-  const config = resolveTeammateRuntimeConfig(cwd);
+  const config = resolveTeammateRuntimeConfig(
+    cwd,
+    process.env,
+    plan.coordinationMode,
+  );
+  for (const diagnostic of config.diagnostics ?? [])
+    console.error(`[teamwork] ${diagnostic}`);
   const capacity = effectiveTeammateCapacity({
     config,
     requested: plan.requestedCapacity,
@@ -63,6 +69,7 @@ export async function teamworkBatch(
         planHash: plan.planHash,
         assignments: plan.assignments.length,
         capacity,
+        capacityPolicy: config,
         rolePolicy: "source-and-git-read-only",
       }),
     );

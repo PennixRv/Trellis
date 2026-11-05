@@ -253,16 +253,19 @@ describe("configurable professional roles and immutable plans", () => {
       mode: "committee",
       defaultMembers: 2,
     });
-    expect(() => assertCoordinationMembers("advisor", [{}, {}])).toThrow(
-      /exactly one/,
-    );
+    expect(() =>
+      assertCoordinationMembers("advisor", [{}, {}, {}]),
+    ).not.toThrow();
+    expect(() =>
+      assertCoordinationMembers("advisor", [{}, {}, {}, {}]),
+    ).toThrow(/one to three/);
     expect(() => assertCoordinationMembers("general", [{}])).not.toThrow();
     expect(() =>
       assertCoordinationMembers("committee", [{ lens: "x" }, { lens: "x" }]),
     ).toThrow(/distinct lenses/);
     config.modes.advisor.default_members = 2;
     fs.writeFileSync(file, JSON.stringify(config));
-    expect(() => resolveCoordination(cwd)).toThrow();
+    expect(resolveCoordination(cwd, "advisor").defaultMembers).toBe(2);
   });
 
   it("hashes nested plan_hash fields as content while ignoring only the outer checksum", () => {
@@ -273,5 +276,24 @@ describe("configurable professional roles and immutable plans", () => {
     expect(computeTeamworkPlanHash(a)).not.toBe(
       computeTeamworkPlanHash({ ...a, assignment: { plan_hash: "two" } }),
     );
+  });
+
+  it("constructs and reads a three-member advisor plan", () => {
+    const input = draft();
+    const plan = constructTeamworkPlan({
+      draft: {
+        ...input,
+        coordination_mode: "advisor",
+        assignments: [1, 2, 3].map((n) => ({
+          ...input.assignments[0],
+          assignment_id: `advice-${n}`,
+        })),
+      },
+      cwd,
+      taskRoot,
+      output: path.join(taskRoot, "advisor.json"),
+      host: CLI_TEAMMATE_HOST,
+    });
+    expect(validateTeamworkPlan(plan, taskRoot).assignments).toHaveLength(3);
   });
 });

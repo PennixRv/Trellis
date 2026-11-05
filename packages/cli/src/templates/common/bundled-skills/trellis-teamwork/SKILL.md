@@ -39,7 +39,7 @@ trellis teamwork context list <session> --scope global --thread <thread>
 | User intent | Read |
 |---|---|
 | `general`: bounded research, review, or verification assignments | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
-| Advisor: one bounded consultation | `references/coordination-modes.md`, then `references/teamwork-plan-construction.md` |
+| Advisor: one to three bounded consultations | `references/coordination-modes.md`, then `references/teamwork-plan-construction.md` |
 | `committee`: parallel assessment by two or three distinct lenses | `references/coordination-modes.md`, then `references/teamwork-plan-construction.md` |
 | Profile, model, provider, reasoning effort, or role-card configuration | `references/teammate-configuration-matrix.md` |
 | “和 codex/claude 讨论一下”, “brainstorm with another agent” | `references/teamwork-plan-construction.md`, then `references/coordination-modes.md` |
