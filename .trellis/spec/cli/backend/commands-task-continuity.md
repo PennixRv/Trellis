@@ -20,7 +20,7 @@ Both commands require one unambiguous, direct current-task binding. The projecti
 - `task`: task ID, repository-relative path, and task status.
 - `phase`: current phase ID, route revision, input revision, and per-phase status, artifact/result revisions, result reference, outcome, evidence references, and acceptance.
 - `evidence_digest`: SHA-256 of the sorted phase evidence references.
-- `git`: `HEAD`, branch, cleanliness, status digest, and content digest. The content digest covers the binary diff against `HEAD` and untracked file contents; `.trellis/session-handoffs/` is excluded because package creation is independent of task continuity.
+- `git`: `HEAD`, branch, cleanliness, status digest, and content digest. The content digest covers the binary diff against `HEAD`, untracked file contents, and the recursively discovered state and dirty worktree content of initialized submodules; uninitialized submodules contribute their recorded gitlink and state. `.trellis/session-handoffs/` is excluded because package creation is independent of task continuity.
 
 `show` returns `ready` when the saved source digest matches, `stale` when it differs, and `absent` when no capture exists. Missing or ambiguous task/session facts return a withheld result. `capture` uses compare-and-set on the previously observed digest (or `absent`), recomputes the projection before writing, and increments its local generation. It never edits `task.json`.
 

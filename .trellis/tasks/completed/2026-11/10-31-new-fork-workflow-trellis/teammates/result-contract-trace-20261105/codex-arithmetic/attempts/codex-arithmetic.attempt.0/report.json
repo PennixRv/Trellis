@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "task_id": "new-fork-workflow-trellis",
+  "batch_id": "result-contract-trace-20261105",
+  "assignment_id": "codex-arithmetic",
+  "attempt_id": "codex-arithmetic.attempt.0",
+  "teammate_id": "codex-arithmetic.teammate.0",
+  "plan_hash": "46119443b76f4d5d240b861512b5866149da3c10be174f1ea811193fe619d59a",
+  "phase_id": "task_implementation",
+  "task_route_revision": "1",
+  "input_revision": "17",
+  "source_digest": "8c5dd15ef3b13279d69d2933dd53327e0b5d8a3ec633a7f155740151aa546e4a",
+  "status": "complete",
+  "answer": "TW-BATCH-RESULT-20261105：complete 项为 alpha=7、gamma=9，合计 16；blocked 项为 beta=4。",
+  "evidence": [
+    {
+      "id": "given-status-values",
+      "locator": "task-input",
+      "summary": "任务输入给出 alpha=7 complete、beta=4 blocked、gamma=9 complete；complete 项求和为 7+9=16，blocked 项为 beta。"
+    },
+    {
+      "id": "assignment-and-contract",
+      "locator": "brief.json; claim.json",
+      "summary": "指定 brief 确认任务范围、验收条件及 schema_version 2；claim 确认 task、batch、assignment、attempt、teammate、plan hash 与 source digest。"
+    }
+  ],
+  "limitations": [],
+  "unresolved": [],
+  "deviations": []
+}

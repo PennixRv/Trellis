@@ -292,3 +292,19 @@ CLI 全套测试首轮发现 profiles 子目录安装漏建，已修复；之后
 - 两仓原生 dry-run 后 `update --create-new`、逐份 sidecar 处置及 `workflow --template native` 完成，项目版本均 0.7.2-beta.0，无待更新/新增模板。根专有禁用代理设置、本仓包声明保留；仅接受 `.task-phase.lock` 忽略项。三份 sidecar 均有精确处置并删除，无 `.new` 残留。两份自动生成的迁移核对任务经原生 analysis 路线、需求接受、交付接受和 complete 收尾，不接管长期主任务指针。
 - 更新保护基线根 3636、Trellis 1524 文件；更新未改这些内容，主动变更仅根审查报告和本仓连续性规范表述，之后追加交付记录。自定义 config、既有 task/workspace/handoff 保持。组合门此时 10/11，唯一差异是根 gitlink 尚未固定新提交，待根提交后复检；不是源码回归。
 - 本轮恢复操作的真实错误保留：迁移 closeout outcome 初次误用 accepted 被原生拒绝，改用 delivery_ready；artifact 返回为短回执，汇总误读为完整 state，核对真实接口后续接；两次假定旧脚本/历史任务路径 ENOENT 和一次假定全局 Core 为同级包的 ENOENT 均纠正，Core 由安装 CLI 的真实模块解析确认。未改写状态文件或模拟成功回执。
+
+### 0.7.2-beta.2 发布修正与重装回执
+
+- beta.1 tag `v0.7.2-beta.1` 的 CI 42180127025 失败：五份 canonical `.trellis/scripts` 未与 templates 一起进入发布 HEAD。release staging 排除 `.trellis/`，工作树 parity 不能证明提交树 parity。按原生 `common.safe_commit.safe_git_add` 仅暂存五个已核实脚本，提交 `3451ea99`；Hook Core 423 passed/1 skipped、CLI 2337 passed/2 skipped。未暂存任务、配置或运行态路径。
+- 保留 beta.1 tag，docs-site `882b789`、Trellis docs gitlink `dc0d8102` 及 beta.2 标签提交 `7573baed` 已推送 `origin`。原生发布全量 CLI 109 files、2337 passed/2 skipped，Core 423 passed/1 skipped；CI [42181989231](https://github.com/PennixRv/Trellis/actions/runs/42181989231) completed/success。公共 npm 双包均为 `0.7.2-beta.2`，beta dist-tag 一致指向 beta.2，latest 保持 0.7.1。
+- Pennix Lifecycle 原生 TTY `update trellis-cli --version 0.7.2-beta.2` 确认后回执 `changed`，目标 SHA-256 `43f61cf38bbfe0b22fbcafca0783e3871bbd36b55320df39e5131a1dfc2b2f74`；实际 `trellis --version` 为 `0.7.2-beta.2`，Pennix status 显示 Trellis `keep (match)`。非 TTY 首次调用按工具合同拒绝且无副作用。全局 `pennix check` exit 1，输出中的其他组件 blocked 状态不归入 Trellis；Trellis 专项匹配，不宣称全局通过。
+- CI 上传后曾短暂出现 Core beta.2 可见、CLI beta.2 尚未可见；既有发布工作流完成公共 registry verification 后整体 success，复查双包版本和 tag 均一致。未在传播中途安装。
+- beta.1 CI 失败、精确脚本提交、beta.2 发布与安装证据已补入根任务逐项 findings 与 execution；本 task 的冻结合同保留原样。父/owner 任务的生命周期仍为 `in_progress`，不在本次增量交付中关闭。
+
+### 2026-11-06：Trellis owner task 最终收敛
+
+- 用户确认 Paseo 目标环境验收与独立 session-handoff package 验收已在前序验收完成；本次以既有执行记录和验收结果为依据，不重复运行持久服务切换或 package 测试。对应根任务证据位于 2026-11-01 主线组合与独立 package 验收记录、Paseo `0.14.0` 目标现场后续验收记录；本 owner task 不重新声明这些 owner 之外的运行事实。
+- Trellis beta.2 项目资产已按原生 updater 更新。`trellis update --dry-run` 与 `--dry-run --migrate` 均报告 `Already up to date`；配置与根项目逐字节一致，`.trellis/config.yaml.new` 已移除；bundled workflow 仅为 `native`。本次没有执行备份清理或迁移任务中的额外待办。
+- 根侧组合门在暂存已验收的 Trellis `7573baedc178fb7e3ee8663fda65e5056ea88dc5` 与 Context Mode `c8d22251be5f5ed05c8ab79794887a13f9911a4d` 两个 gitlink 后通过 11/11；两个提交分别对应 Trellis beta.2 远端标签及 Context Mode 远端 main。配置、模板版本、生成哈希、执行合同、测试/发布/安装收据及相关任务资源已核对，无本 owner 合同内未解决缺口。
+- 通过 Trellis 原生 `phase artifact`、`phase accept` 与 `complete` 收敛本 owner task；beta.2 updater 自动创建的独立 migration task 仍按其自身生命周期保留在 `planning`，不作为本 owner task 的子任务或未结工作包。
+- 收尾操作记录：首次调用 `phase artifact` 漏传当前必需的 `--expected-route-revision 1`，原生 CLI 返回 `TASK_PHASE_INVALID_INPUT` 且未写入。补齐参数后实施接受被原生拒绝，错误为 `TASK_PHASE_STALE_ARTIFACT`：第二轮增量合同已变化但仍沿用旧方案接受摘要。依原生回退合同回到解决方案设计阶段，重核并重新接受当前合同后继续；未绕过 stale-artifact 保护。

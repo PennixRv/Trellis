@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "task_id": "new-fork-workflow-trellis",
+  "batch_id": "result-contract-retry-20261105",
+  "assignment_id": "copilot-arithmetic",
+  "attempt_id": "copilot-arithmetic.attempt.0",
+  "teammate_id": "copilot-arithmetic.teammate.0",
+  "plan_hash": "96ded11eda114455f073f1298953b7e548652a9ae0d77f9431453f902ce8c9e1",
+  "phase_id": "task_implementation",
+  "task_route_revision": "1",
+  "input_revision": "17",
+  "source_digest": "8c5dd15ef3b13279d69d2933dd53327e0b5d8a3ec633a7f155740151aa546e4a",
+  "status": "complete",
+  "answer": "TW-BATCH-RESULT-20261105：complete 项为 alpha=7 与 gamma=9，求和 7+9=16；blocked 项为 beta=4。",
+  "evidence": [
+    {
+      "id": "E1",
+      "locator": "task-input",
+      "summary": "输入给定 alpha=7 complete; beta=4 blocked; gamma=9 complete。筛选 complete 得 alpha、gamma，和为 16；blocked 仅 beta。"
+    },
+    {
+      "id": "E2",
+      "locator": "brief.json / claim.json",
+      "summary": "已读取 brief 与 claim，身份字段与本报告一致，未访问其他来源。"
+    }
+  ],
+  "limitations": [],
+  "unresolved": [],
+  "deviations": []
+}

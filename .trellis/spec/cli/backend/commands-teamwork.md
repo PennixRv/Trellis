@@ -189,7 +189,7 @@ return an existing receipt, but an expired new batch cannot dispatch.
 
 所有 attempt 的报告、工作日志和有界 stderr 诊断保留到显式 `cleanup-artifacts`。该命令先验证终态回执、无未释放预留及安全路径，预览文件指纹，只有匹配 `--confirm` 摘要才删除。结果 `attempts` 包含全部尝试，`reports` 保持最终报告兼容视图。
 
-`reconcile` 以持久化进程终止事实或可核验进程出生身份为依据，仅在资源已结束时收敛；未知或仍存活的进程保留租约。`retry` 只从已终结失败批次选取失败 assignment，生成带原计划关联的新冻结计划，复用原执行和输入合同，不重做已接受成员。
+`reconcile` 自动路径以持久化进程终止事实或可核验进程出生身份为依据；身份未知或进程仍存活时保持 fail closed 并保留租约。用户只有通过原生 `reconcile --execute --reason ... --confirm-unknown-process-exit` 明确确认后，才能对身份未知的 attempt 释放租约；该确认与理由必须写入持久 reconciliation 事件。该确认不覆盖已核实仍存活的进程，也不绕过协调器 reservation 活跃检查。`retry` 只从已终结失败批次选取失败 assignment，生成带原计划关联的新冻结计划，复用原执行和输入合同，不重做已接受成员。
 
 Codex 前台等待投影由 CLI 写入，在受支持的 PreToolUse 工具面阻止无关动作，允许原等待续接及有界原生恢复。Skill 要求静默续接同一宿主句柄。该组合不承诺阻止普通模型消息、未接入 Hook 的工具或宿主唤醒，也不把主代理变成 FIFO 调度者。
 

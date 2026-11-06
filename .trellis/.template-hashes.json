@@ -109,7 +109,7 @@
     ".pi/agents/trellis-check.md": "f6df0b1ff2ae5dc9634e3a4e327de63d20be8d77ab3f54c374c2a3acf1450d3f",
     ".pi/agents/trellis-implement.md": "75e25a3b2d09dbcd49e37cdac4dc28453f341ab4eab0d0074ac84500e23e0cd2",
     ".opencode/package.json": "4b155e844fde1467e331e898b378e66820c323110ef1ecae6fce3844358535ea",
-    ".trellis/scripts/task.py": "d1e6678f51b6f2462a73c52161cc6d479c61577efdddee11ca0a2fb7b70514f5",
+    ".trellis/scripts/task.py": "6e1e23188bae91f1316e6fa19a752c4031a6a9c7037b918bbf6872827669185d",
     ".claude/agents/trellis-check.md": "9e48342243f311d55386f8fb42933945e87aba73d5ade547133aa98345a06128",
     ".claude/agents/trellis-implement.md": "73b56b3047c0e852382c4630aa181fb847d1e5ea1f63459dac4bf728f43fd097",
     ".claude/hooks/inject-subagent-context.py": "5cf09dd45aaef3809071496aadc57561a9ba628587deb88fc0e5c266c35adcd2",
@@ -121,8 +121,8 @@
     ".opencode/agents/trellis-implement.md": "6d0647915518ad8441ac5eae5c965a6b8dde23ff3a336b0b8dc31aad50212bfc",
     ".agents/skills/trellis-start/SKILL.md": "6728bd01c16995e164f20863b9c8acb24df48924b71ff09ac54c3cef2f00ac84",
     ".trellis/scripts/common/safe_commit.py": "87a97d64a90ec64e3919a0a06e3062927ab9e3bdec26f82cfb2e15efe7b32eef",
-    ".trellis/scripts/common/config.py": "482249442aededa51f43fc9a09baefbcf25da56d893ad996705d86d9249c1e76",
-    ".trellis/scripts/common/task_store.py": "3bf2cee90d8a4c5e25a2f37cc63e6916a2bde6a42baca3363bca958d556dfc20",
+    ".trellis/scripts/common/config.py": "5e820d88687fd11f60799b05a42e8a31680f2c8ae0bfef16ad2e5736fd8a2fa1",
+    ".trellis/scripts/common/task_store.py": "f0772488a057f10893f18e720381737c5ceb1e764161c35f8edcd932b6e583e8",
     ".trellis/scripts/common/session_context.py": "acb9c9148cabf4848e499a4f23941bd2f388cbf163ba3bc8440564a53e9b0113",
     ".trellis/scripts/add_session.py": "572804443e0b85f81b791a169cd0a03b641ce547b256b875c949a6df0c9bc6ab",
     ".claude/commands/trellis/continue.md": "56112fec6e93b65274b951b675aeaf40959b531ce18c3a7db5af046db0babaa9",
@@ -209,8 +209,8 @@
     ".trellis/scripts/common/types.py": "9962081cc2608fb9d1deb32c6880e336f62cdca6b338e7ae813304701e155ee9",
     ".trellis/scripts/common/tasks.py": "06d672fffc7305cca520db62b2e87df331ee2e48af1b9087862fa6818be40b27",
     ".trellis/scripts/common/task_context.py": "5c39ddd87e0d069c006a22a995208343f7015d2966a47f0cefd172618f572556",
-    ".trellis/scripts/common/task_workflow.py": "dba60d3bbfa2fe8d600d4f62a30a54dcb8b5c31e2a667f735cef3d163a1775d7",
-    ".trellis/scripts/common/task_continuity.py": "efc65d6cf3a4e2eda4742ef9b7240656a3b008203e8b886db0de287e72592b7b",
+    ".trellis/scripts/common/task_workflow.py": "0358c01f2f45f1dc884e319f95b06f3beefd70c60087360c464abfae0ef94ad4",
+    ".trellis/scripts/common/task_continuity.py": "b2719e36f2e5febb1432a09225cd283901f72bcbafdf9ed939de221dcd27741c",
     ".trellis/scripts/common/packages_context.py": "efe158d7c99c2268851d0216fbb08de22836e418a8dbeb73575b8cc249eed7b7",
     ".trellis/scripts/common/workflow_selection.py": "b136d6ae41aac95f4d5f425b641b62b7002f7cff2d26aa44b056cef9a2242753",
     ".trellis/scripts/common/trellis_config.py": "dbffc8c1287f0b6a0a5c4ab701609e08116fdaa0202efcd553ddc77992c675dc",
@@ -379,6 +379,6 @@
     ".trellis/agents/profiles/review.md": "43d1e93337092a0e66b17fb636d05b125fea1d7b3acba2644aba5896303bb2ac",
     ".trellis/agents/profiles/verification.md": "f290d8d6fb1131dc3e887cb81e64127c28910d4ac7a33038f0c5d172ee66b262",
     ".trellis/teamwork.json": "c62ea48ed5b93c9d6b2afcc70fd00498d3780799be2fede15f0afc45ad485fb7",
-    ".codex/hooks/guard-teamwork-wait.py": "27698793173f3dbe5903be9f40bb3410ad8d8a1e3f847e3d6edf367f8c14fabb"
+    ".codex/hooks/guard-teamwork-wait.py": "ae3cd6b6d2ce487158bb807b3a80f4248d39b9a10d2de9bd7da16ccfd1b68e4e"
   }
 }

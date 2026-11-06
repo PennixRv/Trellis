@@ -3,7 +3,7 @@
   "name": "new-fork-workflow-trellis",
   "title": "新 fork 工作流：Trellis Teamwork 与五阶段运行时改造",
   "description": "跨仓父任务 new-fork-workflow-master-plan-v2 的 Trellis owner task。按已批准范围完成 Teamwork 改名、五阶段任务合同、阶段 workflow/Skills/resolver、连续性及归属接口，并以 bundled native 作为唯一默认主 workflow、移除 Marketplace nested submodule 依赖、保留显式 custom workflow source；等待根任务组合验收。发布、安装、根仓 gitlink 和现场切换仍由父任务处理。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "cli",
@@ -11,7 +11,7 @@
   "creator": "penn",
   "assignee": "penn",
   "createdAt": "2026-10-31",
-  "completedAt": null,
+  "completedAt": "2026-11-06",
   "branch": "v0.7.1",
   "base_branch": "v0.7.1",
   "worktree_path": null,
@@ -37,8 +37,8 @@
         "task_implementation",
         "delivery_review_and_closeout"
       ],
-      "current_phase_id": "task_implementation",
-      "input_revision": "24",
+      "current_phase_id": null,
+      "input_revision": "32",
       "phases": {
         "goal_exploration_and_requirements": {
           "status": "accepted",
@@ -90,69 +90,98 @@
         },
         "solution_design_and_convergence": {
           "status": "accepted",
-          "input_revision": "23",
-          "artifact_revision": "4b8479899ae47643ff4aeaa4d90c7128d4e17f8816624e4ad4a230ba39aa8d44",
+          "input_revision": "27",
+          "artifact_revision": "a370dfe9acebb7aec4902ab81d83b53b7a46bb4746f49b607fe827f36fed8470",
           "artifact_refs": [
             "research/fork-review-remediation.md"
           ],
-          "result_revision": "5",
+          "result_revision": "6",
           "result_ref": "research/fork-review-remediation.md",
           "outcome_kind": "implementation_contract",
           "reason": null,
           "evidence_refs": [
-            "research/fork-review-remediation.md"
+            "execution.md"
           ],
           "acceptance": {
-            "artifact_revision": "4b8479899ae47643ff4aeaa4d90c7128d4e17f8816624e4ad4a230ba39aa8d44",
-            "result_revision": "5",
-            "input_revision": "23",
+            "artifact_revision": "a370dfe9acebb7aec4902ab81d83b53b7a46bb4746f49b607fe827f36fed8470",
+            "result_revision": "6",
+            "input_revision": "27",
             "task_route_revision": "1",
             "evidence_refs": [
-              "research/fork-review-remediation.md"
+              "execution.md"
             ]
           }
         },
         "task_implementation": {
-          "status": "active",
-          "input_revision": "24",
-          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-          "artifact_refs": [],
-          "result_revision": "0",
-          "result_ref": null,
-          "outcome_kind": null,
+          "status": "accepted",
+          "input_revision": "29",
+          "artifact_revision": "33b2e7663d40960d6ec60060ccba667460ba76d107c29f7968c81659b57966d5",
+          "artifact_refs": [
+            "execution.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "execution.md",
+          "outcome_kind": "implemented",
           "reason": null,
-          "evidence_refs": [],
-          "acceptance": null
+          "evidence_refs": [
+            "execution.md",
+            "research/fork-review-remediation.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "33b2e7663d40960d6ec60060ccba667460ba76d107c29f7968c81659b57966d5",
+            "result_revision": "1",
+            "input_revision": "29",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "execution.md",
+              "research/fork-review-remediation.md"
+            ]
+          }
         },
         "delivery_review_and_closeout": {
-          "status": "not_started",
-          "input_revision": "1",
-          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-          "artifact_refs": [],
-          "result_revision": "0",
-          "result_ref": null,
-          "outcome_kind": null,
+          "status": "accepted",
+          "input_revision": "31",
+          "artifact_revision": "33b2e7663d40960d6ec60060ccba667460ba76d107c29f7968c81659b57966d5",
+          "artifact_refs": [
+            "execution.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "execution.md",
+          "outcome_kind": "delivery_ready",
           "reason": null,
-          "evidence_refs": [],
-          "acceptance": null
+          "evidence_refs": [
+            "execution.md",
+            "research/fork-review-remediation.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "33b2e7663d40960d6ec60060ccba667460ba76d107c29f7968c81659b57966d5",
+            "result_revision": "1",
+            "input_revision": "31",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "execution.md",
+              "research/fork-review-remediation.md"
+            ]
+          }
         }
       },
       "route_dependency_admission": null,
       "implementation_authorization": {
         "contract_ref": "research/fork-review-remediation.md",
-        "contract_revision": "4b8479899ae47643ff4aeaa4d90c7128d4e17f8816624e4ad4a230ba39aa8d44",
-        "approval_ref": "research/fork-review-remediation.md",
+        "contract_revision": "a370dfe9acebb7aec4902ab81d83b53b7a46bb4746f49b607fe827f36fed8470",
+        "approval_ref": "execution.md",
         "task_route_revision": "1"
       },
-      "closeout_disposition": null,
+      "closeout_disposition": "delivery_ready",
       "skip_records": {},
       "return_record": {
         "from": "task_implementation",
         "to": "solution_design_and_convergence",
         "return_kind": "contract_change",
         "authorization_retained": false,
-        "reason": "五主题审查整改及四项用户决定已统一，形成新实施合同",
+        "reason": "收尾时原生 CLI 核实第二轮已授权增量已写入合同，但设计接受摘要仍对应前一版；按 stale artifact 门回到方案阶段重新接受当前合同，再续接已完成实施与交付审查。",
         "evidence_refs": [
+          "execution.md",
           "research/fork-review-remediation.md"
         ],
         "task_route_revision": "1"
