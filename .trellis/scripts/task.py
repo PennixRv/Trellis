@@ -247,6 +247,11 @@ def cmd_start(args: argparse.Namespace) -> int:
         return 1
 
     task_json_path = full_path / FILE_TASK_JSON
+    if task_json_path.is_file():
+        task_data, _ = read_json_checked(task_json_path)
+        if task_data is not None and task_data.get("status") in {"completed", "cancelled"}:
+            print(colored(f"TASK_PHASE_TASK_TERMINAL: task is already {task_data['status']}", Colors.RED), file=sys.stderr)
+            return 1
 
     if not resolve_context_key():
         # Degraded mode: no session identity available.
@@ -783,7 +788,7 @@ def main() -> int:
     p_phase.add_argument("--route-reason", help="Reason when initialization omits one or more phases")
     p_phase.add_argument("--route-evidence-ref", action="append", help="Evidence supporting an abbreviated initial route")
     p_phase.add_argument("--target-phase", help="Earlier phase to revisit, or first affected phase for route change")
-    p_phase.add_argument("--return-kind", choices=("contract_change", "execution_rework"), default="contract_change", help="Contract change invalidates authorization; execution rework retains a verified unchanged contract")
+    p_phase.add_argument("--return-kind", choices=("contract_change", "execution_rework", "withdrawal"), default="contract_change", help="Classify a return or explicitly record user withdrawal")
     p_phase.add_argument("--artifact-ref", action="append", help="Task-relative file in the current phase output")
     p_phase.add_argument("--artifact-revision", help="Current artifact_revision required for acceptance")
     p_phase.add_argument("--result-ref", help="Task result artifact reference")

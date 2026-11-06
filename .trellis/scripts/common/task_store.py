@@ -55,6 +55,15 @@ from .task_utils import (
 )
 from .workflow_selection import DIR_WORKFLOWS, WORKFLOW_ID_RE
 
+RESERVED_META_KEYS = {
+    "task_workflow",
+    "delegation_authorizations",
+    "delegated_worktree_execution_history",
+    "delegated_worktree_execution_record",
+    "task_cancellation",
+    "task_lifecycle_recoveries",
+}
+
 
 # =============================================================================
 # Helper Functions
@@ -247,6 +256,9 @@ def _parse_meta_pairs(pairs: list[str] | None) -> dict[str, str] | None:
                 colored(f"Error: malformed --meta value '{pair}' (expected key=value)", Colors.RED),
                 file=sys.stderr,
             )
+            return None
+        if key in RESERVED_META_KEYS:
+            print(colored(f"Error: metadata key is managed by Trellis: {key}", Colors.RED), file=sys.stderr)
             return None
         meta[key] = value
     return meta
@@ -1426,6 +1438,10 @@ def cmd_set_meta(args: argparse.Namespace) -> int:
         return 1
     key = args.key
     value = args.value
+
+    if key in RESERVED_META_KEYS:
+        print(colored(f"Error: metadata key is managed by Trellis: {key}", Colors.RED), file=sys.stderr)
+        return 1
 
     if not key:
         print(colored("Error: Missing arguments", Colors.RED))

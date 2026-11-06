@@ -301,6 +301,11 @@ def get_hooks(event: str, repo_root: Path | None = None) -> list[str]:
             file=sys.stderr,
         )
         return []
+    if event == "after_complete" and "after_archive" in hooks:
+        print(
+            "[WARN] ignoring legacy hook `after_archive`; rename it to `after_complete` in config.yaml",
+            file=sys.stderr,
+        )
     commands = hooks.get(event)
     if commands is None:
         return []
