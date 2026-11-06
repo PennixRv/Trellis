@@ -1,0 +1,163 @@
+{
+  "id": "migrate-to-0.7.2-beta.2",
+  "name": "migrate-to-0.7.2-beta.2",
+  "title": "Migrate to v0.7.2-beta.2",
+  "description": "Breaking change migration from v0.7.2-beta.0 to v0.7.2-beta.2",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "migration",
+  "package": null,
+  "priority": "P1",
+  "creator": "trellis-update",
+  "assignee": "penn",
+  "createdAt": "2026-11-06",
+  "completedAt": "2026-11-06",
+  "branch": null,
+  "base_branch": null,
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "analysis",
+      "complexity": "simple",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "decision_space_construction_and_merging",
+        "solution_design_and_convergence",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "5",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "251eca0ec9804f60e083c9a83538c212b8c938a64953e52327ceb21df6eec39c",
+          "artifact_refs": [
+            "closeout.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "closeout.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            ".trellis/.version",
+            "../.trellis/tasks/completed/2026-11/10-29-new-fork-workflow-master-plan-v2/execution.md",
+            ".trellis/tasks/completed/2026-11/10-31-new-fork-workflow-trellis/execution.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "251eca0ec9804f60e083c9a83538c212b8c938a64953e52327ceb21df6eec39c",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              ".trellis/.version",
+              "../.trellis/tasks/completed/2026-11/10-29-new-fork-workflow-master-plan-v2/execution.md",
+              ".trellis/tasks/completed/2026-11/10-31-new-fork-workflow-trellis/execution.md"
+            ]
+          }
+        },
+        "decision_space_construction_and_merging": {
+          "status": "skipped",
+          "input_revision": "3",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": "该自动生成的迁移任务没有独立的待决方案选项；已按用户确认，以现有 beta.2 交付证据收敛。",
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "acceptance": null
+        },
+        "solution_design_and_convergence": {
+          "status": "skipped",
+          "input_revision": "3",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": "迁移结果已由 updater 资产、版本号、已推送提交和既有验收证据确定；无新的方案决策需要收敛。",
+          "evidence_refs": [
+            "closeout.md",
+            ".trellis/.version"
+          ],
+          "acceptance": null
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "251eca0ec9804f60e083c9a83538c212b8c938a64953e52327ceb21df6eec39c",
+          "artifact_refs": [
+            "closeout.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "closeout.md",
+          "outcome_kind": "delivery_ready",
+          "reason": null,
+          "evidence_refs": [
+            ".trellis/.version",
+            "../.trellis/tasks/completed/2026-11/10-29-new-fork-workflow-master-plan-v2/execution.md",
+            ".trellis/tasks/completed/2026-11/10-31-new-fork-workflow-trellis/execution.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "251eca0ec9804f60e083c9a83538c212b8c938a64953e52327ceb21df6eec39c",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              ".trellis/.version",
+              "../.trellis/tasks/completed/2026-11/10-29-new-fork-workflow-master-plan-v2/execution.md",
+              ".trellis/tasks/completed/2026-11/10-31-new-fork-workflow-trellis/execution.md"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": null,
+      "closeout_disposition": "delivery_ready",
+      "skip_records": {
+        "task_implementation": {
+          "reason": "用户确认 beta.2 迁移任务已完成并要求直接收敛；结合已更新并发布的 Trellis 工作树与当前资产状态，按分析任务补齐阶段验收记录。",
+          "evidence_refs": [
+            ".trellis/.version"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "decision_space_construction_and_merging": {
+          "reason": "该自动生成的迁移任务没有独立的待决方案选项；已按用户确认，以现有 beta.2 交付证据收敛。",
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "3",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "solution_design_and_convergence": {
+          "reason": "迁移结果已由 updater 资产、版本号、已推送提交和既有验收证据确定；无新的方案决策需要收敛。",
+          "evidence_refs": [
+            "closeout.md",
+            ".trellis/.version"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "3",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": null
+    }
+  }
+}
