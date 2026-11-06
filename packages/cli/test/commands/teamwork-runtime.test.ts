@@ -115,12 +115,18 @@ describe("CLI Teamwork coordinator runtime", () => {
         return true;
       });
       spawnMock.mockReturnValue(child);
+      const taskRoot = fs.mkdtempSync(
+        path.join(os.tmpdir(), "trellis-stderr-"),
+      );
+      temporary.push(taskRoot);
+      fs.mkdirSync(path.join(taskRoot, ".trellis"), { recursive: true });
       const context = {
         plan: {
           sessionId: "diagnostic-session",
           deadline: new Date(Date.now() + 5000).toISOString(),
           coordinationMode: "general",
-          coordinationDigest: readCoordinationConfig("/tmp").configDigest,
+          coordinationDigest: readCoordinationConfig(taskRoot).configDigest,
+          batchId: "diagnostic-batch",
         },
         assignment: { briefPath: "brief.json" },
         attemptId: "diagnostic-attempt",
@@ -128,13 +134,9 @@ describe("CLI Teamwork coordinator runtime", () => {
         profile: { provider: "claude", options: {} },
         launch: { instructions: "Read-only review.", context: "" },
       } as unknown as TeammateDispatchContext;
-      const taskRoot = fs.mkdtempSync(
-        path.join(os.tmpdir(), "trellis-stderr-"),
-      );
-      temporary.push(taskRoot);
       const attemptRoot = path.join(taskRoot, "attempts", "diagnostic-attempt");
       fs.mkdirSync(attemptRoot, { recursive: true });
-      const runtime = createCliCoordinatorRuntime("/tmp", taskRoot);
+      const runtime = createCliCoordinatorRuntime(taskRoot, taskRoot);
       await runtime.dispatch(context);
       child.stderr.write("x".repeat(70000) + "provider authentication failed");
       child.stdout.write(
@@ -178,7 +180,10 @@ describe("CLI Teamwork coordinator runtime", () => {
           }),
         );
       expect(child.kill).toHaveBeenCalledWith("SIGTERM");
-      const diagnostic = path.join(attemptRoot, "provider-stderr.log");
+      const diagnostic = path.join(
+        taskRoot,
+        ".trellis/.runtime/teamwork-diagnostics/diagnostic-batch/diagnostic-attempt/provider-stderr.log",
+      );
       expect(fs.statSync(diagnostic).size).toBe(64 * 1024);
       expect(fs.readFileSync(diagnostic, "utf8")).toContain(
         "provider authentication failed",

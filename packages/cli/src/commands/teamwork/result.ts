@@ -45,9 +45,10 @@ export interface TeamworkResult {
     error?: string;
     artifact?: { path: string; sha256: string };
     worklogPath?: string;
+    disposition?: "pending" | "accepted" | "rejected" | "execution_failed";
   }[];
   attempts?: TeamworkResult["reports"];
-  semanticValidation: "not_run";
+  semanticValidation: "not_run" | "partial" | "passed" | "failed";
   disposition: string;
   diagnosticsPath?: string;
 }

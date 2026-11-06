@@ -1348,6 +1348,33 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       "analysis tasks cannot include the Task Implementation and Test Verification Phase",
     );
 
+    for (const taskKind of ["implementation", "combined"] as const) {
+      const missingImplementationPhase = runTask(
+        root,
+        "phase",
+        "init",
+        TASK,
+        "--task-kind",
+        taskKind,
+        "--complexity",
+        "standard",
+        "--project-context",
+        "existing",
+        "--phase-ids",
+        [GOAL_EXPLORATION_AND_REQUIREMENTS, DELIVERY_REVIEW_AND_CLOSEOUT].join(
+          ",",
+        ),
+        "--route-reason",
+        "This route omits implementation",
+        "--route-evidence-ref",
+        "prd.md",
+      );
+      expect(missingImplementationPhase.status).toBe(1);
+      expect(missingImplementationPhase.stderr).toContain(
+        "implementation and combined tasks must include the Task Implementation and Test Verification Phase",
+      );
+    }
+
     runOk(
       root,
       "phase",
@@ -1778,6 +1805,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       "--phase-ids",
       [
         GOAL_EXPLORATION_AND_REQUIREMENTS,
+        DECISION_SPACE_CONSTRUCTION_AND_MERGING,
         SOLUTION_DESIGN_AND_CONVERGENCE,
         DELIVERY_REVIEW_AND_CLOSEOUT,
       ].join(","),
@@ -1808,6 +1836,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       "--evidence-ref",
       "user-message:requirements-approved",
     );
+    accept(root, DECISION_SPACE_CONSTRUCTION_AND_MERGING, "accepted");
     const revision = setArtifact(root, SOLUTION_DESIGN_AND_CONVERGENCE);
     const prematureAccept = runTask(
       root,
@@ -2156,6 +2185,10 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       DELIVERY_REVIEW_AND_CLOSEOUT,
       "--reason",
       "User withdrew the task",
+      "--return-kind",
+      "withdrawal",
+      "--task-kind",
+      "analysis",
       "--evidence-ref",
       "user-message:withdrawn",
     );
@@ -2340,7 +2373,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     ).toContain("user-message:requirements-v2");
   });
 
-  it("completes an implementation-intent no-go without entering implementation", () => {
+  it("reclassifies an implementation-intent no-go to analysis before completion", () => {
     const taskPath = planFixture(root);
     const task = JSON.parse(fs.readFileSync(taskPath, "utf-8"));
     task.status = "planning";
@@ -2359,13 +2392,11 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       "--phase-ids",
       [
         GOAL_EXPLORATION_AND_REQUIREMENTS,
+        DECISION_SPACE_CONSTRUCTION_AND_MERGING,
         SOLUTION_DESIGN_AND_CONVERGENCE,
+        TASK_IMPLEMENTATION,
         DELIVERY_REVIEW_AND_CLOSEOUT,
       ].join(","),
-      "--route-reason",
-      "Decision Space Construction and Consolidation Phase and Task Implementation and Test Verification Phase are not needed for the no-go outcome",
-      "--route-evidence-ref",
-      "prd.md",
     );
     const goalRequirementsRevision = setArtifact(
       root,
@@ -2389,6 +2420,30 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       "--evidence-ref",
       "user-message:requirements-approved",
     );
+    accept(root, DECISION_SPACE_CONSTRUCTION_AND_MERGING, "accepted");
+    runOk(
+      root,
+      "phase",
+      "route",
+      TASK,
+      "--expected-route-revision",
+      "1",
+      "--phase-ids",
+      [
+        GOAL_EXPLORATION_AND_REQUIREMENTS,
+        DECISION_SPACE_CONSTRUCTION_AND_MERGING,
+        SOLUTION_DESIGN_AND_CONVERGENCE,
+        DELIVERY_REVIEW_AND_CLOSEOUT,
+      ].join(","),
+      "--target-phase",
+      SOLUTION_DESIGN_AND_CONVERGENCE,
+      "--reason",
+      "The no-go conclusion means no implementation work remains",
+      "--evidence-ref",
+      "prd.md",
+      "--task-kind",
+      "analysis",
+    );
     accept(root, SOLUTION_DESIGN_AND_CONVERGENCE, "no_go", [
       "--result-ref",
       "prd.md",
@@ -2403,7 +2458,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       "accept",
       TASK,
       "--expected-route-revision",
-      "1",
+      "2",
       "--artifact-revision",
       deliveryCloseoutRevision,
       "--result-ref",
@@ -2424,6 +2479,9 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     );
     expect(completedTask.status).toBe("completed");
     expect(completedTask.meta.task_workflow.closeout_disposition).toBe("no_go");
+    const completedStart = runTask(root, "start", TASK);
+    expect(completedStart.status).toBe(1);
+    expect(completedStart.stderr).toContain("TASK_PHASE_TASK_TERMINAL");
     runOk(
       root,
       "reopen",
@@ -2440,7 +2498,7 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       "return",
       TASK,
       "--expected-route-revision",
-      "1",
+      "2",
       "--target-phase",
       SOLUTION_DESIGN_AND_CONVERGENCE,
       "--reason",
@@ -2522,6 +2580,10 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       DELIVERY_REVIEW_AND_CLOSEOUT,
       "--reason",
       "The user withdrew the task after requirements review",
+      "--return-kind",
+      "withdrawal",
+      "--task-kind",
+      "analysis",
       "--evidence-ref",
       "prd.md",
       "--evidence-ref",
@@ -2610,6 +2672,9 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       ),
     );
     expect(task.status).toBe("cancelled");
+    const cancelledStart = runTask(root, "start", TASK);
+    expect(cancelledStart.status).toBe(1);
+    expect(cancelledStart.stderr).toContain("TASK_PHASE_TASK_TERMINAL");
     expect(task.meta.task_cancellation.reason).toBe(
       "The proposed change is not needed",
     );
@@ -2658,6 +2723,10 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       DELIVERY_REVIEW_AND_CLOSEOUT,
       "--reason",
       "The user withdrew the task during requirements alignment",
+      "--return-kind",
+      "withdrawal",
+      "--task-kind",
+      "analysis",
       "--evidence-ref",
       "prd.md",
       "--evidence-ref",
@@ -2734,6 +2803,55 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     expect(readState(root).current_phase_id).toBe(
       GOAL_EXPLORATION_AND_REQUIREMENTS,
     );
+  });
+
+  it("includes initialized submodule worktree changes in continuity digests", () => {
+    const origin = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-continuity-submodule-origin-"));
+    const nestedOrigin = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-continuity-nested-origin-"));
+    const git = (cwd: string, ...args: string[]) =>
+      execFileSync("git", args, { cwd, stdio: "ignore" });
+    try {
+      git(origin, "init", "--quiet", "--initial-branch=main");
+      git(origin, "config", "user.email", "test@example.invalid");
+      git(origin, "config", "user.name", "Trellis test");
+      fs.writeFileSync(path.join(origin, "tracked.txt"), "base\n");
+      git(origin, "add", ".");
+      git(origin, "commit", "--quiet", "-m", "submodule baseline");
+
+      git(nestedOrigin, "init", "--quiet", "--initial-branch=main");
+      git(nestedOrigin, "config", "user.email", "test@example.invalid");
+      git(nestedOrigin, "config", "user.name", "Trellis test");
+      fs.writeFileSync(path.join(nestedOrigin, "nested.txt"), "nested base\n");
+      git(nestedOrigin, "add", ".");
+      git(nestedOrigin, "commit", "--quiet", "-m", "nested baseline");
+      execFileSync("git", ["-c", "protocol.file.allow=always", "submodule", "add", "--quiet", nestedOrigin, "nested"], { cwd: origin, stdio: "ignore" });
+      git(origin, "commit", "--quiet", "-am", "add nested submodule");
+
+      git(root, "init", "--quiet", "--initial-branch=main");
+      git(root, "config", "user.email", "test@example.invalid");
+      git(root, "config", "user.name", "Trellis test");
+      execFileSync("git", ["-c", "protocol.file.allow=always", "submodule", "add", "--quiet", origin, "module"], { cwd: root, stdio: "ignore" });
+      execFileSync("git", ["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"], { cwd: root, stdio: "ignore" });
+      git(root, "add", ".");
+      git(root, "commit", "--quiet", "-m", "root baseline");
+      runOkAs(root, "submodule-session", "start", TASK);
+
+      const baseline = JSON.parse(runOkAs(root, "submodule-session", "continuity", "show"));
+      fs.writeFileSync(path.join(root, "module", "tracked.txt"), "changed\n");
+      const changed = JSON.parse(runOkAs(root, "submodule-session", "continuity", "show"));
+      expect(changed.current.git.content_digest).not.toBe(baseline.current.git.content_digest);
+      expect(changed.current.git.submodules[0].status_digest).not.toBe(baseline.current.git.submodules[0].status_digest);
+
+      fs.writeFileSync(path.join(root, "module", "untracked.txt"), "new evidence\n");
+      const withUntracked = JSON.parse(runOkAs(root, "submodule-session", "continuity", "show"));
+      expect(withUntracked.current.git.content_digest).not.toBe(changed.current.git.content_digest);
+      fs.writeFileSync(path.join(root, "module", "nested", "nested.txt"), "nested changed\n");
+      const nestedChanged = JSON.parse(runOkAs(root, "submodule-session", "continuity", "show"));
+      expect(nestedChanged.current.git.content_digest).not.toBe(withUntracked.current.git.content_digest);
+    } finally {
+      fs.rmSync(origin, { recursive: true, force: true });
+      fs.rmSync(nestedOrigin, { recursive: true, force: true });
+    }
   });
 
   it("keeps continuity and ownership records distinct for repeated task slugs", () => {

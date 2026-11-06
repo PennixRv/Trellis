@@ -307,6 +307,28 @@ describe("scanLiveWorkers + enforceSpawnBudget (integration)", () => {
     expect(typeof live[0].state.idleSince).toBe("string");
   });
 
+  it("counts an EPERM liveness probe as an existing process for the spawn budget", async () => {
+    await createTeamworkSession("eperm", { by: "main" });
+    await appendEvent(
+      "eperm",
+      { kind: "spawned", by: "main", as: "w1", provider: "claude" },
+      env.projectKey,
+    );
+    writeLivePid(env.teamworkRoot, env.projectKey, "eperm", "w1");
+    vi.spyOn(process, "kill").mockImplementation(() => {
+      throw Object.assign(new Error("permission denied"), { code: "EPERM" });
+    });
+
+    const result = await enforceSpawnBudget({
+      projectKey: env.projectKey,
+      policy: { idleTimeoutMs: 0, maxLiveWorkers: 1 },
+      isSupervisorProcess: verifySupervisor,
+    });
+
+    expect(result.remaining).toHaveLength(1);
+    expect(result.allowed).toBe(false);
+  });
+
   it("skips legacy sessionId dirs with pre-validation names instead of throwing", async () => {
     await createTeamworkSession("c-ok", { by: "main" });
     await appendEvent(

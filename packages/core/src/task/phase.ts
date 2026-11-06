@@ -55,6 +55,8 @@ export interface TaskPhaseSkipRecord {
   reason: string;
   evidence_refs: string[];
   task_route_revision: string;
+  input_revision: string;
+  artifact_revision: string;
 }
 
 export interface TaskPhaseReturnRecord {
@@ -63,7 +65,7 @@ export interface TaskPhaseReturnRecord {
   reason: string;
   evidence_refs: string[];
   task_route_revision: string;
-  return_kind?: "contract_change" | "execution_rework";
+  return_kind?: "contract_change" | "execution_rework" | "withdrawal";
   authorization_retained?: boolean;
 }
 
@@ -224,7 +226,13 @@ export function parseTaskWorkflowState(value: unknown): TaskWorkflowState {
       typeof skip.reason !== "string" ||
       !isStringArray(skip.evidence_refs) ||
       skip.evidence_refs.length === 0 ||
-      skip.task_route_revision !== state.task_route_revision
+      skip.task_route_revision !== state.task_route_revision ||
+      !isRevision(skip.input_revision) ||
+      typeof skip.artifact_revision !== "string" ||
+      !/^[a-f0-9]{64}$/.test(skip.artifact_revision) ||
+      (phase !== undefined &&
+        skip.artifact_revision !==
+          (isRecord(phase) ? phase.artifact_revision : undefined))
     ) {
       throw new Error(`task_workflow.skip_records.${phaseId} is invalid`);
     }
@@ -285,11 +293,13 @@ export function parseTaskWorkflowState(value: unknown): TaskWorkflowState {
     }
     if (
       returned.return_kind !== undefined &&
-      (!["contract_change", "execution_rework"].includes(
+      (!["contract_change", "execution_rework", "withdrawal"].includes(
         returned.return_kind as string,
       ) ||
-        returned.authorization_retained !==
-          (returned.return_kind === "execution_rework") ||
+        (returned.return_kind === "withdrawal"
+          ? returned.authorization_retained === true
+          : returned.authorization_retained !==
+            (returned.return_kind === "execution_rework")) ||
         (returned.return_kind === "execution_rework" &&
           (!TASK_PHASE_IDS.slice(3).includes(returned.from) ||
             !TASK_PHASE_IDS.slice(3).includes(returned.to))))

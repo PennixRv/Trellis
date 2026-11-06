@@ -97,6 +97,65 @@ def _task(root: Path, task_path: str | None = None) -> tuple[Path, dict, str, st
     return directory, data, task_id, active.context_key
 
 
+def _submodule_facts(root: Path) -> list[dict]:
+    rc, output, _ = run_git(["submodule", "status", "--recursive"], cwd=root, timeout=20)
+    if rc:
+        raise ContinuityError("TASK_CONTINUITY_WITHHELD", "Git submodule status is unavailable")
+    facts = []
+    for line in output.splitlines():
+        if len(line) < 43:
+            raise ContinuityError("TASK_CONTINUITY_WITHHELD", "Git submodule status is malformed")
+        state, revision, relative_text = line[0], line[1:41], line[42:]
+        if " (" in relative_text:
+            relative_text = relative_text.rsplit(" (", 1)[0]
+        relative = Path(relative_text)
+        candidate = root / relative
+        try:
+            candidate.resolve(strict=True).relative_to(root.resolve())
+        except (OSError, ValueError) as error:
+            if state == "-" and not candidate.exists():
+                facts.append({"path": relative.as_posix(), "revision": revision, "state": "uninitialized"})
+                continue
+            raise ContinuityError("TASK_CONTINUITY_WITHHELD", f"submodule path is unavailable or unsafe: {relative}") from error
+        if state == "-":
+            facts.append({"path": relative.as_posix(), "revision": revision, "state": "uninitialized"})
+            continue
+        if not candidate.is_dir():
+            raise ContinuityError("TASK_CONTINUITY_WITHHELD", f"submodule path is not a directory: {relative}")
+        rc, head, _ = run_git(["rev-parse", "HEAD"], cwd=candidate, timeout=5)
+        rc_status, status, _ = run_git(["status", "--porcelain=v1", "--untracked-files=all"], cwd=candidate, timeout=10)
+        rc_diff, diff, _ = run_git(["diff", "--binary", "HEAD", "--", "."], cwd=candidate, timeout=20)
+        rc_untracked, untracked, _ = run_git(["ls-files", "--others", "--exclude-standard", "-z"], cwd=candidate, timeout=10)
+        if any((rc, rc_status, rc_diff, rc_untracked)):
+            raise ContinuityError("TASK_CONTINUITY_WITHHELD", f"submodule worktree is unavailable: {relative}")
+        digest = hashlib.sha256(diff.encode("utf-8", errors="surrogateescape"))
+        for raw_path in sorted(os.fsencode(path) for path in untracked.split("\0") if path):
+            path = candidate / Path(os.fsdecode(raw_path))
+            try:
+                path.resolve(strict=True).relative_to(candidate.resolve())
+                if path.is_symlink():
+                    content = os.fsencode(os.readlink(path))
+                elif path.is_file():
+                    content = path.read_bytes()
+                else:
+                    raise OSError("not a regular file or symbolic link")
+            except (OSError, ValueError) as error:
+                raise ContinuityError("TASK_CONTINUITY_WITHHELD", f"submodule untracked path is unavailable or unsafe: {relative / path.name}") from error
+            digest.update(raw_path)
+            digest.update(b"\0")
+            digest.update(content)
+            digest.update(b"\0")
+        facts.append({
+            "path": relative.as_posix(),
+            "revision": revision,
+            "head": head.strip(),
+            "state": state,
+            "status_digest": hashlib.sha256(status.encode("utf-8")).hexdigest(),
+            "content_digest": digest.hexdigest(),
+        })
+    return facts
+
+
 def _projection(root: Path, directory: Path, data: dict, task_id: str) -> dict:
     meta = data.get("meta")
     if not isinstance(meta, dict):
@@ -178,6 +237,8 @@ def _projection(root: Path, directory: Path, data: dict, task_id: str) -> dict:
         worktree.update(b"\0")
         worktree.update(content)
         worktree.update(b"\0")
+    submodules = _submodule_facts(root)
+    worktree.update(json.dumps(submodules, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8"))
     evidence_digest = hashlib.sha256(
         json.dumps(sorted(evidence), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -191,6 +252,7 @@ def _projection(root: Path, directory: Path, data: dict, task_id: str) -> dict:
             "clean": not status,
             "status_digest": hashlib.sha256(status.encode("utf-8")).hexdigest(),
             "content_digest": worktree.hexdigest(),
+            "submodules": submodules,
         },
     }
 

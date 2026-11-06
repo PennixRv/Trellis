@@ -69,7 +69,8 @@ export async function teamworkBatch(
           : settled,
       ),
     );
-    if (settled.status !== "ALL_ACCEPTED") process.exitCode = 1;
+    if (!["AWAITING_REVIEW", "ALL_ACCEPTED"].includes(settled.status))
+      process.exitCode = 1;
     return;
   }
   const plan = loadTeamworkPlan(path.resolve(planPath), taskRoot);
@@ -247,7 +248,8 @@ export async function teamworkBatch(
       if (result.reports.some((item) => item.validation === "failed"))
         process.exitCode = 1;
     } else output = receipt;
-    if (receipt.status !== "ALL_ACCEPTED") process.exitCode = 1;
+    if (!["AWAITING_REVIEW", "ALL_ACCEPTED"].includes(receipt.status))
+      process.exitCode = 1;
   } finally {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
@@ -258,8 +260,15 @@ export async function teamworkBatch(
 
 export async function teamworkReconcile(
   planPath: string,
-  options: { task: string; execute?: boolean; reason?: string },
+  options: {
+    task: string;
+    execute?: boolean;
+    reason?: string;
+    confirmUnknownProcessExit?: boolean;
+  },
 ): Promise<void> {
+  if (options.confirmUnknownProcessExit && !options.execute)
+    throw new Error("--confirm-unknown-process-exit requires --execute");
   const cwd = process.cwd();
   const plan = validateTeamworkPlan(
     readPlanFile(path.resolve(planPath)),
@@ -293,6 +302,7 @@ export async function teamworkReconcile(
       cwd,
       execute: options.execute,
       reason: options.reason,
+      confirmUnknownProcessExit: options.confirmUnknownProcessExit,
     });
     if (
       options.execute &&
@@ -435,7 +445,8 @@ export async function buildBatchResult(
     },
     reports: [],
     attempts: [],
-    semanticValidation: "not_run",
+    semanticValidation:
+      receipt.status === "ALL_ACCEPTED" ? "passed" : "not_run",
     disposition: receipt.status,
   };
   for (const assignment of plan.assignments) {
@@ -462,6 +473,27 @@ export async function buildBatchResult(
       };
       result.attempts?.push(item);
       if (index === Math.max(0, attempts.length - 1)) result.reports.push(item);
+      const review = events
+        .filter(
+          (event) =>
+            event.kind === "coordination" &&
+            event.batchId === plan.batchId &&
+            event.assignmentId === assignment.assignmentId &&
+            event.attemptId === attempt?.attemptId &&
+            typeof event.payload?.reportSha256 === "string",
+        )
+        .at(-1);
+      item.disposition =
+        review?.kind === "coordination"
+          ? review.state === "ACCEPTED"
+            ? "accepted"
+            : "rejected"
+          : projected?.state === "AWAITING_REVIEW"
+            ? "pending"
+            : "execution_failed";
+      if (review && receipt.status !== "ALL_ACCEPTED")
+        result.semanticValidation =
+          receipt.status === "AWAITING_REVIEW" ? "partial" : "failed";
       const failure = events
         .filter(
           (event) =>

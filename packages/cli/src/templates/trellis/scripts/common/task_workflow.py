@@ -110,6 +110,28 @@ def _state(meta: dict) -> dict:
         raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "route dependency admission has an invalid shape")
     if state.get("current_phase_id") is not None and state["current_phase_id"] not in state["phase_ids"]:
         raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "current phase is not in the task route")
+    skip_records = state.get("skip_records")
+    if not isinstance(skip_records, dict):
+        raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", "task phase skip records have an invalid shape")
+    for phase_id, skip in skip_records.items():
+        if (
+            phase_id not in PHASE_ID_SET
+            or not isinstance(skip, dict)
+            or not isinstance(skip.get("reason"), str)
+            or not skip["reason"].strip()
+            or not isinstance(skip.get("evidence_refs"), list)
+            or not skip["evidence_refs"]
+            or any(not isinstance(value, str) or not value.strip() for value in skip["evidence_refs"])
+            or skip.get("task_route_revision") != state["task_route_revision"]
+            or not ROUTE_REVISION.fullmatch(str(skip.get("input_revision", "")))
+            or not isinstance(skip.get("artifact_revision"), str)
+            or not re.fullmatch(r"[a-f0-9]{64}", skip["artifact_revision"])
+            or (
+                phase_id in state["phases"]
+                and skip["artifact_revision"] != state["phases"][phase_id].get("artifact_revision")
+            )
+        ):
+            raise TaskWorkflowError("TASK_PHASE_TASK_INVALID", f"task phase skip record is invalid: {phase_id}")
     for phase_id in state["phase_ids"]:
         record = state["phases"].get(phase_id)
         if not isinstance(record, dict) or record.get("status") not in {"not_started", "active", "waiting_user", "blocked", "accepted", "skipped"}:
@@ -254,6 +276,7 @@ def _is_withdrawal_route(state: dict) -> bool:
         and isinstance(withdrawal.get("from"), str)
         and withdrawal["from"] in PHASE_ID_SET
         and withdrawal.get("to") == PHASE_IDS[4]
+        and withdrawal.get("return_kind") == "withdrawal"
         and withdrawal.get("task_route_revision") == state.get("task_route_revision")
         and isinstance(withdrawal.get("evidence_refs"), list)
         and bool(withdrawal["evidence_refs"])
@@ -389,6 +412,8 @@ def _validate_classification(task_kind: str | None, complexity: str | None, proj
         raise TaskWorkflowError("TASK_PHASE_INVALID_INPUT", "--project-context must be new or existing")
     if task_kind == "analysis" and PHASE_IDS[3] in phases:
         raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "analysis tasks cannot include the Task Implementation and Test Verification Phase")
+    if task_kind in {"implementation", "combined"} and PHASE_IDS[3] not in phases:
+        raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "implementation and combined tasks must include the Task Implementation and Test Verification Phase")
 
 
 def _increment(value: str, allow_zero: bool = False) -> str:
@@ -441,7 +466,13 @@ def _init(args: argparse.Namespace, task_dir: Path, data: dict, meta: dict) -> i
         "implementation_authorization": None,
         "closeout_disposition": None,
         "skip_records": {
-            phase: {"reason": route_reason, "evidence_refs": route_evidence, "task_route_revision": "1"}
+            phase: {
+                "reason": route_reason,
+                "evidence_refs": route_evidence,
+                "task_route_revision": "1",
+                "input_revision": input_revision,
+                "artifact_revision": _phase_record(input_revision)["artifact_revision"],
+            }
             for phase in omitted
         },
         "return_record": None,
@@ -549,7 +580,13 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         if current == PHASE_IDS[0]:
             raise TaskWorkflowError("TASK_PHASE_INVALID_TRANSITION", "The Goal Exploration and Requirements Confirmation Phase must reach minimum alignment and acceptance and cannot be skipped")
         record.update({"status": "skipped", "reason": reason, "evidence_refs": evidence})
-        state["skip_records"][current] = {"reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
+        state["skip_records"][current] = {
+            "reason": reason,
+            "evidence_refs": evidence,
+            "task_route_revision": state["task_route_revision"],
+            "input_revision": state["input_revision"],
+            "artifact_revision": record["artifact_revision"],
+        }
         _advance(state, current)
     elif action == "accept":
         _require_current_accepted_artifacts(task_dir, state)
@@ -660,6 +697,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
             target == PHASE_IDS[4]
             and phases == [PHASE_IDS[0], PHASE_IDS[4]]
             and bool(evidence)
+            and args.return_kind == "withdrawal"
         )
         if not changed and not classification_changed and target == current and not reviewed_delivery:
             raise TaskWorkflowError("TASK_PHASE_INVALID_ROUTE", "the updated route and target are unchanged")
@@ -702,12 +740,24 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
             if phase_id not in old_phases:
                 phase_record["input_revision"] = state["input_revision"]
         state["skip_records"] = {
-            phase_id: {**skip, "task_route_revision": state["task_route_revision"]}
+            phase_id: {
+                **skip,
+                "task_route_revision": state["task_route_revision"],
+                "input_revision": state["input_revision"],
+                "artifact_revision": state["phases"][phase_id]["artifact_revision"],
+            }
             for phase_id, skip in state["skip_records"].items()
             if phase_id in phases and state["phases"][phase_id].get("status") == "skipped"
         }
         for phase_id in omitted:
-            state["skip_records"][phase_id] = {"reason": reason, "evidence_refs": evidence, "task_route_revision": state["task_route_revision"]}
+            phase_record = state["phases"].get(phase_id, old_phases.get(phase_id, _phase_record(state["input_revision"])))
+            state["skip_records"][phase_id] = {
+                "reason": reason,
+                "evidence_refs": evidence,
+                "task_route_revision": state["task_route_revision"],
+                "input_revision": state["input_revision"],
+                "artifact_revision": phase_record["artifact_revision"],
+            }
         if withdrawal_route and state["phases"][PHASE_IDS[0]].get("status") != "accepted":
             state["phases"][PHASE_IDS[0]].update({
                 "status": "skipped",
@@ -721,6 +771,8 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
                 "reason": reason,
                 "evidence_refs": evidence,
                 "task_route_revision": state["task_route_revision"],
+                "input_revision": state["input_revision"],
+                "artifact_revision": state["phases"][PHASE_IDS[0]]["artifact_revision"],
             }
         state["implementation_authorization"] = None
         state["closeout_disposition"] = None
@@ -728,6 +780,7 @@ def _update(args: argparse.Namespace, task_dir: Path, data: dict, state: dict) -
         state["return_record"] = {
             "from": current,
             "to": target,
+            **({"return_kind": "withdrawal"} if withdrawal_route else {}),
             "reason": reason,
             "evidence_refs": evidence,
             "task_route_revision": state["task_route_revision"],

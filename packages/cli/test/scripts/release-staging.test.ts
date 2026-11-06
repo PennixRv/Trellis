@@ -47,6 +47,55 @@ describe("release pre-commit staging", () => {
     ]);
   });
 
+  it("ignores unstaged excluded changes when deciding whether a pre-commit exists", () => {
+    git(tmp, "config", "user.email", "test@example.com");
+    git(tmp, "config", "user.name", "test");
+    fs.mkdirSync(path.join(tmp, ".trellis"), { recursive: true });
+    fs.mkdirSync(path.join(tmp, "docs-site"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, "README.md"), "base\n");
+    fs.writeFileSync(path.join(tmp, ".trellis", "task.md"), "base\n");
+    fs.writeFileSync(path.join(tmp, "docs-site", "page.md"), "base\n");
+    git(tmp, "add", ".");
+    git(tmp, "commit", "-qm", "base");
+    fs.writeFileSync(path.join(tmp, ".trellis", "task.md"), "changed\n");
+    fs.writeFileSync(path.join(tmp, "docs-site", "page.md"), "changed\n");
+
+    git(tmp, "add", "-A", "--", ...PRE_RELEASE_ADD_PATHS);
+
+    expect(git(tmp, "diff", "--cached", "--quiet", "HEAD")).toBe("");
+    expect(fs.readFileSync(RELEASE_SCRIPT, "utf-8")).toContain(
+      'execSync("git diff --cached --quiet HEAD"',
+    );
+  });
+
+  it("refuses pre-staged excluded changes instead of committing them with the release", () => {
+    git(tmp, "config", "user.email", "test@example.com");
+    git(tmp, "config", "user.name", "test");
+    fs.mkdirSync(path.join(tmp, ".trellis"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, "README.md"), "base\n");
+    fs.writeFileSync(path.join(tmp, ".trellis", "task.md"), "base\n");
+    git(tmp, "add", ".");
+    git(tmp, "commit", "-qm", "base");
+    fs.writeFileSync(path.join(tmp, ".trellis", "task.md"), "staged task\n");
+    git(tmp, "add", ".trellis/task.md");
+
+    const result = spawnSync(
+      "git",
+      ["diff", "--cached", "--quiet", "HEAD", "--", ".trellis", "docs-site"],
+      { cwd: tmp, encoding: "utf-8" },
+    );
+    const release = fs.readFileSync(RELEASE_SCRIPT, "utf-8");
+
+    expect(result.status).toBe(1);
+    expect(release).toContain("function assertNoExcludedStagedChanges()");
+    expect(release).toContain(
+      "Refusing to release with staged .trellis/ or docs-site/ changes; unstage them first.",
+    );
+    expect(release.indexOf("assertNoExcludedStagedChanges();")).toBeLessThan(
+      release.indexOf("git add -A -- . ':!docs-site'"),
+    );
+  });
+
   it("requires a manifest for the computed target version before releasing", () => {
     const release = fs.readFileSync(RELEASE_SCRIPT, "utf-8");
 

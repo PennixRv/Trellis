@@ -22,7 +22,11 @@ import {
   teamworkReconcile,
   cleanupTeamworkAttemptEvidence,
 } from "./batch.js";
-import { readPlanFile } from "./coordinator.js";
+import {
+  readPlanFile,
+  loadTeamworkPlan,
+  reviewTeamworkReport,
+} from "./coordinator.js";
 import { validateTeamworkPlan } from "./artifact.js";
 import { resolveTeammateRuntimeConfig } from "./teammate-config.js";
 import {
@@ -602,7 +606,59 @@ export function registerTeamworkCommand(program: Command): void {
       "--reason <text>",
       "explicit disposition reason, required with --execute",
     )
+    .option(
+      "--confirm-unknown-process-exit",
+      "explicitly confirm retirement when a process birth identity cannot be verified (requires --execute and --reason)",
+    )
     .action(teamworkReconcile);
+
+  teamwork
+    .command("review <plan>")
+    .description(
+      "Record main-agent acceptance or rejection after the entire batch is collected",
+    )
+    .requiredOption("--task <path>", "task directory")
+    .requiredOption("--assignment <id>", "assignment to review")
+    .requiredOption(
+      "--report-sha256 <digest>",
+      "digest of the inspected report",
+    )
+    .requiredOption("--decision <status>", "accepted | final_failed")
+    .requiredOption("--reason <text>", "evidence-backed semantic review reason")
+    .action(
+      async (
+        planPath: string,
+        options: {
+          task: string;
+          assignment: string;
+          reportSha256: string;
+          decision: string;
+          reason: string;
+        },
+      ) => {
+        if (
+          options.decision !== "accepted" &&
+          options.decision !== "final_failed"
+        )
+          throw new InvalidArgumentError(
+            "decision must be accepted or final_failed",
+          );
+        const taskRoot = path.resolve(options.task);
+        console.log(
+          JSON.stringify(
+            await reviewTeamworkReport({
+              plan: loadTeamworkPlan(path.resolve(planPath), taskRoot),
+              taskRoot,
+              cwd: process.cwd(),
+              assignmentId: options.assignment,
+              reportSha256: options.reportSha256,
+              decision: options.decision,
+              reason: options.reason,
+            }),
+          ),
+        );
+      },
+    );
 
   teamwork
     .command("retry <plan>")

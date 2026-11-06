@@ -31,6 +31,11 @@ def decision(payload: dict) -> dict | None:
     records = list(directory.glob("*.json"))
     if not records:
         return None
+    for record in records:
+        try:
+            state = json.loads(record.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            continue
     tool = str(payload.get("tool_name", "")).rsplit(".", 1)[-1]
     if tool in {"write_stdin", "wait"}:
         return None

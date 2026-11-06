@@ -1,0 +1,11 @@
+{
+  "version": "0.7.2-beta.1",
+  "description": "Teamwork acceptance, recovery boundaries, and lifecycle revision integrity",
+  "breaking": true,
+  "recommendMigrate": true,
+  "changelog": "Separate teammate report submission from main-agent acceptance; retain complete attempt evidence until explicit cleanup; isolate member-level provider failures; tighten task lifecycle revision and metadata validation; preserve safe in-project asset symlinks; and correct release staging boundaries.",
+  "migrationGuide": "Upgrade through the beta channel to 0.7.2-beta.1, then run the native trellis update command. Existing customized project files remain subject to the normal preview and conflict review. Teamwork batches completed under this version now remain pending coordinator review until each report receives an explicit accepted or final_failed disposition; do not treat an AWAITING_REVIEW receipt as final acceptance. Attempt evidence remains until explicit cleanup-artifacts preview and confirmation.",
+  "aiInstructions": "The CLI owns FIFO dispatch, retries, background monitoring, and batch recovery. Teammates submit conclusions and evidence only. After the full batch returns, the main agent reviews each report and records a disposition bound to its digest and frozen acceptance contract. Preserve attempt evidence and use native reconcile, review, retry, and cleanup-artifacts commands. Unknown process identity remains fail closed unless explicitly confirmed through the auditable native reconciliation entry point.",
+  "migrations": [],
+  "notes": "Keep the beta npm channel. 0.7.2-beta.1 is above stable 0.7.1; do not move the latest tag."
+}

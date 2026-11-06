@@ -89,7 +89,7 @@ const RUNTIME = [
 const PROTECTED =
   /(?:^|\/)(?:tasks|spec|workspace|backlog|session-handoffs|sessions|history|logs?|cache|node_modules|worktrees?|agent-traces|\.runtime|\.git|credentials?|secrets?)(?:\/|$)|(?:^|\/)\.backup-|(?:^|\/)\.env(?:\.|$)|(?:^|\/)(?:\.developer|\.task-layout-migration\.json)$/i;
 
-/** Reject all symlink components, including links that happen to stay in-project. */
+/** Permit managed symlinks only when their resolved target stays in-project. */
 function safePath(root: string, relative: string): string {
   validateManagedRelativePath(relative);
   root = canonicalProjectRoot(root);
@@ -98,15 +98,27 @@ function safePath(root: string, relative: string): string {
     cursor = path.join(cursor, part);
     try {
       const stat = fs.lstatSync(cursor);
-      if (stat.isSymbolicLink())
-        throw new Error(`Symlink in asset path: ${relative}`);
-      if (cursor !== path.join(root, relative) && !stat.isDirectory())
+      const resolved = fs.realpathSync(cursor);
+      const rel = path.relative(root, resolved);
+      if (
+        rel === ".." ||
+        rel.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(rel)
+      )
+        throw new Error(`Asset path escapes project root: ${relative}`);
+      const targetStat = stat.isSymbolicLink() ? fs.statSync(cursor) : stat;
+      if (cursor !== path.join(root, relative) && !targetStat.isDirectory())
         throw new Error(`Invalid asset parent: ${relative}`);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
-  return cursor;
+  try {
+    return fs.realpathSync(cursor);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return cursor;
+  }
 }
 
 function assetPath(relative: string): boolean {
@@ -391,7 +403,7 @@ export function listAssetBackups(root: string): BackupInventoryItem[] {
     try {
       const location = safePath(root, relative);
       if (!fs.existsSync(location)) continue;
-      if (!fs.lstatSync(location).isFile())
+      if (!fs.lstatSync(path.join(root, relative)).isFile())
         throw new Error("Migration sidecar is not a regular file; retained.");
       const size = treeSize(location);
       result.push({

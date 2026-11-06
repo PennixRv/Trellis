@@ -18,7 +18,6 @@ import {
 import {
   type TeamworkPlan,
   TeammateReportReadError,
-  cleanupSettledTeamworkArtifacts,
   readTeammateReport,
   writeTeammateQueueFact,
   writeTeammateClaim,
@@ -38,6 +37,7 @@ import {
 import type { resolveTeammateProfile } from "./profiles.js";
 import { type TeammateLaunchSpec } from "./teammate-launch.js";
 import { readProcessIdentity } from "./process-identity.js";
+import { withLock } from "./store/lock.js";
 
 export type AttemptWaitResult =
   | { kind: "report"; terminal: true; providerSessionId?: string }
@@ -88,10 +88,6 @@ export interface CoordinatorRuntime {
   wait(context: TeammateDispatchContext): Promise<AttemptWaitResult>;
   continue(context: TeammateDispatchContext): Promise<AttemptWaitResult>;
   cancel?(context: TeammateDispatchContext): Promise<AttemptWaitResult>;
-  validateReport?(
-    context: TeammateDispatchContext,
-    report: unknown,
-  ): Promise<boolean> | boolean;
 }
 
 export interface TeamworkCoordinatorInput {
@@ -105,13 +101,19 @@ export interface TeamworkCoordinatorInput {
   config?: TeammateRuntimeConfig;
 }
 
+export class TeamworkPolicyChangedError extends Error {}
+
 export interface TeamworkReceipt {
   schemaVersion: 1;
   batchId: string;
-  status: "ALL_ACCEPTED" | "SETTLED_WITH_FAILURE" | "RECONCILIATION_REQUIRED";
+  status:
+    | "AWAITING_REVIEW"
+    | "ALL_ACCEPTED"
+    | "SETTLED_WITH_FAILURE"
+    | "RECONCILIATION_REQUIRED";
   assignments: {
     assignmentId: string;
-    status: "ACCEPTED" | "FINAL_FAILED" | "UNKNOWN";
+    status: "AWAITING_REVIEW" | "ACCEPTED" | "FINAL_FAILED" | "UNKNOWN";
   }[];
   capacity: number;
   retryCounts: Record<string, number>;
@@ -179,7 +181,11 @@ function terminalReceiptFromProjection(
   if (!batch) return mismatch("does not match the frozen plan");
   if (batch.planHash !== plan.planHash)
     return mismatch("does not match the frozen plan");
-  if (batch.state !== "ALL_ACCEPTED" && batch.state !== "SETTLED_WITH_FAILURE")
+  if (
+    !["AWAITING_REVIEW", "ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(
+      batch.state,
+    )
+  )
     mismatch("is not terminal");
   const effectiveCapacity = batch.effectiveCapacity;
   if (
@@ -242,10 +248,13 @@ function terminalReceiptFromProjection(
     const projected = assignmentById.get(assignment.assignmentId);
     if (
       !projected ||
-      (projected.state !== "ACCEPTED" && projected.state !== "FINAL_FAILED")
+      !["AWAITING_REVIEW", "ACCEPTED", "FINAL_FAILED"].includes(projected.state)
     )
       return mismatch(`assignment '${assignment.assignmentId}' is not settled`);
-    if (projected.state === "ACCEPTED") {
+    if (
+      projected.state === "ACCEPTED" ||
+      projected.state === "AWAITING_REVIEW"
+    ) {
       const acceptedAttempt = attempts.find(
         (attempt) =>
           attempt.attemptId === projected.attemptId &&
@@ -258,12 +267,17 @@ function terminalReceiptFromProjection(
     }
     return {
       assignmentId: assignment.assignmentId,
-      status: projected.state as "ACCEPTED" | "FINAL_FAILED",
+      status: projected.state as
+        | "AWAITING_REVIEW"
+        | "ACCEPTED"
+        | "FINAL_FAILED",
     };
   });
-  const status = assignments.every((item) => item.status === "ACCEPTED")
-    ? "ALL_ACCEPTED"
-    : "SETTLED_WITH_FAILURE";
+  const status = assignments.some((item) => item.status === "AWAITING_REVIEW")
+    ? "AWAITING_REVIEW"
+    : assignments.every((item) => item.status === "ACCEPTED")
+      ? "ALL_ACCEPTED"
+      : "SETTLED_WITH_FAILURE";
   if (batch.state !== status)
     mismatch("terminal state disagrees with its assignment dispositions");
   const retryCounts = Object.fromEntries(
@@ -351,6 +365,7 @@ async function recordRecoveryReconciliation(input: {
   const { plan, cwd, by, existingState, projection, capacity, reason } = input;
   if (
     existingState !== "RECONCILIATION_REQUIRED" &&
+    existingState !== "AWAITING_REVIEW" &&
     existingState !== "ALL_ACCEPTED" &&
     existingState !== "SETTLED_WITH_FAILURE"
   ) {
@@ -412,6 +427,7 @@ async function recoverExistingBatch(input: {
     cwd: input.cwd,
   });
   if (
+    existing.state === "AWAITING_REVIEW" ||
     existing.state === "ALL_ACCEPTED" ||
     existing.state === "SETTLED_WITH_FAILURE"
   ) {
@@ -431,12 +447,12 @@ async function recoverExistingBatch(input: {
         event.kind === "coordination" &&
         event.batchId === input.plan.batchId &&
         event.action === "receipt_recorded" &&
+        event.payload?.status === receipt.status &&
         event.payload?.status !== "RECONCILIATION_REQUIRED",
     );
     if (
-      receipts.length > 1 ||
-      (receipts.length === 1 &&
-        !isDeepStrictEqual(receipts[0]?.payload, receipt))
+      receipts.length > 0 &&
+      !isDeepStrictEqual(receipts.at(-1)?.payload, receipt)
     ) {
       return recordRecoveryReconciliation({
         ...input,
@@ -647,7 +663,9 @@ export async function runTeamworkCoordinator(
   );
   if (
     settled &&
-    ["ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(settled.state)
+    ["AWAITING_REVIEW", "ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(
+      settled.state,
+    )
   ) {
     let terminal = false;
     try {
@@ -783,7 +801,7 @@ export async function runTeamworkCoordinator(
     number,
     Promise<{ slot: number; result: AttemptWaitResult }>
   >();
-  const final = new Map<string, "ACCEPTED" | "FINAL_FAILED">();
+  const final = new Map<string, "AWAITING_REVIEW" | "FINAL_FAILED">();
   const retryCounts: Record<string, number> = {};
   let admissionClosed = false;
 
@@ -1294,7 +1312,7 @@ export async function runTeamworkCoordinator(
     final.set(assignment.assignmentId, "FINAL_FAILED");
   }
 
-  async function accept(activeWork: ActiveAssignment): Promise<void> {
+  async function submit(activeWork: ActiveAssignment): Promise<void> {
     const { assignment, context, retryCount } = activeWork;
     try {
       assertTeamworkPlanCurrent(plan, input.taskRoot);
@@ -1306,26 +1324,13 @@ export async function runTeamworkCoordinator(
       );
       return;
     }
-    writeTeammateDisposition({
-      taskRoot: input.taskRoot,
-      briefPath: assignment.briefPath,
-      identity: {
-        taskId: plan.taskId,
-        batchId: plan.batchId,
-        assignmentId: assignment.assignmentId,
-        attemptId: context.attemptId,
-        teammateId: context.teammateId,
-      },
-      sourceDigest: assignment.sourceDigest,
-      status: "accepted",
-    });
     await appendTransition({
       sessionId: plan.sessionId,
       by,
       batchId: plan.batchId,
       entity: "assignment",
       id: assignment.assignmentId,
-      state: "ACCEPTED",
+      state: "AWAITING_REVIEW",
       states: assignmentStates,
       assignmentId: assignment.assignmentId,
       attemptId: context.attemptId,
@@ -1333,7 +1338,7 @@ export async function runTeamworkCoordinator(
       retryCount,
     });
     await release(activeWork);
-    final.set(assignment.assignmentId, "ACCEPTED");
+    final.set(assignment.assignmentId, "AWAITING_REVIEW");
   }
 
   async function complete(
@@ -1375,12 +1380,12 @@ export async function runTeamworkCoordinator(
         sourceDigest: assignment.sourceDigest,
       });
     } catch (error) {
-      if (error instanceof TeammateReportReadError && error.kind !== "missing")
-        throw error;
       await fail(
         activeWork,
         error instanceof Error ? error.message : String(error),
-        allowRetry,
+        error instanceof TeammateReportReadError && error.kind === "missing"
+          ? allowRetry
+          : false,
       );
       return;
     }
@@ -1388,29 +1393,6 @@ export async function runTeamworkCoordinator(
       await fail(
         activeWork,
         "report schema_version must match the frozen result contract (2)",
-        allowRetry,
-      );
-      return;
-    }
-    if (report.status === "blocked") {
-      await fail(
-        activeWork,
-        `teammate reported blocked: ${report.evidence[0]?.summary ?? "blocker evidence missing"}`,
-        false,
-      );
-      return;
-    }
-    if (report.status !== "complete") {
-      await fail(activeWork, `teammate reported ${report.status}`, allowRetry);
-      return;
-    }
-    if (
-      input.runtime.validateReport &&
-      !(await input.runtime.validateReport(context, report))
-    ) {
-      await fail(
-        activeWork,
-        "report rejected by acceptance contract",
         allowRetry,
       );
       return;
@@ -1484,7 +1466,7 @@ export async function runTeamworkCoordinator(
       retryCount,
     });
 
-    await accept(activeWork);
+    await submit(activeWork);
   }
 
   async function settle(): Promise<TeamworkReceipt> {
@@ -1497,19 +1479,10 @@ export async function runTeamworkCoordinator(
       state: "SETTLING",
       states: batchStates,
     });
-    const cleanupFailures = cleanupSettledTeamworkArtifacts({
-      taskRoot: input.taskRoot,
-      assignments: plan.assignments,
-    });
-    if (cleanupFailures.length > 0) {
-      return reconcile(
-        `Teamwork batch cleanup failed: ${cleanupFailures.join("; ")}`,
-      );
-    }
-    const accepted = plan.assignments.every(
-      (assignment) => final.get(assignment.assignmentId) === "ACCEPTED",
+    const pendingReview = plan.assignments.some(
+      (assignment) => final.get(assignment.assignmentId) === "AWAITING_REVIEW",
     );
-    const status = accepted ? "ALL_ACCEPTED" : "SETTLED_WITH_FAILURE";
+    const status = pendingReview ? "AWAITING_REVIEW" : "SETTLED_WITH_FAILURE";
     await appendTransition({
       sessionId: plan.sessionId,
       by,
@@ -1519,33 +1492,10 @@ export async function runTeamworkCoordinator(
       state: status,
       states: batchStates,
     });
-    const receipt: TeamworkReceipt = {
-      schemaVersion: 1,
-      batchId: plan.batchId,
-      status,
-      assignments: plan.assignments.map((assignment) => ({
-        assignmentId: assignment.assignmentId,
-        status: final.get(assignment.assignmentId) ?? "FINAL_FAILED",
-      })),
-      capacity,
-      retryCounts,
-      evaluationGroups: [
-        ...new Set(
-          plan.assignments
-            .map((assignment) => assignment.evaluationGroup?.id)
-            .filter((id): id is string => id !== undefined),
-        ),
-      ].map((id) => ({
-        id,
-        status: plan.assignments
-          .filter((assignment) => assignment.evaluationGroup?.id === id)
-          .every(
-            (assignment) => final.get(assignment.assignmentId) === "ACCEPTED",
-          )
-          ? "COMPLETE"
-          : "INCOMPLETE",
-      })),
-    };
+    const receipt = terminalReceiptFromProjection(
+      plan,
+      await readCoordinationState({ sessionId: plan.sessionId, cwd }),
+    );
     await appendAction({
       sessionId: plan.sessionId,
       by,
@@ -1588,10 +1538,26 @@ export async function runTeamworkCoordinator(
           !assignmentStates.has(assignment.assignmentId) ||
           assignmentStates.get(assignment.assignmentId) === "QUEUED"
         ) {
-          await failPending(
-            `launch preflight failed before dispatch: ${error instanceof Error ? error.message : String(error)}`,
-          );
-          return;
+          const reason = `launch preflight failed before dispatch: ${error instanceof Error ? error.message : String(error)}`;
+          if (error instanceof TeamworkPolicyChangedError) {
+            await failPending(reason);
+            return;
+          }
+          pending.shift();
+          await appendTransition({
+            sessionId: plan.sessionId,
+            by,
+            batchId: plan.batchId,
+            entity: "assignment",
+            id: assignment.assignmentId,
+            assignmentId: assignment.assignmentId,
+            state: "FINAL_FAILED",
+            states: assignmentStates,
+            retryCount,
+            payload: { reason, dispatched: false },
+          });
+          final.set(assignment.assignmentId, "FINAL_FAILED");
+          continue;
         }
         throw error;
       }
@@ -1830,11 +1796,12 @@ export async function assertTeamworkReceiptDurable(
       event.kind === "coordination" &&
       event.batchId === plan.batchId &&
       event.action === "receipt_recorded" &&
+      event.payload?.status === receipt.status &&
       event.payload?.status !== "RECONCILIATION_REQUIRED",
   );
   if (
-    receipts.length !== 1 ||
-    !isDeepStrictEqual(receipts[0]?.payload, expected)
+    receipts.length === 0 ||
+    !isDeepStrictEqual(receipts.at(-1)?.payload, expected)
   )
     throw new Error(
       `batch '${plan.batchId}' has no matching durable receipt event`,
@@ -1847,6 +1814,7 @@ export async function reconcileTeamworkBatch(input: {
   cwd: string;
   execute?: boolean;
   reason?: string;
+  confirmUnknownProcessExit?: boolean;
 }): Promise<
   TeamworkReceipt | { status: "ready" | "blocked"; blockers: string[] }
 > {
@@ -1867,7 +1835,11 @@ export async function reconcileTeamworkBatch(input: {
       event.batchId === plan.batchId &&
       event.action === "reconciliation_resolved",
   );
-  if (["ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(batch.state)) {
+  if (
+    ["AWAITING_REVIEW", "ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(
+      batch.state,
+    )
+  ) {
     const receipt = terminalReceiptFromProjection(plan, projection);
     if (input.execute) {
       const recovered = await recoverExistingBatch({
@@ -1924,6 +1896,7 @@ export async function reconcileTeamworkBatch(input: {
         ? started.payload?.processIdentity
         : undefined;
     let exited = false;
+    let identityUnknown = true;
     if (
       typeof pid === "number" &&
       Number.isSafeInteger(pid) &&
@@ -1932,15 +1905,27 @@ export async function reconcileTeamworkBatch(input: {
       birth.startsWith(`${pid}:`)
     ) {
       const current = readProcessIdentity(pid);
-      if (current) exited = current !== birth;
-      else {
+      if (current) {
+        exited = current !== birth;
+        identityUnknown = false;
+      } else {
         try {
           process.kill(pid, 0);
         } catch (error) {
-          exited = (error as NodeJS.ErrnoException).code === "ESRCH";
+          const code = (error as NodeJS.ErrnoException).code;
+          exited = code === "ESRCH";
+          identityUnknown = code !== "ESRCH";
         }
       }
     }
+    if (
+      !exited &&
+      identityUnknown &&
+      input.execute &&
+      input.confirmUnknownProcessExit &&
+      input.reason?.trim()
+    )
+      exited = true;
     if (!exited)
       blockers.push(
         `Attempt ${attempt.attemptId} lacks confirmed process exit; preserve its lease`,
@@ -2054,7 +2039,13 @@ export async function reconcileTeamworkBatch(input: {
     entity: "batch",
     action: "reconciliation_resolved",
     reason: input.reason,
-    idempotencyKey: `${plan.batchId}:reconciled`,
+    ...(input.confirmUnknownProcessExit
+      ? { payload: { confirmedUnknownProcessExit: true } }
+      : {}),
+    idempotencyKey: `${plan.batchId}:reconciled:${crypto
+      .createHash("sha256")
+      .update(input.reason ?? "")
+      .digest("hex")}`,
   });
   if (batch.state !== "SETTLING")
     await appendTransition({
@@ -2104,9 +2095,185 @@ export async function readSettledTeamworkReceipt(
 ): Promise<TeamworkReceipt | undefined> {
   const state = await readCoordinationState({ sessionId: plan.sessionId, cwd });
   const batch = state.batches.find((entry) => entry.batchId === plan.batchId);
-  if (!batch || !["ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(batch.state))
+  if (
+    !batch ||
+    !["AWAITING_REVIEW", "ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(
+      batch.state,
+    )
+  )
     return undefined;
   const receipt = terminalReceiptFromProjection(plan, state);
   await assertTeamworkReceiptDurable(plan, receipt, cwd);
   return receipt;
+}
+
+/** Main-agent review starts only after the CLI has drained the entire batch. */
+export async function reviewTeamworkReport(input: {
+  plan: TeamworkPlan;
+  taskRoot: string;
+  cwd: string;
+  assignmentId: string;
+  reportSha256: string;
+  decision: "accepted" | "final_failed";
+  reason: string;
+  by?: string;
+}): Promise<TeamworkReceipt> {
+  const { plan, taskRoot, cwd } = input;
+  if (!input.reason.trim())
+    throw new Error("Review requires an explicit reason");
+  const assignment = plan.assignments.find(
+    (item) => item.assignmentId === input.assignmentId,
+  );
+  if (!assignment)
+    throw new Error("Review assignment is not in the frozen plan");
+  return withLock(
+    path.join(taskRoot, "teammates", `${plan.batchId}.review.lock`),
+    async () => {
+      assertTeamworkPlanCurrent(plan, taskRoot);
+      const projection = await readCoordinationState({
+        sessionId: plan.sessionId,
+        cwd,
+      });
+      const batch = projection.batches.find(
+        (item) => item.batchId === plan.batchId,
+      );
+      if (
+        !batch ||
+        !["AWAITING_REVIEW", "ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(
+          batch.state,
+        )
+      )
+        throw new Error(
+          "Review requires the entire batch to be collected first",
+        );
+      terminalReceiptFromProjection(plan, projection);
+      const work = projection.assignments.find(
+        (item) =>
+          item.batchId === plan.batchId &&
+          item.assignmentId === assignment.assignmentId,
+      );
+      if (!work?.attemptId || !work.teammateId)
+        throw new Error("Review has no matching report attempt");
+      readTeammateReport({
+        taskRoot,
+        briefPath: assignment.briefPath,
+        attemptId: work.attemptId,
+        identity: {
+          taskId: plan.taskId,
+          batchId: plan.batchId,
+          assignmentId: assignment.assignmentId,
+          teammateId: work.teammateId,
+          planHash: plan.planHash,
+          phaseId: plan.phaseId,
+          taskRouteRevision: plan.taskRouteRevision,
+          inputRevision: plan.inputRevision,
+        },
+        sourceDigest: assignment.sourceDigest,
+      });
+      const reportFile = path.join(
+        taskRoot,
+        path.dirname(assignment.briefPath),
+        "attempts",
+        work.attemptId,
+        "report.json",
+      );
+      const reportSha256 = crypto
+        .createHash("sha256")
+        .update(fs.readFileSync(reportFile))
+        .digest("hex");
+      if (reportSha256 !== input.reportSha256)
+        throw new Error(
+          "Review report digest does not match the inspected report",
+        );
+      const state = input.decision === "accepted" ? "ACCEPTED" : "FINAL_FAILED";
+      if (work.state !== "AWAITING_REVIEW" && work.state !== state)
+        throw new Error("Report already has a different final disposition");
+      const by = input.by ?? "main";
+      writeTeammateDisposition({
+        taskRoot,
+        briefPath: assignment.briefPath,
+        identity: {
+          taskId: plan.taskId,
+          batchId: plan.batchId,
+          assignmentId: assignment.assignmentId,
+          attemptId: work.attemptId,
+          teammateId: work.teammateId,
+        },
+        sourceDigest: assignment.sourceDigest,
+        status: input.decision,
+        reason: input.reason,
+        review: {
+          plan_hash: plan.planHash,
+          phase_id: plan.phaseId,
+          task_route_revision: plan.taskRouteRevision,
+          input_revision: plan.inputRevision,
+          report_sha256: reportSha256,
+          acceptance: assignment.acceptance,
+          by,
+        },
+      });
+      if (work.state === "AWAITING_REVIEW")
+        await appendTransition({
+          sessionId: plan.sessionId,
+          cwd,
+          by,
+          batchId: plan.batchId,
+          entity: "assignment",
+          id: assignment.assignmentId,
+          assignmentId: assignment.assignmentId,
+          attemptId: work.attemptId,
+          teammateId: work.teammateId,
+          retryCount: work.retryCount,
+          state,
+          states: new Map([[assignment.assignmentId, work.state]]),
+          payload: {
+            reason: input.reason,
+            reportSha256,
+            planHash: plan.planHash,
+            acceptance: assignment.acceptance,
+          },
+        });
+      let updated = await readCoordinationState({
+        sessionId: plan.sessionId,
+        cwd,
+      });
+      const remaining = updated.assignments.filter(
+        (item) => item.batchId === plan.batchId,
+      );
+      if (
+        batch.state === "AWAITING_REVIEW" &&
+        !remaining.some((item) => item.state === "AWAITING_REVIEW")
+      ) {
+        await appendTransition({
+          sessionId: plan.sessionId,
+          cwd,
+          by,
+          batchId: plan.batchId,
+          entity: "batch",
+          id: plan.batchId,
+          state: remaining.every((item) => item.state === "ACCEPTED")
+            ? "ALL_ACCEPTED"
+            : "SETTLED_WITH_FAILURE",
+          states: new Map([[plan.batchId, batch.state]]),
+        });
+        updated = await readCoordinationState({
+          sessionId: plan.sessionId,
+          cwd,
+        });
+      }
+      const receipt = terminalReceiptFromProjection(plan, updated);
+      await appendAction({
+        sessionId: plan.sessionId,
+        cwd,
+        by,
+        batchId: plan.batchId,
+        entity: "batch",
+        action: "receipt_recorded",
+        id: `${plan.batchId}:review:${crypto.createHash("sha256").update(JSON.stringify(receipt)).digest("hex")}`,
+        payload: { ...receipt },
+      });
+      await assertTeamworkReceiptDurable(plan, receipt, cwd);
+      return receipt;
+    },
+  );
 }

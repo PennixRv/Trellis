@@ -149,21 +149,21 @@ describe("asset snapshots", () => {
     expect(() => loadAssetBackup(root, backup.id)).toThrow(/integrity/);
   });
 
-  it("refuses symlink sources and storage without following them", () => {
+  it("allows in-project symlinks and refuses paths that resolve outside", () => {
     if (process.platform === "win32") return;
     write(".trellis/external", "keep");
     fs.symlinkSync("external", path.join(root, ".trellis/link"));
-    expect(() => createAssetBackup(root, "manual", [".trellis/link"])).toThrow(
-      /Symlink/,
+    expect(createAssetBackup(root, "manual", [".trellis/link"]).entries).toHaveLength(1);
+    const trellis = path.join(root, ".trellis");
+    fs.renameSync(trellis, path.join(root, ".trellis-store"));
+    fs.symlinkSync(".trellis-store", trellis, "dir");
+    expect(createAssetBackup(root, "manual", [".trellis/link"]).entries).toHaveLength(1);
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "asset-backup-outside-"));
+    fs.writeFileSync(path.join(outside, "file.md"), "outside");
+    fs.symlinkSync(outside, path.join(root, ".trellis-store", "escape"));
+    expect(() => createAssetBackup(root, "manual", [".trellis/escape/file.md"])).toThrow(
+      /escapes project root/,
     );
-    fs.symlinkSync(root, path.join(root, ".trellis/.backup-unknown"));
-    const result = pruneAssetBackups(root, {
-      all: true,
-      includeLegacy: true,
-      yes: true,
-    });
-    expect(result.deleted).toEqual([]);
-    expect(result.protected[0]?.problem).toMatch(/Symlink/);
     expect(read(".trellis/external")).toBe("keep");
   });
 

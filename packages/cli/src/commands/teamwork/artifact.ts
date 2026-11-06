@@ -146,7 +146,7 @@ export interface TeammateQueueFact {
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const SECRET =
-  /(-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk|gh[pousr])_[A-Za-z0-9]{20,}\b|\bBearer\s+\S+)/i;
+  /(-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk|gh[pousr])_[A-Za-z0-9]{20,}\b|\bBearer\s+(?!<(?:redacted|token|placeholder)>(?:\s|[.,;:!?)]|$))\S+)/i;
 
 function id(value: unknown, field: string): string {
   if (typeof value !== "string" || !ID.test(value))
@@ -233,7 +233,11 @@ function attemptArtifactPath(
   );
 }
 
-function writeImmutableJson(filePath: string, value: unknown): void {
+function writeImmutableJson(
+  filePath: string,
+  value: unknown,
+  idempotent = false,
+): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const temporary = path.join(
     path.dirname(filePath),
@@ -252,6 +256,12 @@ function writeImmutableJson(filePath: string, value: unknown): void {
     fs.linkSync(temporary, filePath);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      if (
+        idempotent &&
+        fs.lstatSync(filePath).isFile() &&
+        fs.readFileSync(filePath, "utf8") === JSON.stringify(value) + "\n"
+      )
+        return;
       throw new Error(`artifact already exists: ${filePath}`);
     }
     throw error;
@@ -1419,6 +1429,15 @@ export function writeTeammateDisposition(input: {
   sourceDigest: string;
   status: TeammateDispositionStatus;
   reason?: string;
+  review?: {
+    plan_hash: string;
+    phase_id: string;
+    task_route_revision: string;
+    input_revision: string;
+    report_sha256: string;
+    acceptance: string[];
+    by: string;
+  };
 }): void {
   const disposition = validateTeammateDisposition(
     {
@@ -1452,7 +1471,9 @@ export function writeTeammateDisposition(input: {
       status: disposition.status,
       source_digest: disposition.sourceDigest,
       ...(disposition.reason ? { reason: disposition.reason } : {}),
+      ...(input.review ? { review: input.review } : {}),
     },
+    input.review !== undefined,
   );
 }
 
@@ -1558,52 +1579,4 @@ export function readTeammateReport(input: {
     { ...input.identity, attemptId: input.attemptId },
     input.sourceDigest,
   );
-}
-
-export function cleanupSettledTeamworkArtifacts(input: {
-  taskRoot: string;
-  assignments: TeamworkPlan["assignments"];
-}): string[] {
-  const failures: string[] = [];
-  for (const assignment of input.assignments) {
-    try {
-      const assignmentDir = safePath(
-        input.taskRoot,
-        path.dirname(assignment.briefPath),
-      );
-      const queueFile = safePath(
-        input.taskRoot,
-        path.join(assignmentDir, "queue.json"),
-      );
-      if (fs.existsSync(queueFile)) fs.unlinkSync(queueFile);
-      const attemptsDir = safePath(
-        input.taskRoot,
-        path.join(assignmentDir, "attempts"),
-      );
-      if (!fs.existsSync(attemptsDir)) continue;
-      for (const attemptId of fs.readdirSync(attemptsDir)) {
-        if (!ID.test(attemptId)) continue;
-        const attemptDir = safePath(
-          input.taskRoot,
-          path.join(attemptsDir, attemptId),
-        );
-        // Keep every attempt's evidence until an explicit native cleanup.
-        const transientFiles = ["claim.json", "disposition.json"];
-        for (const fileName of transientFiles) {
-          const filePath = safePath(
-            input.taskRoot,
-            path.join(attemptDir, fileName),
-          );
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        }
-        if (fs.readdirSync(attemptDir).length === 0) fs.rmdirSync(attemptDir);
-      }
-      if (fs.readdirSync(attemptsDir).length === 0) fs.rmdirSync(attemptsDir);
-    } catch (error) {
-      failures.push(
-        `${assignment.assignmentId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-  return failures;
 }

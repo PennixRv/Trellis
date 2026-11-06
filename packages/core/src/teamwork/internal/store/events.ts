@@ -294,6 +294,7 @@ export type CoordinationBatchState =
   | "VALIDATING_PLAN"
   | "RUNNING"
   | "SETTLING"
+  | "AWAITING_REVIEW"
   | "ALL_ACCEPTED"
   | "SETTLED_WITH_FAILURE"
   | "SUSPENDED"
@@ -306,6 +307,7 @@ export type CoordinationAssignmentState =
   | "EXECUTING"
   | "REPORT_PENDING"
   | "VALIDATING"
+  | "AWAITING_REVIEW"
   | "ACCEPTED"
   | "FINAL_FAILED"
   | "WAITING_FOR_MAIN_COMMAND";

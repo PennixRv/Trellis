@@ -4,12 +4,19 @@ import fs from "node:fs";
 
 import { getAdapter, type WorkerChild } from "./adapters/index.js";
 import type { TeammateHostCapabilities } from "./teammate-adapters.js";
-import type { AttemptWaitResult, CoordinatorRuntime } from "./coordinator.js";
+import {
+  TeamworkPolicyChangedError,
+  type AttemptWaitResult,
+  type CoordinatorRuntime,
+} from "./coordinator.js";
 import { pumpStdout } from "./supervisor/stdout.js";
 import { resolveProviderPath } from "./supervisor.js";
 import { assertTeammateContextCurrent } from "./teammate-launch.js";
 import { appendEvent } from "./store/events.js";
-import { recordCoordinationEvent } from "@pennixrv/trellis-core/teamwork";
+import {
+  recordCoordinationEvent,
+  redactDiagnostic,
+} from "@pennixrv/trellis-core/teamwork";
 import { readProcessIdentity } from "./process-identity.js";
 import { assertFrozenCoordination } from "./coordination.js";
 import { resolveTeammateRuntimeConfig } from "./teammate-config.js";
@@ -51,19 +58,25 @@ export function createCliCoordinatorRuntime(
         context.plan.coordinationMode,
       );
       if (expectedConfigDigest && config.sourceDigest !== expectedConfigDigest)
-        throw new Error(
+        throw new TeamworkPolicyChangedError(
           "Runtime policy changed after batch admission; pending assignments cannot start",
         );
-      assertFrozenCoordination(
-        cwd,
-        context.plan.coordinationDigest,
-        context.plan.coordinationSnapshot,
-        {
-          mode: context.plan.coordinationMode,
-          maxConcurrency: config.teammate.maxConcurrency,
-          guard: config.guard,
-        },
-      );
+      try {
+        assertFrozenCoordination(
+          cwd,
+          context.plan.coordinationDigest,
+          context.plan.coordinationSnapshot,
+          {
+            mode: context.plan.coordinationMode,
+            maxConcurrency: config.teammate.maxConcurrency,
+            guard: config.guard,
+          },
+        );
+      } catch (error) {
+        throw new TeamworkPolicyChangedError(
+          error instanceof Error ? error.message : String(error),
+        );
+      }
       assertTeammateContextCurrent(context.launch, cwd);
       const adapter = getAdapter(context.profile.provider);
       resolveProviderPath(adapter.provider, cwd);
@@ -76,9 +89,7 @@ export function createCliCoordinatorRuntime(
     },
     async dispatch(context): Promise<undefined> {
       if (aborted) throw new Error("batch runtime has been cancelled");
-      try {
-        runtime.prepare?.(context);
-      } catch (error) {
+      const failBeforeStart = (error: unknown): void => {
         active.set(context.attemptId, {
           result: Promise.resolve({
             kind: "failed",
@@ -88,10 +99,16 @@ export function createCliCoordinatorRuntime(
           stop: async () => true,
           cancel: async () => undefined,
         });
+      };
+      try {
+        runtime.prepare?.(context);
+      } catch (error) {
+        failBeforeStart(error);
         return;
       }
-      const adapter = getAdapter(context.profile.provider);
-      const ctx = adapter.createCtx();
+      let adapter: ReturnType<typeof getAdapter>;
+      let ctx: ReturnType<typeof adapter.createCtx>;
+      let child: WorkerChild;
       const view = {
         cwd,
         model: context.profile.model,
@@ -99,21 +116,28 @@ export function createCliCoordinatorRuntime(
         options: context.profile.options,
         systemPrompt: context.launch.instructions,
       };
-      const executable = resolveProviderPath(adapter.provider, cwd);
-      const child = spawn(
-        executable.command,
-        [...executable.prefixArgs, ...adapter.buildArgs(view)],
-        {
-          cwd,
-          stdio: ["pipe", "pipe", "pipe"],
-          env: {
-            ...process.env,
-            TRELLIS_HOOKS: "0",
-            TRELLIS_TEAMWORK_SESSION: context.plan.sessionId,
-            TRELLIS_TEAMWORK_AS: context.teammateId,
+      try {
+        adapter = getAdapter(context.profile.provider);
+        ctx = adapter.createCtx();
+        const executable = resolveProviderPath(adapter.provider, cwd);
+        child = spawn(
+          executable.command,
+          [...executable.prefixArgs, ...adapter.buildArgs(view)],
+          {
+            cwd,
+            stdio: ["pipe", "pipe", "pipe"],
+            env: {
+              ...process.env,
+              TRELLIS_HOOKS: "0",
+              TRELLIS_TEAMWORK_SESSION: context.plan.sessionId,
+              TRELLIS_TEAMWORK_AS: context.teammateId,
+            },
           },
-        },
-      ) as WorkerChild;
+        ) as WorkerChild;
+      } catch (error) {
+        failBeforeStart(error);
+        return;
+      }
       let closed = false;
       let resolveClosed: () => void = () => undefined;
       const close = new Promise<void>((resolve) => {
@@ -172,23 +196,30 @@ export function createCliCoordinatorRuntime(
         if (stderrTail.length) {
           try {
             const diagnostic = safePath(
-              taskRoot,
+              cwd,
               path.join(
-                path.dirname(context.assignment.briefPath),
-                "attempts",
+                ".trellis",
+                ".runtime",
+                "teamwork-diagnostics",
+                context.plan.batchId,
                 context.attemptId,
                 "provider-stderr.log",
               ),
             );
             const directory = path.dirname(diagnostic);
+            fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
             if (
               fs.lstatSync(directory).isDirectory() &&
               !fs.lstatSync(directory).isSymbolicLink()
             )
-              fs.writeFileSync(diagnostic, stderrTail, {
-                mode: 0o600,
-                flag: "wx",
-              });
+              fs.writeFileSync(
+                diagnostic,
+                redactDiagnostic(stderrTail.toString("utf8")),
+                {
+                  mode: 0o600,
+                  flag: "wx",
+                },
+              );
           } catch (error) {
             if (
               !["EEXIST", "ENOENT"].includes(
@@ -224,9 +255,19 @@ export function createCliCoordinatorRuntime(
         );
       };
       child.once("error", (error) => {
-        closed = true;
-        resolveClosed();
-        settle({ kind: "failed", terminal: true, reason: error.message });
+        // A spawn failure has no PID; other errors still require confirmed shutdown.
+        if (!child.pid) {
+          closed = true;
+          resolveClosed();
+        }
+        void finish({ kind: "failed", terminal: true, reason: error.message });
+      });
+      child.stdin.on("error", (error) => {
+        void finish({
+          kind: "failed",
+          terminal: true,
+          reason: `provider input failed: ${error.message}`,
+        });
       });
       child.once("close", () => {
         closed = true;

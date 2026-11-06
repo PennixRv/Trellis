@@ -51,13 +51,30 @@ function output(command, options = {}) {
 
 function hasGitDiff() {
   try {
-    execSync("git diff-index --quiet HEAD", {
+    execSync("git diff --cached --quiet HEAD", {
       cwd: CLI_DIR,
       stdio: ["pipe", "pipe", "pipe"],
     });
     return false;
-  } catch {
-    return true;
+  } catch (error) {
+    if (error.status === 1) return true;
+    throw error;
+  }
+}
+
+function assertNoExcludedStagedChanges() {
+  try {
+    execSync("git diff --cached --quiet HEAD -- .trellis docs-site", {
+      cwd: CLI_DIR,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch (error) {
+    if (error.status === 1) {
+      fail(
+        "Refusing to release with staged .trellis/ or docs-site/ changes; unstage them first.",
+      );
+    }
+    throw error;
   }
 }
 
@@ -160,6 +177,7 @@ function main() {
   checkSubmodules();
   run("node scripts/check-manifest-continuity.js");
   docsGuard(type);
+  assertNoExcludedStagedChanges();
   run("pnpm build");
   run("pnpm test");
 

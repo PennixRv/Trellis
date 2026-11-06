@@ -165,4 +165,43 @@ describe.skipIf(!hasPython())("task.py meta (task.json.meta access)", () => {
     expect(r2.status).toBe(0);
     expect(readTaskJson(tmp, dir).meta).toEqual({ "priority-note": "later" });
   });
+
+  it("set-meta cannot overwrite Trellis-managed lifecycle metadata", () => {
+    const created = runTask(
+      tmp,
+      "create",
+      "managed metadata task",
+      "--description",
+      "regression fixture",
+      "--slug",
+      "managed-meta-task",
+    );
+    expect(created.status).toBe(0);
+    const dir = findTaskDir(tmp, "managed-meta-task");
+    const taskDir = `.trellis/tasks/planning/${dir}`;
+    for (const key of ["task_workflow", "task_cancellation", "task_lifecycle_recoveries"]) {
+      const before = readTaskJson(tmp, dir);
+      const result = runTask(tmp, "set-meta", taskDir, key, "corrupt");
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("metadata key is managed by Trellis");
+      expect(readTaskJson(tmp, dir)).toEqual(before);
+    }
+  });
+
+  it("create --meta cannot seed Trellis-managed lifecycle metadata", () => {
+    const result = runTask(
+      tmp,
+      "create",
+      "reserved metadata task",
+      "--description",
+      "regression fixture",
+      "--slug",
+      "reserved-meta-task",
+      "--meta",
+      "task_workflow=corrupt",
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("metadata key is managed by Trellis");
+    expect(fs.existsSync(path.join(tmp, ".trellis/tasks/planning"))).toBe(false);
+  });
 });

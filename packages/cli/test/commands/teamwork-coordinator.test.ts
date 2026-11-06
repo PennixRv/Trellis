@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
@@ -20,6 +21,7 @@ import { projectDir } from "../../src/commands/teamwork/store/paths.js";
 import {
   runTeamworkCoordinator,
   reconcileTeamworkBatch,
+  reviewTeamworkReport,
   type TeammateDispatchContext,
 } from "../../src/commands/teamwork/coordinator.js";
 import { constructTeamworkRetry } from "../../src/commands/teamwork/plan.js";
@@ -27,6 +29,7 @@ import { readCoordinationConfig } from "../../src/commands/teamwork/coordination
 import {
   readCoordinationState,
   recordCoordinationEvent,
+  readTeamworkEvents,
   resolveTeamworkSession,
 } from "@pennixrv/trellis-core/teamwork";
 import {
@@ -432,6 +435,118 @@ describe("TeamworkSession teammate coordinator", () => {
     expect(state.issues).toEqual([]);
   });
 
+  it("requires explicit audited confirmation to retire an attempt with unknown process identity", async () => {
+    const raw = createPlan(env.taskRoot, ["work-a"], 0);
+    const plan = validateTeamworkPlan(raw, env.taskRoot);
+    await runTeamworkCoordinator({
+      plan: raw,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard,
+      config,
+      runtime: {
+        dispatch: vi.fn(),
+        wait: async () => ({
+          kind: "reconciliation",
+          reason: "lost provider handle",
+        }),
+        continue: vi.fn(),
+      },
+    });
+    const request = {
+      plan,
+      cwd: env.projectDir,
+      reason: "Operator confirmed the provider process is no longer active",
+    };
+    expect(await reconcileTeamworkBatch(request)).toMatchObject({
+      status: "blocked",
+    });
+    await expect(
+      reconcileTeamworkBatch({ ...request, execute: true }),
+    ).rejects.toThrow(/preserve its lease/);
+    await expect(
+      reconcileTeamworkBatch({
+        ...request,
+        execute: true,
+        confirmUnknownProcessExit: true,
+      }),
+    ).resolves.toMatchObject({ status: "SETTLED_WITH_FAILURE" });
+    const events = await readTeamworkEvents({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+    });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        kind: "coordination",
+        action: "reconciliation_resolved",
+        reason: request.reason,
+        payload: { confirmedUnknownProcessExit: true },
+      }),
+    );
+  });
+
+  it("preserves a changed reconciliation disposition reason after an interrupted resolution", async () => {
+    const raw = createPlan(env.taskRoot, ["work-a"], 0);
+    const plan = validateTeamworkPlan(raw, env.taskRoot);
+    await runTeamworkCoordinator({
+      plan: raw,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard,
+      config,
+      runtime: {
+        dispatch: vi.fn(),
+        wait: async () => ({
+          kind: "reconciliation",
+          reason: "lost provider handle",
+        }),
+        continue: vi.fn(),
+      },
+    });
+    await recordCoordinationEvent({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+      by: "main",
+      batchId: plan.batchId,
+      entity: "attempt",
+      action: "process_exited",
+      attemptId: "work-a.attempt.0",
+      planHash: plan.planHash,
+      idempotencyKey: "fixture-exit",
+    });
+    await recordCoordinationEvent({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+      by: "main",
+      batchId: plan.batchId,
+      entity: "batch",
+      action: "reconciliation_resolved",
+      reason: "first resolution before crash",
+      idempotencyKey: `${plan.batchId}:reconciled`,
+    });
+    await reconcileTeamworkBatch({
+      plan,
+      cwd: env.projectDir,
+      execute: true,
+      reason: "verified termination after recovery",
+    });
+    const resolutions = (await readTeamworkEvents({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+    })).filter(
+      (event) =>
+        event.kind === "coordination" &&
+        event.batchId === plan.batchId &&
+        event.action === "reconciliation_resolved",
+    );
+    expect(resolutions.map((event) => event.reason)).toEqual([
+      "first resolution before crash",
+      "verified termination after recovery",
+    ]);
+  });
+
   it("publishes an idempotent linked retry round containing only failed work", async () => {
     const raw = createPlan(env.taskRoot, ["work-a", "work-b"], 0);
     raw.coordination_digest = readCoordinationConfig(
@@ -460,6 +575,10 @@ describe("TeamworkSession teammate coordinator", () => {
         continue: vi.fn(),
       },
     });
+    const reviewedFile = path.join(env.taskRoot, "teammates/batch-1/work-a/attempts/work-a.attempt.0/report.json");
+    await reviewTeamworkReport({ plan: validateTeamworkPlan(raw, env.taskRoot), taskRoot: env.taskRoot,
+      cwd: env.projectDir, assignmentId: "work-a", decision: "accepted", reason: "Evidence accepted by main agent",
+      reportSha256: crypto.createHash("sha256").update(fs.readFileSync(reviewedFile)).digest("hex") });
     const request = {
       planPath: file,
       cwd: env.projectDir,
@@ -597,7 +716,7 @@ describe("TeamworkSession teammate coordinator", () => {
         },
       },
     });
-    expect(receipt.status).toBe("ALL_ACCEPTED");
+    expect(receipt.status).toBe("AWAITING_REVIEW");
     const result = await buildBatchResult(
       validateTeamworkPlan(plan, env.taskRoot),
       receipt,
@@ -745,7 +864,7 @@ describe("TeamworkSession teammate coordinator", () => {
     }
 
     const receipt = await run;
-    expect(receipt.status).toBe("ALL_ACCEPTED");
+    expect(receipt.status).toBe("AWAITING_REVIEW");
     const result = await buildBatchResult(
       validateTeamworkPlan(plan, env.taskRoot),
       receipt,
@@ -773,20 +892,20 @@ describe("TeamworkSession teammate coordinator", () => {
     expect(invalid.reports[0]?.validation).toBe("failed");
     fs.writeFileSync(damaged, original);
     expect(receipt.assignments.map((item) => item.status)).toEqual([
-      "ACCEPTED",
-      "ACCEPTED",
-      "ACCEPTED",
+      "AWAITING_REVIEW",
+      "AWAITING_REVIEW",
+      "AWAITING_REVIEW",
     ]);
     expect(receipt.capacity).toBe(2);
     const state = await readCoordinationState({
       sessionId: "parallel",
       cwd: env.projectDir,
     });
-    expect(state.batches[0].state).toBe("ALL_ACCEPTED");
+    expect(state.batches[0].state).toBe("AWAITING_REVIEW");
     expect(state.assignments.map((item) => item.state)).toEqual([
-      "ACCEPTED",
-      "ACCEPTED",
-      "ACCEPTED",
+      "AWAITING_REVIEW",
+      "AWAITING_REVIEW",
+      "AWAITING_REVIEW",
     ]);
     expect(state.leases).toEqual([]);
     const acceptedAttempt = dispatched.find(
@@ -802,12 +921,12 @@ describe("TeamworkSession teammate coordinator", () => {
       acceptedAttempt.attemptId,
     );
     expect(fs.existsSync(path.join(attemptDir, "report.json"))).toBe(true);
-    expect(fs.existsSync(path.join(attemptDir, "claim.json"))).toBe(false);
+    expect(fs.existsSync(path.join(attemptDir, "claim.json"))).toBe(true);
     expect(
       fs.existsSync(
         path.join(env.taskRoot, "teammates", "batch-1", "work-a", "queue.json"),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("fills a freed slot while another slot is waiting on the same attempt", async () => {
@@ -899,7 +1018,7 @@ describe("TeamworkSession teammate coordinator", () => {
     waiters.get("work-c")?.({ kind: "report", terminal: true });
 
     const receipt = await run;
-    expect(receipt.status).toBe("ALL_ACCEPTED");
+    expect(receipt.status).toBe("AWAITING_REVIEW");
     expect(receipt.retryCounts).toMatchObject({
       "work-a": 0,
       "work-b": 0,
@@ -993,10 +1112,10 @@ describe("TeamworkSession teammate coordinator", () => {
       },
     });
 
-    expect(receipt.status).toBe("SETTLED_WITH_FAILURE");
+    expect(receipt.status).toBe("AWAITING_REVIEW");
     expect(receipt.assignments.map((item) => item.status)).toEqual([
-      "FINAL_FAILED",
-      "ACCEPTED",
+      "AWAITING_REVIEW",
+      "AWAITING_REVIEW",
     ]);
     expect(dispatched.map((item) => item.assignment.assignmentId)).toEqual([
       "work-a",
@@ -1047,7 +1166,7 @@ describe("TeamworkSession teammate coordinator", () => {
       },
     });
 
-    expect(receipt.status).toBe("ALL_ACCEPTED");
+    expect(receipt.status).toBe("AWAITING_REVIEW");
     expect(receipt.retryCounts["work-a"]).toBe(1);
     expect(dispatched.map((item) => item.attemptId)).toEqual([
       "work-a.attempt.0",
@@ -1097,7 +1216,7 @@ describe("TeamworkSession teammate coordinator", () => {
       },
     });
 
-    expect(receipt.status).toBe("ALL_ACCEPTED");
+    expect(receipt.status).toBe("AWAITING_REVIEW");
     expect(dispatched).toHaveLength(2);
     for (const context of dispatched) {
       expect(context.attemptId).toMatch(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/);
@@ -1107,7 +1226,7 @@ describe("TeamworkSession teammate coordinator", () => {
     expect(dispatched[0].teammateId).not.toBe(dispatched[1].teammateId);
   });
 
-  it("retries a report rejected by the acceptance contract within the work budget", async () => {
+  it("collects a report once and requires explicit main-agent review", async () => {
     const plan = createPlan(env.taskRoot, ["work-a"], 1);
     const dispatched: TeammateDispatchContext[] = [];
     const receipt = await runTeamworkCoordinator({
@@ -1128,19 +1247,24 @@ describe("TeamworkSession teammate coordinator", () => {
         async continue() {
           throw new Error("no continuation expected");
         },
-        validateReport(context) {
-          return context.retryCount === 1;
-        },
       },
     });
 
-    expect(receipt.status).toBe("ALL_ACCEPTED");
-    expect(receipt.retryCounts["work-a"]).toBe(1);
+    expect(receipt.status).toBe("AWAITING_REVIEW");
+    expect(receipt.retryCounts["work-a"]).toBe(0);
     expect(dispatched.map((item) => item.attemptId)).toEqual([
       "work-a.attempt.0",
-      "work-a.attempt.1",
     ]);
-    expect(dispatched[0].slot).toBe(dispatched[1].slot);
+    const reportFile = path.join(env.taskRoot, "teammates/batch-1/work-a/attempts/work-a.attempt.0/report.json");
+    const review = { plan: validateTeamworkPlan(plan, env.taskRoot), taskRoot: env.taskRoot,
+      cwd: env.projectDir, assignmentId: "work-a", decision: "accepted" as const,
+      reason: "Main agent checked the evidence against all acceptance criteria",
+      reportSha256: crypto.createHash("sha256").update(fs.readFileSync(reportFile)).digest("hex") };
+    await expect(reviewTeamworkReport({ ...review, reportSha256: "0".repeat(64) })).rejects.toThrow(/digest/);
+    expect((await reviewTeamworkReport(review)).status).toBe("ALL_ACCEPTED");
+    expect((await reviewTeamworkReport(review)).status).toBe("ALL_ACCEPTED");
+    const disposition = JSON.parse(fs.readFileSync(path.join(path.dirname(reportFile), "disposition.json"), "utf8"));
+    expect(disposition.review).toMatchObject({ plan_hash: review.plan.planHash, report_sha256: review.reportSha256 });
   });
 
   it("derives committee completion in the terminal batch receipt", async () => {
@@ -1171,8 +1295,17 @@ describe("TeamworkSession teammate coordinator", () => {
       },
     });
     expect(receipt.evaluationGroups).toEqual([
-      { id: "review-pair", status: "COMPLETE" },
+      { id: "review-pair", status: "INCOMPLETE" },
     ]);
+    const validated = validateTeamworkPlan(plan, env.taskRoot);
+    for (const [index, assignment] of validated.assignments.entries()) {
+      const reportFile = path.join(env.taskRoot, path.dirname(assignment.briefPath), "attempts", `${assignment.assignmentId}.attempt.0`, "report.json");
+      const reviewed = await reviewTeamworkReport({ plan: validated, taskRoot: env.taskRoot,
+        cwd: env.projectDir, assignmentId: assignment.assignmentId, decision: "accepted",
+        reason: "All assigned criteria checked against report evidence",
+        reportSha256: crypto.createHash("sha256").update(fs.readFileSync(reportFile)).digest("hex") });
+      expect(reviewed.status).toBe(index === validated.assignments.length - 1 ? "ALL_ACCEPTED" : "AWAITING_REVIEW");
+    }
   });
 
   it("continues a timed-out attempt in place without consuming a retry", async () => {
@@ -1205,7 +1338,7 @@ describe("TeamworkSession teammate coordinator", () => {
       },
     });
 
-    expect(receipt.status).toBe("ALL_ACCEPTED");
+    expect(receipt.status).toBe("AWAITING_REVIEW");
     expect(receipt.retryCounts["work-a"]).toBe(0);
     expect(waits).toBe(1);
     expect(dispatched).toHaveLength(1);
@@ -1214,7 +1347,7 @@ describe("TeamworkSession teammate coordinator", () => {
       cwd: env.projectDir,
     });
     expect(state.assignments[0]).toMatchObject({
-      state: "ACCEPTED",
+      state: "AWAITING_REVIEW",
       retryCount: 0,
     });
     expect(state.attempts[0]).toMatchObject({
@@ -1255,8 +1388,8 @@ describe("TeamworkSession teammate coordinator", () => {
       },
     });
 
-    expect(receipt.status).toBe("ALL_ACCEPTED");
-    expect(receipt.assignments[0].status).toBe("ACCEPTED");
+    expect(receipt.status).toBe("AWAITING_REVIEW");
+    expect(receipt.assignments[0].status).toBe("AWAITING_REVIEW");
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(continueAttempt).toHaveBeenCalledTimes(9);
     expect(leaseGuard.release).toHaveBeenCalledTimes(1);
@@ -1269,7 +1402,7 @@ describe("TeamworkSession teammate coordinator", () => {
       retryCount: 0,
       terminal: true,
     });
-    expect(state.assignments[0].state).toBe("ACCEPTED");
+    expect(state.assignments[0].state).toBe("AWAITING_REVIEW");
     expect(state.leases).toEqual([]);
   });
 
@@ -1527,7 +1660,7 @@ describe("TeamworkSession teammate coordinator", () => {
   });
 
   it.each(["directory", "malformed"] as const)(
-    "retains the active lease when a terminal attempt has a %s report artifact",
+    "settles a terminal attempt with a %s report artifact as member failure",
     async (artifactKind) => {
       const plan = createPlan(env.taskRoot, ["work-a"], 1);
       const batchGuard = {
@@ -1565,14 +1698,14 @@ describe("TeamworkSession teammate coordinator", () => {
         },
       });
 
-      expect(receipt.status).toBe("RECONCILIATION_REQUIRED");
-      expect(receipt.assignments[0]?.status).toBe("UNKNOWN");
-      expect(batchGuard.release).not.toHaveBeenCalled();
+      expect(receipt.status).toBe("SETTLED_WITH_FAILURE");
+      expect(receipt.assignments[0]?.status).toBe("FINAL_FAILED");
+      expect(batchGuard.release).toHaveBeenCalledOnce();
       const state = await readCoordinationState({
         sessionId: "parallel",
         cwd: env.projectDir,
       });
-      expect(state.leases).toHaveLength(1);
+      expect(state.leases).toHaveLength(0);
     },
   );
 
@@ -1656,7 +1789,7 @@ describe("TeamworkSession teammate coordinator", () => {
         },
       },
     };
-    expect((await runTeamworkCoordinator(input)).status).toBe("ALL_ACCEPTED");
+    expect((await runTeamworkCoordinator(input)).status).toBe("AWAITING_REVIEW");
     await recordCoordinationEvent({
       sessionId: "parallel",
       cwd: env.projectDir,
@@ -1678,7 +1811,7 @@ describe("TeamworkSession teammate coordinator", () => {
       sessionId: "parallel",
       cwd: env.projectDir,
     });
-    expect(state.batches[0]?.state).toBe("ALL_ACCEPTED");
+    expect(state.batches[0]?.state).toBe("AWAITING_REVIEW");
     expect(state.leases).toContainEqual(
       expect.objectContaining({ leaseId: "conflicting-live-lease" }),
     );
@@ -1710,7 +1843,7 @@ describe("TeamworkSession teammate coordinator", () => {
         },
       },
     };
-    expect((await runTeamworkCoordinator(input)).status).toBe("ALL_ACCEPTED");
+    expect((await runTeamworkCoordinator(input)).status).toBe("AWAITING_REVIEW");
     await recordCoordinationEvent({
       sessionId: "parallel",
       cwd: env.projectDir,
@@ -1722,7 +1855,7 @@ describe("TeamworkSession teammate coordinator", () => {
       payload: {
         schemaVersion: 1,
         batchId: plan.batch_id,
-        status: "ALL_ACCEPTED",
+        status: "AWAITING_REVIEW",
         assignments: [],
         capacity: 1,
         retryCounts: {},

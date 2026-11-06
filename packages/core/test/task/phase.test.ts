@@ -60,12 +60,17 @@ describe("task phase identifiers", () => {
           reason: "No decision branch applies",
           evidence_refs: ["prd.md"],
           task_route_revision: "1",
+          input_revision: "1",
+          artifact_revision: artifactRevision,
         },
       },
       return_record: null,
     };
 
     expect(parseTaskWorkflowState(state)).toEqual(state);
+    expect(() => parseTaskWorkflowState({ ...state, skip_records: {
+      [TASK_PHASE_IDS[1]]: { ...state.skip_records[TASK_PHASE_IDS[1]], input_revision: "" },
+    } })).toThrow(/skip_records/);
     const admission = {
       task_route_revision: "1",
       dependencies: ["provider-transport"],
@@ -200,6 +205,8 @@ describe("task phase identifiers", () => {
           reason: skippedPhase.reason,
           evidence_refs: skippedPhase.evidence_refs,
           task_route_revision: "1",
+          input_revision: "1",
+          artifact_revision: artifactRevision,
         },
       },
     };
