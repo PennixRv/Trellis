@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.3",
+  "description": "Taskless routing gate and explicit task-creation approval",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Clarify the taskless workflow contract for bounded, immediately verifiable work and require approval before inferred task creation when the user did not explicitly request a task.",
+  "migrations": [],
+  "notes": "The release updates bundled workflow templates and agent guidance only; no project file migration is required."
+}
