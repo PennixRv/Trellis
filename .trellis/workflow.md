@@ -4,7 +4,7 @@
 
 1. 保持下表列出的业务阶段各自独立。每个阶段都有自己的活动、产物、接受条件和回流路径。
 2. 任务与阶段事实由 Trellis CLI 管理。Skills、Hooks、Teamwork、Paseo 和其他组件按各自职责提供指引、证据或执行能力。
-3. 采用满足任务风险和验收需要的最小流程。可以基于证据跳过阶段；边界清楚、风险低、可逆、已获授权且能立即验证的请求可以不创建 Trellis task。
+3. 采用满足任务风险和验收需要的最小流程。可以基于证据跳过阶段；目标清楚、责任方单一、范围封闭、风险受控、已获授权、能在当前会话立即验证且不需要持久路线、协调、设计、审查、发布、安装、迁移或外部交付的请求可以不创建 Trellis task。不可逆动作还必须有精确对象核验、可接受的恢复或损失边界和停止条件；用户授权不是唯一充分条件。
 4. 在任务资产中记录决定和当前证据。不得从阶段状态、Teamwork 结果或会话交接状态推断任务状态。
 
 ## Trellis 项目上下文
@@ -74,7 +74,7 @@ python3 ./.trellis/scripts/add_session.py --title "<title>" --summary "<summary>
 ```mermaid
 flowchart LR
   request["用户请求"] --> triage{"是否需要 Trellis task？"}
-  triage -->|"否；边界清楚、低风险、可逆、已授权且可验证"| direct["直接处理并验证"]
+  triage -->|"否；目标/范围清楚、风险受控、已授权、可立即验证且无需持久治理"| direct["直接处理并验证"]
   triage -->|"是"| goal_exploration_and_requirements["目标探索与需求核对阶段"]
   goal_exploration_and_requirements -->|"当前基线已获用户确认"| decision_space_construction_and_merging["决策空间构造与归并阶段"]
   decision_space_construction_and_merging -->|"已接受或有证据的跳过记录"| solution_design_and_convergence["解决方案设计与收敛阶段"]
@@ -88,7 +88,7 @@ flowchart LR
 <!-- 宿主 Hook 从以下区块读取每轮工作流提示。 -->
 
 [workflow-state:no_task]
-先判断请求性质。只有范围清楚、责任方单一、风险低、可逆、已获授权且能立即验证时，才直接处理而不创建任务；否则创建或恢复 Trellis task。创建任务不代表获准实施。
+先按 taskless 合同判断目标、责任方、范围、风险、授权、立即验证和持久治理需要。全部满足时直接处理并验证，不创建 task；不可逆动作还要核验精确对象、恢复或损失边界和停止条件。若模型判断需要任务而用户没有明确要求创建，先说明不满足的门槛、任务 owner/范围/路线和不建任务的风险，向用户申请后再调用 create。用户明确要求创建或恢复任务时复用该创建授权。创建任务不代表获准实施。
 [/workflow-state:no_task]
 
 [workflow-state:task_error]
