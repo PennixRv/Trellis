@@ -19,6 +19,11 @@ describe("request intake distribution", () => {
       );
       expect(intake?.[1]).toContain("earliest affected phase");
       expect(intake?.[1]).toContain("do not repeat session initialization");
+      expect(intake?.[1]).toContain(
+        "stop before the create command and ask for creation approval",
+      );
+      expect(intake?.[1]).toContain("User authorization alone is not sufficient");
+      expect(intake?.[1]).toContain("lifecycle action only");
       for (const phase of [
         "goal-exploration-and-requirements",
         "decision-space-construction-and-merging",

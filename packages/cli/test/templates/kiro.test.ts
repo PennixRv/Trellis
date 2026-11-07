@@ -63,6 +63,9 @@ describe("kiro templates", () => {
     expect(guidance).toContain("Task Implementation and Test Verification Phase");
     expect(guidance).toContain("Delivery Review and On-Site Closeout Phase");
     expect(guidance).toContain("taskless route");
+    expect(guidance).toContain("ask before running task.py create");
+    expect(guidance).toContain("explicitly request one");
+    expect(guidance).toContain("lifecycle action only");
     expect(guidance).toContain("task lifecycle status and artifact presence do not");
     expect(guidance).toContain("implementation authorization");
     expect(guidance).not.toContain("plan / implement / check phases");

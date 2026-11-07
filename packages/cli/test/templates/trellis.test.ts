@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getCommandTemplates } from "../../src/templates/common/index.js";
+import {
+  getCommandTemplates,
+  getSkillTemplates,
+} from "../../src/templates/common/index.js";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -131,6 +134,25 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).toContain("实施合同已授权");
     expect(workflowMdTemplate).toContain("会话交接");
     expect(workflowMdTemplate).not.toContain("phase model");
+  });
+
+  it("workflow taskless routing uses governance gates and creation approval", () => {
+    expect(workflowMdTemplate).toContain("责任方单一、范围封闭、风险受控");
+    expect(workflowMdTemplate).toContain("持久路线、协调、设计、审查、发布、安装、迁移");
+    expect(workflowMdTemplate).toContain("向用户申请后再调用 create");
+    expect(workflowMdTemplate).toContain("用户明确要求创建或恢复任务时复用该创建授权");
+    expect(workflowMdTemplate).toContain("用户授权不是唯一充分条件");
+  });
+
+  it("request intake preserves taskless examples and the pre-create gate", () => {
+    const intake = getSkillTemplates().find(
+      (skill) => skill.name === "request-intake",
+    )?.content ?? "";
+    expect(intake).toContain("Read-only inspection, bounded diagnosis");
+    expect(intake).toContain("User authorization alone is not sufficient");
+    expect(intake).toContain("stop before the create command and ask for creation approval");
+    expect(intake).toContain("explicitly ask to create a task");
+    expect(intake).toContain("lifecycle action only");
   });
 
   it("keeps Task Implementation and Test Verification Phase tools conditional on the task and change", () => {
