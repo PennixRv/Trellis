@@ -1,0 +1,177 @@
+{
+  "id": "decision-design-convergence-fix",
+  "name": "decision-design-convergence-fix",
+  "title": "实现决策与方案阶段的最小防早收敛修订并发布重装",
+  "description": "补强两阶段 bundled workflow 的重要分支发现、答后重算和退出依据；沿现有 beta 路线发布、重装及原生物化，保留轻量验证和干净 Git。用户授权记录位于根任务 implementation-approval.md。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-11-08",
+  "completedAt": "2026-11-08",
+  "branch": "v0.7.1",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "implementation",
+      "complexity": "complex",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "decision_space_construction_and_merging",
+        "solution_design_and_convergence",
+        "task_implementation",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "11",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "42764f77cc2ce47443c75fc594a1737891c370b288134260fb4346357175a1fd",
+          "artifact_refs": [
+            "prd.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "prd.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "42764f77cc2ce47443c75fc594a1737891c370b288134260fb4346357175a1fd",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "approval.md"
+            ]
+          }
+        },
+        "decision_space_construction_and_merging": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "810d267bc81d9a84a7aecdb9a9501b5fbee3272bffc64a3adc25b3c1f425031c",
+          "artifact_refs": [
+            "design.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "design.md",
+          "outcome_kind": "decision_space",
+          "reason": null,
+          "evidence_refs": [
+            "approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "810d267bc81d9a84a7aecdb9a9501b5fbee3272bffc64a3adc25b3c1f425031c",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "approval.md"
+            ]
+          }
+        },
+        "solution_design_and_convergence": {
+          "status": "accepted",
+          "input_revision": "6",
+          "artifact_revision": "810d267bc81d9a84a7aecdb9a9501b5fbee3272bffc64a3adc25b3c1f425031c",
+          "artifact_refs": [
+            "design.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "design.md",
+          "outcome_kind": "implementation_contract",
+          "reason": null,
+          "evidence_refs": [
+            "approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "810d267bc81d9a84a7aecdb9a9501b5fbee3272bffc64a3adc25b3c1f425031c",
+            "result_revision": "1",
+            "input_revision": "6",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "approval.md"
+            ]
+          }
+        },
+        "task_implementation": {
+          "status": "accepted",
+          "input_revision": "8",
+          "artifact_revision": "297a72bd22a4111334f69281b6f55b44c1ebf8bfdbd4eea086f68962c65df308",
+          "artifact_refs": [
+            "execution.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "execution.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "297a72bd22a4111334f69281b6f55b44c1ebf8bfdbd4eea086f68962c65df308",
+            "result_revision": "1",
+            "input_revision": "8",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "approval.md"
+            ]
+          }
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "10",
+          "artifact_revision": "52486e17457385ee9e3a2f26eff7f9d1bbb3250c61493d5111b622c82cbe5032",
+          "artifact_refs": [
+            "delivery-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "delivery-review.md",
+          "outcome_kind": "delivery_ready",
+          "reason": null,
+          "evidence_refs": [
+            "execution.md",
+            "approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "52486e17457385ee9e3a2f26eff7f9d1bbb3250c61493d5111b622c82cbe5032",
+            "result_revision": "1",
+            "input_revision": "10",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "execution.md",
+              "approval.md"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": {
+        "contract_ref": "design.md",
+        "contract_revision": "810d267bc81d9a84a7aecdb9a9501b5fbee3272bffc64a3adc25b3c1f425031c",
+        "approval_ref": "approval.md",
+        "task_route_revision": "1"
+      },
+      "closeout_disposition": "delivery_ready",
+      "skip_records": {},
+      "return_record": null
+    }
+  }
+}

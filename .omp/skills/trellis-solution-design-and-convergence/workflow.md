@@ -4,6 +4,8 @@
 
 比较适用方案，说明选择依据、重要后果、行为边界、责任、必要依赖、验证方式、停止与恢复条件及实质风险。对新颖核心机制、重大重构、跨组件边界变化或关键不确定性缺少可信本地先例的方案，在结果接受前完成有界 `prior-art review`，记录适用性、采纳或排除理由，或说明没有适用先例。外部材料改变候选、标准或依赖时回到决策空间构造与归并阶段。
 
+用户答复、新证据、方案修订或复核发现后，重新筛选受影响的重要选择：是否出现新分支、前置是否满足、原决定是否仍有效。先保存真实答案及其影响，只重开受影响项；可查事实继续补证，用户取舍按依赖提问，不把问完原有列表或当前无就绪问题等同于方案完整。关键未知须有补证、用户决定、明确接受的剩余风险、延期或不继续等处置，不能静默排除。
+
 判断当前结果：分析交付形成 `analysis_conclusion`；不继续形成 `no_go`；延期形成带责任方、触发条件和恢复位置的 `deferred`，留在解决方案设计与收敛阶段；实施路线形成 `implementation_contract`，明确目标、范围和接受条件，并按路线需要补足实施与核验信息。只有交付物具有独立实施或集成边界时才拆分工作包，并说明推进和协作所需的依赖、顺序、责任或集成信息；单一交付不人为拆分工作包。解决方案设计与收敛阶段的结果接受与实施授权分开记录；只有合同及明确批准均有效时，Trellis CLI 才允许进入任务实施与测试验证阶段。
 
 合同结果已接受、实施尚未授权时，发现需要返修，应通过 `task.py phase return` 回到本阶段或更早受影响阶段，记录理由和证据。受影响的接受与授权随之失效；修订后重新接受当前产物，再核验实施授权。
@@ -14,22 +16,29 @@
 
 研究、原型和协作证据写回现有阶段产物、research 或 execution 自然落点，注明来源与版本、事实和假设、适用性、限制及决定影响。证据足够即停止扩搜；工具、报告或模板不能替代用户决定和 Trellis 原生接受事实。
 
+请求整体批准前，落实已有独立复核，在现有产物简短说明关键反例、发现及处置。以当前任务的具体行为或交付物检验端到端可执行性与验收依据；涉及发布安装时，核对本地验证、发布产物和实际运行身份的关系，不能只凭版本字符串认定同一产物。发现未决重要选择就回到筛选，不为没有新发现的情况追加轮次；充分的整体接受和实施授权不重复索取。
+
 ```mermaid
 flowchart TD
-  input["核对需求基线与已接受的 DecisionSpace"] --> decisions{"存在尚待用户决定的实质取舍？"}
+  input["核对需求基线与已接受的 DecisionSpace"] --> rescreen["复用已定事项，重新筛选重要分支、前置与未知处置"]
+  rescreen --> decisions{"存在尚待用户决定的实质取舍？"}
   decisions -->|"是"| grill["pennix-decision-grill 同步询问；留在解决方案设计与收敛阶段"]
   grill --> impact{"答复影响哪个范围？"}
   impact -->|"目标或范围"| goal_exploration_and_requirements["回到目标探索与需求核对阶段"]
   impact -->|"候选、标准或依赖"| decision_space_construction_and_merging["回到决策空间构造与归并阶段"]
-  impact -->|"当前候选中的选择"| compare["比较方案和重要后果"]
-  decisions -->|"否"| compare
+  impact -->|"当前候选中的选择；保存答复后重算"| rescreen
+  decisions -->|"否；必要证据和未知已有处置"| compare["比较方案和重要后果"]
+  decisions -->|"前置或证据尚缺"| repair["补证或修订受影响方案"]
+  repair --> rescreen
   compare --> prior{"触发 prior-art review？"}
   prior -->|"是"| review["核验相关开源实现或公开提案并记录适用性"]
   review --> changed{"外部证据改变候选、标准或依赖？"}
   changed -->|"是"| decision_space_construction_and_merging
-  changed -->|"否"| assess["核对完整性、风险、验证和恢复条件"]
+  changed -->|"否"| newDecisions{"新证据出现未决重要分支？"}
+  newDecisions -->|"是"| rescreen
+  newDecisions -->|"否"| assess["独立复核完整性、风险、验证、恢复与关键发现处置"]
   prior -->|"否"| assess
-  assess -->|"有实质缺口"| compare
+  assess -->|"有实质缺口；补证或修订后重算"| repair
   assess -->|"analysis_conclusion 或 no_go"| reviewResult["Trellis CLI 接受解决方案设计与收敛阶段结果"]
   assess -->|"deferred"| defer["记录恢复条件并留在解决方案设计与收敛阶段"]
   assess -->|"implementation_contract"| contract["冻结必要实施合同"]
