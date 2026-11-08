@@ -25,7 +25,7 @@
   "meta": {
     "task_workflow": {
       "schema_version": 1,
-      "task_route_revision": "1",
+      "task_route_revision": "2",
       "task_kind": "implementation",
       "complexity": "complex",
       "project_context": "existing",
@@ -37,7 +37,7 @@
         "delivery_review_and_closeout"
       ],
       "current_phase_id": null,
-      "input_revision": "11",
+      "input_revision": "15",
       "phases": {
         "goal_exploration_and_requirements": {
           "status": "accepted",
@@ -113,12 +113,12 @@
         },
         "task_implementation": {
           "status": "accepted",
-          "input_revision": "8",
-          "artifact_revision": "297a72bd22a4111334f69281b6f55b44c1ebf8bfdbd4eea086f68962c65df308",
+          "input_revision": "13",
+          "artifact_revision": "76456022e824af03e109c667b31699ef76760911806a0c386207ee4edab17516",
           "artifact_refs": [
             "execution.md"
           ],
-          "result_revision": "1",
+          "result_revision": "2",
           "result_ref": "execution.md",
           "outcome_kind": "accepted",
           "reason": null,
@@ -126,10 +126,10 @@
             "approval.md"
           ],
           "acceptance": {
-            "artifact_revision": "297a72bd22a4111334f69281b6f55b44c1ebf8bfdbd4eea086f68962c65df308",
-            "result_revision": "1",
-            "input_revision": "8",
-            "task_route_revision": "1",
+            "artifact_revision": "76456022e824af03e109c667b31699ef76760911806a0c386207ee4edab17516",
+            "result_revision": "2",
+            "input_revision": "13",
+            "task_route_revision": "2",
             "evidence_refs": [
               "approval.md"
             ]
@@ -137,12 +137,12 @@
         },
         "delivery_review_and_closeout": {
           "status": "accepted",
-          "input_revision": "10",
+          "input_revision": "14",
           "artifact_revision": "52486e17457385ee9e3a2f26eff7f9d1bbb3250c61493d5111b622c82cbe5032",
           "artifact_refs": [
             "delivery-review.md"
           ],
-          "result_revision": "1",
+          "result_revision": "2",
           "result_ref": "delivery-review.md",
           "outcome_kind": "delivery_ready",
           "reason": null,
@@ -152,9 +152,9 @@
           ],
           "acceptance": {
             "artifact_revision": "52486e17457385ee9e3a2f26eff7f9d1bbb3250c61493d5111b622c82cbe5032",
-            "result_revision": "1",
-            "input_revision": "10",
-            "task_route_revision": "1",
+            "result_revision": "2",
+            "input_revision": "14",
+            "task_route_revision": "2",
             "evidence_refs": [
               "execution.md",
               "approval.md"
@@ -167,11 +167,32 @@
         "contract_ref": "design.md",
         "contract_revision": "810d267bc81d9a84a7aecdb9a9501b5fbee3272bffc64a3adc25b3c1f425031c",
         "approval_ref": "approval.md",
-        "task_route_revision": "1"
+        "task_route_revision": "2"
       },
       "closeout_disposition": "delivery_ready",
       "skip_records": {},
-      "return_record": null
-    }
+      "return_record": {
+        "from": "delivery_review_and_closeout",
+        "to": "task_implementation",
+        "reason": "Refresh implementation acceptance after correcting npm package identity in execution evidence",
+        "evidence_refs": [
+          "execution.md"
+        ],
+        "task_route_revision": "2"
+      }
+    },
+    "task_lifecycle_recoveries": [
+      {
+        "from_status": "completed",
+        "to_status": "planning",
+        "reason": "Correct the recorded public npm package identity and align accepted phase evidence with the verified release state",
+        "evidence_refs": [
+          "execution.md"
+        ],
+        "reopened_at": "2026-11-08T07:48:23.234361+00:00",
+        "terminal_completed_at": "2026-11-08",
+        "terminal_cancellation": null
+      }
+    ]
   }
 }
