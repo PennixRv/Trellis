@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.4",
+  "description": "Bounded decision discovery and solution re-evaluation before convergence",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Challenge material defaults before decision handoff, reconsider affected choices after answers and evidence, and record completion evidence before requesting overall approval without adding fixed interview rounds.",
+  "migrations": [],
+  "notes": "Updates the two bundled phase workflow documents and diagrams. Use native trellis update to refresh project skills; no project file migration is required."
+}
