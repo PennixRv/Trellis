@@ -57,7 +57,10 @@ function hasPython(): boolean {
 }
 
 function setupRepo(root: string): void {
-  fs.writeFileSync(path.join(root, ".gitignore"), ".trellis/.runtime/\n");
+  fs.writeFileSync(
+    path.join(root, ".gitignore"),
+    ".trellis/.runtime/\n__pycache__/\n",
+  );
   const scriptsDir = path.join(root, ".trellis", "scripts");
   fs.mkdirSync(scriptsDir, { recursive: true });
   fs.cpSync(TEMPLATE_SCRIPTS, scriptsDir, { recursive: true });
@@ -964,14 +967,12 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     },
   );
 
-  it("starts an authorized child through Paseo and records its worktree and agent mapping", () => {
-    const designPath = prepareImplementationContract(root);
-    authorizeImplementation(
-      root,
-      path.relative(taskDirectory(root, TASK), designPath),
-    );
+  it("runs protocol v1 through native controller CLI and recovers unknown agent creation without replay", () => {
+    prepareImplementationContract(root);
+    authorizeImplementation(root, "design.md");
     const childId = linkChildTask(root);
-    const roleDir = path.join(root, ".trellis", "agents");
+    const childDir = taskDirectory(root, childId);
+    const roleDir = path.join(root, ".trellis/agents");
     fs.mkdirSync(roleDir, { recursive: true });
     fs.copyFileSync(
       path.resolve(
@@ -980,324 +981,231 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       ),
       path.join(roleDir, "delegated-worktree-primary-agent.md"),
     );
-    const baseCommit = createGitBaseline(root);
-    runOk(root, "delegate-bind", childId);
-    const paseo = installPaseoStub(root);
-
-    const result = runTaskWithEnv(
+    fs.writeFileSync(
+      path.join(childDir, "settings.json"),
+      JSON.stringify({
+        version: 1,
+        provider: "codex",
+        model: "fixture-model",
+        effort: "high",
+        mode: "full-access",
+      }),
+    );
+    fs.writeFileSync(
+      path.join(childDir, "requirements.json"),
+      JSON.stringify({ version: 1, allowed_paths: ["source.txt"] }),
+    );
+    createGitBaseline(root);
+    const branch = execFileSync("git", ["branch", "--show-current"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+    const bind = () =>
+      runTask(
+        root,
+        "delegate-bind",
+        childId,
+        "--target-repo",
+        root,
+        "--integration-branch",
+        branch,
+        "--settings-ref",
+        "settings.json",
+        "--requirements-ref",
+        "requirements.json",
+      );
+    expect(bind().status).toBe(0);
+    const bin = path.join(root, "fixture-bin");
+    fs.mkdirSync(bin);
+    fs.copyFileSync(
+      path.join(__dirname, "fixtures/fake_paseo_adapter.py"),
+      path.join(bin, "trellis-paseo-adapter"),
+    );
+    fs.chmodSync(path.join(bin, "trellis-paseo-adapter"), 0o755);
+    const callsFile = path.join(root, "adapter-calls.jsonl");
+    const env = {
+      PATH: bin + path.delimiter + process.env.PATH,
+      PASEO_TEST_REPO: root,
+      PASEO_TEST_CALLS: callsFile,
+    };
+    const run = (...args: string[]) => runTaskWithEnv(root, env, ...args);
+    const failed = runTaskWithEnv(
       root,
-      {
-        PATH: `${paseo.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
-        PASEO_TEST_REPO: root,
-        PASEO_TEST_CALLS: paseo.callsFile,
-      },
+      { ...env, PASEO_TEST_FAIL_OPERATION: "prepare-agent" },
       "delegate-start",
       childId,
     );
-    expect(result.status, result.stderr).toBe(0);
-    const record = JSON.parse(result.stdout) as {
-      workspace_id: string;
-      worktree_path: string;
-      agent_id: string;
-      base_commit: string;
-      status: string;
-    };
-    expect(record).toMatchObject({
-      workspace_id: "workspace-test-id",
-      agent_id: "agent-test-id",
-      base_commit: baseCommit,
-      status: "running",
-    });
-    expect(fs.existsSync(record.worktree_path)).toBe(true);
-    const child = JSON.parse(
-      fs.readFileSync(
-        path.join(taskDirectory(root, childId), "task.json"),
-        "utf-8",
-      ),
-    ) as {
-      meta: { delegated_worktree_execution_record: Record<string, unknown> };
-    };
-    expect(child.meta.delegated_worktree_execution_record).toMatchObject(
-      record,
+    expect(failed.status).toBe(1);
+    const recordPath = path.join(
+      root,
+      ".trellis/.runtime/delegation",
+      childId,
+      "record.json",
     );
+    const pending = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+    expect(pending.intent).toBe("prepare-agent");
+    expect(run("delegate-start", childId).status).toBe(1);
+    expect(bind().status).toBe(1);
+    const recovered = run(
+      "delegate-reconcile",
+      childId,
+      "--recover",
+      "--workspace-id",
+      "workspace-test-id",
+      "--agent-id",
+      "agent-test-id",
+      "--execute",
+      "--reason",
+      "exact native resource mapping",
+      "--approval-ref",
+      "user:existing",
+    );
+    expect(recovered.status, recovered.stderr).toBe(0);
+    const record = JSON.parse(recovered.stdout);
+    const reportDir = path.join(
+      record.worktree_path,
+      ".trellis-delegation",
+      record.attempt_id,
+    );
+    fs.mkdirSync(reportDir, { recursive: true });
+    const base = {
+      version: 1,
+      attempt_id: record.attempt_id,
+      binding_revision: record.binding.binding_revision,
+      base_commit: record.binding.base_commit,
+      head_commit: record.binding.base_commit,
+      workspace_id: record.workspace_id,
+      agent_id: record.agent_id,
+      observations: {},
+      limitations: [],
+    };
+    fs.writeFileSync(
+      path.join(reportDir, "ready.json"),
+      JSON.stringify({ ...base, kind: "ready", missing: [] }),
+    );
+    expect(run("delegate-execute", childId).status).toBe(0);
+    fs.writeFileSync(
+      path.join(record.worktree_path, "source.txt"),
+      "real source result\n",
+    );
+    execFileSync("git", ["add", "source.txt"], { cwd: record.worktree_path });
+    execFileSync(
+      "git",
+      ["-c", "commit.gpgsign=false", "commit", "-m", "fixture result"],
+      { cwd: record.worktree_path },
+    );
+    const head = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: record.worktree_path,
+      encoding: "utf8",
+    }).trim();
+    fs.writeFileSync(
+      path.join(reportDir, "result.json"),
+      JSON.stringify({
+        ...base,
+        kind: "result",
+        head_commit: head,
+        changed_paths: ["source.txt"],
+        source_commits: [head],
+        checks: ["fixture check passed"],
+        remaining: [],
+      }),
+    );
+    expect(run("delegate-reconcile", childId).status).toBe(1);
+    execFileSync("git", ["merge", "--ff-only", head], { cwd: root });
+    expect(run("delegate-reconcile", childId).status).toBe(0);
+    fs.writeFileSync(
+      path.join(childDir, "writers.md"),
+      "Controller checked native process and resources; no background writer.",
+    );
+    const closed = run(
+      "delegate-reconcile",
+      childId,
+      "--execute",
+      "--reason",
+      "reviewed and integrated",
+      "--approval-ref",
+      "user:existing",
+      "--writer-evidence-ref",
+      "writers.md",
+    );
+    expect(closed.status, closed.stderr).toBe(0);
+    expect(JSON.parse(closed.stdout).status).toBe("retired");
     const calls = fs
-      .readFileSync(paseo.callsFile, "utf-8")
+      .readFileSync(callsFile, "utf8")
       .trim()
       .split("\n")
-      .map((line) => JSON.parse(line) as { args: string[] });
-    expect(calls.map((call) => call.args[0])).toEqual([
-      "--version",
-      "agent",
-      "workspace",
-      "run",
-    ]);
-    expect(calls[3]?.args.at(-1)).toContain("# Child implementation contract");
-    expect(calls[3]?.args.at(-1)).toContain(
-      "sole task-specific implementation contract",
+      .map((line) => JSON.parse(line));
+    expect(
+      calls.filter((call) => call.operation === "prepare-workspace"),
+    ).toHaveLength(1);
+    expect(
+      calls.filter((call) => call.operation === "prepare-agent"),
+    ).toHaveLength(1);
+    expect(calls.filter((call) => call.operation === "execute")).toHaveLength(
+      1,
     );
-    const env = {
-      PATH: `${paseo.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
-      PASEO_TEST_REPO: root,
-      PASEO_TEST_CALLS: paseo.callsFile,
-    };
-    const live = runTaskWithEnv(
-      root,
-      { ...env, PASEO_TEST_AGENT_STATUS: "running" },
-      "delegate-reconcile",
-      childId,
-    );
-    expect(live.status).toBe(1);
-    expect(live.stderr).toContain("TASK_PHASE_RESOURCE_ACTIVE");
-    const preview = runTaskWithEnv(root, env, "delegate-reconcile", childId);
-    expect(preview.status, preview.stderr).toBe(0);
-    expect(JSON.parse(preview.stdout).status).toBe("ready");
-    fs.writeFileSync(
-      path.join(record.worktree_path, "unintegrated.txt"),
-      "preserve me",
-    );
-    const dirty = runTaskWithEnv(
-      root,
-      env,
-      "delegate-reconcile",
-      childId,
-      "--execute",
-      "--reason",
-      "reviewed",
-      "--approval-ref",
-      "user:close",
-    );
-    expect(dirty.status).toBe(1);
-    expect(dirty.stderr).toContain("unintegrated changes");
-    fs.unlinkSync(path.join(record.worktree_path, "unintegrated.txt"));
-    const retired = runTaskWithEnv(
-      root,
-      env,
-      "delegate-reconcile",
-      childId,
-      "--execute",
-      "--reason",
-      "reviewed clean baseline",
-      "--approval-ref",
-      "user:close",
-    );
-    expect(retired.status, retired.stderr).toBe(0);
-    expect(JSON.parse(retired.stdout)).toMatchObject({
-      status: "retired",
-      closure_evidence: { approval_ref: "user:close" },
-    });
     expect(fs.existsSync(record.worktree_path)).toBe(true);
+    expect(
+      JSON.parse(fs.readFileSync(path.join(childDir, "task.json"), "utf8")).meta
+        .delegated_worktree_execution_record,
+    ).toBeUndefined();
   });
 
   it.each(["prd", "role"])(
-    "rejects frozen delegated %s drift before creating a workspace",
+    "refuses protocol v1 frozen %s drift before calling the adapter",
     (kind) => {
       prepareImplementationContract(root);
       authorizeImplementation(root, "design.md");
       const child = linkChildTask(root);
-      const role = path.join(
-        root,
-        ".trellis/agents/delegated-worktree-primary-agent.md",
-      );
+      const dir = taskDirectory(root, child),
+        role = path.join(
+          root,
+          ".trellis/agents/delegated-worktree-primary-agent.md",
+        );
       fs.mkdirSync(path.dirname(role), { recursive: true });
-      fs.writeFileSync(role, "bounded delegated role");
+      fs.writeFileSync(role, "stable role");
+      fs.writeFileSync(
+        path.join(dir, "settings.json"),
+        JSON.stringify({
+          version: 1,
+          provider: "codex",
+          model: "fixture-model",
+          effort: "high",
+          mode: "full-access",
+        }),
+      );
+      fs.writeFileSync(
+        path.join(dir, "requirements.json"),
+        JSON.stringify({ version: 1, allowed_paths: ["source.txt"] }),
+      );
       createGitBaseline(root);
-      runOk(root, "delegate-bind", child);
+      const branch = execFileSync("git", ["branch", "--show-current"], {
+        cwd: root,
+        encoding: "utf8",
+      }).trim();
+      runOk(
+        root,
+        "delegate-bind",
+        child,
+        "--target-repo",
+        root,
+        "--integration-branch",
+        branch,
+        "--settings-ref",
+        "settings.json",
+        "--requirements-ref",
+        "requirements.json",
+      );
       fs.appendFileSync(
-        kind === "prd" ? path.join(taskDirectory(root, child), "prd.md") : role,
+        kind === "prd" ? path.join(dir, "prd.md") : role,
         " changed",
       );
-      const paseo = installPaseoStub(root);
-      const result = runTaskWithEnv(
-        root,
-        {
-          PATH: `${paseo.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
-          PASEO_TEST_REPO: root,
-          PASEO_TEST_CALLS: paseo.callsFile,
-        },
-        "delegate-start",
-        child,
-      );
+      const result = runTask(root, "delegate-start", child);
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("TASK_DELEGATE_STALE_CONTRACT");
-      expect(fs.existsSync(path.join(root, ".paseo-worktrees", child))).toBe(
-        false,
-      );
-      expect(
-        JSON.parse(
-          fs.readFileSync(
-            path.join(taskDirectory(root, child), "task.json"),
-            "utf8",
-          ),
-        ).meta.delegated_worktree_execution_record,
-      ).toBeUndefined();
+      expect(result.stderr).toContain("frozen input");
+      expect(fs.existsSync(path.join(root, ".paseo-worktrees"))).toBe(false);
     },
   );
-
-  it("preserves an uncertain run and reuses or rebuilds resources only after reconciliation and fresh authorization", () => {
-    const designPath = prepareImplementationContract(root);
-    authorizeImplementation(
-      root,
-      path.relative(taskDirectory(root, TASK), designPath),
-    );
-    const childId = linkChildTask(root);
-    const roleDir = path.join(root, ".trellis", "agents");
-    fs.mkdirSync(roleDir, { recursive: true });
-    fs.copyFileSync(
-      path.resolve(
-        __dirname,
-        "../../src/templates/trellis/agents/delegated-worktree-primary-agent.md",
-      ),
-      path.join(roleDir, "delegated-worktree-primary-agent.md"),
-    );
-    createGitBaseline(root);
-    const paseo = installPaseoStub(root);
-    const env = {
-      PATH: `${paseo.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
-      PASEO_TEST_REPO: root,
-      PASEO_TEST_CALLS: paseo.callsFile,
-      PASEO_TEST_FAIL_RUN: "1",
-    };
-    runOk(root, "delegate-bind", childId);
-
-    const failed = runTaskWithEnv(root, env, "delegate-start", childId);
-    expect(failed.status, failed.stderr).toBe(1);
-    expect(failed.stderr).toContain("TASK_DELEGATE_AGENT_START_FAILED");
-    const childTaskPath = path.join(taskDirectory(root, childId), "task.json");
-    const child = JSON.parse(fs.readFileSync(childTaskPath, "utf-8")) as {
-      meta: { delegated_worktree_execution_record: Record<string, unknown> };
-    };
-    expect(child.meta.delegated_worktree_execution_record).toMatchObject({
-      workspace_id: "workspace-test-id",
-      status: "reconciliation_required",
-      last_error: { code: "TASK_DELEGATE_AGENT_START_FAILED" },
-    });
-    expect(
-      fs.existsSync(
-        child.meta.delegated_worktree_execution_record.worktree_path as string,
-      ),
-    ).toBe(true);
-
-    const retryWithoutAuthorization = runTaskWithEnv(
-      root,
-      env,
-      "delegate-start",
-      childId,
-    );
-    expect(retryWithoutAuthorization.status).toBe(1);
-    expect(retryWithoutAuthorization.stderr).toContain(
-      "TASK_DELEGATE_REAUTHORIZATION_REQUIRED",
-    );
-
-    authorizeImplementation(
-      root,
-      path.relative(taskDirectory(root, TASK), designPath),
-      "user-message:retry-approved",
-    );
-    runOk(root, "delegate-bind", childId);
-    const retryEnv: NodeJS.ProcessEnv = { ...env };
-    delete retryEnv.PASEO_TEST_FAIL_RUN;
-    const activeAgent = runTaskWithEnv(
-      root,
-      { ...retryEnv, PASEO_TEST_AGENT_STATUS: "running" },
-      "delegate-start",
-      childId,
-    );
-    expect(activeAgent.status).toBe(1);
-    expect(activeAgent.stderr).toContain(
-      "TASK_DELEGATE_RECONCILIATION_REQUIRED",
-    );
-
-    const mappedWorktree = child.meta.delegated_worktree_execution_record
-      .worktree_path as string;
-    const untrackedFile = path.join(mappedWorktree, "untracked-result.md");
-    fs.writeFileSync(untrackedFile, "preserve this result\n");
-    const dirtyWorkspace = runTaskWithEnv(
-      root,
-      { ...retryEnv, PASEO_TEST_AGENT_STATUS: "closed" },
-      "delegate-start",
-      childId,
-    );
-    expect(dirtyWorkspace.status).toBe(1);
-    expect(dirtyWorkspace.stderr).toContain(
-      "TASK_DELEGATE_RECONCILIATION_REQUIRED",
-    );
-    expect(fs.readFileSync(untrackedFile, "utf-8")).toBe(
-      "preserve this result\n",
-    );
-    fs.rmSync(untrackedFile);
-
-    const retry = runTaskWithEnv(
-      root,
-      {
-        ...retryEnv,
-        PASEO_TEST_AGENT_STATUS: "closed",
-        PASEO_TEST_RUN_AGENT_ID: "agent-retried-id",
-      },
-      "delegate-start",
-      childId,
-    );
-    expect(retry.status, retry.stderr).toBe(0);
-    const retriedRecord = JSON.parse(retry.stdout) as Record<string, unknown>;
-    expect(retriedRecord).toMatchObject({
-      workspace_id: "workspace-test-id",
-      agent_id: "agent-retried-id",
-      base_commit: child.meta.delegated_worktree_execution_record.base_commit,
-      authorization_ref: "user-message:retry-approved",
-      status: "running",
-    });
-    const calls = fs
-      .readFileSync(paseo.callsFile, "utf-8")
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line).args as string[]);
-    expect(
-      calls.filter((args) => args[0] === "workspace" && args[1] === "create"),
-    ).toHaveLength(1);
-    expect(calls.filter((args) => args[0] === "run")).toHaveLength(2);
-
-    const retriedWorktree = retriedRecord.worktree_path as string;
-    authorizeImplementation(
-      root,
-      path.relative(taskDirectory(root, TASK), designPath),
-      "user-message:retry-after-cleanup-approved",
-    );
-    runOk(root, "delegate-bind", childId);
-    execFileSync("git", ["worktree", "remove", "--force", retriedWorktree], {
-      cwd: root,
-    });
-    execFileSync("git", ["branch", "-D", "test/delegated-child"], {
-      cwd: root,
-    });
-    const rebuilt = runTaskWithEnv(
-      root,
-      {
-        ...retryEnv,
-        PASEO_TEST_WORKSPACE_ACTIVE: "0",
-        PASEO_TEST_AGENT_STATUS: "closed",
-        PASEO_TEST_AGENT_ID: "agent-retried-id",
-        PASEO_TEST_RUN_AGENT_ID: "agent-rebuilt-id",
-      },
-      "delegate-start",
-      childId,
-    );
-    expect(rebuilt.status, rebuilt.stderr).toBe(0);
-    expect(JSON.parse(rebuilt.stdout)).toMatchObject({
-      agent_id: "agent-rebuilt-id",
-      authorization_ref: "user-message:retry-after-cleanup-approved",
-      status: "running",
-    });
-    const finalCalls = fs
-      .readFileSync(paseo.callsFile, "utf-8")
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line).args as string[]);
-    expect(
-      finalCalls.filter(
-        (args) => args[0] === "workspace" && args[1] === "create",
-      ),
-    ).toHaveLength(2);
-    expect(finalCalls.filter((args) => args[0] === "run")).toHaveLength(3);
-  });
 
   it("rejects task routes without Delivery Review and On-Site Closeout Phase", () => {
     const routeWithoutCloseout = runTask(
@@ -2806,8 +2714,12 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
   });
 
   it("includes initialized submodule worktree changes in continuity digests", () => {
-    const origin = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-continuity-submodule-origin-"));
-    const nestedOrigin = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-continuity-nested-origin-"));
+    const origin = fs.mkdtempSync(
+      path.join(os.tmpdir(), "trellis-continuity-submodule-origin-"),
+    );
+    const nestedOrigin = fs.mkdtempSync(
+      path.join(os.tmpdir(), "trellis-continuity-nested-origin-"),
+    );
     const git = (cwd: string, ...args: string[]) =>
       execFileSync("git", args, { cwd, stdio: "ignore" });
     try {
@@ -2824,30 +2736,87 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
       fs.writeFileSync(path.join(nestedOrigin, "nested.txt"), "nested base\n");
       git(nestedOrigin, "add", ".");
       git(nestedOrigin, "commit", "--quiet", "-m", "nested baseline");
-      execFileSync("git", ["-c", "protocol.file.allow=always", "submodule", "add", "--quiet", nestedOrigin, "nested"], { cwd: origin, stdio: "ignore" });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "protocol.file.allow=always",
+          "submodule",
+          "add",
+          "--quiet",
+          nestedOrigin,
+          "nested",
+        ],
+        { cwd: origin, stdio: "ignore" },
+      );
       git(origin, "commit", "--quiet", "-am", "add nested submodule");
 
       git(root, "init", "--quiet", "--initial-branch=main");
       git(root, "config", "user.email", "test@example.invalid");
       git(root, "config", "user.name", "Trellis test");
-      execFileSync("git", ["-c", "protocol.file.allow=always", "submodule", "add", "--quiet", origin, "module"], { cwd: root, stdio: "ignore" });
-      execFileSync("git", ["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"], { cwd: root, stdio: "ignore" });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "protocol.file.allow=always",
+          "submodule",
+          "add",
+          "--quiet",
+          origin,
+          "module",
+        ],
+        { cwd: root, stdio: "ignore" },
+      );
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "protocol.file.allow=always",
+          "submodule",
+          "update",
+          "--init",
+          "--recursive",
+        ],
+        { cwd: root, stdio: "ignore" },
+      );
       git(root, "add", ".");
       git(root, "commit", "--quiet", "-m", "root baseline");
       runOkAs(root, "submodule-session", "start", TASK);
 
-      const baseline = JSON.parse(runOkAs(root, "submodule-session", "continuity", "show"));
+      const baseline = JSON.parse(
+        runOkAs(root, "submodule-session", "continuity", "show"),
+      );
       fs.writeFileSync(path.join(root, "module", "tracked.txt"), "changed\n");
-      const changed = JSON.parse(runOkAs(root, "submodule-session", "continuity", "show"));
-      expect(changed.current.git.content_digest).not.toBe(baseline.current.git.content_digest);
-      expect(changed.current.git.submodules[0].status_digest).not.toBe(baseline.current.git.submodules[0].status_digest);
+      const changed = JSON.parse(
+        runOkAs(root, "submodule-session", "continuity", "show"),
+      );
+      expect(changed.current.git.content_digest).not.toBe(
+        baseline.current.git.content_digest,
+      );
+      expect(changed.current.git.submodules[0].status_digest).not.toBe(
+        baseline.current.git.submodules[0].status_digest,
+      );
 
-      fs.writeFileSync(path.join(root, "module", "untracked.txt"), "new evidence\n");
-      const withUntracked = JSON.parse(runOkAs(root, "submodule-session", "continuity", "show"));
-      expect(withUntracked.current.git.content_digest).not.toBe(changed.current.git.content_digest);
-      fs.writeFileSync(path.join(root, "module", "nested", "nested.txt"), "nested changed\n");
-      const nestedChanged = JSON.parse(runOkAs(root, "submodule-session", "continuity", "show"));
-      expect(nestedChanged.current.git.content_digest).not.toBe(withUntracked.current.git.content_digest);
+      fs.writeFileSync(
+        path.join(root, "module", "untracked.txt"),
+        "new evidence\n",
+      );
+      const withUntracked = JSON.parse(
+        runOkAs(root, "submodule-session", "continuity", "show"),
+      );
+      expect(withUntracked.current.git.content_digest).not.toBe(
+        changed.current.git.content_digest,
+      );
+      fs.writeFileSync(
+        path.join(root, "module", "nested", "nested.txt"),
+        "nested changed\n",
+      );
+      const nestedChanged = JSON.parse(
+        runOkAs(root, "submodule-session", "continuity", "show"),
+      );
+      expect(nestedChanged.current.git.content_digest).not.toBe(
+        withUntracked.current.git.content_digest,
+      );
     } finally {
       fs.rmSync(origin, { recursive: true, force: true });
       fs.rmSync(nestedOrigin, { recursive: true, force: true });

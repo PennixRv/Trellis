@@ -1,0 +1,14 @@
+# 主控操作合同
+
+使用项目原生 `python3 .trellis/scripts/task.py <command> --help` 核对参数。先核对父任务有效实施合同、父子链接、owner、当前路线的 Lifecycle/Paseo/Git 准入及证据。一个 controller task 是控制权威；节点不创建第二套阶段状态。
+
+1. 读取 adapter 的 capability（有界 stdin JSON `version=1, operation=capability, daemon_selector={}, payload={cwd:目标绝对路径}`），从实际可用 Codex 模型解析默认值并固定显式 model/effort。使用 mode `full-access`，sandbox/approval/reviewer/context 保留 `native_default`。固定角色为 `.trellis/agents/delegated-worktree-primary-agent.md`，节点方法为 `.trellis/agents/worktree-delegation-node.md`；两包共用同版正文。
+2. 在子任务记录 PRD、`settings.json`、`requirements.json`，通过原生 `task.py set-branch` 设置不存在的执行分支。settings 含 version=1、provider=codex、model、effort、mode=full-access；可指定同机 daemon_home。requirements 含 version=1、非空 allowed_paths、forbidden_paths、required_rules/required_skills/required_tools/checks/resources 字符串数组、可选 setup_ref、teamwork_permission（none/read_only）。声明准确来源、工具真实探测、测试端口/数据库等资源；setup_ref 指向已授权的原生准备动作。禁止副作用隐藏在 setup 中。
+3. `delegate-bind <child> --target-repo <确切 checkout> --integration-branch <owner 分支> --settings-ref settings.json --requirements-ref requirements.json` 冻结 PRD/角色/设置/能力哈希、base、目标 Git 身份及父授权。target 与 controller 可不同；integration 是该目标 owner 分支。主控在启动前检查项目原生 workspace setup/teardown，不允许未经批准的脚本；原生 autoArchiveAfterMerge 必须为 false。CLI 不修改 daemon 配置。
+4. `delegate-start <child>` 先持久化创建 intent，再创建 workspace 和 prepare agent。只授予准备许可；观察 native resources 与 bounded ready，核对当前源码 HEAD、完整必需能力、实际模型/effort/mode；不能只凭节点自报或 idle 就接受。主控检查 `delegate-inspect` 后，`delegate-execute` 发送实施指令。有并行包时分别准备、执行，按真实依赖集成后再派下游。
+5. `delegate-wait <child> --timeout-ms 3600000` 使用原生等待；主控还有独立工作就先推进。没有其他工作时持续原生等待，timeout 不是完成或批准。observe/inspect 不改结果接受；`delegate-followup --instructions-ref <子任务内文件>` 返工前重核当前绑定与实际设置。interrupt 仅请求取消，不证明 writer 已停止。
+6. 压缩/新主控恢复先 inspect，沿当前 task/binding/attempt/native ID 续接。未知创建使用 `delegate-reconcile --recover --workspace-id <完整ID> [--agent-id <完整ID>]` 预览，核验准确原生 workspace、cwd、Git common/branch/base、agent 标签后，显式 `--execute --reason ... --approval-ref ...` 接回。未知发送/取消还需要 `--delivery-evidence-ref`，引用主控实际检查的原生 timeline/turn 证据；不得把 idle 当交付证明。workspace 已映射而尚未发起 agent 时，恢复后 `delegate-start` 仅创建尚未发起的 agent。未知 agent 创建必须先找到准确 ID，不能再创建一个。
+7. owner 审查 result 的真实 commits/diff/checks、范围和控制面未被改动，依赖结果只能在集成后作为当前树事实。通过目标 owner 原生 merge/FF 集成，验证 accepted HEAD 是目标 integration branch 的祖先；禁止默认 cherry-pick。根侧 gitlink 集成单独记录。
+8. `delegate-reconcile --disposition integrated` 预览；确认原生 agent 无 active turn、结果和接受证据、源码保全、后台 writer 与测试服务已停后，使用 `--execute --reason ... --approval-ref ... --writer-evidence-ref <子任务内证据>` 核销。取消可用 retained，保留实际 checkout/HEAD/status 和候选；没有结果时也必须保留源码，不销毁未知 writer。核销仅结束控制记录，不自动 archive/delete。资源删除由原生 owner 另按已批准处置执行。
+
+新协议记录在 ignored `.trellis/.runtime/delegation/<child>/`；任务 PRD 和实施/接受证据仍在原生任务中。不要手写 record、映射或许可。旧 meta 记录只供旧 reconciliation/闭合，不能作为新协议启动成功证据。完成、取消、转移、解绑、移动及重命名前应核销活动委派；遇未知状态保留资源并报告。

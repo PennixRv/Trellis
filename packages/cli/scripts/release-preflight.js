@@ -49,6 +49,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const CORE_PKG = path.join(REPO_ROOT, "packages/core/package.json");
 const CLI_PKG = path.join(REPO_ROOT, "packages/cli/package.json");
+const ADAPTER_PKG = path.join(REPO_ROOT, "packages/paseo-adapter/package.json");
 
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";
@@ -75,11 +76,14 @@ function readJSON(p) {
 function readVersions() {
   const core = readJSON(CORE_PKG);
   const cli = readJSON(CLI_PKG);
+  const adapter = readJSON(ADAPTER_PKG);
   return {
     coreName: core.name,
     coreVersion: core.version,
     cliName: cli.name,
     cliVersion: cli.version,
+    adapterName: adapter.name,
+    adapterVersion: adapter.version,
   };
 }
 
@@ -174,12 +178,13 @@ function fail(msg) {
 
 function checkVersions({ requireTag, quiet = false }) {
   const v = readVersions();
-  if (v.coreVersion !== v.cliVersion) {
+  if (v.coreVersion !== v.cliVersion || v.adapterVersion !== v.cliVersion) {
     fail(
       `Version mismatch:\n` +
         `  ${v.coreName}: ${v.coreVersion}\n` +
         `  ${v.cliName}:  ${v.cliVersion}\n` +
-        `Both packages must share the exact same version. Re-run the release\n` +
+        `  ${v.adapterName}: ${v.adapterVersion}\n` +
+        `All three packages must share the exact same version. Re-run the release\n` +
         `bump script so they move together.`,
     );
   }
@@ -217,11 +222,13 @@ function publishPlan({ output }) {
   const tag = computeNpmTag(v.cliVersion);
   const coreExists = npmVersionExists(v.coreName, v.coreVersion);
   const cliExists = npmVersionExists(v.cliName, v.cliVersion);
+  const adapterExists = npmVersionExists(v.adapterName, v.adapterVersion);
   const plan = {
     version: v.cliVersion,
     tag,
     core: { name: v.coreName, publish: !coreExists, alreadyOnNpm: coreExists },
     cli: { name: v.cliName, publish: !cliExists, alreadyOnNpm: cliExists },
+    adapter: { name: v.adapterName, publish: !adapterExists, alreadyOnNpm: adapterExists },
   };
   if (output === "json") {
     process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
@@ -237,8 +244,10 @@ function publishPlan({ output }) {
         `tag=${plan.tag}`,
         `core_publish=${plan.core.publish}`,
         `cli_publish=${plan.cli.publish}`,
+        `adapter_publish=${plan.adapter.publish}`,
         `core_already_on_npm=${plan.core.alreadyOnNpm}`,
         `cli_already_on_npm=${plan.cli.alreadyOnNpm}`,
+        `adapter_already_on_npm=${plan.adapter.alreadyOnNpm}`,
       ].join("\n") + "\n",
     );
   }
@@ -249,7 +258,8 @@ function publishPlan({ output }) {
   console.log(
     `${DIM}plan for v${plan.version} -> npm tag "${plan.tag}":${RESET}\n` +
       `  ${plan.core.name}@${plan.version}: ${status(plan.core)}\n` +
-      `  ${plan.cli.name}@${plan.version}:  ${status(plan.cli)}`,
+      `  ${plan.cli.name}@${plan.version}:  ${status(plan.cli)}\n` +
+      `  ${plan.adapter.name}@${plan.version}: ${status(plan.adapter)}`,
   );
   return plan;
 }
@@ -303,6 +313,7 @@ async function verifyNpm({ packageFilter }) {
   const packages = [
     { key: "core", name: v.coreName },
     { key: "cli", name: v.cliName },
+    { key: "adapter", name: v.adapterName },
   ].filter((pkg) => packageFilter === "all" || pkg.key === packageFilter);
 
   for (const pkg of packages) {
@@ -369,8 +380,8 @@ async function main() {
   if (cmd === "verify-npm") {
     const packageIndex = rest.indexOf("--package");
     const packageArg = packageIndex >= 0 ? rest[packageIndex + 1] : "all";
-    if (!["all", "core", "cli"].includes(packageArg)) {
-      fail(`--package must be one of: all, core, cli`);
+    if (!["all", "core", "cli", "adapter"].includes(packageArg)) {
+      fail(`--package must be one of: all, core, cli, adapter`);
     }
     await verifyNpm({ packageFilter: packageArg });
     return;

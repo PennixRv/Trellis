@@ -396,7 +396,7 @@ describe("getAllAgents", () => {
     const agents = getAllAgents();
     expect(agents.get("teammate.md")).toBe(teammateAgentTemplate);
     expect(agents.get("delegated-worktree-primary-agent.md")).toContain(
-      "sole task-specific implementation contract",
+      "TRELLIS_DELEGATION_CONTEXT",
     );
   });
 

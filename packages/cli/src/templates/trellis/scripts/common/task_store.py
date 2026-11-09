@@ -1019,6 +1019,11 @@ def cmd_rename(args: argparse.Namespace) -> int:
             print(colored(f"Error: Task not found: {args.name}", Colors.RED), file=sys.stderr)
         return 1
 
+    from .worktree_delegation import runtime_path
+    if runtime_path(repo_root, task_dir.name).exists():
+        print("Error: preserve delegation identity; a task with delegation runtime cannot be renamed", file=sys.stderr)
+        return 1
+
     # Restrict renames to the prescribed status directory levels.
     if not is_within_tasks_dir(task_dir, repo_root):
         print(
@@ -1259,7 +1264,8 @@ def cmd_remove_subtask(args: argparse.Namespace) -> int:
 
     if parent_data.get("status") != "cancelled":
         from .task_workflow import _assert_delegated_record_closed
-        _assert_delegated_record_closed(child_dir.name, child_data.get("meta", {}).get("delegated_worktree_execution_record"))
+        from .worktree_delegation import resolve_record
+        _assert_delegated_record_closed(child_dir.name, resolve_record(repo_root, child_dir, child_data))
     original_parent = json.loads(json.dumps(parent_data))
     # Remove child from parent's children list
     parent_children = _ensure_children_list(parent_data)

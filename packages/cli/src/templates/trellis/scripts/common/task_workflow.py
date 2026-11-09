@@ -1377,8 +1377,10 @@ def _assert_delegated_resources_closed(task_dir: Path, data: dict) -> None:
     if not isinstance(children, list):
         raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", "linked child task list is malformed")
     for task_id in [task_dir.name, *children]:
-        _, child_meta = _load(_task_dir(task_id))
-        _assert_delegated_record_closed(task_id, child_meta.get("delegated_worktree_execution_record"))
+        child_dir = _task_dir(task_id)
+        child_data, _ = _load(child_dir)
+        from .worktree_delegation import resolve_record
+        _assert_delegated_record_closed(task_id, resolve_record(get_repo_root(), child_dir, child_data))
 
 
 def _assert_delegated_record_closed(task_id: str, record) -> None:
@@ -1386,6 +1388,8 @@ def _assert_delegated_record_closed(task_id: str, record) -> None:
         return
     if isinstance(record, dict) and record.get("status") == "retired" and isinstance(record.get("closure_evidence"), dict):
         return
+    if isinstance(record, dict) and "binding" in record:
+        raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"protocol v1 delegation for {task_id} must be explicitly reconciled before closing or moving")
     agent_id = record.get("agent_id") if isinstance(record, dict) else None
     if not isinstance(agent_id, str) or not agent_id.strip():
         raise TaskWorkflowError("TASK_PHASE_RESOURCE_ACTIVE", f"delegated execution status is unknown for {task_id}; preserve the current state")

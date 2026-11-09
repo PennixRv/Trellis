@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.5",
+  "description": "同机 Paseo 工作树委派与公开 SDK 可选适配",
+  "breaking": true,
+  "recommendMigrate": false,
+  "changelog": "引入显式目标和能力绑定、准备/实施两步许可、固定角色与按次投影、未知创建/发送恢复，以及目标 owner 集成后核销。新增独立 Node >=22 适配包，基础 CLI/core 仍支持 Node >=18.17。",
+  "migrations": [],
+  "notes": "通过原生 trellis update 更新角色、脚本、Hook 和协作 Skill。旧运行记录先沿原生 reconciliation 保全闭合；新启动必须传入目标、设置和能力要求，不能退回旧的一步启动。"
+}

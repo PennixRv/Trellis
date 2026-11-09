@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -807,11 +808,28 @@ def main() -> int:
     p_delegate_bind = subparsers.add_parser("delegate-bind", help="Freeze a linked child contract within current parent authorization")
     p_delegate_bind.add_argument("child_task")
     p_delegate_bind.add_argument("--result-path", help="Assigned artifact under .trellis/delegated-results/")
+    p_delegate_bind.add_argument("--target-repo")
+    p_delegate_bind.add_argument("--integration-branch")
+    p_delegate_bind.add_argument("--settings-ref")
+    p_delegate_bind.add_argument("--requirements-ref")
     p_delegate_reconcile = subparsers.add_parser("delegate-reconcile", help="Inspect or explicitly retire a verified delegated execution")
     p_delegate_reconcile.add_argument("child_task")
     p_delegate_reconcile.add_argument("--execute", action="store_true")
     p_delegate_reconcile.add_argument("--reason")
     p_delegate_reconcile.add_argument("--approval-ref")
+    p_delegate_reconcile.add_argument("--disposition", choices=("integrated", "retained"), default="integrated")
+    p_delegate_reconcile.add_argument("--writer-evidence-ref")
+    p_delegate_reconcile.add_argument("--recover", action="store_true", help="Adopt verified existing resources; never replay an unknown create/send")
+    p_delegate_reconcile.add_argument("--workspace-id")
+    p_delegate_reconcile.add_argument("--agent-id")
+    p_delegate_reconcile.add_argument("--delivery-evidence-ref")
+    for operation in ("inspect", "execute", "followup", "observe", "wait", "interrupt"):
+        command = subparsers.add_parser(f"delegate-{operation}", help="Protocol v1 controller operation; see trellis-worktree-delegation")
+        command.add_argument("child_task")
+        if operation == "followup":
+            command.add_argument("--instructions-ref", required=True)
+        if operation == "wait":
+            command.add_argument("--timeout-ms", type=int, default=3600000)
 
     add_continuity_commands(subparsers)
 
@@ -884,6 +902,10 @@ def main() -> int:
 
     args = parser.parse_args()
 
+    if os.environ.get("TRELLIS_DELEGATION_CONTEXT") and args.command not in {"current", "list", "list-context", "validate"}:
+        print("TASK_DELEGATE_NODE_READ_ONLY: delegated nodes cannot mutate controller tasks; use the assigned candidate files", file=sys.stderr)
+        return 1
+
     if not args.command:
         show_usage()
         return 1
@@ -926,7 +948,15 @@ def main() -> int:
             if args.command == "transfer":
                 return transfer_task_ownership(args)
             if args.command in commands:
+                if args.command.startswith("delegate-"):
+                    from common.worktree_delegation import run, runtime_path
+                    child = resolve_task_dir(args.child_task, get_repo_root())
+                    if args.command != "delegate-reconcile" or (child and runtime_path(get_repo_root(), child.name).exists()):
+                        return run(args)
                 return commands[args.command](args)
+            if args.command.startswith("delegate-"):
+                from common.worktree_delegation import run
+                return run(args)
             show_usage()
             return 1
     except TaskWorkflowError as error:

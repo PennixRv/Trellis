@@ -131,6 +131,10 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("common/task_store.py", commonTaskStore);
   scripts.set("common/task_workflow.py", commonTaskWorkflow);
   scripts.set("common/task_continuity.py", commonTaskContinuity);
+  scripts.set(
+    "common/worktree_delegation.py",
+    readTemplate("scripts/common/worktree_delegation.py"),
+  );
   scripts.set("common/session_context.py", commonSessionContext);
   scripts.set("common/packages_context.py", commonPackagesContext);
   scripts.set("common/workflow_phase.py", commonWorkflowPhase);

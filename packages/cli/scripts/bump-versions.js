@@ -25,6 +25,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const CORE_PKG = path.join(REPO_ROOT, "packages/core/package.json");
 const CLI_PKG = path.join(REPO_ROOT, "packages/cli/package.json");
+const ADAPTER_PKG = path.join(REPO_ROOT, "packages/paseo-adapter/package.json");
 
 const RED = "\x1b[31m";
 const GREEN = "\x1b[32m";
@@ -107,7 +108,8 @@ function main() {
 
   const core = readJSON(CORE_PKG);
   const cli = readJSON(CLI_PKG);
-  if (core.version !== cli.version) {
+  const adapter = readJSON(ADAPTER_PKG);
+  if (core.version !== cli.version || adapter.version !== cli.version) {
     fail(
       `Pre-bump version mismatch: core=${core.version} cli=${cli.version}.\n` +
         `Reconcile them manually (edit both package.json files to the same value)\n` +
@@ -118,8 +120,10 @@ function main() {
   const next = computeNext(cli.version, type);
   core.version = next;
   cli.version = next;
+  adapter.version = next;
   writeJSON(CORE_PKG, core);
   writeJSON(CLI_PKG, cli);
+  writeJSON(ADAPTER_PKG, adapter);
   // Human message to stderr so stdout stays a clean machine-readable value.
   process.stderr.write(
     `${GREEN}ok${RESET} bumped @pennixrv/trellis and @pennixrv/trellis-core (${type}) -> ${next}\n`,

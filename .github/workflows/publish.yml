@@ -35,7 +35,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Setup pnpm
@@ -48,6 +48,9 @@ jobs:
 
       - name: Verify version alignment (core, cli, git tag)
         run: node packages/cli/scripts/release-preflight.js check-versions --require-tag
+
+      - name: Verify release changelog assets
+        run: node packages/cli/scripts/check-docs-changelog.js --type beta --version "${GITHUB_REF_NAME#v}"
 
       - name: Typecheck (core + cli)
         run: pnpm typecheck
@@ -90,6 +93,14 @@ jobs:
       - name: Skip @pennixrv/trellis (already on npm)
         if: steps.plan.outputs.cli_publish != 'true'
         run: echo "@pennixrv/trellis@${{ steps.plan.outputs.version }} already published; skipping."
+
+      - name: Publish @pennixrv/trellis-paseo-adapter
+        if: steps.plan.outputs.adapter_publish == 'true'
+        run: pnpm publish --access public --no-git-checks --tag ${{ steps.plan.outputs.tag }}
+        working-directory: packages/paseo-adapter
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
 
       - name: Verify published packages on public npm
         run: node packages/cli/scripts/release-preflight.js verify-npm --package all

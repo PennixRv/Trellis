@@ -107,8 +107,8 @@ def _plan(root: Path, moves: list[tuple[Path, Path]], updates: dict[Path, dict])
             elif not path.is_dir():
                 raise ValueError(f"Unsupported task content: {path}")
         data = _read(source / "task.json")
-        meta = data.get("meta")
-        delegated = meta.get("delegated_worktree_execution_record") if isinstance(meta, dict) else None
+        from .worktree_delegation import resolve_record
+        delegated = resolve_record(root, source, data)
         if delegated is not None:
             from .task_workflow import _assert_delegated_record_closed
             _assert_delegated_record_closed(source.name, delegated)

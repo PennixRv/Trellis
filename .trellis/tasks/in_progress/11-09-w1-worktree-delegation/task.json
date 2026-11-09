@@ -1,0 +1,124 @@
+{
+  "id": "w1-worktree-delegation",
+  "name": "w1-worktree-delegation",
+  "title": "W1 本地 Codex 工作树委派完整集成",
+  "description": "依据父任务 implement.md 与 implementation-resumption.md 的真实授权，实施 Trellis W1 控制面、SDK 可选适配包、角色、技能、Hook、兼容与回归；仅当前组件源码，保留未提交交主控审查。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-11-09",
+  "completedAt": null,
+  "branch": "v0.7.1",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "parent_authorization": "/home/penn/devel/codex-workflow-optimization/.trellis/tasks/in_progress/11-09-paseo-based-parallelism-integration-design/implementation-resumption.md",
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "implementation",
+      "complexity": "complex",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "task_implementation",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": "task_implementation",
+      "input_revision": "4",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "ede2dca97a9699e00f65feaecfddeee0d8dda3e3e98b436fe878fd9e133fa49d",
+          "artifact_refs": [
+            "prd.md",
+            "implement.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "prd.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "implement.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "ede2dca97a9699e00f65feaecfddeee0d8dda3e3e98b436fe878fd9e133fa49d",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "implement.md"
+            ]
+          }
+        },
+        "task_implementation": {
+          "status": "active",
+          "input_revision": "4",
+          "artifact_revision": "2716841dcd5cbffe8ac19ba5f0dae35eaffb6fc916d1db5c6cc8de1615b468ea",
+          "artifact_refs": [
+            "implement.md"
+          ],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": null,
+          "evidence_refs": [],
+          "acceptance": null
+        },
+        "delivery_review_and_closeout": {
+          "status": "not_started",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": null,
+          "evidence_refs": [],
+          "acceptance": null
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": {
+        "contract_ref": "implement.md",
+        "contract_revision": "2716841dcd5cbffe8ac19ba5f0dae35eaffb6fc916d1db5c6cc8de1615b468ea",
+        "approval_ref": "prd.md",
+        "task_route_revision": "1"
+      },
+      "closeout_disposition": null,
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "复用父任务已批准完整设计，本组件仅实施 W1，不重复决策和设计",
+          "evidence_refs": [
+            "implement.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "solution_design_and_convergence": {
+          "reason": "复用父任务已批准完整设计，本组件仅实施 W1，不重复决策和设计",
+          "evidence_refs": [
+            "implement.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": null
+    }
+  }
+}

@@ -495,6 +495,20 @@ def _build_workflow_toc(workflow_path: Path) -> str:
 
 
 def main() -> None:
+    if os.environ.get("TRELLIS_DELEGATION_CONTEXT"):
+        try:
+            locator = Path(os.environ["TRELLIS_DELEGATION_CONTEXT"])
+            if locator.is_symlink() or locator.stat().st_size > 256 * 1024:
+                raise ValueError("invalid delegation context")
+            context = json.loads(locator.read_text(encoding="utf8"))
+            result = subprocess.run([sys.executable, str(Path(context["control_root"]) / ".trellis/scripts/get_context.py")], capture_output=True, text=True, timeout=15)
+            message = result.stdout.strip() if result.returncode == 0 else "Delegated node blocked: invalid/stale context; preserve resources and report to controller."
+            if len(message.encode()) > 256 * 1024:
+                raise ValueError("oversized delegation context")
+        except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
+            message = "Delegated node blocked: missing/invalid execution context; do not enter controller workflow."
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": message}}))
+        return
     if should_skip_injection():
         sys.exit(0)
 

@@ -52,7 +52,12 @@ function main() {
   }
 
   const current = readPackageVersion();
-  const target = computeNext(current, type);
+  const versionIdx = args.indexOf("--version");
+  const target = versionIdx === -1 ? computeNext(current, type) : args[versionIdx + 1];
+  if (!target || !/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.+-]+)?$/.test(target)) {
+    console.error("Error: --version requires an exact release version");
+    process.exit(2);
+  }
 
   const missing = [];
   const enPath = path.join(DOCS_SITE, "changelog", `v${target}.mdx`);

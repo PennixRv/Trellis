@@ -56,6 +56,7 @@ const BUNDLED_SKILL_NAMES = [
   "trellis-decision-space-construction-and-merging",
   "trellis-solution-design-and-convergence",
   "trellis-task-implementation",
+  "trellis-worktree-delegation",
   "trellis-delivery-review-and-closeout",
 ];
 const BUNDLED_SKILL_NAME = "trellis-meta";

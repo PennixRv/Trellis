@@ -242,8 +242,16 @@ def _projection(root: Path, directory: Path, data: dict, task_id: str) -> dict:
     evidence_digest = hashlib.sha256(
         json.dumps(sorted(evidence), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+    from .worktree_delegation import runtime_path, read as read_delegation
+    delegations = {}
+    for task_name in [directory.name, *data.get("children", [])]:
+        path = runtime_path(root, task_name)
+        if path.exists():
+            record = read_delegation(path)
+            delegations[task_name] = {"record_digest": _digest(record), "attempt_id": record.get("attempt_id"), "status": record.get("status"), "intent": record.get("intent")}
     return {
         "task": {"id": task_id, "path": directory.relative_to(root).as_posix(), "status": data.get("status")},
+        "delegations": delegations,
         "phase": {"current_phase_id": current_phase, "task_route_revision": route_revision, "input_revision": input_revision, "phases": phases},
         "evidence_digest": evidence_digest,
         "git": {
@@ -670,6 +678,9 @@ def assert_task_identity_change_allowed(repo_root: Path, task_dir: Path, data: d
 @contextlib.contextmanager
 def task_mutation_guard(repo_root: Path, task_dir: Path, data: dict):
     """Hold the ownership lock across a single task mutation."""
+    if os.environ.get("TRELLIS_DELEGATION_CONTEXT"):
+        yield False
+        return
     from .task_move import layout_lock, require_settled_layout
 
     with layout_lock(repo_root):

@@ -6,14 +6,15 @@
 
 ## Overview
 
-Trellis publishes two npm packages from one git tag:
+Trellis publishes three npm packages from one git tag:
 
 | Package | Role | Published by |
 |---|---|---|
 | `@pennixrv/trellis` | User-facing CLI | GitHub Actions only |
 | `@pennixrv/trellis-core` | Programmatic core APIs used by the CLI and external integrations | GitHub Actions only |
+| `@pennixrv/trellis-paseo-adapter` | Optional same-host public Paseo SDK adapter (Node >=22) | GitHub Actions only |
 
-The package pair is version-locked. Every published version must exist for both packages with the exact same version and npm dist-tag.
+All three packages are version-locked and share the exact version and npm dist-tag. The adapter is not a core/CLI dependency; the base packages retain Node >=18.17 support. Publishing runs on Node 22 and includes the adapter's tests and packed public SDK entry points.
 
 ---
 

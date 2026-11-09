@@ -49,6 +49,16 @@ def main() -> None:
     """CLI entry point."""
     import argparse
 
+    from .worktree_delegation import node_context
+    from .task_workflow import TaskWorkflowError
+    try:
+        delegated = node_context()
+    except (ValueError, OSError, KeyError, TaskWorkflowError) as error:
+        raise SystemExit(f"Delegated node blocked: {error}") from error
+    if delegated is not None:
+        print(json.dumps({"delegated_node": delegated, "instruction": "Read node_method_ref and current contract. Do not enter controller phases, task intake, or nested implementation delegation."}, ensure_ascii=False))
+        return
+
     parser = argparse.ArgumentParser(description="Get Session Context for AI Agent")
     parser.add_argument(
         "--json",
