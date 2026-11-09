@@ -307,6 +307,33 @@ def recover(root: Path, child_dir: Path, record: dict, path: Path, args):
     return adopted
 
 
+def wait_for_node(args):
+    from .task_workflow import _task_dir, _task_lock
+    from .task_move import layout_lock, require_settled_layout
+    root = get_repo_root().resolve()
+    with layout_lock(root):
+        require_settled_layout(root)
+        child_dir = _task_dir(args.child_task)
+        with _task_lock(child_dir):
+            task_inputs(child_dir)
+            record, _ = current(root, child_dir)
+            if not record.get("agent_id") or record["status"] == "retired":
+                fail("wait requires a current mapped agent")
+    # Long native waits must leave the controller free to inspect or interrupt.
+    observations = adapter(record, "wait", {"agent_id": record["agent_id"], "cwd": record["worktree_path"], "timeout_ms": args.timeout_ms})
+    with layout_lock(root):
+        require_settled_layout(root)
+        child_dir = _task_dir(args.child_task)
+        with _task_lock(child_dir):
+            task_inputs(child_dir)
+            latest, _ = current(root, child_dir)
+            if any(latest.get(k) != record.get(k) for k in ["binding", "attempt_id", "agent_id", "workspace_id", "worktree_path"]) or latest["status"] == "retired":
+                fail("wait target changed; inspect current binding instead of using stale observations")
+            reports = {name: candidate(latest, name, current_head=False) for name in ["ready", "result", "blocked"]}
+            print(json.dumps({"record": latest, "observations": observations, "candidates": reports}, ensure_ascii=False))
+    return 0
+
+
 def run(args):
     from .task_workflow import _task_dir, _task_lock
     root = get_repo_root().resolve()
@@ -385,13 +412,13 @@ def run(args):
                 save(path, record)
                 assert_worktree(record)
                 prepare_agent(root, child_dir, record, path)
-            elif operation in {"inspect", "observe", "wait", "interrupt"}:
+            elif operation in {"inspect", "observe", "interrupt"}:
                 if operation == "interrupt":
                     if record.get("intent"):
                         fail("resolve prior intent before interrupt; native emergency cancellation remains available")
                     record["intent"] = "interrupt_pending"
                     save(path, record)
-                observations = adapter(record, "wait" if operation == "wait" else "interrupt" if operation == "interrupt" else "observe" if record.get("agent_id") else "inspect", {"agent_id": record["agent_id"], "cwd": record["worktree_path"], **({"timeout_ms": args.timeout_ms} if operation == "wait" else {})} if record.get("agent_id") else {"target": b["target_locator"], **({"workspace_id": record["workspace_id"]} if record.get("workspace_id") else {})})
+                observations = adapter(record, "interrupt" if operation == "interrupt" else "observe" if record.get("agent_id") else "inspect", {"agent_id": record["agent_id"], "cwd": record["worktree_path"]} if record.get("agent_id") else {"target": b["target_locator"], **({"workspace_id": record["workspace_id"]} if record.get("workspace_id") else {})})
                 if operation == "interrupt":
                     record.setdefault("interrupt_receipts", []).append(observations)
                     record["intent"] = None

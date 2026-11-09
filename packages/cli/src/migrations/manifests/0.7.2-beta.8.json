@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.8",
+  "description": "原生委派长等待不再阻塞主控操作",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "delegate-wait 只在等待前后持有布局和任务锁；原生等待期间主控可检查其他工作包或中断当前节点。返回后重新核对当前授权、绑定、attempt与原生映射，拒绝已替换或核销的陈旧观察。",
+  "migrations": [],
+  "notes": "更新CLI并通过原生trellis update刷新task.py和委派模块；adapter协议及固定角色不变。"
+}

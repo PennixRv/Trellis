@@ -940,6 +940,9 @@ def main() -> int:
     }
 
     try:
+        if args.command == "delegate-wait":
+            from common.worktree_delegation import wait_for_node
+            return wait_for_node(args)
         with layout_lock(get_repo_root()):
             if args.command != "migrate-layout":
                 require_settled_layout(get_repo_root())

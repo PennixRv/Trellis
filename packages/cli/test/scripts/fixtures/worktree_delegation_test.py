@@ -1,6 +1,8 @@
 """Real Git/filesystem boundaries; native phase authorization is tested separately."""
 import argparse
+import contextlib
 import copy
+import io
 import json
 import os
 from pathlib import Path
@@ -168,6 +170,32 @@ class Delegation(unittest.TestCase):
         self.assertEqual(d.resolve_record(self.root, self.child, {}), record)
         with self.assertRaises(TaskWorkflowError):
             _assert_delegated_record_closed("child", record)
+
+    def test_long_wait_releases_controller_locks_and_rechecks_binding(self):
+        record = self.record()
+        args = argparse.Namespace(child_task=str(self.child), timeout_ms=3600000)
+        probe = """
+import sys
+from pathlib import Path
+from unittest.mock import patch
+sys.path.insert(0, sys.argv[1])
+from common.task_move import layout_lock
+from common.task_workflow import _task_lock
+with patch('common.task_workflow.get_repo_root', return_value=Path(sys.argv[2])):
+    with layout_lock(Path(sys.argv[2])), _task_lock(Path(sys.argv[3])):
+        print('controller available')
+"""
+        def native(*_):
+            result = subprocess.check_output([sys.executable, "-c", probe, str(Path(d.__file__).parents[1]), str(self.root), str(self.child)], timeout=3, text=True)
+            self.assertEqual(result.strip(), "controller available")
+            return {"agent": {"id": "agent", "status": "idle"}}
+        with patch.object(d, "get_repo_root", return_value=self.root), patch("common.task_workflow.get_repo_root", return_value=self.root), patch("common.task_workflow._task_dir", return_value=self.child), patch.object(d, "adapter", side_effect=native), contextlib.redirect_stdout(io.StringIO()):
+            with patch.object(d, "current", side_effect=[(copy.deepcopy(record), None), (copy.deepcopy(record), None)]):
+                self.assertEqual(d.wait_for_node(args), 0)
+            changed = copy.deepcopy(record)
+            changed["attempt_id"] = "b" * 32
+            with patch.object(d, "current", side_effect=[(copy.deepcopy(record), None), (changed, None)]), self.assertRaises(TaskWorkflowError):
+                d.wait_for_node(args)
 
 
 unittest.main()
