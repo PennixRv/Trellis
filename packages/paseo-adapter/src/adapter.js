@@ -67,7 +67,7 @@ export async function perform(request, api, client, identity) {
     const cwd = realpathSync(text(p.cwd));
     const config = { provider: `codex/${text(p.model)}`, thinkingOptionId: text(p.effort), modeId: 'full-access', systemPrompt: text(p.role) };
     if (p.codegraph) config.mcpServers = { codegraph: { type: 'stdio', command: 'codegraph', args: ['serve', '--mcp', '--bound-worktree', cwd] } };
-    const ref = await api.workspaces.ref(text(p.workspace_id)).agents.create({ config, env: { TRELLIS_DELEGATION_CONTEXT: text(p.context) }, prompt: text(p.prompt), labels: p.labels, idempotencyKey: createHash('sha256').update(request.attempt_id + request.binding_revision).digest('hex'), background: true });
+    const ref = await api.workspaces.ref(text(p.workspace_id)).agents.create({ config, env: { TRELLIS_DELEGATION_CONTEXT: text(p.context) }, prompt: text(p.prompt), labels: p.labels, idempotencyKey: createHash('sha256').update(request.attempt_id + request.binding_revision).digest('hex') });
     await ref.refresh();
     return { identity, agent: projectAgent(ref.current()) };
   }
@@ -91,7 +91,7 @@ export async function perform(request, api, client, identity) {
   const agents = [], workspaces = [];
   let cursor;
   do {
-    const page = await api.agents.list({ cursor, limit: 100, includeArchived: true });
+    const page = await api.agents.list({ cursor, limit: 100, includeArchived: true, includeBackground: true });
     agents.push(...page.entries.map(e => projectAgent(e.agent ?? e)));
     cursor = page.pageInfo?.nextCursor;
     if (agents.length > 1000) refuse('unsupported');

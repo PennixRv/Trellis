@@ -8,6 +8,7 @@
 4. `delegate-start <child>` 先持久化创建 intent，再创建 workspace 和 prepare agent。只授予准备许可；观察 native resources 与 bounded ready，核对当前源码 HEAD、完整必需能力、实际模型/effort/mode；不能只凭节点自报或 idle 就接受。主控检查 `delegate-inspect` 后，`delegate-execute` 发送实施指令。有并行包时分别准备、执行，按真实依赖集成后再派下游。
 5. `delegate-wait <child> --timeout-ms 3600000` 使用原生等待；主控还有独立工作就先推进。没有其他工作时持续原生等待，timeout 不是完成或批准。observe/inspect 不改结果接受；`delegate-followup --instructions-ref <子任务内文件>` 返工前重核当前绑定与实际设置。interrupt 仅请求取消，不证明 writer 已停止。
 6. 压缩/新主控恢复先 inspect，沿当前 task/binding/attempt/native ID 续接。未知创建使用 `delegate-reconcile --recover --workspace-id <完整ID> [--agent-id <完整ID>]` 预览，核验准确原生 workspace、cwd、Git common/branch/base、agent 标签后，显式 `--execute --reason ... --approval-ref ...` 接回。未知发送/取消还需要 `--delivery-evidence-ref`，引用主控实际检查的原生 timeline/turn 证据；不得把 idle 当交付证明。workspace 已映射而尚未发起 agent 时，恢复后 `delegate-start` 仅创建尚未发起的 agent。未知 agent 创建必须先找到准确 ID，不能再创建一个。
+   若原生验证明确在创建前拒绝 agent，且包含后台/归档的全量检查确认没有当前 attempt agent，可使用 `--delivery-evidence-ref` 提交主控核验的原生拒绝与未创建证据，显式恢复到 workspace_created。仅“当前列表没看到”不充分；发现匹配 agent 时必须映射准确 ID，未知结果保留现场。
 7. owner 审查 result 的真实 commits/diff/checks、范围和控制面未被改动，依赖结果只能在集成后作为当前树事实。通过目标 owner 原生 merge/FF 集成，验证 accepted HEAD 是目标 integration branch 的祖先；禁止默认 cherry-pick。根侧 gitlink 集成单独记录。
 8. `delegate-reconcile --disposition integrated` 预览；确认原生 agent 无 active turn、结果和接受证据、源码保全、后台 writer 与测试服务已停后，使用 `--execute --reason ... --approval-ref ... --writer-evidence-ref <子任务内证据>` 核销。取消可用 retained，保留实际 checkout/HEAD/status 和候选；没有结果时也必须保留源码，不销毁未知 writer。核销仅结束控制记录，不自动 archive/delete。资源删除由原生 owner 另按已批准处置执行。
 

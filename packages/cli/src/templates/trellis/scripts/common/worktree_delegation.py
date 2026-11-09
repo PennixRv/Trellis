@@ -276,12 +276,17 @@ def recover(root: Path, child_dir: Path, record: dict, path: Path, args):
         if record.get("agent_id") and record["agent_id"] != agent_id:
             fail("recovery cannot replace an existing agent")
         adopted.update({"agent_id": agent_id, "status": "running"})
+    elif record["intent"] == "prepare-agent" and args.delivery_evidence_ref:
+        if any(a and a.get("labels", {}).get("trellis.attempt") == record["attempt_id"] for a in observed.get("agents", [])):
+            fail("native attempt agent exists; map its exact ID instead of asserting absence")
+        file_ref(child_dir, args.delivery_evidence_ref)
+        adopted["status"] = "workspace_created"
     elif record["intent"] != "prepare-workspace":
         fail("unknown agent creation must be mapped before any new agent is created")
     else:
         adopted["status"] = "workspace_created"
     evidence = {"observation": observed, "intent": record["intent"]}
-    if record["intent"] in {"send_pending", "interrupt_pending"}:
+    if record["intent"] in {"send_pending", "interrupt_pending", "prepare-agent"} and (not agent_id or record["intent"] != "prepare-agent"):
         if not args.delivery_evidence_ref:
             fail("controller-owned native delivery/interrupt evidence required; idle alone cannot resolve unknown delivery")
         evidence["delivery_evidence"] = file_ref(child_dir, args.delivery_evidence_ref).read_text(encoding="utf8")

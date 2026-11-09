@@ -7,3 +7,5 @@
 验证：完整 CLI 2340 项通过、2 项既有跳过；core 与 adapter 通过，adapter 3 项协议/SDK请求边界检查通过；build、lint、TypeScript typecheck、packed CLI exact-core 通过。Python checker 变更文件已无错误；全仓仍有未改动的 guard-teamwork-wait.py:36 未使用 state 基线错误及既有 warnings，未扩大范围修复。GitNexus impact/detect-changes 已执行，索引落后35提交，不能替代当前源码和测试证据。
 
 发布候选为三包同版 0.7.2-beta.5；原生 docs-site 双语 changelog 及导航已提交。版本/发布计划同时核对 adapter，CI 使用 Node22，基础 CLI/core 不依赖 SDK。源码回归不代表实际 daemon/节点、生效或恢复验收，后者交根任务 W4 在发布重装后完成。
+
+正式beta.5安装后的真实启动保留workspace_created与prepare-agent intent，原生接口在创建前拒绝已有workspace上的background参数。beta.6删除该非法参数，inspect显式包含后台/归档agent；增加主控持有原生拒绝证据且全量检查无当前attempt agent时的显式恢复，不自动重试未知创建。SDK请求边界回归及真实Git恢复fixture覆盖缺证据/已有agent拒绝和保留workspace恢复。修复和检查仍由当前会话直接完成。

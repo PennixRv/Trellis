@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.6",
+  "description": "修复真实 Paseo 委派创建及后台节点对账",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "已有 workspace 内创建 agent 不再重复传入 background；完整检查后台与已归档节点。经明确原生拒绝及全量资源核验的未创建 agent，可凭主控证据显式恢复到 workspace_created，不重放未知创建。",
+  "migrations": [],
+  "notes": "同步升级 CLI 与可选 adapter，并通过原生 trellis update 更新控制脚本及协作方法；既有绑定和源码保留。"
+}

@@ -123,6 +123,27 @@ class Delegation(unittest.TestCase):
             d.recover(self.root, self.child, record, d.runtime_path(self.root, self.child.name), args)
         self.assertEqual(record["intent"], "send_pending")
 
+    def test_rejected_agent_creation_needs_explicit_absence_evidence(self):
+        record = self.record()
+        record.update(intent="prepare-agent", status="workspace_created")
+        record.pop("agent_id")
+        observation = {"workspaces": [{"id": "workspace", "workspaceDirectory": record["worktree_path"]}], "agents": []}
+        args = argparse.Namespace(workspace_id=None, agent_id=None, delivery_evidence_ref=None, execute=True, reason="native rejected before creation", approval_ref="approved")
+        path = d.runtime_path(self.root, self.child.name)
+        with patch.object(d, "adapter", return_value=observation), self.assertRaises(TaskWorkflowError):
+            d.recover(self.root, self.child, record, path, args)
+        args.delivery_evidence_ref = "native-rejection.md"
+        (self.child / args.delivery_evidence_ref).write_text("native existing-workspace visibility validation rejected before agent creation; full background/archived inspection found no attempt agent")
+        with patch.object(d, "adapter", return_value=observation) as native:
+            adopted = d.recover(self.root, self.child, record, path, args)
+            self.assertEqual(adopted["status"], "workspace_created")
+            self.assertIsNone(adopted["intent"])
+            self.assertNotIn("agent_id", adopted)
+            self.assertEqual(native.call_count, 1)
+        observation["agents"] = [{"labels": {"trellis.attempt": record["attempt_id"]}}]
+        with patch.object(d, "adapter", return_value=observation), self.assertRaises(TaskWorkflowError):
+            d.recover(self.root, self.child, record, path, args)
+
     def test_one_runtime_resolver_preserves_legacy_and_blocks_active_closure(self):
         legacy = {"status": "retired"}
         self.assertEqual(d.resolve_record(self.root, self.child, {"meta": {"delegated_worktree_execution_record": legacy}}), legacy)

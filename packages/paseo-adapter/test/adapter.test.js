@@ -15,7 +15,7 @@ test('SDK create uses stable role, explicit settings, per-tree MCP and attempt i
     let sent;
     const snapshot = { id: 'native-full-id', workspaceId: 'workspace', cwd, status: 'initializing', activeTurn: { id: 'turn', prompt: 'private' }, runtimeInfo: { model: 'model', token: 'private' } };
     const ref = { refresh: async () => {}, current: () => snapshot };
-    const api = { workspaces: { ref: () => ({ agents: { create: async (input) => { sent = input; return ref; } } }) } };
+    const api = { workspaces: { ref: () => ({ agents: { create: async (input) => { assert.equal(input.background, undefined, 'native existing-workspace creation rejects visibility intent'); sent = input; return ref; } } }) } };
     const input = request('prepare-agent', { workspace_id: 'workspace', cwd, model: 'model', effort: 'high', role: 'stable role', context: '/projection', prompt: 'prepare', codegraph: true, labels: { 'trellis.attempt': 'attempt' } });
     const result = await perform(validate(input), api, {}, { server_id: 'same-host' });
     assert.equal(sent.config.systemPrompt, 'stable role');
@@ -28,6 +28,14 @@ test('SDK create uses stable role, explicit settings, per-tree MCP and attempt i
     assert.ok(!JSON.stringify(result).includes('private'));
     assert.equal(sent.config.sandbox, undefined);
   } finally { rmSync(cwd, { recursive: true, force: true }); }
+});
+test('native inspection includes background and archived agents for reconciliation', async () => {
+  let options;
+  const api = { agents: { list: async (input) => { options = input; return { entries: [{ id: 'background-agent', cwd: '/tree', labels: { 'trellis.attempt': 'attempt' } }], pageInfo: {} }; } }, config: { get: async () => ({ config: { autoArchiveAfterMerge: false } }) }, projects: { list: async () => ({ projects: [] }) } };
+  const result = await perform(request('inspect', {}), api, {}, {});
+  assert.equal(options.includeBackground, true);
+  assert.equal(options.includeArchived, true);
+  assert.equal(result.agents[0].id, 'background-agent');
 });
 test('unknown cwd never sends, native cancellation never claims writer stop', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'adapter-'));
