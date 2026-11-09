@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import uuid
 from typing import NoReturn
@@ -241,9 +242,14 @@ def prepare_agent(root: Path, child_dir: Path, record: dict, path: Path):
     role = (root / ".trellis/agents/delegated-worktree-primary-agent.md").read_text(encoding="utf8")
     if role.startswith("---\n"):
         role = role.split("\n---\n", 1)[1].lstrip("\n")
+    codegraph = "codegraph" in record["requirements"].get("required_tools", [])
+    tool = shutil.which("codegraph") if codegraph else None
+    if codegraph and not tool:
+        fail("required CodeGraph executable is unavailable to the controller")
+    tool_payload = {"codegraph_command": str(Path(tool).resolve(strict=True))} if tool else {}
     record["intent"] = "prepare-agent"
     save(path, record)
-    agent = adapter(record, "prepare-agent", {"workspace_id": record["workspace_id"], "cwd": record["worktree_path"], "model": record["settings"]["model"], "effort": record["settings"]["effort"], "role": role, "context": str(context), "prompt": f"prepare：读取 {context}，只准备并提交 ready.json；当前 agent_id 映射由主控落盘，身份不完整时只报告阻断。", "codegraph": "codegraph" in record["requirements"].get("required_tools", []), "labels": {"trellis.control": record["control_project_id"], "trellis.child": record["binding"]["child_task_id"], "trellis.attempt": record["attempt_id"]}})["agent"]
+    agent = adapter(record, "prepare-agent", {"workspace_id": record["workspace_id"], "cwd": record["worktree_path"], "model": record["settings"]["model"], "effort": record["settings"]["effort"], "role": role, "context": str(context), "prompt": f"prepare：读取 {context}，只准备并提交 ready.json；当前 agent_id 映射由主控落盘，身份不完整时只报告阻断。", "codegraph": codegraph, **tool_payload, "labels": {"trellis.control": record["control_project_id"], "trellis.child": record["binding"]["child_task_id"], "trellis.attempt": record["attempt_id"]}})["agent"]
     if not agent or not agent.get("id") or agent.get("workspaceId") != record["workspace_id"]:
         fail("agent creation outcome unknown; preserve intent")
     record.update({"agent_id": agent["id"], "status": "running", "intent": None})

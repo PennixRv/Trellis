@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.7",
+  "description": "修复 daemon PATH 差异和已拒绝请求的幂等键冲突",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "必需 CodeGraph 由主控解析并核验绝对入口，避免 daemon PATH 不含用户安装目录导致 MCP 缺失；agent 创建幂等键包含实际请求指纹，相同请求保持稳定，经显式核验未创建后修正的请求不再撞旧指纹。",
+  "migrations": [],
+  "notes": "同步更新 CLI、可选 adapter 和原生项目资产；准备缺项仍阻断 execute，未知创建仍须原生对账，不能自动重试。"
+}

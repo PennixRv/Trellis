@@ -16,15 +16,22 @@ test('SDK create uses stable role, explicit settings, per-tree MCP and attempt i
     const snapshot = { id: 'native-full-id', workspaceId: 'workspace', cwd, status: 'initializing', activeTurn: { id: 'turn', prompt: 'private' }, runtimeInfo: { model: 'model', token: 'private' } };
     const ref = { refresh: async () => {}, current: () => snapshot };
     const api = { workspaces: { ref: () => ({ agents: { create: async (input) => { assert.equal(input.background, undefined, 'native existing-workspace creation rejects visibility intent'); sent = input; return ref; } } }) } };
-    const input = request('prepare-agent', { workspace_id: 'workspace', cwd, model: 'model', effort: 'high', role: 'stable role', context: '/projection', prompt: 'prepare', codegraph: true, labels: { 'trellis.attempt': 'attempt' } });
+    const input = request('prepare-agent', { workspace_id: 'workspace', cwd, model: 'model', effort: 'high', role: 'stable role', context: '/projection', prompt: 'prepare', codegraph: true, codegraph_command: process.execPath, labels: { 'trellis.attempt': 'attempt' } });
     const result = await perform(validate(input), api, {}, { server_id: 'same-host' });
     assert.equal(sent.config.systemPrompt, 'stable role');
     assert.equal(sent.config.provider, 'codex/model');
     assert.equal(sent.config.modeId, 'full-access');
     assert.equal(sent.config.thinkingOptionId, 'high');
     assert.deepEqual(sent.config.mcpServers.codegraph.args, ['serve', '--mcp', '--bound-worktree', cwd]);
+    assert.equal(sent.config.mcpServers.codegraph.command, process.execPath, 'daemon PATH must not choose the required executable');
+    await assert.rejects(perform(validate(request('prepare-agent', { ...input.payload, codegraph_command: 'codegraph' })), api, {}, {}));
     assert.equal(sent.env.TRELLIS_DELEGATION_CONTEXT, '/projection');
     assert.equal(sent.idempotencyKey.length, 64);
+    const firstKey = sent.idempotencyKey;
+    await perform(validate(input), api, {}, { server_id: 'same-host' });
+    assert.equal(sent.idempotencyKey, firstKey);
+    await perform(validate(request('prepare-agent', { ...input.payload, role: 'corrected role' })), api, {}, { server_id: 'same-host' });
+    assert.notEqual(sent.idempotencyKey, firstKey, 'a corrected rejected request must not collide with the native cached fingerprint');
     assert.ok(!JSON.stringify(result).includes('private'));
     assert.equal(sent.config.sandbox, undefined);
   } finally { rmSync(cwd, { recursive: true, force: true }); }

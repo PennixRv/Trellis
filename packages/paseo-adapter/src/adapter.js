@@ -1,4 +1,5 @@
-import { realpathSync } from 'node:fs';
+import { accessSync, constants, realpathSync, statSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 
@@ -20,7 +21,7 @@ export function validate(request) {
   const fields = {
     capability: ['cwd'], inspect: ['target', 'workspace_id', 'agent_id'], 'resource-preview': ['target', 'workspace_id', 'agent_id'],
     'prepare-workspace': ['target', 'branch', 'base_commit', 'title'],
-    'prepare-agent': ['workspace_id', 'cwd', 'model', 'effort', 'role', 'context', 'prompt', 'codegraph', 'labels'],
+    'prepare-agent': ['workspace_id', 'cwd', 'model', 'effort', 'role', 'context', 'prompt', 'codegraph', 'codegraph_command', 'labels'],
     execute: ['agent_id', 'cwd', 'prompt', 'client_message_id'], followup: ['agent_id', 'cwd', 'prompt', 'client_message_id'],
     observe: ['agent_id', 'cwd'], wait: ['agent_id', 'cwd', 'timeout_ms'], interrupt: ['agent_id', 'cwd'],
   };
@@ -66,8 +67,15 @@ export async function perform(request, api, client, identity) {
   if (op === 'prepare-agent') {
     const cwd = realpathSync(text(p.cwd));
     const config = { provider: `codex/${text(p.model)}`, thinkingOptionId: text(p.effort), modeId: 'full-access', systemPrompt: text(p.role) };
-    if (p.codegraph) config.mcpServers = { codegraph: { type: 'stdio', command: 'codegraph', args: ['serve', '--mcp', '--bound-worktree', cwd] } };
-    const ref = await api.workspaces.ref(text(p.workspace_id)).agents.create({ config, env: { TRELLIS_DELEGATION_CONTEXT: text(p.context) }, prompt: text(p.prompt), labels: p.labels, idempotencyKey: createHash('sha256').update(request.attempt_id + request.binding_revision).digest('hex') });
+    if (p.codegraph) {
+      const command = text(p.codegraph_command);
+      if (!isAbsolute(command) || !statSync(command).isFile()) refuse('invalid_input');
+      accessSync(command, constants.X_OK);
+      // The daemon may have a narrower PATH than the controller that admitted the tool.
+      config.mcpServers = { codegraph: { type: 'stdio', command, args: ['serve', '--mcp', '--bound-worktree', cwd] } };
+    }
+    const fingerprint = JSON.stringify({ config, cwd, context: p.context, prompt: p.prompt, labels: p.labels });
+    const ref = await api.workspaces.ref(text(p.workspace_id)).agents.create({ config, env: { TRELLIS_DELEGATION_CONTEXT: text(p.context) }, prompt: text(p.prompt), labels: p.labels, idempotencyKey: createHash('sha256').update(request.attempt_id + request.binding_revision + fingerprint).digest('hex') });
     await ref.refresh();
     return { identity, agent: projectAgent(ref.current()) };
   }

@@ -123,6 +123,21 @@ class Delegation(unittest.TestCase):
             d.recover(self.root, self.child, record, d.runtime_path(self.root, self.child.name), args)
         self.assertEqual(record["intent"], "send_pending")
 
+    def test_prepare_freezes_absolute_tool_entry_before_daemon_creation(self):
+        record = self.record()
+        path = d.runtime_path(self.root, self.child.name)
+        with patch.object(d.shutil, "which", return_value=None), patch.object(d, "adapter") as native:
+            with self.assertRaises(TaskWorkflowError):
+                d.prepare_agent(self.root, self.child, record, path)
+            native.assert_not_called()
+            self.assertNotIn("intent", record)
+        with patch.object(d.shutil, "which", return_value=sys.executable), patch.object(d, "adapter", return_value={"agent": {"id": "agent", "workspaceId": "workspace"}}) as native:
+            d.prepare_agent(self.root, self.child, record, path)
+            payload = native.call_args.args[2]
+            self.assertEqual(payload["codegraph_command"], str(Path(sys.executable).resolve()))
+            self.assertTrue(payload["codegraph"])
+            self.assertIsNone(record["intent"])
+
     def test_rejected_agent_creation_needs_explicit_absence_evidence(self):
         record = self.record()
         record.update(intent="prepare-agent", status="workspace_created")

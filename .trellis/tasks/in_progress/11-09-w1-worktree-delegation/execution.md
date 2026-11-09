@@ -9,3 +9,5 @@
 发布候选为三包同版 0.7.2-beta.5；原生 docs-site 双语 changelog 及导航已提交。版本/发布计划同时核对 adapter，CI 使用 Node22，基础 CLI/core 不依赖 SDK。源码回归不代表实际 daemon/节点、生效或恢复验收，后者交根任务 W4 在发布重装后完成。
 
 正式beta.5安装后的真实启动保留workspace_created与prepare-agent intent，原生接口在创建前拒绝已有workspace上的background参数。beta.6删除该非法参数，inspect显式包含后台/归档agent；增加主控持有原生拒绝证据且全量检查无当前attempt agent时的显式恢复，不自动重试未知创建。SDK请求边界回归及真实Git恢复fixture覆盖缺证据/已有agent拒绝和保留workspace恢复。修复和检查仍由当前会话直接完成。
+
+beta.6 真实创建后发现 daemon PATH 仅含系统目录，裸命令 CodeGraph 无法启动 MCP；另一个已被原生拒绝的旧请求在修正参数后撞上原生幂等指纹。beta.7 由主控解析必需工具的绝对入口，adapter 验证后传入；请求键包含实际请求指纹，相同输入稳定，修正输入仅在显式对账后重试。真实 B 准备节点保持缺项、未授实施，已按 retained 原生核销并 archive agent；源码、索引、报告和工作树保留。
