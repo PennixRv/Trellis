@@ -6,6 +6,8 @@ Reuse verified evidence and existing authorization. Follow the taskless route in
 
 ## Start the task
 
+Choose auxiliary methods from the host's available Skills according to the actual business problem, including taskless requests. A clear match goes directly to that Skill; combinations or unclear ownership may use an available workflow router. Do not require the user to name a method, preload a collection, or create a task merely to use one. Method output returns to this intake or the current phase; it does not grant action permissions or replace Trellis acceptance and authorization.
+
 1. Inspect only evidence that can change the goal, scope, acceptance criteria, constraints, or route. Ask the user only for missing intent or a material user choice; use the project's decision method when needed.
 2. When the work needs a persistent route, coordination, design, review, release, installation, migration, external delivery, or a durable record, treat it as task-based. If the user did not explicitly ask to create a task, stop before the create command and ask for creation approval. State which taskless condition is not met, the proposed owner/scope/route, and the risk of proceeding without a task. An explicit user request to create or resume a task is already authorization for that lifecycle action only; it does not authorize implementation or delivery:
 

@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.9",
+  "description": "按业务问题连接可选辅助Skill并保留五阶段职责",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "原生workflow、intake、start/continue及五阶段Skill按需选择宿主方法，完成产物后返回当前阶段；可选集合缺席不阻断原生流程，不预读全集或重复已定问题。",
+  "migrations": [],
+  "notes": "升级CLI后由原生trellis update更新生成资产；Pennix集合与全局规则分别由其owner管理。三包同版本，运行时协议不变。"
+}
