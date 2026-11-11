@@ -8528,29 +8528,6 @@ describe("regression: opencode plugin files have only export default (#212)", ()
 describe("regression: Gemini CLI 0.40.x template compatibility (#224)", () => {
   const __dirname2 = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(__dirname2, "../../..");
-  const geminiAgentsDir = path.resolve(
-    __dirname2,
-    "../src/templates/gemini/agents",
-  );
-
-  it("[#224] gemini agent .md files do NOT carry a comma-separated tools line", () => {
-    // Gemini CLI 0.40+ Zod schema rejects `tools: a, b, c` with
-    // "tools: Expected array, received string". Trellis omits the line so
-    // sub-agents inherit parent tools (per research/agent-tools-frontmatter.md).
-    for (const entry of fs.readdirSync(geminiAgentsDir)) {
-      if (!entry.endsWith(".md")) continue;
-      const content = fs.readFileSync(
-        path.join(geminiAgentsDir, entry),
-        "utf-8",
-      );
-      const fm = content.split("---\n")[1] ?? "";
-      expect(
-        fm,
-        `gemini/agents/${entry} must NOT include a tools: line — Gemini CLI 0.40+ rejects the comma-separated form`,
-      ).not.toMatch(/^tools:/m);
-    }
-  });
-
   it("[#224] gemini settings.json uses BeforeAgent (not UserPromptSubmit)", () => {
     const settingsPath = path.resolve(
       repoRoot,

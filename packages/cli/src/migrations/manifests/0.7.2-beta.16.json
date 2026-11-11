@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.16",
+  "description": "Verify complete execution retirement without obsolete source directories",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Remove a remaining Gemini role-only test which relied on an untracked empty source directory. Retain all main-session behavior, retirement preflight, same-path replacement and preservation tests.",
+  "migrations": [],
+  "notes": "beta.15 failed its clean-checkout CI gate before npm publication and was not deployed. Use this fixed candidate for native project updates. No removed role directory is recreated for test compatibility."
+}
