@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.15",
+  "description": "Retire generated legacy configuration advice without replacing user settings",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Complete native execution removal and Reasonix replacement, including exact generated legacy TOML/YAML advice cleanup. Preserve neighboring MCP configuration, package mappings and independent user agent settings.",
+  "migrations": [],
+  "notes": "beta.13 and beta.14 were cancelled before npm publication and were not deployed. Run native trellis update with this fixed candidate. Known generated commentary is retirement metadata only, never a legacy execution resolver."
+}

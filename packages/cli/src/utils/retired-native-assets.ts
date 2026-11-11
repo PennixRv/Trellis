@@ -1,5 +1,7 @@
 import fs from "node:fs";
-import retired from "../migrations/retired-native-paths.js";
+import retired, {
+  retiredConfigComments,
+} from "../migrations/retired-native-paths.js";
 import { computeHash } from "./template-hash.js";
 import type { TemplateHashes } from "../types/migration.js";
 import { assertSafeManagedPath, lstatIfPresent } from "./managed-removal.js";
@@ -78,6 +80,13 @@ function scrubHooks(value: unknown): unknown {
 
 /** Deletion-only metadata never interprets old modes as execution policy. */
 function scrubConfig(relative: string, content: string, owned = false): string {
+  const generatedComments = retiredConfigComments[relative] ?? [];
+  const knownDefaults =
+    owned ||
+    (relative === ".codex/config.toml" &&
+      generatedComments.some((entry) => content.includes(entry.before)));
+  for (const entry of generatedComments)
+    content = content.replace(entry.before, entry.after);
   if (hookFiles.includes(relative)) {
     if (
       !content.includes("inject-subagent-context.py") &&
@@ -103,11 +112,20 @@ function scrubConfig(relative: string, content: string, owned = false): string {
       },
     );
   }
-  if (relative === ".codex/config.toml" && owned) {
+  if (relative === ".codex/config.toml" && knownDefaults) {
     return content.replace(
       /^(\[agents\][^\n]*\n)([\s\S]*?)(?=^\[|(?![\s\S]))/gm,
-      (_all, heading: string, body: string) =>
-        heading + body.replace(/^\s*max_depth\s*=\s*1\s*(?:#[^\n]*)?\n/gm, ""),
+      (_all, heading: string, body: string) => {
+        const cleaned = body.replace(
+          /^\s*max_depth\s*=\s*1\s*(?:#[^\n]*)?\n/gm,
+          "",
+        );
+        return (
+          heading +
+          (/^\s*enabled\s*=/m.test(cleaned) ? "" : "enabled = false\n") +
+          cleaned
+        );
+      },
     );
   }
   return content;

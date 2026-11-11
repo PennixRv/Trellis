@@ -237,3 +237,37 @@ export default {
   ".codex/agents/implementer.toml": [],
   ".codex/agents/researcher.toml": [],
 };
+
+/** Exact generated commentary may be retired without replacing user settings. */
+export const retiredConfigComments: Record<
+  string,
+  { before: string; after: string }[]
+> = {
+  ".codex/config.toml": [
+    {
+      before:
+        "# NOTE: Trellis intentionally does NOT write a [features.multi_agent_v2]\n# block here. Codex CLI changed `features` deserialization between 0.130\n# and 0.131: the structured table form (with max_concurrent_threads_per_session\n# / *_wait_timeout_ms) is only accepted by 0.131+. On 0.130 and earlier —\n# including the codex CLI bundled inside the Codex desktop app — it fails\n# with `data did not match any variant of untagged enum FeatureToml`, which\n# aborts the entire config load and blocks Codex from starting. Codex's own\n# default for multi_agent_v2 is used instead; tune it in your user-level\n# config if needed.\n\n# Pin the subagent recursion depth explicitly instead of relying on Codex's\n# default. #445 removed the per-agent `[features] multi_agent = false` guard\n# (the #240/#241 wait_agent-deadlock structural fix) because native subagent\n# dispatch already caps recursion via `agents.max_depth` — but that key is\n# global/user-level, not settable inside an individual agent's .toml. Pinning\n# it here means an upstream default change, or a user's own global override,\n# can't silently reopen the recursion the #240/#241 fix closed. Project config\n# (this file) takes precedence over user-level `~/.codex/config.toml`.\n",
+      after:
+        "# Native role dispatch is not part of the Trellis execution model.\n",
+    },
+  ],
+  ".trellis/config.yaml": [
+    {
+      before:
+        '#-------------------------------------------------------------------------------\n# Codex (dispatch behavior)\n#-------------------------------------------------------------------------------\n# Codex-only knob; other platforms ignore it. Default ("auto") dispatches\n# trellis-implement / trellis-check / trellis-research sub-agents. This does\n# not rely on inherited parent transcripts: `fork_turns` remains\n# caller-controlled, while Codex\'s native SubagentStart hook injects task\n# context when trusted and child-side loading remains the fallback when it is\n# unavailable. Set to "inline" only to keep implementation and checks in the\n# main session. "sub-agent" remains a backwards-compatible alias for "auto".\n# Invalid explicit values safely use inline mode.\n#\n# In "auto" mode, dispatched sub-agents inherit the main session\'s model\n# unless you pin one. To use a cheaper/faster model for implement/check/\n# research sub-agent work, edit `model` / `model_reasoning_effort` directly\n# on the generated `.codex/agents/trellis-*.toml` files (see the commented\n# hint lines in those files) — there is no config.yaml knob for this,\n# `trellis update` preserves your edits across regeneration.\n#\n# codex:\n#   dispatch_mode: auto  # or "inline"; legacy alias: "sub-agent"\n\n',
+      after: "",
+    },
+    {
+      before:
+        "#-------------------------------------------------------------------------------\n# Sub-agent context injection limits\n#-------------------------------------------------------------------------------\n# Caps how much task context (implement.jsonl / check.jsonl referenced files,\n# plus prd.md / design.md / implement.md) gets inlined into a sub-agent's\n# first prompt. Oversized files are truncated with a notice; once the total\n# payload cap is reached, remaining files degrade to index lines (path +\n# reason + size) instead of being inlined.\n#\n# All values are byte counts. `0` disables the corresponding limit.\n#\n# context_injection:\n#   max_file_bytes: 32768        # per implement.jsonl / check.jsonl referenced file\n#   max_artifact_bytes: 65536    # per task artifact (prd.md / design.md / implement.md)\n#   max_total_bytes: 131072      # whole injected payload; overflow degrades to index lines\n\n",
+      after:
+        "#-------------------------------------------------------------------------------\n# Main-session context file budgets (Pi/OMP and JSONL validation)\n#-------------------------------------------------------------------------------\n# Optional context references are data, not execution authority. Byte caps use\n# UTF-8 boundaries; 0 means unlimited.\n# context_injection:\n#   max_file_bytes: 32768\n#   max_artifact_bytes: 65536\n#   max_total_bytes: 131072\n\n",
+    },
+    {
+      before:
+        "# skipped for that turn only. Does not affect SessionStart or sub-agent\n# context injection.\n",
+      after:
+        "# skipped for that turn only. Does not affect startup or path-scoped specs.\n",
+    },
+  ],
+};
