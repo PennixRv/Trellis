@@ -197,8 +197,12 @@ answer. Retention may remove failed-attempt artifacts. Main-agent semantic
 review checks the answer and evidence against the acceptance criteria; shape
 validation does not perform that review or change native task acceptance.
 
-The coordinator returns `ALL_ACCEPTED`, `SETTLED_WITH_FAILURE`, or
-`RECONCILIATION_REQUIRED`. For `ALL_ACCEPTED`, review every accepted report
+The coordinator returns `AWAITING_REVIEW`, `ALL_ACCEPTED`, `SETTLED_WITH_FAILURE`, or
+`RECONCILIATION_REQUIRED`. For `AWAITING_REVIEW`, read every report and its
+evidence, limitations and unresolved items, then use `trellis teamwork review`
+with the exact task, batch and assignment identity (see `review --help`).
+Accept or request rework through that native interface; do not edit receipts.
+For `ALL_ACCEPTED`, review every accepted report
 against the phase contract, record the evidence in the task-owned artifact, and
 use the native task acceptance gate before advancing. For
 `SETTLED_WITH_FAILURE`, review the failure reports and blockers, do not accept

@@ -1,0 +1,123 @@
+{
+  "id": "project-governance-spec-implementation",
+  "name": "project-governance-spec-implementation",
+  "title": "项目入口、通用 spec 与 AGENTS 原生写入实现",
+  "description": "承接根任务 trellis-project-governance-spec-orchestration 已批准合同 W1：通用 spec 生成消费、AGENTS 严格块写入与恢复、必要导航和兼容验证。根任务统一实施与发布部署授权，不另设方案或请求批准。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-11-11",
+  "completedAt": "2026-11-11",
+  "branch": "fix/project-governance-spec-orchestration",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "analysis",
+      "complexity": "simple",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "5",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "e8447c250a4669982a240eb2c6367a8d974fd1babb382f83464d0950f313e177",
+          "artifact_refs": [
+            "prd.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "prd.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "e8447c250a4669982a240eb2c6367a8d974fd1babb382f83464d0950f313e177",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "prd.md"
+            ]
+          }
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "8d09461262ad4ff80edfb5eea980661fc2ac953fdc9d0faf4901b6635ce69fc4",
+          "artifact_refs": [
+            "closeout.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "closeout.md",
+          "outcome_kind": "delivery_ready",
+          "reason": null,
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "8d09461262ad4ff80edfb5eea980661fc2ac953fdc9d0faf4901b6635ce69fc4",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "closeout.md"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": null,
+      "closeout_disposition": "delivery_ready",
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "根任务已统一授权并完成 W1 实施；本地仅核验已完成结果与组件记账，不另建方案或倒填历史实施阶段",
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "solution_design_and_convergence": {
+          "reason": "根任务已统一授权并完成 W1 实施；本地仅核验已完成结果与组件记账，不另建方案或倒填历史实施阶段",
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "task_implementation": {
+          "reason": "根任务已统一授权并完成 W1 实施；本地仅核验已完成结果与组件记账，不另建方案或倒填历史实施阶段",
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": null
+    }
+  }
+}
