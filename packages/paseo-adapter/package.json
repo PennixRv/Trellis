@@ -1,6 +1,6 @@
 {
   "name": "@pennixrv/trellis-paseo-adapter",
-  "version": "0.7.2-beta.16",
+  "version": "0.7.2-beta.17",
   "description": "Optional local Paseo public SDK adapter for Trellis worktree delegation",
   "type": "module",
   "bin": {
