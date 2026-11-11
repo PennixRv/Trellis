@@ -9,16 +9,10 @@
  *   └── hooks.json     # Hook configuration
  */
 
-import {
-  createTemplateReader,
-  type AgentTemplate,
-  type HookTemplate,
-} from "../template-utils.js";
+import { createTemplateReader, type HookTemplate } from "../template-utils.js";
 
-export type { AgentTemplate, HookTemplate };
+export type { HookTemplate };
 
-const { listMdAgents, getSettings } = createTemplateReader(import.meta.url);
-
-export const getAllAgents = (): AgentTemplate[] => listMdAgents();
+const { getSettings } = createTemplateReader(import.meta.url);
 export const getSettingsTemplate = (): HookTemplate =>
   getSettings("hooks.json");

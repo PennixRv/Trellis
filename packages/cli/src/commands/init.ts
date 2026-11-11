@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
+import { assertCurrentExecutionTree } from "../utils/retired-native-assets.js";
 import path from "node:path";
 import readline from "node:readline";
 import chalk from "chalk";
@@ -432,10 +433,8 @@ exists under \`.trellis/tasks/\`. When they want to work on it, they should star
 this task from a session that provides Trellis session identity.
 
 **Your job**: help them populate \`.trellis/spec/\` with the team's real
-coding conventions. Every future AI session — this project's
-\`trellis-implement\` and \`trellis-check\` sub-agents — auto-loads spec files
-listed in per-task jsonl manifests. Empty spec = sub-agents write generic
-code. Real spec = sub-agents match the team's actual patterns.
+coding conventions. Future AI sessions use these conventions during implementation and review.
+Task JSONL manifests are optional context references, not execution authority.
 
 Don't dump instructions. Open with a short greeting, figure out if the repo
 has any existing convention docs (CLAUDE.md, .cursorrules, etc.), and drive
@@ -502,8 +501,7 @@ Scan real code to discover patterns. Before writing each spec file:
 ### Step 3: Document reality, not ideals
 
 **Critical**: write what the code *actually does*, not what it should do.
-Sub-agents match the spec, so aspirational patterns that don't exist in the
-codebase will cause sub-agents to write code that looks out of place.
+AI sessions follow the spec, so describe existing patterns accurately.
 
 If the team has known tech debt, document the current state — improvement
 is a separate conversation, not a bootstrap concern.
@@ -512,11 +510,9 @@ is a separate conversation, not a bootstrap concern.
 
 ## Quick explainer of the runtime (share when they ask "why do we need spec at all")
 
-- On hosts that support native sub-agents, \`trellis-implement\` writes code
-  and \`trellis-check\` verifies quality under the project's authorized route.
-- Each task has \`implement.jsonl\` / \`check.jsonl\` manifests listing which
-  spec files to load.
-- Supported hooks inject the task manifests and artifacts. Without hook
+- The main session implements and verifies the authorized contract.
+- Tasks may have optional \`implement.jsonl\` / \`check.jsonl\` context manifests.
+- Supported hooks inject current task and phase context. Without hook
   context, explicitly read those references and the applicable spec indexes;
   inspect the current phase with \`task.py phase show <task>\`.
 - Source of truth: \`.trellis/spec/\`. That's why filling it well now pays
@@ -685,8 +681,8 @@ code every session.
   carrying the current task + phase hint.
 - **\`/trellis:continue\`** reads the active phase from the Trellis task record
   and routes to that phase's Skill.
-- Hosts may use \`trellis-implement\` and \`trellis-check\` agents when their
-  workflow and the authorized contract call for delegated work.
+- Collaboration uses \`trellis teamwork\` for read-only packages or
+  \`paseo-based-parallelism\` for authorized implementation packages.
 
 File layout (mention when they ask "where does what live"):
 - \`.trellis/.runtime/sessions/<session>.json\` — session active-task state, gitignored
@@ -1096,6 +1092,8 @@ interface InitAnswers {
 }
 
 export async function init(options: InitOptions): Promise<void> {
+  // Existing legacy projects must use the ownership-aware update transaction.
+  assertCurrentExecutionTree(process.cwd());
   return withAssetMaintenance(process.cwd(), async () => {
     // Refuse to run in $HOME — running here would scoop platform runtime data
     // (Claude/Codex/OpenCode session histories etc.) into the trellis hash

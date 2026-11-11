@@ -303,7 +303,7 @@ describe("init() integration", () => {
       fs.existsSync(
         path.join(tmpDir, ".codex", "agents", "trellis-check.toml"),
       ),
-    ).toBe(true);
+    ).toBe(false);
     // parallel skill removed — platform-native worktree features used instead
     expect(fs.existsSync(path.join(tmpDir, ".codex", "hooks.json"))).toBe(true);
     expect(
@@ -600,7 +600,7 @@ describe("init() integration", () => {
     ).toBe(true);
     expect(
       fs.existsSync(path.join(tmpDir, ".pi", "agents", "trellis-implement.md")),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       fs.existsSync(
         path.join(tmpDir, ".pi", "extensions", "trellis", "index.ts"),
@@ -683,7 +683,7 @@ describe("init() integration", () => {
           "SKILL.md",
         ),
       ),
-    ).toBe(true);
+    ).toBe(false);
 
     // Custom sub-agent definitions → .kimi-code/agents/
     for (const name of [
@@ -693,7 +693,7 @@ describe("init() integration", () => {
     ]) {
       expect(
         fs.existsSync(path.join(tmpDir, ".kimi-code", "agents", `${name}.md`)),
-      ).toBe(true);
+      ).toBe(false);
     }
 
     // Kimi has no project-level hooks/settings surface.
@@ -760,7 +760,7 @@ describe("init() integration", () => {
           "SKILL.md",
         ),
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(fs.existsSync(path.join(tmpDir, ".dsh", "DSH.md"))).toBe(true);
 
     // dsh has no project-level hooks/settings surface.
@@ -818,13 +818,7 @@ describe("init() integration", () => {
       fs.existsSync(
         path.join(tmpDir, ".trae", "agents", "trellis-implement.md"),
       ),
-    ).toBe(true);
-    expect(
-      fs.readFileSync(
-        path.join(tmpDir, ".trae", "agents", "trellis-implement.md"),
-        "utf-8",
-      ),
-    ).toContain("Load Trellis Context First");
+    ).toBe(false);
 
     const hashFile = path.join(
       tmpDir,
@@ -895,15 +889,15 @@ describe("init() integration", () => {
       fs.existsSync(
         path.join(tmpDir, ".zcode", "agents", "trellis-implement.md"),
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       fs.existsSync(path.join(tmpDir, ".zcode", "agents", "trellis-check.md")),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       fs.existsSync(
         path.join(tmpDir, ".zcode", "agents", "trellis-research.md"),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("[issue-zcode-plugin-hint] zcode init prints a concise bilingual plugin hint", async () => {

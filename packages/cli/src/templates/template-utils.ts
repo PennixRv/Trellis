@@ -20,7 +20,6 @@ export interface HookTemplate {
 export interface TemplateReader {
   readTemplate: (relativePath: string) => string;
   listFiles: (dir: string) => string[];
-  listMdAgents: (dir?: string) => AgentTemplate[];
   listJsonAgents: (dir?: string) => AgentTemplate[];
   getSettings: (filename?: string) => HookTemplate;
   getConfig: (filename: string) => string;
@@ -28,7 +27,7 @@ export interface TemplateReader {
 
 /**
  * Create a template reader bound to the caller's directory.
- * Usage: `const { readTemplate, listMdAgents, getSettings } = createTemplateReader(import.meta.url);`
+ * Usage: `const { readTemplate, getSettings } = createTemplateReader(import.meta.url);`
  */
 export function createTemplateReader(importMetaUrl: string): TemplateReader {
   const __dirname = dirname(fileURLToPath(importMetaUrl));
@@ -47,16 +46,6 @@ export function createTemplateReader(importMetaUrl: string): TemplateReader {
     } catch {
       return [];
     }
-  }
-
-  /** Read all .md agent files from a subdirectory */
-  function listMdAgents(dir = "agents"): AgentTemplate[] {
-    return listFiles(dir)
-      .filter((f) => f.endsWith(".md"))
-      .map((f) => ({
-        name: f.replace(".md", ""),
-        content: readTemplate(`${dir}/${f}`),
-      }));
   }
 
   /** Read all .json agent files from a subdirectory (Kiro) */
@@ -82,7 +71,6 @@ export function createTemplateReader(importMetaUrl: string): TemplateReader {
   return {
     readTemplate,
     listFiles,
-    listMdAgents,
     listJsonAgents,
     getSettings,
     getConfig,

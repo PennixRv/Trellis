@@ -1,16 +1,4 @@
-/**
- * Kiro templates
- *
- * Kiro uses pure JSON agent definitions, not Markdown.
- * CLI agents embed hooks in their JSON (`hooks.agentSpawn`,
- * `hooks.userPromptSubmit`); the IDE surface reads standalone `.kiro.hook`
- * JSON files (`when`/`then` schema).
- *
- * Directory structure:
- *   kiro/
- *   ├── agents/      # Agent definitions (JSON) — main `trellis` + 3 sub-agents
- *   └── hooks/       # IDE `.kiro.hook` definitions (JSON)
- */
+/** Main-session platform assets and native context entry points. */
 
 import { createTemplateReader, type AgentTemplate } from "../template-utils.js";
 export type { AgentTemplate };

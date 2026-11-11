@@ -1,30 +1,7 @@
-/**
- * Snow CLI configurator.
- *
- * Snow CLI is a class-1 platform (agentCapable + auto context inject +
- * project agent discovery + beforeSubAgentStart), same capability class as
- * Claude Code / OMP — host protocol differs, workflow surface matches.
- *
- * Output paths:
- * - `.snow/skills/` — workflow + bundled skills (Claude Code Skills layout)
- * - `.snow/commands/trellis-*.json` — custom prompt slash commands (no trellis-start)
- * - `.snow/agents/` — project sub-agents (auto-discovered by Snow; primary path)
- * - `.snow/hooks/` — inject hooks (session / user / beforeSubAgentStart)
- * - `.snow/SNOW.md` — operator guide
- *
- * Modern Snow does NOT ship `.snow/sub-agents.trellis.json` (legacy merge
- * fragment for older hosts without project-agent discovery).
- *
- * hasHooks=true → filterCommands drops `start`; SessionStart injects context.
- * Agents are written without class-2 pull-based prelude (hook inject is primary).
- */
+/** Main-session platform assets and native context entry points. */
 
 import { AI_TOOLS } from "../types/ai-tools.js";
-import {
-  getAllAgents,
-  getAllHooks,
-  getSnowGuide,
-} from "../templates/snow/index.js";
+import { getAllHooks, getSnowGuide } from "../templates/snow/index.js";
 import {
   collectSkillTemplates,
   resolveAllAsSkills,
@@ -87,11 +64,6 @@ export function collectSnowTemplates(): Map<string, string> {
       `.snow/commands/trellis-${cmd.name}.json`,
       buildSnowCommandJson(cmd.name, body),
     );
-  }
-
-  // class-1: no applyPullBasedPreludeMarkdown (hook inject is primary)
-  for (const agent of getAllAgents()) {
-    files.set(`.snow/agents/${agent.name}.md`, agent.content);
   }
 
   for (const [filePath, content] of collectSnowStaticFiles()) {

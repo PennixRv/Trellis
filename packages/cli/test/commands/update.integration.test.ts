@@ -235,6 +235,43 @@ describe("update() integration", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  it("retires owned native assets through update and remains idempotent", async () => {
+    await init({ yes: true, force: true, codex: true });
+    const role = ".codex/agents/trellis-implement.toml";
+    const hooks = ".codex/hooks.json";
+    stageVersionedUpgradeProject({
+      fromVersion: "0.7.2-beta.11",
+      pristineTemplates: {
+        [role]: "owned native role",
+        [hooks]: JSON.stringify({ hooks: { SubagentStart: [{ hooks: [{ command: "python .codex/hooks/inject-subagent-context.py" }] }] }, user: true }),
+        ".trellis/config.yaml": "codex:\n  dispatch_mode: auto\nsession_auto_commit: false\n",
+      },
+    });
+    writeProjectFile(".codex/agents/user.toml", "private user role");
+    await update({ yes: true });
+    expect(fs.existsSync(projectFile(role))).toBe(false);
+    expect(readProjectFile(hooks)).not.toContain("inject-subagent-context");
+    expect(JSON.parse(readProjectFile(hooks)).user).toBe(true);
+    expect(readProjectFile(".trellis/config.yaml")).toContain("session_auto_commit: false");
+    expect(readProjectFile(".trellis/config.yaml")).not.toContain("dispatch_mode");
+    expect(readProjectFile(".codex/agents/user.toml")).toBe("private user role");
+    await update({ yes: true });
+    expect(fs.existsSync(projectFile(role))).toBe(false);
+  });
+
+  it.each(["modified", "skip"])("blocks %s retired assets before update writes", async (kind) => {
+    await init({ yes: true, force: true, codex: true });
+    const role = ".codex/agents/trellis-implement.toml";
+    stageVersionedUpgradeProject({ fromVersion: "0.7.2-beta.11", pristineTemplates: { [role]: "owned role" } });
+    if (kind === "modified") writeProjectFile(role, "user changes");
+    else writeProjectFile(".trellis/config.yaml", "update:\n  skip:\n    - .codex/agents\n");
+    const before = readProjectFile(MANAGED_FILE);
+    await expect(update({ yes: true, force: true })).rejects.toThrow();
+    expect(readProjectFile(MANAGED_FILE)).toBe(before);
+    expect(readProjectFile(role)).toBe(kind === "modified" ? "user changes" : "owned role");
+    expect(readProjectFile(".trellis/.version")).toBe("0.7.2-beta.11");
+  });
+
   it.each([
     "planning",
     "in_progress",
@@ -493,7 +530,7 @@ describe("update() integration", () => {
     ).toBe(true);
     expect(
       fs.existsSync(projectFile(".zcode/agents/trellis-research.md")),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       fs.existsSync(projectFile(".agents/skills/trellis-start/SKILL.md")),
     ).toBe(false);
@@ -515,7 +552,7 @@ describe("update() integration", () => {
     ).toBe(true);
     expect(
       fs.existsSync(projectFile(".zcode/agents/trellis-research.md")),
-    ).toBe(true);
+    ).toBe(false);
     expect(fs.existsSync(projectFile(".agents/skills"))).toBe(false);
   });
 

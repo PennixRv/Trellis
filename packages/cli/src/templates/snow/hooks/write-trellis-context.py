@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Snow CLI Trellis context writer + additionalContext emitter.
 
-Used by onSessionStart / onUserMessage / beforeSubAgentStart hooks.
+Used by onSessionStart / onUserMessage hooks.
 
 1. Writes a breadcrumb file agents/skills can Read:
      .snow/log/trellis-context.txt
@@ -10,7 +10,7 @@ Used by onSessionStart / onUserMessage / beforeSubAgentStart hooks.
      { "additionalContext": "...", "display": "..." }
 
 Modes (compact vs full):
-- argv: session | user | subagent  (preferred)
+- argv: session | user  (preferred)
 - env:  TRELLIS_SNOW_HOOK_MODE
 - stdin JSON from Snow may include agentId/agentName/prompt/cwd/sessionId
 
@@ -74,7 +74,7 @@ def _run(cmd: list[str], cwd: Path) -> str:
             text=True,
             encoding="utf-8",
             errors="replace",
-            # Keep below Snow user/subagent hook timeout (15s) so fail-open JSON
+            # Keep below Snow user hook timeout (15s) so fail-open JSON
             # can still emit if task.py stalls.
             timeout=5,
             check=False,
@@ -233,18 +233,16 @@ def _resolve_mode(
 ) -> str:
     for arg in argv[1:]:
         a = arg.strip().lower()
-        if a in {"session", "user", "subagent", "full", "compact"}:
+        if a in {"session", "user", "full", "compact"}:
             if a == "full":
                 return "session"
             if a == "compact":
                 return "user"
             return a
     env_mode = (env.get("TRELLIS_SNOW_HOOK_MODE") or "").strip().lower()
-    if env_mode in {"session", "user", "subagent"}:
+    if env_mode in {"session", "user"}:
         return env_mode
     # Infer from Snow stdin context shape.
-    if stdin_ctx.get("agentId") or stdin_ctx.get("agentName") or stdin_ctx.get("prompt"):
-        return "subagent"
     if stdin_ctx.get("message") is not None or stdin_ctx.get("source") in {"normal", "pending"}:
         return "user"
     if stdin_ctx.get("isResume") is not None or stdin_ctx.get("messages") is not None:
@@ -252,21 +250,7 @@ def _resolve_mode(
     return "session"
 
 
-def _agent_kind(stdin_ctx: dict[str, Any]) -> str:
-    blob = " ".join(
-        str(stdin_ctx.get(k) or "")
-        for k in ("agentId", "agentName", "prompt")
-    ).lower()
-    if "implement" in blob:
-        return "implement"
-    if "check" in blob:
-        return "check"
-    if "research" in blob:
-        return "research"
-    return "generic"
-
-
-def _task_artifact_summary(task_dir: Path, *, detailed: bool, kind: str) -> list[str]:
+def _task_artifact_summary(task_dir: Path, *, detailed: bool) -> list[str]:
     lines: list[str] = [f"## Active task artifacts ({task_dir.as_posix()})"]
     for name in ("prd.md", "design.md", "implement.md", "task.json"):
         p = task_dir / name
@@ -308,50 +292,37 @@ def _task_artifact_summary(task_dir: Path, *, detailed: bool, kind: str) -> list
         if body:
             lines.extend(["## prd.md summary", body, ""])
 
-    if kind in {"implement", "generic"}:
-        impl = task_dir / "implement.jsonl"
-        items = _jsonl_summaries(impl, max_items=10)
-        if items:
-            lines.append("## implement.jsonl (recent)")
-            lines.extend(items)
-            lines.append("")
-        design = task_dir / "design.md"
-        if design.is_file():
-            dbody = _read_text(design, 900)
-            if dbody:
-                lines.extend(["## design.md excerpt", dbody, ""])
-        implement_md = task_dir / "implement.md"
-        if implement_md.is_file():
-            ibody = _read_text(implement_md, 900)
-            if ibody:
-                lines.extend(["## implement.md excerpt", ibody, ""])
+    impl = task_dir / "implement.jsonl"
+    items = _jsonl_summaries(impl, max_items=10)
+    if items:
+        lines.append("## implement.jsonl (recent)")
+        lines.extend(items)
+        lines.append("")
+    design = task_dir / "design.md"
+    if design.is_file():
+        dbody = _read_text(design, 900)
+        if dbody:
+            lines.extend(["## design.md excerpt", dbody, ""])
+    implement_md = task_dir / "implement.md"
+    if implement_md.is_file():
+        ibody = _read_text(implement_md, 900)
+        if ibody:
+            lines.extend(["## implement.md excerpt", ibody, ""])
 
-    if kind in {"check", "generic"}:
-        lines.extend(
-            [
-                "## Check focus",
-                "- Run `git diff` / diagnostics for uncommitted changes.",
-                "- Compare against prd/design/implement and project specs.",
-                "- Self-fix issues; do not only report.",
-                "",
-            ]
-        )
-        check_items = _jsonl_summaries(task_dir / "check.jsonl", max_items=8)
-        if check_items:
-            lines.append("## check.jsonl (recent)")
-            lines.extend(check_items)
-            lines.append("")
-
-    if kind == "research":
-        lines.extend(
-            [
-                "## Research focus",
-                f"- Persist findings ONLY under `{task_dir.as_posix()}/research/`.",
-                "- Chat reply should list file paths + one-line summaries, not full dumps.",
-                "- Do not modify code outside the research directory.",
-                "",
-            ]
-        )
+    lines.extend(
+        [
+            "## Check focus",
+            "- Run `git diff` / diagnostics for uncommitted changes.",
+            "- Compare against prd/design/implement and project specs.",
+            "- Self-fix issues; do not only report.",
+            "",
+        ]
+    )
+    check_items = _jsonl_summaries(task_dir / "check.jsonl", max_items=8)
+    if check_items:
+        lines.append("## check.jsonl (recent)")
+        lines.extend(check_items)
+        lines.append("")
 
     return lines
 
@@ -448,12 +419,11 @@ def build_context(
     stdin_ctx: dict[str, Any],
 ) -> str:
     compact = mode == "user"
-    kind = _agent_kind(stdin_ctx) if mode == "subagent" else "generic"
 
     lines: list[str] = [
         "# Trellis context (Snow CLI)",
         "",
-        f"Mode: {mode}" + (f" | agentKind: {kind}" if mode == "subagent" else ""),
+        f"Mode: {mode}",
         f"Repo: {repo}",
         "",
     ]
@@ -462,19 +432,6 @@ def build_context(
         lines.append(f"Snow sessionId: {stdin_ctx.get('sessionId')}")
     if stdin_ctx.get("cwd"):
         lines.append(f"Hook cwd: {stdin_ctx.get('cwd')}")
-    if mode == "subagent":
-        if stdin_ctx.get("agentId") or stdin_ctx.get("agentName"):
-            lines.append(
-                f"Sub-agent: {stdin_ctx.get('agentId') or stdin_ctx.get('agentName')}"
-            )
-        prompt = stdin_ctx.get("prompt")
-        if isinstance(prompt, str) and prompt.strip():
-            p = prompt.strip()
-            if len(p) > 240:
-                p = p[:237] + "..."
-            lines.append(f"Dispatch prompt (truncated): {p}")
-        lines.append("")
-
     task_py = repo / ".trellis" / "scripts" / "task.py"
     current = ""
     task_dir: Path | None = None
@@ -492,7 +449,6 @@ def build_context(
             _task_artifact_summary(
                 task_dir,
                 detailed=not compact,
-                kind=kind if mode == "subagent" else "generic",
             )
         )
     elif current:
@@ -504,7 +460,7 @@ def build_context(
 
         identity = repo / ".trellis" / "identity.md"
         if identity.is_file():
-            body = _read_text(identity, 900 if mode == "subagent" else 1200)
+            body = _read_text(identity, 1200)
             if body:
                 lines.extend(["## .trellis/identity.md", body, ""])
     else:
@@ -517,55 +473,18 @@ def build_context(
                 lines.append(f"Identity: {first}")
                 lines.append("")
 
-    # Mode-specific checklist (keep short).
-    if mode == "subagent" and kind == "research":
-        task_hint = (
-            task_dir.as_posix()
-            if task_dir
-            else "<path from task.py current>"
-        )
-        lines.extend(
-            [
-                "## Sub-agent checklist (research)",
-                f"1. Active task: {task_hint}",
-                f"2. Write ONLY under `{task_hint}/research/`.",
-                "3. Return paths + one-line summaries to main session.",
-                "",
-            ]
-        )
-    elif mode == "subagent" and kind == "check":
-        lines.extend(
-            [
-                "## Sub-agent checklist (check)",
-                "1. `git diff` + diagnostics first.",
-                "2. Compare against prd/design/implement + specs.",
-                "3. Self-fix; no git commit/push/merge.",
-                "",
-            ]
-        )
-    elif mode == "subagent" and kind == "implement":
-        lines.extend(
-            [
-                "## Sub-agent checklist (implement)",
-                "1. Read prd + design/implement artifacts before coding.",
-                "2. Prefer Active task path from task.py / inject above.",
-                "3. No git commit/push/merge from implement agent.",
-                "",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "## Main-session checklist",
-                "1. Session/user hooks auto-inject Trellis context; `/trellis-start` is optional."
-                if not compact
-                else "1. Compact inject — full context also at `.snow/log/trellis-context.txt`.",
-                "2. When dispatching implement/check/research, start the prompt with:",
-                "   `Active task: <path from task.py current>`",
-                "3. Do not git commit/push/merge from Trellis implement/check agents.",
-                "",
-            ]
-        )
+    lines.extend(
+        [
+            "## Main-session checklist",
+            "1. Session/user hooks auto-inject Trellis context; `/trellis-start` is optional."
+            if not compact
+            else "1. Compact inject — full context also at `.snow/log/trellis-context.txt`.",
+            "2. When dispatching implement/check/research, start the prompt with:",
+            "   `Active task: <path from task.py current>`",
+            "3. Do not git commit/push/merge from Trellis implement/check agents.",
+            "",
+        ]
+    )
 
     return "\n".join(lines).strip() + "\n"
 
@@ -610,7 +529,6 @@ def main() -> int:
         display = {
             "session": "Trellis session context injected",
             "user": "Trellis compact breadcrumb",
-            "subagent": f"Trellis sub-agent context ({_agent_kind(stdin_ctx)})",
         }.get(mode, "Trellis context refreshed")
         display = f"{display} (.snow/log/trellis-context.txt)"
 

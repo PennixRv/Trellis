@@ -1,16 +1,6 @@
-/**
- * Cursor templates
- *
- * Directory structure:
- *   cursor/
- *   ├── agents/      # Sub-agent definitions
- *   └── hooks.json   # Hooks configuration
- */
+/** Main-session platform assets and native context entry points. */
 
-import { createTemplateReader, type AgentTemplate } from "../template-utils.js";
-export type { AgentTemplate };
+import { createTemplateReader } from "../template-utils.js";
 
-const { listMdAgents, getConfig } = createTemplateReader(import.meta.url);
-
-export const getAllAgents = (): AgentTemplate[] => listMdAgents();
+const { getConfig } = createTemplateReader(import.meta.url);
 export const getHooksConfig = (): string => getConfig("hooks.json");

@@ -47,6 +47,7 @@ import {
   type WorkflowTemplateListing,
 } from "../utils/workflow-resolver.js";
 import { writeFileAtomic } from "../utils/atomic-write.js";
+import { assertCurrentExecutionAsset } from "../utils/retired-native-assets.js";
 
 export interface WorkflowCommandOptions {
   template?: string;
@@ -222,6 +223,7 @@ async function writeWorkflow(
     fs.mkdirSync(dest, { recursive: true });
   }
   const finalContent = replacePythonCommandLiterals(template.content);
+  assertCurrentExecutionAsset(".trellis/workflow.md", finalContent);
 
   // `--create-new` always writes the `.new` sibling, regardless of disk state.
   if (options.createNew) {
@@ -286,13 +288,7 @@ async function writeWorkflow(
  * sync with `.trellis/spec/cli/backend/workflow-state-contract.md` (status
  * writer + reachability tables) — update both together.
  */
-const REQUIRED_WORKFLOW_STATE_IDS = [
-  "no_task",
-  "planning",
-  "planning-inline",
-  "in_progress",
-  "in_progress-inline",
-];
+const REQUIRED_WORKFLOW_STATE_IDS = ["no_task", "planning", "in_progress"];
 
 /**
  * Soft parser-contract validation for saved library variants: warn (never
@@ -374,6 +370,10 @@ async function saveWorkflowToLibrary(
 }
 
 function setProjectDefaultWorkflow(cwd: string, id: string): void {
+  assertCurrentExecutionAsset(
+    ".trellis/workflow.md",
+    fs.readFileSync(path.join(cwd, ".trellis/workflows", `${id}.md`), "utf8"),
+  );
   const configPath = path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml");
   if (!fs.existsSync(configPath)) {
     throw new WorkflowCommandError(
@@ -395,6 +395,10 @@ function setProjectDefaultWorkflow(cwd: string, id: string): void {
 }
 
 function setPersonalDefaultWorkflow(cwd: string, id: string): void {
+  assertCurrentExecutionAsset(
+    ".trellis/workflow.md",
+    fs.readFileSync(path.join(cwd, ".trellis/workflows", `${id}.md`), "utf8"),
+  );
   const developerPath = path.join(cwd, PATHS.DEVELOPER_FILE);
   if (!fs.existsSync(developerPath)) {
     throw new WorkflowCommandError(

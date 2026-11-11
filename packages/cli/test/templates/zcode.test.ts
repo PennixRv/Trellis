@@ -1,30 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAllAgents, getHooksConfig } from "../../src/templates/zcode/index.js";
-
-const EXPECTED_AGENT_NAMES = [
-  "trellis-check",
-  "trellis-implement",
-  "trellis-research",
-];
-
-describe("zcode getAllAgents", () => {
-  it("returns the expected custom agent set", () => {
-    const agents = getAllAgents();
-    const names = agents.map((agent) => agent.name);
-    expect(names).toEqual(EXPECTED_AGENT_NAMES);
-  });
-
-  it("each agent is a Markdown file with YAML frontmatter", () => {
-    for (const agent of getAllAgents()) {
-      const content = agent.content.replace(/\r\n/g, "\n");
-      expect(content.length).toBeGreaterThan(0);
-      expect(content).toMatch(/^---\n/);
-      expect(content).toContain("name: ");
-      expect(content).toContain("description:");
-      expect(content).toContain("color:");
-    }
-  });
-});
+import { getHooksConfig } from "../../src/templates/zcode/index.js";
 
 describe("zcode getHooksConfig", () => {
   it("targets .zcode/config.json (workspace config form)", () => {
@@ -42,10 +17,10 @@ describe("zcode getHooksConfig", () => {
     expect(cfg.content).toContain('"SessionStart"');
     expect(cfg.content).toContain('"UserPromptSubmit"');
     expect(cfg.content).toContain('"PreToolUse"');
-    expect(cfg.content).toContain('"matcher": "Agent|Task"');
+    expect(cfg.content).not.toContain('"matcher": "Agent|Task"');
     expect(cfg.content).toContain("session-start.py");
     expect(cfg.content).toContain("inject-workflow-state.py");
-    expect(cfg.content).toContain("inject-subagent-context.py");
+    expect(cfg.content).not.toContain("inject-subagent-context.py");
     // Uses {{PYTHON_CMD}} placeholder so init resolves host python.
     expect(cfg.content).toContain("{{PYTHON_CMD}}");
   });
@@ -68,38 +43,10 @@ describe("zcode getHooksConfig", () => {
       expect.arrayContaining([
         '{{PYTHON_CMD}} "${ZCODE_PROJECT_DIR}/.zcode/hooks/session-start.py"',
         '{{PYTHON_CMD}} "${ZCODE_PROJECT_DIR}/.zcode/hooks/inject-workflow-state.py"',
-        '{{PYTHON_CMD}} "${ZCODE_PROJECT_DIR}/.zcode/hooks/inject-subagent-context.py"',
       ]),
     );
     for (const command of commands) {
       expect(command).not.toMatch(/{{PYTHON_CMD}}\s+\.zcode\/hooks\//);
     }
-  });
-});
-
-describe("zcode class-1 agent fallback protocol", () => {
-  it("keeps source agents prelude-free but gives implement/check hook fallback instructions", () => {
-    const agents = getAllAgents();
-    for (const agent of agents) {
-      if (
-        agent.name === "trellis-implement" ||
-        agent.name === "trellis-check"
-      ) {
-        expect(agent.content).not.toContain("Load Trellis Context First");
-        expect(agent.content).toContain("Trellis Context Loading Protocol");
-        expect(agent.content).toContain("<!-- trellis-hook-injected -->");
-        expect(agent.content).toContain("Active task:");
-      }
-    }
-  });
-
-  it("does not add context fallback instructions to research", () => {
-    const agents = getAllAgents();
-    const research = agents.find((agent) => agent.name === "trellis-research");
-    expect(research).toBeDefined();
-    if (!research) return;
-    expect(research.content).not.toContain("Trellis Context Loading Protocol");
-    expect(research.content).not.toContain("Load Trellis Context First");
-    expect(research.content).toContain("{TASK_DIR}/research/");
   });
 });

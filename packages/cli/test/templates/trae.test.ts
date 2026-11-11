@@ -2,23 +2,12 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getAllAgents, getSettingsTemplate } from "../../src/templates/trae/index.js";
-import {
-  resolveAllAsSkills,
-  resolveSkills,
-  resolveBundledSkills,
-  applyPullBasedPreludeMarkdown,
-} from "../../src/configurators/shared.js";
+import { getSettingsTemplate } from "../../src/templates/trae/index.js";
+import { resolveAllAsSkills, resolveSkills, resolveBundledSkills } from "../../src/configurators/shared.js";
 import { AI_TOOLS } from "../../src/types/ai-tools.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");
-
-const EXPECTED_AGENT_NAMES = [
-  "trellis-check",
-  "trellis-implement",
-  "trellis-research",
-];
 
 // Shared skills are sourced from common/ via resolveAllAsSkills (written to
 // .trae/skills/ — Trae has its own private config dir, no .agents/skills alias).
@@ -55,52 +44,6 @@ describe("trae shared skills (from common source)", () => {
       expect(skill.content).toContain(`name: ${skill.name}`);
     }
   });
-});
-
-describe("trae getAllAgents", () => {
-  it("returns the expected custom agent set", () => {
-    const agents = getAllAgents();
-    const names = agents.map((agent) => agent.name);
-    expect(names).toEqual(EXPECTED_AGENT_NAMES);
-  });
-
-  it("each agent is a Markdown file with YAML frontmatter", () => {
-    for (const agent of getAllAgents()) {
-      expect(agent.content.length).toBeGreaterThan(0);
-      expect(agent.content).toMatch(/^---\n/);
-      expect(agent.content).toContain("name: ");
-      expect(agent.content).toContain("description:");
-    }
-  });
-});
-
-// =============================================================================
-// Trae sub-agent recursion guard (mirrors codex issue #234)
-// =============================================================================
-//
-// trellis-implement / trellis-check agent markdown MUST contain a hard recursion
-// guard so the dispatched sub-agent does not spawn another
-// trellis-implement / trellis-check sub-agent.
-describe("trae sub-agent recursion guard", () => {
-  for (const name of ["trellis-implement", "trellis-check"] as const) {
-    it(`${name}.md forbids spawning trellis-implement / trellis-check`, () => {
-      const mdPath = path.join(
-        repoRoot,
-        "packages/cli/src/templates/trae/agents",
-        `${name}.md`,
-      );
-      const content = fs.readFileSync(mdPath, "utf-8");
-      // Hard prohibition keyword
-      expect(content).toMatch(/Do NOT spawn/i);
-      // Mentions both sibling agent kinds explicitly
-      expect(content).toContain("trellis-implement");
-      expect(content).toContain("trellis-check");
-      // Mentions the leakage source so the reader knows why
-      expect(content).toMatch(
-        /SessionStart|dispatch.*main session|breadcrumb/i,
-      );
-    });
-  }
 });
 
 describe("trae has no config.toml (no Codex CLI trust mechanism)", () => {
@@ -212,35 +155,5 @@ describe("trae platform detection in shared session-start.py", () => {
     const content = fs.readFileSync(hookPath, "utf-8");
     expect(content).toMatch(/if "\.trae" in script_parts:\s*\n\s*return "trae"/);
     expect(content).toContain("TRAE_PROJECT_DIR");
-  });
-});
-
-// =============================================================================
-// Pull-based prelude (class-2 platform)
-// =============================================================================
-//
-// Trae is a class-2 (pull-based) platform: hooks cannot mutate sub-agent
-// prompts. The implement/check agents must have a pull-based prelude injected
-// so they load Trellis context themselves.
-describe("trae pull-based prelude injection (class-2)", () => {
-  it("applyPullBasedPreludeMarkdown injects context-loading instructions", () => {
-    const agents = applyPullBasedPreludeMarkdown(getAllAgents());
-    for (const agent of agents) {
-      if (
-        agent.name === "trellis-implement" ||
-        agent.name === "trellis-check"
-      ) {
-        expect(agent.content).toContain("Load Trellis Context First");
-        expect(agent.content).toContain("task.py current --source");
-      }
-    }
-  });
-
-  it("research agent does not get the prelude (no task context needed)", () => {
-    const agents = applyPullBasedPreludeMarkdown(getAllAgents());
-    const research = agents.find((a) => a.name === "trellis-research");
-    expect(research).toBeDefined();
-    if (!research) return; // guard for type-safety
-    expect(research.content).not.toContain("Load Trellis Context First");
   });
 });

@@ -34,16 +34,6 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "{{PYTHON_CMD}} .factory/hooks/inject-subagent-context.py",
-            "timeout": 30
-          }
-        ]
-      },
-      {
         "matcher": "Execute|Bash",
         "hooks": [
           {

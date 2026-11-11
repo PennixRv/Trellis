@@ -36,32 +36,9 @@ function listFiles(dir: string): string[] {
   }
 }
 
-export interface AgentTemplate {
-  name: string;
-  content: string;
-}
-
 export interface ConfigTemplate {
   targetPath: string;
   content: string;
-}
-
-// Shared skills are now sourced from common/ templates (see templates/common/index.ts)
-
-export function getAllAgents(): AgentTemplate[] {
-  const agents: AgentTemplate[] = [];
-
-  for (const file of listFiles("agents")) {
-    if (!file.endsWith(".toml")) {
-      continue;
-    }
-
-    const name = file.replace(".toml", "");
-    const content = readTemplate(`agents/${file}`);
-    agents.push({ name, content });
-  }
-
-  return agents;
 }
 
 export interface HookTemplate {

@@ -45,28 +45,6 @@
         ]
       }
     ],
-    "PreToolUse": [
-      {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/inject-subagent-context.py",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/inject-subagent-context.py",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Read|Edit|Write|MultiEdit",

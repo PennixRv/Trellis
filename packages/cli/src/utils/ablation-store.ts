@@ -10,6 +10,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
+import { assertCurrentExecutionAsset } from "./retired-native-assets.js";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
@@ -939,6 +940,7 @@ export function restoreTransactionFiles(
   transaction: LoadedAblationTransaction,
   options: { verifyExpectedState?: boolean } = {},
 ): void {
+  assertRestorableExecutionAssets(transaction);
   const ordered = [...transaction.state.entries].sort(
     (left, right) =>
       left.relativePath.split("/").length -
@@ -946,6 +948,35 @@ export function restoreTransactionFiles(
   );
   for (const entry of ordered) {
     restoreEntry(transaction, entry, options.verifyExpectedState ?? false);
+  }
+}
+
+function assertRestorableExecutionAssets(
+  transaction: LoadedAblationTransaction,
+): void {
+  function visit(absolute: string, relative: string): void {
+    // These directories contain records, not active execution assets.
+    if (
+      /^\.trellis\/(?:tasks|workspace|session-handoffs|\.backup-[^/]+)(?:\/|$)/.test(
+        relative,
+      )
+    )
+      return;
+    const stat = fs.lstatSync(absolute);
+    if (stat.isSymbolicLink()) assertCurrentExecutionAsset(relative, "");
+    if (stat.isDirectory()) {
+      for (const child of fs.readdirSync(absolute))
+        visit(path.join(absolute, child), `${relative}/${child}`);
+    } else if (stat.isFile()) {
+      assertCurrentExecutionAsset(relative, fs.readFileSync(absolute, "utf8"));
+    }
+  }
+  for (const entry of transaction.state.entries) {
+    if (entry.backupPath)
+      visit(
+        path.join(transaction.paths.transactionDir, entry.backupPath),
+        entry.relativePath,
+      );
   }
 }
 
@@ -997,6 +1028,7 @@ export function restoreAblationTransaction(
     transaction.paths = reloaded.paths;
     transaction.state = reloaded.state;
 
+    assertRestorableExecutionAssets(transaction);
     const conflicts = collectRestoreConflicts(transaction);
     if (conflicts.length > 0) {
       if (!options.dryRun && !mayAlreadyBeRestored(transaction.state)) {

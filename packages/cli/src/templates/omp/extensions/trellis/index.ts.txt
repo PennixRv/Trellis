@@ -311,23 +311,14 @@ function buildSessionContext(projectRoot: string, contextKey: string | null): st
 // Task context — prd.md, info.md, and jsonl-referenced spec/research files
 // ---------------------------------------------------------------------------
 
-type AgentType = "trellis-implement" | "trellis-check" | "trellis-research" | null;
-
-function taskContextJsonlNames(agentType?: AgentType): string[] {
-   if (agentType === "trellis-implement") return ["implement.jsonl"];
-   if (agentType === "trellis-check") return ["check.jsonl"];
-   if (agentType === "trellis-research") return [];
-   return ["implement.jsonl", "check.jsonl"];
-}
-
-function taskContextInputPaths(projectRoot: string, taskDir: string, agentType?: AgentType): string[] {
+function taskContextInputPaths(projectRoot: string, taskDir: string): string[] {
    const trustedRoots = resolveTrustedRoots(projectRoot);
    const paths = new Set<string>([
       join(projectRoot, ".trellis", "config.yaml"),
       join(taskDir, "prd.md"),
       join(taskDir, "info.md"),
    ]);
-   for (const jsonlName of taskContextJsonlNames(agentType)) {
+   for (const jsonlName of ["implement.jsonl", "check.jsonl"]) {
       const jsonlPath = join(taskDir, jsonlName);
       paths.add(jsonlPath);
       if (!existsSync(jsonlPath)) continue;
@@ -349,8 +340,8 @@ function taskContextInputPaths(projectRoot: string, taskDir: string, agentType?:
    return [...paths];
 }
 
-function taskContextSignature(projectRoot: string, taskDir: string, agentType?: AgentType): string {
-   return taskContextInputPaths(projectRoot, taskDir, agentType).map((filePath) => {
+function taskContextSignature(projectRoot: string, taskDir: string): string {
+   return taskContextInputPaths(projectRoot, taskDir).map((filePath) => {
       try {
          const stat = statSync(filePath);
          return `${filePath}:${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
@@ -630,7 +621,7 @@ function readJsonlLines(jsonlPath: string, displayPath: string): { lines: string
    }
 }
 
-function buildTaskContext(projectRoot: string, taskDir: string, agentType?: AgentType): string {
+function buildTaskContext(projectRoot: string, taskDir: string): string {
    const parts: string[] = [];
    // Resolved once per call (not per referenced file) — avoids re-parsing
    // config.yaml for every jsonl row.
@@ -666,7 +657,7 @@ function buildTaskContext(projectRoot: string, taskDir: string, agentType?: Agen
    }
 
    // Determine which jsonl files to read based on agent type
-   const jsonlNames = taskContextJsonlNames(agentType);
+   const jsonlNames = ["implement.jsonl", "check.jsonl"];
 
    // A file may be referenced by both manifests. Use the resolved real path so
    // relative aliases and symlinked paths cannot consume the context budget twice.
@@ -881,24 +872,9 @@ function parseWorkflowStateBlocks(markdown: string): WorkflowStateBlock[] {
    return blocks;
 }
 
-// ---------------------------------------------------------------------------
-// Sub-agent detection
-// ---------------------------------------------------------------------------
-
-const TRELLIS_AGENTS = new Set(["trellis-implement", "trellis-check", "trellis-research"]);
-
-function detectAgentType(): AgentType {
-   const blocked = process.env.PI_BLOCKED_AGENT;
-   if (blocked && TRELLIS_AGENTS.has(blocked)) {
-      return blocked as AgentType;
-   }
-   return null;
-}
-
 interface TaskContextCache {
    projectRoot: string;
    taskDir: string;
-   agentType: AgentType;
    signature: string;
    content: string;
 }
@@ -910,8 +886,6 @@ interface TaskContextCache {
 export default function(pi: ExtensionAPI): void {
    let projectRoot: string | null = null;
    const turnCache = new TurnContextCache();
-   const agentType = detectAgentType();
-   const isSubAgent = agentType !== null;
    let taskContextCache: TaskContextCache | null = null;
 
    // Tracks compaction boundaries — context handler skips scanning when no
@@ -926,12 +900,12 @@ export default function(pi: ExtensionAPI): void {
    };
 
    const getTaskContext = (taskDir: string, root: string): string => {
-      const signature = taskContextSignature(root, taskDir, agentType);
-      if (taskContextCache?.projectRoot === root && taskContextCache.taskDir === taskDir && taskContextCache.agentType === agentType && taskContextCache.signature === signature) {
+      const signature = taskContextSignature(root, taskDir);
+      if (taskContextCache?.projectRoot === root && taskContextCache.taskDir === taskDir && taskContextCache.signature === signature) {
          return taskContextCache.content;
       }
-      const content = buildTaskContext(root, taskDir, agentType);
-      taskContextCache = { projectRoot: root, taskDir, agentType, signature, content };
+      const content = buildTaskContext(root, taskDir);
+      taskContextCache = { projectRoot: root, taskDir, signature, content };
       return content;
    };
 
@@ -941,20 +915,7 @@ export default function(pi: ExtensionAPI): void {
 
       if (!projectRoot) return;
 
-      if (isSubAgent) {
-         // Sub-agent: inject precise task context once
-         const { taskDir } = resolveActiveTaskStatus(projectRoot, contextKey);
-         if (taskDir) {
-            const taskContext = getTaskContext(taskDir, projectRoot);
-            if (taskContext) {
-               await pi.sendMessage({
-                  customType: "trellis-task-context",
-                  content: taskContext,
-                  display: false,
-               });
-            }
-         }
-      } else {
+
          // Main session: inject session context (global map) + task context
          const sessionContext = buildSessionContext(projectRoot, contextKey);
          if (sessionContext) {
@@ -978,7 +939,6 @@ export default function(pi: ExtensionAPI): void {
          }
 
          ctx.ui.notify("Trellis workflow system available", "info");
-      }
    });
 
    pi.on("session_before_compact", async () => {

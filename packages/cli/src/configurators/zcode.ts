@@ -1,19 +1,7 @@
-/**
- * ZCode configurator.
- *
- * ZCode (智谱) is an agentCapable class-1 platform. Since ZCode 3.x it exposes
- * a workspace hook config at `.zcode/config.json` (SessionStart,
- * UserPromptSubmit, and PreToolUse for Agent/Task), so `hasHooks` is true.
- * Four output paths:
- * - `.zcode/skills/` — ZCode-private workflow and bundled skills
- * - `.zcode/commands/trellis/` — slash commands (invoked as /trellis:<name>)
- * - `.zcode/agents/` — sub-agent definitions with hook-injection fallback
- * - `.zcode/hooks/` + `.zcode/config.json` — shared Python hook scripts and
- *   the workspace hook registration
- */
+/** Main-session platform assets and native context entry points. */
 
 import { AI_TOOLS } from "../types/ai-tools.js";
-import { getAllAgents, getHooksConfig } from "../templates/zcode/index.js";
+import { getHooksConfig } from "../templates/zcode/index.js";
 import { getSharedHookScriptsForPlatform } from "../templates/shared-hooks/index.js";
 import {
   collectSkillTemplates,
@@ -47,11 +35,6 @@ export function collectZcodeTemplates(): Map<string, string> {
   // 2. Commands → .zcode/commands/trellis/
   for (const cmd of resolveCommands(ctx)) {
     files.set(`.zcode/commands/trellis/${cmd.name}.md`, cmd.content);
-  }
-
-  // 3. Sub-agents → .zcode/agents/ (hook-inject; templates carry fallback).
-  for (const agent of getAllAgents()) {
-    files.set(`.zcode/agents/${agent.name}.md`, agent.content);
   }
 
   // 4. Shared hook scripts → .zcode/hooks/.

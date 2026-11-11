@@ -1,17 +1,6 @@
 # Trellis on DeepSeek Harness (dsh)
 
-dsh is a **class-2 pull-based** Trellis host. It discovers Trellis skills from
-the project, uses native continuable sub-agents for isolated implementation and
-review roles, and exposes a stable `DSH_SESSION_ID` to every managed shell.
-
-| Capability | Without companion plugin | With `dsh-trellis` |
-| --- | --- | --- |
-| Shared and entry skills | Works | Works |
-| Session-scoped active task | Works through verified `DSH_SHELL=1` + `DSH_SESSION_ID`, including nested launches | Managed per-execution identity can forward a distinct child session |
-| Implement/check/research roles | Foreground native sub-agent | Background native sub-agent |
-| Per-turn workflow breadcrumb | Not available | Injected from `workflow.md` |
-| Event-driven child wait | Not available | `trellis_wait` |
-| Utility commands | Not available | `/trellis-status`, `/trellis-finish` |
+dsh discovers project Skills and exposes a stable `DSH_SESSION_ID` to managed shells. The optional companion plugin supplies main-session breadcrumbs; Trellis does not install that plugin.
 
 ## Quick start
 
@@ -24,25 +13,9 @@ In dsh:
 
 1. Describe the work in natural language and load `trellis-start` when a
    session needs explicit Trellis bootstrap.
-2. The main session dispatches `trellis-agent-research`,
-   `trellis-agent-implement`, and `trellis-agent-check` through DSH's native
-   `subagent` tool. Each child loads exactly one matching role skill.
+2. Follow the current task phase and authorized contract. Collaboration uses `trellis teamwork` or `paseo-based-parallelism`.
 3. Use Delivery Review and On-Site Closeout Phase to review and close the task. `trellis-finish-work` records
    session progress separately and does not change task lifecycle state.
-
-## Companion plugin fallback contract
-
-The Trellis adapter does not install a DSH profile plugin. Before dispatching a
-role, check whether the `trellis_wait` tool is available:
-
-- If available, use DSH's default continuable background mode, continue
-  independent work, then call `trellis_wait` once per dependent child id and
-  consume each native settlement notice before entering the dependent gate.
-- If unavailable, dispatch every child with `run_in_background: false` from the outset
-  so the dependent workflow gate cannot overtake it.
-
-Never replace either path with shell sleep, polling loops, `job_output`, or
-repeated agent-list polling.
 
 ## Nested host sessions
 
@@ -62,8 +35,6 @@ from the shell's own session id.
   the other Agent Skills writers.
 - `.dsh/skills/trellis-{start,continue,finish-work}/` — DSH-private entry
   skills.
-- `.dsh/skills/trellis-agent-{research,implement,check}/` — child-only role
-  skills; implement/check include the pull-based task context prelude.
 - `.dsh/DSH.md` — this operator guide.
 - `.trellis/` — workflow, specs, tasks, workspace journal, and shared scripts.
 
@@ -71,8 +42,6 @@ from the shell's own session id.
 
 - Generated Python commands use `python3` in source templates and are rendered
   to the detected Windows launcher during `trellis init` / `trellis update`.
-- Role dispatch prompts start with `Active task: <task path>`. This exact task
-  path is the child's primary context source; children must not guess globally.
 - Each `dsh --profile headless` invocation creates a fresh DSH session. Do not
   expect an active-task pointer to persist across separate headless calls; keep
   the workflow in one session or explicitly resume its returned session id.

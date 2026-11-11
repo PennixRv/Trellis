@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.13",
+  "description": "Remove native subagent execution and retain current collaboration ownership",
+  "breaking": true,
+  "recommendMigrate": false,
+  "changelog": "Remove native role generation, context dispatch hooks, Codex modes and virtual states, Pi child execution and OpenCode role materialization. Preserve main-session context, optional manifests, ordinary check Skills and current Teamwork/Paseo roles.",
+  "migrations": [],
+  "notes": "Run native trellis update after upgrading the CLI. Ownership-aware retirement uses existing backups and blocks modified, unknown, skipped or unsafe retired execution assets. Native restore cannot reactivate retired executors. No legacy mode or dispatch compatibility remains."
+}

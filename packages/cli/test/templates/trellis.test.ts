@@ -246,23 +246,6 @@ describe("trellis template constants", () => {
     expect(deliveryDiagram).toContain("另行执行子任务自身的取消流程");
   });
 
-  it("[codex-native-subagents] template mode helpers default to auto and fail invalid values closed to inline", () => {
-    const scripts = getAllScripts();
-    const config = scripts.get("common/config.py") ?? "";
-    const workflowPhase = scripts.get("common/workflow_phase.py") ?? "";
-    const taskStore = scripts.get("common/task_store.py") ?? "";
-
-    expect(config).toContain('DEFAULT_CODEX_DISPATCH_MODE = "auto"');
-    expect(config).toContain('if mode == "sub-agent":');
-    expect(config).toContain('return "auto"');
-    expect(config).toContain("using inline");
-    expect(workflowPhase).toContain('mode = "auto"');
-    expect(workflowPhase).toContain(
-      'return "codex-sub-agent" if mode == "auto" else "codex-inline"',
-    );
-    expect(taskStore).toContain('get_codex_dispatch_mode(repo_root) == "auto"');
-  });
-
   it("workflow.md Goal Exploration and Requirements Confirmation Phase provides the baseline", () => {
     const step = stepSection("1.1");
     expect(step).toContain("仅收集可能改变目标、范围");
@@ -291,11 +274,11 @@ describe("trellis template constants", () => {
 
   it("workflow.md planning breadcrumb requires a route before implementation", () => {
     const planning = workflowStateBreadcrumb("planning");
-    const planningInline = workflowStateBreadcrumb("planning-inline");
+
     expect(planning).toContain("task.py phase init");
     expect(planning).toContain("实施授权");
-    expect(planningInline).toContain("planning");
-    expect(planningInline).toContain("主会话");
+
+
   });
 
   it("start command enters the requirements Skill and follows the current phase route", () => {

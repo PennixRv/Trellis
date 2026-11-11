@@ -42,19 +42,6 @@ vi.mock("../../src/templates/copilot/index.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../src/templates/reasonix/index.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("../../src/templates/reasonix/index.js")
-    >();
-  return {
-    ...actual,
-    getAllAgents: () =>
-      actual
-        .getAllAgents()
-        .map((agent) => ({ ...agent, content: agent.content + PYTHON3_LINE })),
-  };
-});
 
 const {
   collectPlatformTemplates,
@@ -69,7 +56,6 @@ const { resetResolvedPythonCommand, setResolvedPythonCommand } = await import(
 const RAW_WRITE_SITES = [
   ["snow", ".snow/SNOW.md"],
   ["copilot", ".github/copilot-instructions.md"],
-  ["reasonix", ".reasonix/skills/trellis-implement/SKILL.md"],
 ] as const;
 
 async function configureInto(

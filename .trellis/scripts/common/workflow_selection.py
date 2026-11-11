@@ -44,7 +44,17 @@ WORKFLOW_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _global_workflow_md(repo_root: Path) -> Path:
-    return repo_root / DIR_WORKFLOW / "workflow.md"
+    return _current_workflow(repo_root / DIR_WORKFLOW / "workflow.md")
+
+
+def _current_workflow(candidate: Path) -> Path:
+    """Retired execution instructions may remain archived, but cannot be loaded."""
+    if candidate.is_file() and re.search(
+        r"planning-inline|in_progress-inline|<codex-mode>|已配置时可使用宿主原生 agent 路径",
+        candidate.read_text(encoding="utf-8"),
+    ):
+        raise ValueError(f"Retired native workflow cannot be activated: {candidate}")
+    return candidate
 
 
 def _library_variant(repo_root: Path, workflow_id: str | None) -> Path | None:
@@ -59,7 +69,7 @@ def _library_variant(repo_root: Path, workflow_id: str | None) -> Path | None:
     if not WORKFLOW_ID_RE.match(workflow_id):
         return None
     variant = repo_root / DIR_WORKFLOW / DIR_WORKFLOWS / f"{workflow_id}.md"
-    return variant if variant.is_file() else None
+    return _current_workflow(variant) if variant.is_file() else None
 
 
 def _developer_workflow_id(repo_root: Path) -> str | None:

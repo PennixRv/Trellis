@@ -7,7 +7,7 @@ import {
   resolveSkills,
   wrapWithOmpFrontmatter,
 } from "./shared.js";
-import { getAllAgents, getExtensionTemplate } from "../templates/omp/index.js";
+import { getExtensionTemplate } from "../templates/omp/index.js";
 
 /**
  * The OMP file set — written at init and diffed by `trellis update`.
@@ -33,11 +33,6 @@ export function collectOmpTemplates(): Map<string, string> {
     resolveBundledSkills(ctx),
   )) {
     files.set(filePath, content);
-  }
-
-  // Agents (class-1: no pull-based prelude)
-  for (const agent of getAllAgents()) {
-    files.set(`.omp/agents/${agent.name}.md`, agent.content);
   }
 
   // Extension

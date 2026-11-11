@@ -29,12 +29,11 @@ from .packages_context import (
 )
 from .paths import get_repo_root
 from .spec_match import match_specs_for_file
-from .trellis_config import read_trellis_config
 from .workflow_phase import (
     filter_platform,
     get_phase_index,
     get_step,
-    resolve_effective_platform,
+    resolve_platform_label,
 )
 
 # Backward-compatible alias — external modules import this name
@@ -106,8 +105,8 @@ def main() -> None:
             else:
                 parser.exit(2, "Phase Index section not found in workflow.md\n")
         if args.platform:
-            effective = resolve_effective_platform(
-                args.platform, read_trellis_config()
+            effective = resolve_platform_label(
+                args.platform
             )
             content = filter_platform(content, effective)
         print(content, end="")

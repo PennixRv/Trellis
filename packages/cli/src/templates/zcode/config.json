@@ -27,16 +27,6 @@
       ],
       "PreToolUse": [
         {
-          "matcher": "Agent|Task",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "{{PYTHON_CMD}} \"${ZCODE_PROJECT_DIR}/.zcode/hooks/inject-subagent-context.py\"",
-              "timeout": 30
-            }
-          ]
-        },
-        {
           "matcher": "Bash",
           "hooks": [
             {

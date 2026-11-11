@@ -10,7 +10,7 @@ Provides:
 Note:
     ``cmd_init_context`` was removed in v0.5.0-beta.12. JSONL context files
     are created empty at ``task.py create`` time; the AI agent curates real
-    entries during planning when the task needs sub-agent/spec context. See
+    entries during planning when the task needs spec/research context. See
     ``.trellis/workflow.md`` for the current planning artifact contract.
 
     Older Trellis versions seeded those files with a ``{"_example": ...}``
@@ -35,7 +35,7 @@ from .task_utils import resolve_task_dir
 # Extensions that look like code rather than spec/research docs. Entries with
 # one of these extensions outside .trellis/spec/, docs/docs-site, or the
 # task's own directory get a hygiene warning in `task.py validate` — the
-# reader is a sub-agent, not a human, so code paths belong in the diff the
+# reader is an AI session, so code paths belong in the diff the
 # agent reads itself, not in implement.jsonl / check.jsonl.
 _CODE_FILE_EXTENSIONS = {
     ".ts",
@@ -208,7 +208,7 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
     non-blocking hygiene warnings (never counted in ``errors``, never change
     the exit code): entries that look like code files rather than
     spec/research docs, and entries whose file size exceeds the configured
-    sub-agent context injection cap (``context_injection.max_file_bytes``).
+    main-session context injection cap (``context_injection.max_file_bytes``).
     """
     file_name = jsonl_file.name
     errors = 0

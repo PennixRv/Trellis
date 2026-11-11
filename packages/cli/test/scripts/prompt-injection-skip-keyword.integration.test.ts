@@ -297,14 +297,5 @@ describeFn("no-trellis skip keyword (issue #427)", () => {
       expect(r.status).toBe(0);
       expect(r.stdout).toContain("<session-context>");
     });
-
-    it("inject-subagent-context.py has no skip-keyword handling (module source check)", () => {
-      const source = fs.readFileSync(
-        path.join(SHARED_HOOKS, "inject-subagent-context.py"),
-        "utf-8",
-      );
-      expect(source).not.toContain("skip_keyword");
-      expect(source).not.toContain("prompt_has_skip_keyword");
-    });
   });
 });

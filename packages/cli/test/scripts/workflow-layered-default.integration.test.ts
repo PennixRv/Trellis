@@ -112,6 +112,14 @@ describe.skipIf(!hasPython())("layered workflow default resolution", () => {
     expect(resolve(tmp, null)).toBe(".trellis/workflow.md");
   });
 
+  it("refuses retired workflow instructions in a selected library variant", () => {
+    setupRepo(tmp, { config: "default_workflow: native\n" });
+    fs.writeFileSync(path.join(tmp, ".trellis/workflows/native.md"), "<!-- planning-inline -->");
+    const result = spawnSync("python3", ["-c", DRIVER, tmp], { cwd: tmp, encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Retired native workflow cannot be activated");
+  });
+
   it("team default only -> team variant", () => {
     setupRepo(tmp, { config: 'default_workflow: "tdd"  # team default\n' });
     expect(resolve(tmp, null)).toBe(".trellis/workflows/tdd.md");

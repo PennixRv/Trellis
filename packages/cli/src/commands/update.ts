@@ -71,10 +71,15 @@ import {
   collectPlatformTemplates,
 } from "../configurators/index.js";
 import { replacePythonCommandLiterals } from "../configurators/shared.js";
-import { preserveCodexAgentModelKeys } from "../configurators/codex.js";
 import { printZcodeSetupHint } from "../configurators/zcode.js";
 import { ensureGitattributes } from "../configurators/workflow.js";
 import { pruneOrphanManifestKeys } from "../utils/manifest-prune.js";
+import {
+  planNativeRetirement,
+  executeNativeRetirement,
+  assertCurrentExecutionTree,
+  assertNativeRetirementWrites,
+} from "../utils/retired-native-assets.js";
 import {
   fetchRegistrySpecTemplates,
   collectDirectoryFiles,
@@ -973,15 +978,6 @@ async function collectTemplateFiles(
         );
       }
     }
-  }
-
-  // Users configure sub-agent models by editing `model` /
-  // `model_reasoning_effort` directly on the generated agent tomls. Preserve
-  // those two keys from the on-disk files into the freshly rendered desired
-  // content so a project whose only local edit is these keys is not flagged
-  // as a modified-file conflict by the hash comparison below.
-  if (platforms.has("codex")) {
-    preserveCodexAgentModelKeys(cwd, files);
   }
 
   preserveExistingClaudeStatusLine(cwd, files);
@@ -2166,6 +2162,18 @@ export async function update(options: UpdateOptions): Promise<void> {
 
       // Load template hashes for modification detection
       let hashes = loadHashes(cwd);
+      const retirementHashes = { ...hashes };
+      // Keep ownership evidence before orphan pruning removes retired paths.
+      const nativeRetirement = planNativeRetirement(
+        cwd,
+        hashes,
+        loadUpdateSkipPaths(cwd),
+      );
+      if (nativeRetirement.deletions.length > 0) {
+        console.log(chalk.cyan("Retiring native execution assets:"));
+        for (const entry of nativeRetirement.deletions)
+          console.log(`  Delete: ${entry.path}`);
+      }
       const zcodeConfigured = getConfiguredPlatforms(cwd).has("zcode");
       const isFirstHashTracking = Object.keys(hashes).length === 0;
 
@@ -2248,6 +2256,16 @@ export async function update(options: UpdateOptions): Promise<void> {
         cwd,
         codexUpgradeNeeded ? new Set<AITool>(["codex"]) : undefined,
         breakingBypass,
+      );
+      for (const [relative, content] of nativeRetirement.edits) {
+        templates.set(relative, content);
+        hashes[relative] = nativeRetirement.originalHashes.get(relative) ?? "";
+      }
+      assertNativeRetirementWrites(
+        cwd,
+        templates,
+        retirementHashes,
+        nativeRetirement.edits,
       );
       if (
         readManagedMarkdown(path.join(cwd, FILE_NAMES.AGENTS)) !==
@@ -2448,8 +2466,10 @@ export async function update(options: UpdateOptions): Promise<void> {
         changes.autoUpdateFiles.length === 0 &&
         changes.changedFiles.length === 0 &&
         !hasPendingMigrations &&
-        !hasSafeDeletes
+        !hasSafeDeletes &&
+        nativeRetirement.deletions.length === 0
       ) {
+        assertCurrentExecutionTree(cwd);
         // The "already up to date" exit still has to repair the receipt: this is
         // exactly the clean tree where every file is `unchanged`, so it is the run
         // where a wrong entry would otherwise be skipped again.
@@ -2608,6 +2628,7 @@ export async function update(options: UpdateOptions): Promise<void> {
         ];
       });
       const backupDir = createFullBackup(cwd, [
+        ...nativeRetirement.deletions.map((entry) => entry.path),
         ...templates.keys(),
         ...changes.changedFiles.map((file) => `${file.relativePath}.new`),
         ...migrationScope,
@@ -2658,6 +2679,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       }
 
       // Execute safe-file-delete (after backup, before template writes)
+      executeNativeRetirement(cwd, nativeRetirement);
       let safeDeleted = 0;
       if (hasSafeDeletes) {
         safeDeleted = executeSafeFileDeletes(safeFileDeletes, cwd);
@@ -2772,6 +2794,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       }
 
       // Update version file
+      assertCurrentExecutionTree(cwd);
       updateVersionFile(cwd);
 
       // Update template hashes for new, auto-updated, and overwritten files

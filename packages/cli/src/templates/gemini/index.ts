@@ -1,16 +1,6 @@
-/**
- * Gemini CLI templates
- *
- * Directory structure:
- *   gemini/
- *   ├── agents/        # Sub-agent definitions
- *   └── settings.json  # Settings configuration
- */
+/** Main-session platform assets and native context entry points. */
 
-import { createTemplateReader, type AgentTemplate } from "../template-utils.js";
-export type { AgentTemplate };
+import { createTemplateReader } from "../template-utils.js";
 
-const { listMdAgents, getConfig } = createTemplateReader(import.meta.url);
-
-export const getAllAgents = (): AgentTemplate[] => listMdAgents();
+const { getConfig } = createTemplateReader(import.meta.url);
 export const getSettingsTemplate = (): string => getConfig("settings.json");

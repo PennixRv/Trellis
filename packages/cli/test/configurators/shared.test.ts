@@ -222,14 +222,6 @@ describe("resolvePlaceholders", () => {
   // -----------------------------------------------------------------------
 
   describe("simple substitutions", () => {
-    it("resolves {{EXECUTOR_AI}}", () => {
-      expect(
-        resolvePlaceholders("| `[AI]` | {{EXECUTOR_AI}} |", claudeCtx),
-      ).toBe("| `[AI]` | Bash scripts or Task calls |");
-      expect(
-        resolvePlaceholders("| `[AI]` | {{EXECUTOR_AI}} |", codexCtx),
-      ).toBe("| `[AI]` | Bash scripts or tool calls |");
-    });
 
     it("resolves {{USER_ACTION_LABEL}}", () => {
       expect(
@@ -257,47 +249,6 @@ describe("resolvePlaceholders", () => {
   // -----------------------------------------------------------------------
 
   describe("conditional blocks", () => {
-    describe("{{#AGENT_CAPABLE}}", () => {
-      const template = [
-        "Before",
-        "{{#AGENT_CAPABLE}}",
-        "Call Implement Agent",
-        "{{/AGENT_CAPABLE}}",
-        "After",
-      ].join("\n");
-
-      it("includes block when agentCapable=true", () => {
-        const result = resolvePlaceholders(template, claudeCtx);
-        expect(result).toContain("Call Implement Agent");
-        expect(result).toContain("Before");
-        expect(result).toContain("After");
-      });
-
-      it("removes block when agentCapable=false", () => {
-        const result = resolvePlaceholders(template, cursorCtx);
-        expect(result).not.toContain("Call Implement Agent");
-        expect(result).toContain("Before");
-        expect(result).toContain("After");
-      });
-    });
-
-    describe("{{^AGENT_CAPABLE}} (negated)", () => {
-      const template = [
-        "{{^AGENT_CAPABLE}}",
-        "Implement the changes directly",
-        "{{/AGENT_CAPABLE}}",
-      ].join("\n");
-
-      it("removes block when agentCapable=true", () => {
-        const result = resolvePlaceholders(template, claudeCtx);
-        expect(result).not.toContain("Implement the changes directly");
-      });
-
-      it("includes block when agentCapable=false", () => {
-        const result = resolvePlaceholders(template, cursorCtx);
-        expect(result).toContain("Implement the changes directly");
-      });
-    });
 
     describe("{{#HAS_HOOKS}} / {{^HAS_HOOKS}}", () => {
       const template = [
@@ -319,46 +270,6 @@ describe("resolvePlaceholders", () => {
         const result = resolvePlaceholders(template, codexCtx);
         expect(result).not.toContain("auto-injected by hook");
         expect(result).toContain("read specs manually");
-      });
-    });
-
-    describe("nested conditionals", () => {
-      const template = [
-        "{{#AGENT_CAPABLE}}",
-        "Agents available",
-        "{{#HAS_HOOKS}}",
-        "Hook injection active",
-        "{{/HAS_HOOKS}}",
-        "{{^HAS_HOOKS}}",
-        "No hooks, manual injection",
-        "{{/HAS_HOOKS}}",
-        "{{/AGENT_CAPABLE}}",
-        "{{^AGENT_CAPABLE}}",
-        "No agents, do it inline",
-        "{{/AGENT_CAPABLE}}",
-      ].join("\n");
-
-      it("Claude (agent+hooks): agents + hook injection", () => {
-        const result = resolvePlaceholders(template, claudeCtx);
-        expect(result).toContain("Agents available");
-        expect(result).toContain("Hook injection active");
-        expect(result).not.toContain("No hooks");
-        expect(result).not.toContain("No agents");
-      });
-
-      it("Codex (agent, no hooks): agents + manual injection", () => {
-        const result = resolvePlaceholders(template, codexCtx);
-        expect(result).toContain("Agents available");
-        expect(result).not.toContain("Hook injection active");
-        expect(result).toContain("No hooks, manual injection");
-        expect(result).not.toContain("No agents");
-      });
-
-      it("Cursor (no agent, no hooks): inline only", () => {
-        const result = resolvePlaceholders(template, cursorCtx);
-        expect(result).not.toContain("Agents available");
-        expect(result).not.toContain("Hook injection");
-        expect(result).toContain("No agents, do it inline");
       });
     });
   });
@@ -472,17 +383,6 @@ describe("resolvePlaceholdersNeutral", () => {
     expect(
       resolvePlaceholdersNeutral("--platform {{CLI_FLAG}}", claudeCtx),
     ).toBe("--platform claude");
-  });
-
-  it("still resolves {{EXECUTOR_AI}} and {{USER_ACTION_LABEL}} per platform", () => {
-    // Defensive: not used in current shared skills, but kept functional for
-    // future templates.
-    expect(resolvePlaceholdersNeutral("{{EXECUTOR_AI}}", claudeCtx)).toBe(
-      "Bash scripts or Task calls",
-    );
-    expect(resolvePlaceholdersNeutral("{{USER_ACTION_LABEL}}", codexCtx)).toBe(
-      "Skills",
-    );
   });
 
   it("still applies conditional blocks per context", () => {

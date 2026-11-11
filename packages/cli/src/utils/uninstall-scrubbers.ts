@@ -408,7 +408,11 @@ export function scrubCodexConfigToml(content: string): ScrubResult {
       !tableHeader.test(filteredLines[cursor] ?? "")
     ) {
       const candidate = filteredLines[cursor] ?? "";
-      if (!/^\s*max_depth\s*=\s*1\s*(?:#.*)?$/.test(candidate)) {
+      if (
+        !/^\s*(?:max_depth\s*=\s*1|enabled\s*=\s*false)\s*(?:#.*)?$/.test(
+          candidate,
+        )
+      ) {
         tableLines.push(candidate);
       }
       cursor += 1;

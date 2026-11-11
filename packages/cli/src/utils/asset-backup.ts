@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
+import { assertCurrentExecutionAsset } from "./retired-native-assets.js";
 import path from "node:path";
 import { z } from "zod";
 import { VERSION } from "../constants/version.js";
@@ -571,6 +572,8 @@ export function planAssetRestore(
   const entries = backup.entries.map((entry) => {
     const actual = current(root, entry.path);
     const data = desiredContent(root, backup, entry.path);
+    if (data !== undefined)
+      assertCurrentExecutionAsset(entry.path, data.toString("utf8"));
     const desired: Fingerprint =
       data === undefined
         ? { kind: "absent" }

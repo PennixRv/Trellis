@@ -1,6 +1,5 @@
 import { AI_TOOLS } from "../types/ai-tools.js";
 import {
-  applyPullBasedPreludeMarkdown,
   collectSkillTemplates,
   resolveCommands,
   resolveBundledSkills,
@@ -8,7 +7,6 @@ import {
   resolveSkillsNeutral,
 } from "./shared.js";
 import {
-  getAllAgents,
   getExtensionTemplate,
   getSettingsTemplate,
 } from "../templates/pi/index.js";
@@ -48,10 +46,6 @@ export function collectPiTemplates(): Map<string, string> {
     resolveBundledSkills(ctx),
   )) {
     files.set(filePath, content);
-  }
-
-  for (const agent of applyPullBasedPreludeMarkdown(getAllAgents())) {
-    files.set(`.pi/agents/${agent.name}.md`, agent.content);
   }
 
   files.set(".pi/extensions/trellis/index.ts", getExtensionTemplate());

@@ -8,17 +8,7 @@
 
 ## Overview
 
-The breadcrumb is the **only** per-turn channel that fires while a Trellis task
-is active. It is intended for the main AI session, while sub-agent context
-normally arrives through `inject-subagent-context` on class-1 platforms or a
-pull-based prelude on class-2 platforms. Host behavior can still surface the
-breadcrumb inside sub-agent turns, though, and hooks do not currently expose a
-stable main-vs-sub-agent identity signal. Therefore: **every `[required · once]`
-step that the workflow-walkthrough mandates for a given phase must also be
-mentioned in that phase's breadcrumb tag block, and breadcrumb text must be
-safe when read by a sub-agent.** If required gates are absent, the AI in the
-main session will silently skip them. Prior bugs around planning gates and
-Phase 3.4 commit reminders hit exactly this failure mode.
+The breadcrumb supplies main-session phase guidance. Every required workflow gate must be represented by the corresponding native phase block. Task CLI owns lifecycle and phase state; the breadcrumb does not authorize implementation or collaboration. Hosts may expose main-session context in other turns, so guidance must preserve the current work-package boundary without inferring new authority.
 
 This document is the source of truth for the runtime mechanics. The user-facing
 breadcrumb body lives in `.trellis/workflow.md` — or in the active task's
@@ -80,9 +70,7 @@ Both regexes MUST use the `\1` backreference variant — `[workflow-state:([A-Za
 5. It resolves the workflow file (per-task resolution order below: the
    active task's `.trellis/workflows/<id>.md` when selected, else
    `.trellis/workflow.md`) and parses every `[workflow-state:STATUS]` block.
-6. Codex may map `planning` / `in_progress` to `planning-inline` /
-   `in_progress-inline` based on `codex.dispatch_mode`; all other platforms
-   use the plain status.
+6. All main-session platforms use the plain task lifecycle status and current named phase. Execution policy does not create virtual platform or status labels.
 7. It looks up the current status in the parsed map. If found → emits the
    block body in `<workflow-state>...</workflow-state>`. If not found →
    emits the generic line `Refer to workflow.md for current step.`
@@ -360,8 +348,8 @@ Which breadcrumbs actually fire in normal flow:
 | Status | Reachability | Notes |
 |--------|--------------|-------|
 | `no_task` | ✅ reachable | Pseudo-status; emitted when `resolve_active_task()` returns no pointer. |
-| `planning` | ✅ reachable | After `cmd_create` (which now auto-sets the session pointer when available) and before `cmd_start`. `planning-inline` is the Codex inline-mode breadcrumb body for the same task status. |
-| `in_progress` | ✅ reachable | After `cmd_start`, until `complete` or `cancel`. `in_progress-inline` is the Codex inline-mode breadcrumb body for the same task status. |
+| `planning` | ✅ reachable | After `cmd_create` (which now auto-sets the session pointer when available) and before `cmd_start`. |
+| `in_progress` | ✅ reachable | After `cmd_start`, until `complete` or `cancel`. |
 | `completed` / `cancelled` | 生命周期终态；普通活动指针已清除 | 原生完成或取消会在事务中清除指针；不会将终态目录误作正在实施任务。 |
 | `stale_<source_type>` | ✅ reachable (rare) | Synthesized when the session pointer references a deleted task directory. Emits the generic body via `build_breadcrumb` because no `stale_*` tag is shipped. |
 
@@ -383,35 +371,9 @@ Forks can define custom statuses. To do so:
 
 ---
 
-## Hook reachability matrix
+## Main-session context channels
 
-The breadcrumb is **intended** for the main AI session. Sub-agents have their
-own context loading paths, but host platforms may still run per-turn breadcrumb
-hooks for child turns or inherit main-session per-turn context. Trellis must not
-rely on categorical breadcrumb invisibility inside sub-agents.
-
-| Channel | Main session | Hook-inject sub-agent | Pull-prelude sub-agent | Extension-backed sub-agent |
-|---------|:------------:|:---------------------:|:----------------------:|:--------------------------:|
-| `<workflow-state>` per-turn breadcrumb | ✅ | ⚠️ possible host-dependent exposure | ⚠️ possible host-dependent exposure | ⚠️ possible host-dependent exposure |
-| `inject-subagent-context` (`implement.jsonl`/`check.jsonl` + task artifact injection) | ❌ | ✅ | ❌ | ❌ |
-| Pull-based prelude (`shared.ts:buildPullBasedPrelude`) | N/A | N/A | ✅ | fallback |
-
-Hook-inject platforms: claude, cursor, codebuddy, droid, kiro (`agentSpawn`), opencode (JS plugin).
-Pull-prelude platforms: codex, gemini, qoder, copilot.
-Extension-backed platforms: pi.
-Hookless: kilo, antigravity, devin.
-
-**Implication**: sub-agent-required guidance must still be propagated through
-`inject-subagent-context` for hook-inject platforms, `buildPullBasedPrelude` for
-pull-prelude platforms, or the Pi extension's prompt builder for
-extension-backed platforms. All paths must use the same task artifact order:
-jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if
-present`. Breadcrumb text must additionally be safe if a sub-agent sees it:
-main-session dispatch guidance must self-exempt `trellis-implement` /
-`trellis-check` readers so they implement or check directly instead of spawning
-nested Trellis sub-agents.
-
----
+Startup Hooks, per-turn workflow state and path-scoped specs are separate main-session channels. Optional JSONL is context data. Native subagent context Hooks, pull preludes, mode banners and child identity shards are removed. The main session integrates read-only Teamwork evidence and authorized Paseo implementation results; host context visibility does not change ownership.
 
 ## DO
 

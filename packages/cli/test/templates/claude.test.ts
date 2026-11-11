@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  settingsTemplate,
-  getAllAgents,
-  getSettingsTemplate,
-} from "../../src/templates/claude/index.js";
+import { settingsTemplate, getSettingsTemplate } from "../../src/templates/claude/index.js";
 
 // =============================================================================
 // settingsTemplate — module-level constant
@@ -108,22 +104,6 @@ describe("settingsTemplate PostToolUse matchers", () => {
   it("all PostToolUse entries use {{PYTHON_CMD}} placeholder", () => {
     for (const entry of postToolUseEntries) {
       expect(entry.hooks[0].command).toContain("{{PYTHON_CMD}}");
-    }
-  });
-});
-
-// Commands are now sourced from common/ templates and tested in platforms.test.ts
-
-// =============================================================================
-// getAllAgents — reads agent templates
-// =============================================================================
-
-describe("getAllAgents", () => {
-  it("each agent has name and content", () => {
-    const agents = getAllAgents();
-    for (const agent of agents) {
-      expect(agent.name.length).toBeGreaterThan(0);
-      expect(agent.content.length).toBeGreaterThan(0);
     }
   });
 });

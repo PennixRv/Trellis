@@ -425,7 +425,7 @@ describe("collectPlatformTemplates", () => {
     expect(result).toBeInstanceOf(Map);
     expect(result?.has(".pi/prompts/trellis-start.md")).toBe(true);
     expect(result?.has(".pi/prompts/trellis-finish-work.md")).toBe(true);
-    expect(result?.has(".pi/agents/trellis-implement.md")).toBe(true);
+    expect(result?.has(".pi/agents/trellis-implement.md")).toBe(false);
     expect(result?.has(".pi/extensions/trellis/index.ts")).toBe(true);
     expect(result?.has(".pi/settings.json")).toBe(true);
   });
@@ -448,9 +448,9 @@ describe("collectPlatformTemplates", () => {
     expect(result?.has(".zcode/skills/trellis-before-dev/SKILL.md")).toBe(true);
     expect(result?.has(".zcode/skills/trellis-check/SKILL.md")).toBe(true);
     expect(result?.has(".zcode/commands/trellis/start.md")).toBe(false);
-    expect(result?.has(".zcode/agents/trellis-implement.md")).toBe(true);
-    expect(result?.has(".zcode/agents/trellis-check.md")).toBe(true);
-    expect(result?.has(".zcode/agents/trellis-research.md")).toBe(true);
+    expect(result?.has(".zcode/agents/trellis-implement.md")).toBe(false);
+    expect(result?.has(".zcode/agents/trellis-check.md")).toBe(false);
+    expect(result?.has(".zcode/agents/trellis-research.md")).toBe(false);
   });
 
   it("grok collectTemplates includes flat commands and .grok-owned skills", () => {
@@ -466,9 +466,9 @@ describe("collectPlatformTemplates", () => {
     expect(result?.has(".grok/commands/trellis/start.md")).toBe(false);
     expect(result?.has(".grok/skills/trellis-check/SKILL.md")).toBe(true);
     expect(result?.has(".grok/skills/trellis-before-dev/SKILL.md")).toBe(true);
-    expect(result?.has(".grok/agents/trellis-implement.md")).toBe(true);
-    expect(result?.has(".grok/agents/trellis-check.md")).toBe(true);
-    expect(result?.has(".grok/agents/trellis-research.md")).toBe(true);
+    expect(result?.has(".grok/agents/trellis-implement.md")).toBe(false);
+    expect(result?.has(".grok/agents/trellis-check.md")).toBe(false);
+    expect(result?.has(".grok/agents/trellis-research.md")).toBe(false);
   });
 
   it("kimi collectTemplates includes shared skills and .kimi-code skills", () => {
@@ -490,15 +490,15 @@ describe("collectPlatformTemplates", () => {
     ).toBe(true);
     expect(
       result?.has(".kimi-code/skills/trellis-implement/SKILL.md"),
-    ).toBe(true);
-    expect(result?.has(".kimi-code/skills/trellis-check/SKILL.md")).toBe(true);
+    ).toBe(false);
+    expect(result?.has(".kimi-code/skills/trellis-check/SKILL.md")).toBe(false);
     expect(
       result?.has(".kimi-code/skills/trellis-research/SKILL.md"),
-    ).toBe(true);
+    ).toBe(false);
     // Custom sub-agent definitions
-    expect(result?.has(".kimi-code/agents/trellis-implement.md")).toBe(true);
-    expect(result?.has(".kimi-code/agents/trellis-check.md")).toBe(true);
-    expect(result?.has(".kimi-code/agents/trellis-research.md")).toBe(true);
+    expect(result?.has(".kimi-code/agents/trellis-implement.md")).toBe(false);
+    expect(result?.has(".kimi-code/agents/trellis-check.md")).toBe(false);
+    expect(result?.has(".kimi-code/agents/trellis-research.md")).toBe(false);
     // No project-level hooks/settings for Kimi
     expect(
       [...(result?.keys() ?? [])].some((key) =>
@@ -521,13 +521,9 @@ describe("collectPlatformTemplates", () => {
     expect(result?.has(".dsh/skills/trellis-start/SKILL.md")).toBe(true);
     expect(result?.has(".dsh/skills/trellis-continue/SKILL.md")).toBe(true);
     expect(result?.has(".dsh/skills/trellis-finish-work/SKILL.md")).toBe(true);
-    expect(result?.has(".dsh/skills/trellis-agent-implement/SKILL.md")).toBe(
-      true,
-    );
-    expect(result?.has(".dsh/skills/trellis-agent-check/SKILL.md")).toBe(true);
-    expect(result?.has(".dsh/skills/trellis-agent-research/SKILL.md")).toBe(
-      true,
-    );
+    expect(result?.has(".dsh/skills/trellis-agent-implement/SKILL.md")).toBe(false);
+    expect(result?.has(".dsh/skills/trellis-agent-check/SKILL.md")).toBe(false);
+    expect(result?.has(".dsh/skills/trellis-agent-research/SKILL.md")).toBe(false);
     expect(result?.has(".dsh/DSH.md")).toBe(true);
     // No project-level hooks/settings for dsh
     expect(

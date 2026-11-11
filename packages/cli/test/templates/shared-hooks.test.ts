@@ -16,7 +16,6 @@ const ALL_HOOK_FILES = [
   "guard-teamwork-wait.py",
   "inject-shell-session-context.py",
   "inject-workflow-state.py",
-  "inject-subagent-context.py",
   "inject-spec-context.py",
 ] as const;
 
@@ -59,22 +58,8 @@ describe("shared-hooks capability table", () => {
     }
   });
 
-  it("inject-subagent-context.py is restricted to platforms with native sub-agent context delivery", () => {
-    // Codex uses SubagentStart.additionalContext; these remaining platforms
-    // are class-2 and load their context from an agent-definition prelude.
-    const class2 = new Set(["copilot", "gemini", "qoder", "trae"]);
-    for (const [platform, hooks] of Object.entries(SHARED_HOOKS_BY_PLATFORM)) {
-      const has = hooks.includes("inject-subagent-context.py");
-      if (class2.has(platform))
-        expect(
-          has,
-          `${platform} is class-2 pull-based and must not ship inject-subagent-context.py`,
-        ).toBe(false);
-    }
-
-    expect(SHARED_HOOKS_BY_PLATFORM.codex).toContain(
-      "inject-subagent-context.py",
-    );
+  it("does not distribute retired role-context hooks", () => {
+    expect(getSharedHookScripts().map((hook) => hook.name)).not.toContain("inject-subagent-context.py");
   });
 
   it("inject-spec-context.py is distributed to Claude Code, Codex, and OpenCode", () => {
@@ -164,8 +149,7 @@ describe("shared-hooks capability table", () => {
     // the same trio as other agent-capable push-based platforms.
     expect([...SHARED_HOOKS_BY_PLATFORM.kiro].sort()).toEqual(
       [
-        "inject-subagent-context.py",
-        "inject-workflow-state.py",
+              "inject-workflow-state.py",
         "session-start.py",
       ].sort(),
     );
@@ -179,8 +163,7 @@ describe("shared-hooks capability table", () => {
     expect([...SHARED_HOOKS_BY_PLATFORM.zcode].sort()).toEqual(
       [
         "inject-shell-session-context.py",
-        "inject-subagent-context.py",
-        "inject-workflow-state.py",
+              "inject-workflow-state.py",
         "session-start.py",
       ].sort(),
     );

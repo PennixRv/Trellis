@@ -1324,7 +1324,7 @@ print(f"v={rec['v']} version={STATE_VERSION} reset={rec['reset']}")
       expect(additionalContext(other.stdout)).toContain("<spec-context");
     });
 
-    it("keeps agent_id state separate from the same session_id without it (both first touches are full)", () => {
+    it("ignores agent_id when the same native session has already seen the spec", () => {
       writeGoverningSpec();
 
       const parent = runHook(
@@ -1336,8 +1336,7 @@ print(f"v={rec['v']} version={STATE_VERSION} reset={rec['reset']}")
         `<spec-context file="${EDITED}" spec="${SPEC_REL}" sha256="`,
       );
 
-      // Same session_id, now carrying agent_id → independent identity → still
-      // first → full (parent and subagent must NOT share dedup state).
+      // The removed native child field does not select another state shard.
       const sub = runHook(
         tmp,
         buildPayload(tmp, {
@@ -1347,12 +1346,8 @@ print(f"v={rec['v']} version={STATE_VERSION} reset={rec['reset']}")
         }),
       );
       expect(sub.status).toBe(0);
-      expect(additionalContext(sub.stdout)).toContain(
-        `<spec-context file="${EDITED}" spec="${SPEC_REL}" sha256="`,
-      );
-
-      // Two distinct identity shards were written.
-      expect(listJsonl(stateBase(tmp)).length).toBe(2);
+      expect(sub.stdout.trim()).toBe("");
+      expect(listJsonl(stateBase(tmp)).length).toBe(1);
     });
 
     it("fires on a Read tool event exactly like Edit (touching a file counts)", () => {
@@ -1653,68 +1648,6 @@ print(f"v={rec['v']} version={STATE_VERSION} reset={rec['reset']}")
         expect(additionalContext(second.stdout)).toContain("<spec-context");
         expect(runHook(tmp, payload).stdout.trim()).toBe("");
       });
-    });
-
-    it("shares lifecycle resets across parent and subagent exposure histories", () => {
-      writeGoverningSpec();
-      const parentPayload = buildPayload(tmp, { filePath: EDITED });
-      const subagentPayload = buildPayload(tmp, {
-        filePath: EDITED,
-        agentId: "sub7",
-      });
-
-      expect(additionalContext(runHook(tmp, parentPayload).stdout)).toContain(
-        "<spec-context",
-      );
-      expect(additionalContext(runHook(tmp, subagentPayload).stdout)).toContain(
-        "<spec-context",
-      );
-
-      const reset = runHook(
-        tmp,
-        JSON.stringify({
-          hook_event_name: "SessionStart",
-          source: "compact",
-          cwd: tmp,
-          session_id: "sess-1",
-        }),
-      );
-      expect(reset.status).toBe(0);
-      expect(reset.stdout.trim()).toBe("");
-
-      expect(additionalContext(runHook(tmp, parentPayload).stdout)).toContain(
-        "<spec-context",
-      );
-      expect(additionalContext(runHook(tmp, subagentPayload).stdout)).toContain(
-        "<spec-context",
-      );
-      expect(runHook(tmp, parentPayload).stdout.trim()).toBe("");
-      expect(runHook(tmp, subagentPayload).stdout.trim()).toBe("");
-
-      const shards = listJsonl(stateBase(tmp));
-      expect(shards.map((shard) => path.basename(shard)).sort()).toEqual([
-        "session_sess-1+a-sub7.jsonl",
-        "session_sess-1.jsonl",
-      ]);
-      const parentShard = shards.find(
-        (shard) => path.basename(shard) === "session_sess-1.jsonl",
-      );
-      const subagentShard = shards.find(
-        (shard) => path.basename(shard) === "session_sess-1+a-sub7.jsonl",
-      );
-      if (!parentShard || !subagentShard) {
-        throw new Error("expected parent and subagent state shards");
-      }
-      const parent = readShardRecords(parentShard);
-      const subagent = readShardRecords(subagentShard);
-      const resetId = parent.find((record) => !record.spec)?.reset;
-      expect(resetId).toMatch(/^[0-9a-f]{32}$/);
-      expect(parent.filter((record) => record.spec).at(-1)?.reset).toBe(
-        resetId,
-      );
-      expect(subagent.filter((record) => record.spec).at(-1)?.reset).toBe(
-        resetId,
-      );
     });
 
     // -----------------------------------------------------------------------

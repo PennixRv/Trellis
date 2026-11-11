@@ -8,7 +8,7 @@
  * stay untouched (issue #553).
  */
 
-import { TrellisContext, debugLog, isTrellisSubagent } from "../lib/trellis-context.js"
+import { TrellisContext, debugLog } from "../lib/trellis-context.js"
 import {
   MESSAGES_TRANSFORM_HOOK,
   platformInputFromMessages,
@@ -23,7 +23,7 @@ function stripFirstReplyNotice(context) {
   return context.replace(FIRST_REPLY_NOTICE_RE, "")
 }
 
-// OpenCode 1.2.x expects plugins to be factory functions (see inject-subagent-context.js comment).
+// OpenCode 1.2.x expects plugins to be factory functions (see the native plugin factory contract).
 export default async ({ directory }) => {
   const ctx = new TrellisContext(directory)
   debugLog("session", "Plugin loaded, directory:", directory)
@@ -36,10 +36,6 @@ export default async ({ directory }) => {
         const agent = platformInput?.agent || "unknown"
         debugLog("session", "messages.transform called, agent:", agent)
 
-        if (isTrellisSubagent(platformInput)) {
-          debugLog("session", "Skipping trellis subagent turn:", agent)
-          return
-        }
 
         if (process.env.TRELLIS_HOOKS === "0" || process.env.TRELLIS_DISABLE_HOOKS === "1") {
           debugLog("session", "Skipping - TRELLIS_HOOKS disabled")
