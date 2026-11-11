@@ -32,7 +32,7 @@ If none of these apply, don't call `mem`. It is a tool, not a ceremony.
 
 - The relevant context is already in the current turn, `prd.md`, `design.md`, recent `git log`, or the open files. `mem` is for stuff that has fallen out of immediate reach.
 - The user is asking about a fact in the code, not a fact from a past conversation. `git log -p` / `grep` / reading the file directly is faster and more authoritative.
-- You are in a sub-agent (`trellis-implement` / `trellis-check`) whose dispatch prompt already includes the curated `implement.jsonl` / `check.jsonl` context. Adding `mem` on top usually just clutters.
+- An authorized teammate or delegated-agent work package already contains the relevant evidence and context. Read history only if the assigned question requires it; history does not expand the assignment or authorization.
 - The user has explicitly said "don't dig through history, just answer what I asked".
 
 ## What to do with what `mem` returns

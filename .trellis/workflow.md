@@ -116,17 +116,11 @@ flowchart LR
 任务尚未初始化阶段路线。核对需求后，按适用性选择有序阶段，并为省略阶段记录理由和证据，再使用 `task.py phase init`。解决方案设计与收敛阶段的实施合同获接受且另行取得实施授权前，不得开始实施。
 [/workflow-state:planning]
 
-[workflow-state:planning-inline]
-遵循 `planning` 的相同规划路线，并在主会话中工作。除非用户或任务合同有此要求，否则不要派发原生实施或检查 agent。
-[/workflow-state:planning-inline]
 
 [workflow-state:in_progress]
-任务生命周期状态为 `in_progress`。读取下方当前阶段提示。任务实施与测试验证阶段按已接受合同和目标包适用规范推进，并运行与改动相称的验证。代码修改前或切换目标包时，可使用 `trellis-before-dev` 辅助定位规范；需要完整质量核验时，可使用 `trellis-check`。已配置时可使用宿主原生 agent 路径。实施变更不得超出授权范围。
+任务生命周期状态为 `in_progress`。读取下方当前阶段提示。任务实施与测试验证阶段按已接受合同和目标包适用规范推进，并运行与改动相称的验证。代码修改前或切换目标包时，可使用 `trellis-before-dev` 辅助定位规范；需要完整质量核验时，可使用 `trellis-check`。协作仅通过已授权的 trellis teamwork 或 paseo-based-parallelism；已有历史记录不授予派发权限。实施变更不得超出授权范围。
 [/workflow-state:in_progress]
 
-[workflow-state:in_progress-inline]
-遵循 `in_progress` 的相同阶段路线，并在主会话中工作，运行与变更相称的检查。
-[/workflow-state:in_progress-inline]
 
 [workflow-state:goal_exploration_and_requirements]
 读取 `trellis-goal-exploration-and-requirements` 及其 `workflow.md`。用户明确确认当前需求资产 revision 前，不得离开目标探索与需求核对阶段。

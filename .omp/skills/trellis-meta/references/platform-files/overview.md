@@ -15,7 +15,7 @@ Platform files do not store business state. They let the corresponding AI tool r
 | --- | --- | --- |
 | settings/config | `.claude/settings.json`, `.codex/hooks.json`, `.qoder/settings.json`, `.trae/hooks.json` | Register hooks, plugins, extensions, or platform behavior. |
 | hooks/plugins/extensions | `.claude/hooks/`, `.opencode/plugins/`, `.pi/extensions/` | Inject context at session start, user input, agent startup, shell execution, and similar events. |
-| agents | `.claude/agents/`, `.codex/agents/`, `.kiro/agents/`, `.zcode/agents/` | Define `trellis-research`, `trellis-implement`, and `trellis-check`. |
+| 协作角色 | `.trellis/agents/` | Teamwork 只读角色与 Paseo 实施节点；Kiro 另有主会话入口。 |
 | skills | `.claude/skills/`, `.agents/skills/`, `.qoder/skills/`, `.zcode/skills/` | Capability descriptions that auto-trigger or can be read on demand. |
 | commands/prompts/workflows | `.cursor/commands/`, `.github/prompts/`, `.devin/workflows/`, `.zcode/commands/` | Entry points explicitly invoked by the user. |
 
@@ -29,20 +29,17 @@ Common capabilities:
 
 - session-start injection of a `.trellis/` overview.
 - workflow-state hints for each user turn.
-- PRD/spec/research injection when sub-agents start.
 - Shell commands inheriting session identity.
 
 To change "when the AI knows what," inspect hooks/plugins/extensions and settings first.
 
 ### 2. Agent Prelude / Pull-Based
 
-Some platforms cannot reliably let hooks rewrite sub-agent prompts, so the agent file itself instructs the agent to read the active task, PRD, and JSONL context after startup.
-
-To change how sub-agents load context, inspect the agent files themselves.
+协作上下文由原生工作包或节点合同提供，职责见 `agents.md`。
 
 ### 3. Main-Session Workflow
 
-Some platforms do not have Trellis sub-agent or hook capabilities. They rely on workflows/skills/commands to guide the main-session AI to read files, run scripts, and move tasks forward.
+没有启动 Hook 的平台通过 workflow、Skills 和命令引导主会话读取文件、运行脚本并推进任务。
 
 To change behavior, inspect platform workflows/skills/commands and `.trellis/workflow.md`.
 

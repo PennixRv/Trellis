@@ -326,77 +326,10 @@ def prompt_has_skip_keyword(prompt: str, keyword: str) -> bool:
     return re.search(pattern, prompt, re.IGNORECASE) is not None
 
 
-def _resolve_codex_dispatch_mode(config: dict) -> str:
-    """Normalize `codex.dispatch_mode` from .trellis/config.yaml to "auto" or "inline".
-
-    Defaults to `auto`. The legacy `sub-agent` value is an alias for `auto`.
-    Any other explicit value (including invalid ones) falls back to `inline`
-    without per-turn warnings. Shared by `_codex_mode_banner` (the per-turn
-    banner) and `resolve_breadcrumb_key` (the breadcrumb tag key) so the two
-    stay in lockstep.
-    """
-    mode = "auto"
-    if isinstance(config, dict):
-        codex_cfg = config.get("codex")
-        if isinstance(codex_cfg, dict):
-            cfg_mode = str(codex_cfg.get("dispatch_mode", mode)).strip().lower()
-            if cfg_mode == "inline":
-                mode = "inline"
-            elif cfg_mode in ("auto", "sub-agent"):
-                mode = "auto"
-            else:
-                mode = "inline"
-    return mode
 
 
-def _codex_mode_banner(config: dict) -> str:
-    """Emit a `<codex-mode>` banner for the additionalContext payload.
-
-    Reads `codex.dispatch_mode` from .trellis/config.yaml; defaults to
-    `auto`, which dispatches Trellis sub-agents using native Codex context
-    injection with a child-side fallback. This does not rely on inherited
-    parent transcripts: `fork_turns` remains caller-controlled, and
-    fresh-history sub-agents still receive their explicit delegated task and
-    inherited session configuration. `inline` is an explicit opt-out; the
-    legacy `sub-agent` value is an alias for `auto`. Invalid explicit values
-    fall back to `inline` without per-turn warnings. The banner makes the
-    active mode explicit to Codex AI per turn, complementing the workflow-state
-    body which is per-status. Mode tells AI which dispatch protocol to follow;
-    workflow-state tells AI what step it's at.
-    """
-    mode = _resolve_codex_dispatch_mode(config)
-    if mode == "auto":
-        meaning = (
-            "auto: implement/check work defaults to Trellis sub-agents; native Codex "
-            "context injection is preferred and child-side loading is the fallback. "
-            "The main session still coordinates, clarifies, updates specs, commits, and finishes."
-        )
-    else:
-        meaning = (
-            "inline: the main session implements/checks directly; "
-            "do not dispatch implement/check sub-agents."
-        )
-    return f"<codex-mode>{meaning}</codex-mode>"
 
 
-def resolve_breadcrumb_key(
-    status: str, platform: str | None, config: dict
-) -> str:
-    """Pick the breadcrumb tag key based on Codex dispatch_mode.
-
-    Codex defaults to ``auto`` and therefore uses the ordinary ``<status>``
-    breadcrumb for native SubagentStart dispatch with child-side fallback;
-    it does not depend on an inherited parent transcript. ``inline`` selects
-    the parallel ``<status>-inline`` tag; ``sub-agent`` remains an alias for
-    ``auto``. Invalid explicit values fall back to inline without per-turn
-    warnings.
-
-    Non-codex platforms return the plain status unchanged.
-    """
-    if platform == "codex":
-        mode = _resolve_codex_dispatch_mode(config)
-        return f"{status}-inline" if mode == "inline" else status
-    return status
 
 
 def build_breadcrumb(
@@ -404,7 +337,6 @@ def build_breadcrumb(
     status: str,
     templates: dict[str, str],
     source: str | None = None,
-    breadcrumb_key: str | None = None,
     phase_status: str | None = None,
 ) -> str:
     """Build the <workflow-state>...</workflow-state> block.
@@ -414,10 +346,7 @@ def build_breadcrumb(
       "Refer to workflow.md for current step." line
     - `no_task` pseudo-status (task_id is None) → header omits task info
     """
-    lookup_key = breadcrumb_key or status
-    body = templates.get(lookup_key)
-    if body is None and lookup_key != status:
-        body = templates.get(status)
+    body = templates.get(status)
     if body is None:
         body = "Refer to workflow.md for current step."
     if task_id is None:
@@ -502,23 +431,20 @@ def main() -> int:
     task = get_active_task(root, data)
     if task is None:
         # No active task — still emit a breadcrumb for classifying new work.
-        no_task_key = resolve_breadcrumb_key("no_task", platform, config)
         breadcrumb = build_breadcrumb(
-            None, "no_task", templates, breadcrumb_key=no_task_key
+            None, "no_task", templates
         )
     else:
         task_id, status, source, phase_status = task
-        status_key = resolve_breadcrumb_key(status, platform, config)
         source_for_breadcrumb = None if platform == "codex" else source
         breadcrumb = build_breadcrumb(
-            task_id, status, templates, source_for_breadcrumb, breadcrumb_key=status_key,
+            task_id, status, templates, source_for_breadcrumb,
             phase_status=phase_status,
         )
     if platform == "codex":
         parts: list[str] = []
         if task is None:
             parts.append(CODEX_NO_TASK_BOOTSTRAP_NOTICE)
-        parts.append(_codex_mode_banner(config))
         parts.append(breadcrumb)
         breadcrumb = "\n\n".join(parts)
 

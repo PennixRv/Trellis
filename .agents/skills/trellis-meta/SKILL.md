@@ -37,7 +37,7 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 - `references/local-architecture/task-system.md`: Task directories, active task, JSONL context, parent/child task trees, and task runtime.
 - `references/local-architecture/spec-system.md`: How `.trellis/spec/` is organized, injected, and refreshed from a `registry.spec` source.
 - `references/local-architecture/workspace-memory.md`: `.trellis/workspace/` journals plus `trellis mem` cross-session recall and the `@pennixrv/trellis-core/mem` SDK.
-- `references/local-architecture/context-injection.md`: Hooks, sub-agent preludes, and Teamwork message inbox routing.
+- `references/local-architecture/context-injection.md`: Main-session hooks, task context, and Teamwork message inbox routing.
 - `references/local-architecture/multi-agent-teamwork.md`: `trellis teamwork`, Teamwork Session storage, teammate process guard, task ownership boundary, and bundled `.trellis/agents/` runtime instructions.
 - `references/local-architecture/bundled-skills.md`: Bundled skills under `packages/cli/src/templates/common/bundled-skills/` and how `getBundledSkillTemplates()` ships them to platform skill roots.
 
@@ -45,8 +45,8 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 
 - `references/platform-files/overview.md`: How shared `.trellis/` files relate to platform directories and the three platform integration modes (hook-driven, agent prelude, main-session workflow).
 - `references/platform-files/platform-map.md`: Platform directories and paths for skills, agents, hooks, and extensions across all supported platforms including DeepSeek Harness, Reasonix, and Pi's native `trellis_subagent` extension.
-- `references/platform-files/hooks-and-settings.md`: How settings/config files, hooks, plugins, and extensions connect to Trellis; covers `teamwork.teammate_guard.*` and `codex.dispatch_mode`.
-- `references/platform-files/agents.md`: Per-platform `trellis-research` / `trellis-implement` / `trellis-check` sub-agent files plus the bundled `.trellis/agents/teammate.md` role card.
+- `references/platform-files/hooks-and-settings.md`: How settings/config files, hooks, plugins, and extensions connect to Trellis; covers `teamwork.teammate_guard.*` and main-session context.
+- `references/platform-files/agents.md`: Teamwork role cards, Paseo node methods, and the Kiro main-session entry.
 - `references/platform-files/skills-and-commands.md`: Differences between skills, commands, prompts, and workflows, plus how to change them.
 
 ### Local Customization
@@ -56,7 +56,7 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 - `references/customize-local/change-task-lifecycle.md`: Change task creation, lifecycle and phase state, parent/child links, and lifecycle hooks.
 - `references/customize-local/change-context-loading.md`: Change how tasks, specs, journals, hook context, Teamwork inbox messages, and `trellis mem` recall are loaded.
 - `references/customize-local/change-hooks.md`: Change platform hooks, settings, task lifecycle hooks (`hooks.after_*`), and shell session bridges.
-- `references/customize-local/change-agents.md`: Change research, implement, and check agent behavior across platform sub-agents, the Teamwork teammate role card, and the Codex `dispatch_mode` toggle.
+- `references/customize-local/change-agents.md`: Change Teamwork read-only profiles and Paseo implementation node methods.
 - `references/customize-local/change-skills-or-commands.md`: Add or modify local skills, commands, prompts, and workflows; covers upstream bundled-skill auto-dispatch.
 - `references/customize-local/change-spec-structure.md`: Adjust the project spec structure under `.trellis/spec/`, including registry-backed sources.
 - `references/customize-local/add-project-local-conventions.md`: Put team rules into project-local specs or local skills.
@@ -64,11 +64,11 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 ## Current Rules
 
 - `.trellis/workflow.md` is the local workflow source of truth. By default, `trellis init` writes the bundled `native` workflow; a custom workflow is available only when its source is explicitly supplied, and can be re-selected via `trellis workflow --template <id> --workflow-source <source>`. Missing `.trellis/agents/<name>.md` files referenced by the active template trigger a non-blocking stderr warning pointing at `trellis update`.
-- `.trellis/config.yaml` is the project-level Trellis configuration entry point. It hosts task lifecycle hooks (`hooks.after_create` / `after_start` / `after_finish`), journal shape (`session_commit_message` / `max_journal_lines` / `session_auto_commit`), Teamwork teammate guard (`teamwork.teammate_guard.idle_timeout` / `max_live_teammates`), Codex dispatch mode (`codex.dispatch_mode: inline | sub-agent`), and the spec registry block (`registry.spec.source` + `registry.spec.template`).
+- `.trellis/config.yaml` is the project-level Trellis configuration entry point. It hosts task lifecycle hooks (`hooks.after_create` / `after_start` / `after_finish`), journal shape (`session_commit_message` / `max_journal_lines` / `session_auto_commit`), Teamwork teammate guard (`teamwork.teammate_guard.idle_timeout` / `max_live_teammates`), the spec registry block (`registry.spec.source` + `registry.spec.template`).
 - `.trellis/spec/` stores the user's project-specific coding conventions and design constraints. When `registry.spec` is set, files are refreshed by `trellis update`; local edits surface as `modified by user` conflicts in `.trellis/.template-hashes.json`.
 - `.trellis/tasks/` stores task records, planning artifacts, research, and JSONL context. Tasks follow their status directory: planning, in_progress, completed/YYYY-MM, or cancelled. Native relocation preserves identity and history and updates machine references transactionally. Tasks form parent/child trees through `task.py create --parent`, `add-subtask`, `remove-subtask`, and `list-context`.
 - `.trellis/workspace/` stores **deliberately written** developer journals. Raw cross-session dialogue is **not** stored here — it lives on disk under `~/.claude/projects/`, `~/.codex/sessions/`, and `~/.pi/agent/sessions/` and is recovered via `trellis mem search|extract|context`. The bundled `trellis-session-insight` skill teaches when to reach for `mem`.
-- `.trellis/agents/teammate.md` is the bundled, platform-agnostic instruction card loaded for a teammate by `trellis teamwork spawn --agent teammate`. Editable; `trellis update` backfills it if missing. Editing the per-platform `trellis-implement.md` / `trellis-check.md` does **not** change Teamwork teammate behavior.
+- `.trellis/agents/teammate.md` is the bundled, platform-agnostic instruction card loaded for a teammate by `trellis teamwork spawn --agent teammate`. Editable; `trellis update` backfills it if missing.
 - `~/.trellis/teamwork/<project>/<session>/events.jsonl` is the Teamwork Session event log. User-owned, file-locked sequence numbering, durable `idempotencyKey` support; never under `.trellis/`.
 - Directories under `packages/cli/src/templates/common/bundled-skills/` are auto-dispatched to platform skill roots by `getBundledSkillTemplates()` in `packages/cli/src/templates/common/index.ts`. Adding a directory there is enough for the shared loader to include it on the next `trellis init` or `trellis update`.
 - Platform settings/config files decide which hooks, agents, skills, commands, prompts, and workflows actually run. Reasonix has no settings file — behavior is encoded inside skill frontmatter.
@@ -81,5 +81,5 @@ Do not assume the user has the Trellis source repository. Do not default to modi
 - Do not overwrite user-modified local files with default templates; check `.trellis/.template-hashes.json` first and prefer `.new` sidecar files over destructive overwrites.
 - Do not put team-private project rules into a public bundled skill; put project rules in `.trellis/spec/`, a project-local skill, the current task, or the workspace journal — `trellis update` will overwrite anything inside a bundled skill directory.
 - Do not hand-edit `~/.trellis/teamwork/<project>/<session>/events.jsonl`; sequence numbers are assigned under a file lock and replay-safe writes go through the `trellis teamwork` CLI or the `@pennixrv/trellis-core/teamwork` SDK.
-- Do not edit `.claude/agents/trellis-implement.md` (or any other per-platform sub-agent file) when the goal is to change Teamwork teammate behavior — edit `.trellis/agents/teammate.md` instead.
+- Teamwork behavior belongs in `.trellis/agents/teammate.md` and profiles; Paseo implementation behavior belongs in its node methods. The main session owns task decisions and integration.
 - Do not describe removed or never-shipped mechanisms as current Trellis behavior; cross-check against the local `.trellis/config.yaml` and the installed CLI's `trellis --help` before claiming a knob exists.

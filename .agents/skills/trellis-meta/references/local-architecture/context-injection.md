@@ -30,14 +30,9 @@ workflow-state is a lightweight hint injected around each user turn. Based on cu
 
 If the user wants to change "what the AI should do next in a given state," edit the corresponding state block in `.trellis/workflow.md` first.
 
-## sub-agent context
+## 任务与协作上下文
 
-Implement and check agents need task context. Trellis has two loading modes:
-
-1. **hook push**: a platform hook injects jsonl-referenced files plus `prd.md`, `design.md` if present, and `implement.md` if present before the agent starts.
-2. **agent pull**: the agent definition instructs the agent to read the active task, jsonl context, and task artifacts after startup.
-
-In both modes, JSONL files in the task directory are the manifest for spec/research context. Task artifacts are read separately in this order: `prd.md` -> `design.md if present` -> `implement.md if present`.
+主会话按当前阶段读取任务资产和适用规范。`implement.jsonl`、`check.jsonl` 是按需创建的可选上下文清单，不表示执行者类型或派发许可。Teamwork 通过明确工作包和原生上下文输入消费所需内容；Paseo 节点按实施合同和节点绑定读取上下文。角色卡和 Skill 由各自 owner 维护。
 
 ## JSONL Reading Rules
 
@@ -61,8 +56,8 @@ If shell commands cannot see the same context key, `task.py current --source` ma
 | --- | --- |
 | Change session-start injected content | The platform's `session-start` hook or plugin file. |
 | Change per-turn workflow-state rules | `[workflow-state:STATUS]` block in `.trellis/workflow.md`. The platform workflow-state hook parses these blocks verbatim and embeds no fallback text. |
-| Change how sub-agents read context | Platform agent definitions, the `inject-subagent-context` hook, or agent preludes. |
+| 调整协作上下文 | 对应工作包、原生 Teamwork 输入或 Paseo 节点合同。 |
 | Change JSONL validation/display | `.trellis/scripts/common/task_context.py`. |
 | Change active task resolution | `.trellis/scripts/common/active_task.py`. |
 
-When modifying context injection, verify two things: new sessions can see the correct task, and sub-agents can see the correct task artifacts/spec/research.
+When modifying context injection, verify two things: new sessions can see the correct task, and the current session or collaboration node sees its own task artifacts/spec/research.

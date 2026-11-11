@@ -48,4 +48,4 @@ All three layers live inside the user project, so an AI can read and modify them
 - To change the task model, JSONL context, or active task behavior, read `task-system.md`.
 - To change coding convention injection, read `spec-system.md`.
 - To understand journals and cross-session memory, read `workspace-memory.md`.
-- To change hooks or sub-agent context loading, read `context-injection.md`.
+- To change hooks or collaboration context loading, read `context-injection.md`.

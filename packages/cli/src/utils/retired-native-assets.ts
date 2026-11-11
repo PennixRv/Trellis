@@ -20,6 +20,11 @@ const hookFiles = [
   ".trae/hooks.json",
   ".github/copilot/hooks.json",
 ];
+export const mixedNativeAssets = [
+  ...hookFiles,
+  ".trellis/config.yaml",
+  ".codex/config.toml",
+];
 const executionFiles = [
   replacement,
   ...hookFiles,
@@ -183,11 +188,7 @@ export function planNativeRetirement(
     if (relative !== replacement) plan.deletions.push({ path: relative, hash });
     else plan.originalHashes.set(relative, hash);
   }
-  for (const relative of [
-    ...hookFiles,
-    ".trellis/config.yaml",
-    ".codex/config.toml",
-  ]) {
+  for (const relative of mixedNativeAssets) {
     const content = read(relative);
     if (content === undefined) continue;
     const cleaned = scrubConfig(

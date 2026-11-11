@@ -257,6 +257,36 @@ describe("update() integration", () => {
     expect(readProjectFile(".codex/agents/user.toml")).toBe("private user role");
     await update({ yes: true });
     expect(fs.existsSync(projectFile(role))).toBe(false);
+    expect(JSON.parse(readProjectFile(hooks)).user).toBe(true);
+    expect(readProjectFile(".trellis/config.yaml")).toContain("session_auto_commit: false");
+  });
+  it("preserves mixed user content across cleanup and repeated updates", async () => {
+    await init({ yes: true, force: true, codex: true });
+    const config = ".codex/config.toml";
+    stageVersionedUpgradeProject({ fromVersion: "0.7.2-beta.12", pristineTemplates: {
+      [config]: "[agents]\nmax_depth = 1\nenabled = false\n\n[mcp_servers.private]\ncommand = \"private-mcp\"\n",
+    } });
+    await update({ yes: true, skipAll: true });
+    const cleaned = readProjectFile(config);
+    expect(cleaned).not.toContain("max_depth");
+    expect(cleaned).toContain("private-mcp");
+    expect(readHashesV2(hashFilePath())[config]).not.toBe(computeHash(cleaned));
+    await update({ yes: true, skipAll: true });
+    expect(readProjectFile(config)).toBe(cleaned);
+  });
+  it("does not treat a mixed-content receipt as full-file ownership", async () => {
+    await init({ yes: true, force: true, codex: true });
+    const content = {
+      ".codex/config.toml": "[agents]\nenabled = false\n\n[mcp_servers.private]\ncommand = \"private-mcp\"\n",
+      ".trellis/config.yaml": "session_auto_commit: false\npackages:\n  private:\n    path: private\n",
+      ".codex/hooks.json": JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ command: "private-hook" }] }] } }),
+    };
+    stageVersionedUpgradeProject({ fromVersion: "0.7.2-beta.16", pristineTemplates: content });
+    await update({ yes: true, skipAll: true });
+    for (const [relative, expected] of Object.entries(content)) {
+      expect(readProjectFile(relative)).toBe(expected);
+      expect(readHashesV2(hashFilePath())[relative]).not.toBe(computeHash(expected));
+    }
   });
 
   it("replaces the owned Reasonix native role with the ordinary check Skill", async () => {

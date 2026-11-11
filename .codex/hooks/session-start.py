@@ -131,7 +131,7 @@ def _has_curated_jsonl_entry(jsonl_path: Path) -> bool:
     A newly created jsonl is empty, and older tasks may still carry a
     ``{"_example": ...}`` placeholder row (no ``file`` key) — neither is
     "ready". Readiness requires at least one curated entry. Matches the
-    contract used by ``inject-subagent-context.py``.
+    contract used by main-session context readers.
     """
     try:
         for line in jsonl_path.read_text(encoding="utf-8").splitlines():

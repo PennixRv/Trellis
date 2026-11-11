@@ -43,9 +43,8 @@ Identity (misfire asymmetry: a collision that MISSES an injection is
 unacceptable; drift that OVER-injects is fine): the session/window key is
 delegated to common.active_task.resolve_context_key — the shared resolver
 every other hook uses — called payload-first, environment-inclusive second,
-so two live sessions can never collapse onto one exported env value. A
-`+a-<agent_id>` suffix (appended after each part is sanitized) keeps a
-subagent's state separate from its parent's. When the resolver is unavailable
+so two live sessions can never collapse onto one exported env value.
+When the resolver is unavailable
 (older installed scripts tree), a minimal payload-only ladder (session keys,
 then transcript hash) keeps the hook working. No key from any source, or an
 unwritable state dir → stateless: no state IO at all, every hit is a TICKET
@@ -54,8 +53,7 @@ unwritable state dir → stateless: no state IO at all, every hit is a TICKET
 State: user-global, out of the repo, one append-only JSONL file per identity
 under ${TRELLIS_SPEC_STATE_DIR:-~/.trellis/spec-inject}/<project16>/<identity>.jsonl.
 SessionStart(clear|compact) appends an opaque reset marker to the base session
-shard; parent and subagent emission histories stay separate but observe that
-shared marker. A best-effort fcntl lock is held across read→decide→append;
+shard; subsequent events observe that marker. A best-effort fcntl lock is held across read→decide→append;
 where fcntl is unavailable (Windows) the worst case is a duplicate injection.
 A once-per-hour GC prunes conforming shards older than 48 h.
 
@@ -147,7 +145,7 @@ STATE_MAX_AGE_SECONDS = 48 * 60 * 60   # shards older than this are pruned
 # this hook into an unlink loop over someone's files. The optional `.<pid>`
 # alternative covers shards written by the pre-lock layout.
 GC_PROJECT_DIR_RE = re.compile(r"^[0-9a-f]{16}$")
-# `+` is part of the identity charset: subagent shards use the `+a-<agent_id>`
+# Identity characters remain stable for existing main-session state files.
 # suffix (contract amendment 2 — without it those shards were never pruned).
 GC_SHARD_NAME_RE = re.compile(r"^[A-Za-z0-9_+-]+(\.[0-9]+)?\.jsonl$")
 PATCH_PATH_RE = re.compile(
@@ -168,12 +166,6 @@ def _patch_paths(command: str) -> list[str]:
             if path and path not in paths:
                 paths.append(path)
     return paths
-
-
-def _agent_id(payload: dict) -> str:
-    """The subagent id carried by the event, or "" for a main-session event."""
-    raw = payload.get("agent_id")
-    return raw.strip() if isinstance(raw, str) else ""
 
 
 def find_trellis_root(start: Path) -> Path | None:
@@ -734,10 +726,6 @@ def main() -> int:
         return 0
 
     base_identity, stateless = resolve_base_identity(root, input_data)
-    identity = base_identity
-    agent = _agent_id(input_data)
-    if agent:
-        identity += "+a-" + _sanitize(agent)
 
     state_records: dict[str, dict] = {}
     clock = {"reset": None, "ts": time.time()}
@@ -760,25 +748,8 @@ def main() -> int:
                 os.close(base_fd)
             else:
                 base_records, reset_id = base_snapshot
-                if identity == base_identity:
-                    fd = base_fd
-                    state_records = base_records
-                else:
-                    unlock_shard(base_fd)
-                    os.close(base_fd)
-                    fd = open_shard(project_dir / f"{identity}.jsonl")
-                    if fd is None:
-                        stateless = True
-                    else:
-                        lock_shard(fd)
-                        snapshot = load_state(fd, STATE_VERSION)
-                        if snapshot is None:
-                            stateless = True
-                            unlock_shard(fd)
-                            os.close(fd)
-                            fd = None
-                        else:
-                            state_records, _ = snapshot
+                fd = base_fd
+                state_records = base_records
 
                 if not stateless:
                     clock = {

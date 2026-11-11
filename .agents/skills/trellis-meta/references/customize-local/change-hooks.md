@@ -16,7 +16,6 @@ Hooks are the automation layer that connects a platform to Trellis. When the use
 | --- | --- |
 | session-start | Injects a Trellis overview when a session starts, clears, or compacts. |
 | workflow-state | Injects a state hint on each user input. |
-| sub-agent context | Injects PRD/spec/research before an agent starts. |
 | shell session bridge | Lets `task.py` commands in shell see the same session identity. |
 
 ## Modification Steps
@@ -47,7 +46,7 @@ python3 ./.trellis/scripts/task.py current --source
 python3 ./.trellis/scripts/task.py validate <task>
 ```
 
-If the task and JSONL are correct, determine whether the platform uses hook push or agent pull. For hook push, edit `inject-subagent-context`; for agent pull, edit the agent file.
+任务和可选 JSONL 正确时，继续检查当前会话身份及对应机制的原生工作包输入。Hook 负责主会话接入；协作角色由 `change-agents.md` 所列 owner 管理。
 
 ## Notes
 

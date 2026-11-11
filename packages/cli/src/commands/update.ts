@@ -79,6 +79,7 @@ import {
   executeNativeRetirement,
   assertCurrentExecutionTree,
   assertNativeRetirementWrites,
+  mixedNativeAssets,
 } from "../utils/retired-native-assets.js";
 import {
   fetchRegistrySpecTemplates,
@@ -2257,6 +2258,23 @@ export async function update(options: UpdateOptions): Promise<void> {
         codexUpgradeNeeded ? new Set<AITool>(["codex"]) : undefined,
         breakingBypass,
       );
+      const mixedBaselines = new Map<string, string>();
+      for (const relative of mixedNativeAssets) {
+        const template = templates.get(relative);
+        const absolute = path.join(cwd, relative);
+        if (template === undefined || !fs.existsSync(absolute)) continue;
+        const current = fs.readFileSync(absolute, "utf8");
+        if (nativeRetirement.edits.has(relative)) {
+          mixedBaselines.set(relative, template);
+        } else if (
+          current !== template &&
+          hashes[relative] === computeHash(current)
+        ) {
+          // A mixed-content receipt cannot authorize replacing user fields.
+          hashes[relative] = computeHash(template);
+          mixedBaselines.set(relative, template);
+        }
+      }
       for (const [relative, content] of nativeRetirement.edits) {
         templates.set(relative, content);
       }
@@ -2818,6 +2836,9 @@ export async function update(options: UpdateOptions): Promise<void> {
             filesToHash.set(file.relativePath, file.newContent);
           }
         }
+      }
+      for (const [relative, template] of mixedBaselines) {
+        filesToHash.set(relative, template);
       }
       if (filesToHash.size > 0) {
         updateHashes(cwd, filesToHash);

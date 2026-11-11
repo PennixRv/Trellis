@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.17",
+  "description": "Preserve mixed user configuration across native retirement updates",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Record canonical template baselines after retirement cleanup. A mixed-content receipt cannot authorize replacing user MCP settings, package mappings or custom Hooks; preserve those files through the normal conflict policy.",
+  "migrations": [],
+  "notes": "beta.16 was published and installed for acceptance. Repeated-update preview exposed a mixed ownership risk before further writes; acceptance user data remained intact. Upgrade to this version and use native trellis update --migrate --skip-all to retain reviewed user configuration while correcting its baseline. No legacy execution compatibility is restored."
+}

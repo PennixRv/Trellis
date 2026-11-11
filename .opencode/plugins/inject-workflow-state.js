@@ -34,7 +34,7 @@ import {
   platformInputFromMessages,
   prependEphemeralText,
 } from "../lib/context-visibility.js"
-import { TrellisContext, debugLog, isTrellisSubagent } from "../lib/trellis-context.js"
+import { TrellisContext, debugLog } from "../lib/trellis-context.js"
 
 // Supports STATUS values with letters, digits, underscores, hyphens
 // (so "in-review" / "blocked-by-team" work alongside "in_progress").
@@ -290,7 +290,7 @@ function buildBreadcrumb(id, status, templates, phaseStatus = null) {
   return `<workflow-state>\n${header}\n${body}\n</workflow-state>`
 }
 
-// OpenCode 1.2.x expects plugins to be factory functions (see inject-subagent-context.js comment).
+// OpenCode 1.2.x expects plugins to be factory functions (see the native plugin factory contract).
 export default async ({ directory }) => {
   const ctx = new TrellisContext(directory)
   debugLog("workflow-state", "Plugin loaded, directory:", directory)
@@ -300,14 +300,8 @@ export default async ({ directory }) => {
         try {
           const messages = output?.messages
           const platformInput = platformInputFromMessages(messages)
-          // Skip Trellis sub-agent turns — the per-turn breadcrumb is for the
-          // main session only; sub-agent context comes from the parent's
-          // tool.execute.before injection.
-          if (isTrellisSubagent(platformInput)) {
-            debugLog("workflow-state", "Skipping trellis subagent turn:", platformInput?.agent)
-            return
-          }
-          if (process.env.TRELLIS_HOOKS === "0" || process.env.TRELLIS_DISABLE_HOOKS === "1") {
+
+            if (process.env.TRELLIS_HOOKS === "0" || process.env.TRELLIS_DISABLE_HOOKS === "1") {
             return
           }
           if (process.env.OPENCODE_NON_INTERACTIVE === "1") {

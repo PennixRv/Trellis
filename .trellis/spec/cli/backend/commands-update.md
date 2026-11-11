@@ -113,6 +113,10 @@ as user-managed instead of auto-updating it back to bundled native workflow.
 | `autoUpdateFiles` | disk differs from template; stored hash matches current content, or an allowed untracked Copilot merge applies → safe to write |
 | `changedFiles` | disk differs from template; stored hash absent or stale → user edited; needs decision |
 
+原生退休清理处理混合文件时，只删除已知旧执行字段、Hook 注册及生成注释，保留相邻用户内容。持久指纹必须记录清理前收集的现行模板基线，不能把清理后包含 MCP、包映射或自定义 Hook 的整份文件登记成模板所有物。退休计划的原始文件指纹仅用于本次写前复核。
+
+对这些混合文件，当前内容与候选模板不同，即使 receipt 恰好等于当前整份文件，也不能据此自动覆盖。更新应将其作为用户修改处理，并把 receipt 收敛到模板基线；`--skip-all` 保留实际内容。连续两次更新必须验证用户字段仍在，不能只检查旧角色已删除。
+
 This bucketing is the basis for both the printed plan and the write phase.
 
 ---

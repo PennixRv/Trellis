@@ -8,7 +8,6 @@ settings/config files usually register:
 
 - session-start hook: injects a Trellis overview when a new session starts or context resets.
 - workflow-state hook: parses `[workflow-state:STATUS]` blocks from `.trellis/workflow.md` and emits the body matching the current task `status` on each user input. Parser-only; the script does not embed fallback content.
-- sub-agent context hook: injects task context when implementation/check/research agents start.
 - shell/session bridge: lets shell commands see the same Trellis session identity.
 - platform plugin or extension entry points.
 
@@ -29,7 +28,7 @@ Common files:
 | Pi Agent | `.pi/settings.json`, `.pi/extensions/trellis/` |
 | Trae IDE | `.trae/hooks.json` |
 
-Reasonix is a pull-based platform whose agent files contain prelude instructions to read context after startup. ZCode uses `.zcode/config.json` with shared hooks, including PreToolUse for sub-agent prompt injection. Kimi Code is likewise pull-based and has no project-level settings/hooks file Trellis writes (hooks live only in the user-level `~/.kimi-code/config.toml`), so its agent prompts ship as skills with the same prelude. DeepSeek Harness also has no project-level hook/settings surface Trellis writes; the optional `dsh-trellis` profile plugin supplies per-turn breadcrumbs and event-driven `trellis_wait`, while DSH role skills pull task context in both plugin and no-plugin paths.
+Reasonix、Kimi Code 和 DeepSeek Harness 通过项目 Skills 提供主会话方法入口；ZCode 通过主会话 Hook 注入阶段和 shell 身份。Trellis 不部署宿主实施、检查或研究角色。
 
 Whether these files exist in a project depends on which `trellis init --<platform>` flags the user ran.
 
@@ -39,7 +38,6 @@ Whether these files exist in a project depends on which `trellis init --<platfor
 | --- | --- |
 | `session-start.py` | Generates session-start context. |
 | `inject-workflow-state.py` | Parses `[workflow-state:STATUS]` blocks in `.trellis/workflow.md` and emits the body matching the current task status. Falls back to `Refer to workflow.md for current step.` when no matching block exists. |
-| `inject-subagent-context.py` | Injects PRD, JSONL context, and related spec/research into sub-agents. |
 | `inject-spec-context.py` | Matches path-scoped specs and manages budgeted delivery state. |
 | `inject-shell-session-context.py` | Lets shell commands inherit Trellis session identity. |
 
@@ -51,7 +49,7 @@ Not every platform has every hook. Do not copy files from another platform just 
 | --- | --- |
 | AI should see more/less context in a new session | Platform `session-start` hook. |
 | Per-turn hint policy should change | `[workflow-state:STATUS]` block in `.trellis/workflow.md`. The hook parses workflow.md verbatim — no script edit required. |
-| Sub-agent cannot read PRD/spec | `inject-subagent-context` hook or agent prelude. |
+| 协作节点缺少 PRD/spec | 原生工作包输入与节点合同。 |
 | `task.py current` in shell has no active task | Shell/session bridge hook or platform environment variable configuration. |
 | Disable an automatic injection | The corresponding hook registration in settings/config. |
 

@@ -1,84 +1,14 @@
-# Agents
+# 协作角色
 
-Trellis agent files define specialized roles. Common Trellis agents in a user project are:
+主会话负责需求、决策、授权、集成和结果接受。协作只有两类，各自由原生 owner 管理：
 
-- `trellis-research`
-- `trellis-implement`
-- `trellis-check`
+| 机制与实例 | 适用工作 | 项目资产与入口 |
+| --- | --- | --- |
+| trellis teamwork / trellis teammates | 明确工作包的只读研究、审查与验证 | `.trellis/agents/teammate.md`、`teammate-profiles.json`、`profiles/`；使用 `trellis-teamwork` |
+| paseo-based-parallelism / paseo delegated-agent | 已授权实施阶段的完整实施结果包 | `.trellis/agents/delegated-worktree-primary-agent.md`、`worktree-delegation-node.md`；使用 `trellis-worktree-delegation` |
 
-File locations and formats differ by platform, but responsibility boundaries should stay consistent.
+修改前读取当前任务合同、目标角色文件和对应 Skill 的原生说明。角色卡描述职责、输入、写入边界和报告格式；任务状态、接受与授权仍由 Task CLI 管理。节点收到明确工作包后执行，遇到缺失输入或权限冲突向主会话报告，由主会话处理用户决策。
 
-## Agent Responsibilities
+工程规范写入 `.trellis/spec/`；可复用方法写入 Skills。可选 JSONL 只是上下文清单，存在清单不授权协作。禁止通过宿主角色文件、裸 CLI 进程或历史启动记录另建派发路线。
 
-| Agent | Responsibility |
-| --- | --- |
-| `trellis-research` | Investigate the question and write findings into the current task's `research/`. |
-| `trellis-implement` | Implement against `prd.md`, optional `design.md` / `implement.md`, `implement.jsonl`, and related spec/research. |
-| `trellis-check` | Review changes, fix discovered issues, and run necessary checks. |
-
-Agent files should not become generic chat prompts. They should define input sources, write boundaries, whether code may be changed, and how results are reported.
-
-## Common Paths
-
-| Platform | Agent path |
-| --- | --- |
-| Claude Code | `.claude/agents/trellis-*.md` |
-| Cursor | `.cursor/agents/trellis-*.md` |
-| OpenCode | `.opencode/agents/trellis-*.md` |
-| Codex | `.codex/agents/trellis-*.toml` |
-| Kiro | `.kiro/agents/trellis-*.json` |
-| Gemini CLI | `.gemini/agents/trellis-*.md` |
-| Qoder | `.qoder/agents/trellis-*.md` |
-| CodeBuddy | `.codebuddy/agents/trellis-*.md` |
-| Factory Droid | `.factory/droids/trellis-*.md` |
-| Pi Agent | `.pi/agents/trellis-*.md` |
-| Reasonix | `.reasonix/skills/trellis-*/SKILL.md` (subagent frontmatter) |
-| ZCode | `.zcode/agents/trellis-*.md` |
-| Kimi Code | `.kimi-code/skills/trellis-*/SKILL.md` (agent prompts as skills, dispatched to the built-in `coder`; research needs its file-editing tools to persist findings) |
-| DeepSeek Harness | `.dsh/skills/trellis-agent-*/SKILL.md` (role prompts as child-only skills; optional `trellis_wait` enables continuable background settlement; without it, dispatch every child with `run_in_background: false` from the outset) |
-
-GitHub Copilot agent/prompt support is provided by a combination of directories such as `.github/agents/`, `.github/prompts/`, and `.github/skills/`; inspect the files actually generated in the user project.
-
-Main-session workflow platforms such as Kilo, Antigravity, and Devin may not have Trellis sub-agent files. They usually rely on workflows/skills to guide the main session.
-
-## Two Context Loading Modes
-
-### hook push
-
-The platform hook injects task context before the agent starts. The agent file itself can focus more on responsibilities and boundaries.
-
-Common on platforms that support agent hooks.
-
-### agent pull
-
-The agent file instructs the agent to read after startup:
-
-- `python3 ./.trellis/scripts/task.py current --source`
-- `implement.jsonl` or `check.jsonl`
-- spec/research files referenced by JSONL
-- current task `prd.md`
-- `design.md` if present
-- `implement.md` if present
-
-This mode fits platforms whose hooks cannot reliably rewrite sub-agent prompts.
-
-## Local Change Scenarios
-
-| User need | Edit location |
-| --- | --- |
-| Implement agent must follow extra restrictions | The platform's `trellis-implement` agent file. |
-| Check agent must run project-specific commands | `trellis-check` agent file, and `.trellis/spec/` if needed. |
-| Research agent must output a fixed format | `trellis-research` agent file. |
-| Agent cannot read task context | Agent prelude or `inject-subagent-context` hook. |
-| Add a project-specific agent | Platform agent directory + related workflow/command/skill entry point. |
-
-## Modification Principles
-
-1. **Keep responsibilities single-purpose**. Do not mix research, implement, and check responsibilities into one agent.
-2. **Specify the read order**. Agents must know to start from the active task, read jsonl/spec context, then read `prd.md`, `design.md` if present, and `implement.md` if present.
-3. **Specify write boundaries**. Research usually only writes `research/`; implement can write code; check can fix issues.
-4. **Keep semantics synchronized in multi-platform projects**. If the user configured Claude, Codex, and Cursor together, decide whether changes to one platform's agent also need to be applied to others.
-
-## Do Not Default To Editing Upstream Templates
-
-Local AI should default to modifying platform agent files inside the user project. Discuss upstream template source only when the user explicitly wants to contribute the change back to Trellis.
+Kiro 的 `.kiro/agents/trellis.json` 是主会话入口；普通 `trellis-check` 是检查方法 Skill。两者都不承担旧角色分发。修改安装资产必须沿所属组件的原生更新入口；只修改源模板不会更新既有项目。

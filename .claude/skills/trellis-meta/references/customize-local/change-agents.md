@@ -1,56 +1,14 @@
-# Change Local Agents
+# 调整项目协作角色
 
-When the user wants to change `trellis-research`, `trellis-implement`, or `trellis-check` behavior, edit platform agent files in the user project.
+主会话负责需求、决策、授权、集成和结果接受。协作只有两类，各自由原生 owner 管理：
 
-## Read These Files First
+| 机制与实例 | 适用工作 | 项目资产与入口 |
+| --- | --- | --- |
+| trellis teamwork / trellis teammates | 明确工作包的只读研究、审查与验证 | `.trellis/agents/teammate.md`、`teammate-profiles.json`、`profiles/`；使用 `trellis-teamwork` |
+| paseo-based-parallelism / paseo delegated-agent | 已授权实施阶段的完整实施结果包 | `.trellis/agents/delegated-worktree-primary-agent.md`、`worktree-delegation-node.md`；使用 `trellis-worktree-delegation` |
 
-1. Target platform agent directory
-2. `.trellis/workflow.md` Decision Space Construction and Consolidation Phase / research routing
-3. Current task `prd.md`
-4. Current task `implement.jsonl` / `check.jsonl`
-5. Relevant hook or agent prelude
+修改前读取当前任务合同、目标角色文件和对应 Skill 的原生说明。角色卡描述职责、输入、写入边界和报告格式；任务状态、接受与授权仍由 Task CLI 管理。节点收到明确工作包后执行，遇到缺失输入或权限冲突向主会话报告，由主会话处理用户决策。
 
-## Common Paths
+工程规范写入 `.trellis/spec/`；可复用方法写入 Skills。可选 JSONL 只是上下文清单，存在清单不授权协作。禁止通过宿主角色文件、裸 CLI 进程或历史启动记录另建派发路线。
 
-| Platform | Path |
-| --- | --- |
-| Claude Code | `.claude/agents/trellis-*.md` |
-| Cursor | `.cursor/agents/trellis-*.md` |
-| OpenCode | `.opencode/agents/trellis-*.md` |
-| Codex | `.codex/agents/trellis-*.toml` |
-| Kiro | `.kiro/agents/trellis-*.json` |
-| Gemini CLI | `.gemini/agents/trellis-*.md` |
-| Qoder | `.qoder/agents/trellis-*.md` |
-| CodeBuddy | `.codebuddy/agents/trellis-*.md` |
-| Factory Droid | `.factory/droids/trellis-*.md` |
-| Pi Agent | `.pi/agents/trellis-*.md` |
-| Reasonix | `.reasonix/skills/trellis-*/SKILL.md` (subagent frontmatter) |
-| ZCode | `.zcode/agents/trellis-*.md` |
-
-Use the actual paths in the user project as authoritative.
-
-## Common Needs
-
-| Need | Which agent to edit |
-| --- | --- |
-| Research must write files, not only reply in chat | `trellis-research` |
-| Certain local specs must be read before implementation | `trellis-implement` + `implement.jsonl` configuration rules |
-| Specific commands must run during checking | `trellis-check` |
-| Agent must not modify certain directories | The corresponding agent's write boundary instructions |
-| Agent output format must be fixed | The corresponding agent's final/reporting instructions |
-
-## Modification Principles
-
-1. **Preserve role boundaries**: research investigates and persists; implement writes implementation; check reviews and fixes.
-2. **Do not hard-code project specs into agents**: long-term specs belong in `.trellis/spec/`; agents are responsible for reading them.
-3. **Make read order explicit**: active task -> PRD -> info -> JSONL -> spec/research.
-4. **Make write boundaries explicit**: which directories may be written and which may not.
-5. **Synchronize across platforms**: when the user configured multiple platforms, decide whether to change only the current platform or all platform agents.
-
-## Agent Pull Platforms
-
-If an agent file contains a prelude for "read task/context after startup," do not remove those steps when editing. Otherwise the agent will work only from chat context and bypass Trellis's core mechanism.
-
-## Hook Push Platforms
-
-If context is injected by a hook, the agent file should still retain responsibility boundaries. Do not remove PRD/spec requirements from the agent just because a hook injects context.
+Kiro 的 `.kiro/agents/trellis.json` 是主会话入口；普通 `trellis-check` 是检查方法 Skill。两者都不承担旧角色分发。修改安装资产必须沿所属组件的原生更新入口；只修改源模板不会更新既有项目。
