@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   batchReservationPath,
@@ -19,7 +19,27 @@ describe("durable batch capacity", () => {
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-capacity-"));
   });
-  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("tolerates native settlement removing a reservation during a read", () => {
+    writeBatchReservation(root, {
+      schemaVersion: 1,
+      sessionId: "s",
+      batchId: "b",
+      planHash: "a".repeat(64),
+      capacity: 1,
+      ownerPid: process.pid,
+    });
+    const original = fs.lstatSync;
+    vi.spyOn(fs, "lstatSync").mockImplementation(((file: fs.PathLike) => {
+      fs.unlinkSync(batchReservationPath(root, "s", "b"));
+      return original(file);
+    }) as typeof fs.lstatSync);
+    expect(readBatchReservations(root)).toEqual([]);
+  });
 
   it("counts unresolved slots after coordinator death and never idle-kills synthetic reservations", async () => {
     const bucket = path.join(root, "project");

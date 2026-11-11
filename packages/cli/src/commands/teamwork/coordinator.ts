@@ -1815,8 +1815,15 @@ export async function reconcileTeamworkBatch(input: {
   execute?: boolean;
   reason?: string;
   confirmUnknownProcessExit?: boolean;
+  /** CLI verified the original reservation owner is absent under its lock. */
+  coordinatorExited?: boolean;
 }): Promise<
-  TeamworkReceipt | { status: "ready" | "blocked"; blockers: string[] }
+  | TeamworkReceipt
+  | {
+      status: "ready" | "blocked";
+      blockers: string[];
+      coordinatorRecoveryRequired?: true;
+    }
 > {
   const { plan, cwd } = input;
   const projection = await readCoordinationState({
@@ -1854,10 +1861,10 @@ export async function reconcileTeamworkBatch(input: {
     }
     return receipt;
   }
-  if (
+  const needsRecovery =
     batch.state !== "RECONCILIATION_REQUIRED" &&
-    !(resolving && batch.state === "SETTLING")
-  )
+    !(resolving && batch.state === "SETTLING");
+  if (needsRecovery && !input.coordinatorExited)
     throw new Error(
       "Recover the original batch into RECONCILIATION_REQUIRED first",
     );
@@ -1932,10 +1939,29 @@ export async function reconcileTeamworkBatch(input: {
       );
   }
   if (!input.execute)
-    return { status: blockers.length ? "blocked" : "ready", blockers };
+    return {
+      status: blockers.length ? "blocked" : "ready",
+      blockers,
+      ...(needsRecovery ? { coordinatorRecoveryRequired: true as const } : {}),
+    };
   if (blockers.length) throw new Error(blockers.join("; "));
   if (!input.reason?.trim())
     throw new Error("Reconciliation requires an explicit disposition reason");
+  if (needsRecovery) {
+    if (
+      typeof batch.effectiveCapacity !== "number" ||
+      !Number.isSafeInteger(batch.effectiveCapacity) ||
+      batch.effectiveCapacity < 1
+    )
+      throw new Error("Recovered batch lacks its frozen effective capacity");
+    await recoverExistingBatch({
+      plan,
+      cwd,
+      by: "main",
+      capacity: batch.effectiveCapacity,
+    });
+    return reconcileTeamworkBatch({ ...input, coordinatorExited: false });
+  }
   const by = "main";
   for (const attempt of attempts) {
     await recordCoordinationEvent({

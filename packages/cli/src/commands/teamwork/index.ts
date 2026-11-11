@@ -599,6 +599,10 @@ export function registerTeamworkCommand(program: Command): void {
     )
     .requiredOption("--task <path>", "original task directory")
     .option(
+      "--wait <seconds>",
+      "observe the original batch read-only for 1–60 seconds, even when its host wait handle is unavailable",
+    )
+    .option(
       "--execute",
       "record verified disposition and release the original capacity reservation",
     )

@@ -204,6 +204,34 @@ return an existing receipt, but an expired new batch cannot dispatch.
 
 ## Change and verification requirements
 
+### Lost foreground host handle recovery
+
+`reconcile <plan> --task <task> --wait <seconds>` observes the same batch for an
+integer budget of 1–60 seconds. It is mutually exclusive with disposition flags.
+The original coordinator retains FIFO, cancellation, deadline and capacity;
+observation must not dispatch, write events, clear guards or accept reports.
+Its JSON `mode: observe` view returns `pending`, `settled`,
+`reconciliation_required` or `blocked`, with frozen identity and deadline.
+Only a verified durable receipt permits `settled`; reuse the ordinary read-only
+batch result builder for reports/artifact identities. Missing receipt append
+remains pending; conflicting durable facts fail closed. Concurrent/repeated or
+interrupted observers never change execution counts or resource ownership.
+
+Foreground schema-1 projections may add plan/task/deadline locators. The shared
+guard admits only narrowly parsed recovery commands matching the protected
+identity and safe paths. Missing legacy locators require explicit original
+inputs; corrupt/symlinked records do not authorize arbitrary reads or writes.
+The guard has no host-handle mapping and does not prove a continuation belongs
+to the batch. CLI validation is independent from Hook permission.
+
+Under the existing capacity lock, a verified absent reservation owner permits
+previewing a nonterminal recovery transition without writes. Explicit execute
+reuses the existing transition into RECONCILIATION_REQUIRED before settling;
+provider-exit proof remains mandatory. Missing/unknown owner facts are not
+death proof. Do not re-enter batch to perform this bridge or infer exit from a
+deadline. A reservation removed between directory listing and read is normal
+settlement; all other malformed reservation failures remain errors.
+
 批次容量按实际 assignment 数量收敛，项目锁下同时计入其他批次预留和非批次成员，避免双重计数。`max_live_teammates: 0` 只关闭共享上限。冻结后的启动策略可以收紧，不能通过配置或环境变量放宽；启动后策略变化停止后续派发，已运行进程仍须确认退出。
 
 所有 attempt 的报告、工作日志和有界 stderr 诊断保留到显式 `cleanup-artifacts`。该命令先验证终态回执、无未释放预留及安全路径，预览文件指纹，只有匹配 `--confirm` 摘要才删除。结果 `attempts` 包含全部尝试，`reports` 保持最终报告兼容视图。

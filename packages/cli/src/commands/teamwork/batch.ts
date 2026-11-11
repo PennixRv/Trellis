@@ -222,7 +222,7 @@ export async function teamworkBatch(
               ownerPid: process.pid,
             });
             try {
-              recordForegroundWait(cwd, plan);
+              recordForegroundWait(cwd, plan, { planPath, taskRoot });
             } catch (error) {
               fs.rmSync(reservationFile, { force: true });
               throw error;
@@ -265,8 +265,21 @@ export async function teamworkReconcile(
     execute?: boolean;
     reason?: string;
     confirmUnknownProcessExit?: boolean;
+    wait?: string;
   },
 ): Promise<void> {
+  if (
+    options.wait !== undefined &&
+    (options.execute ||
+      options.reason !== undefined ||
+      options.confirmUnknownProcessExit)
+  )
+    throw new Error("--wait cannot be combined with disposition options");
+  if (
+    options.wait !== undefined &&
+    !/^(?:[1-9]|[1-5][0-9]|60)$/.test(options.wait)
+  )
+    throw new Error("--wait must be an integer from 1 to 60 seconds");
   if (options.confirmUnknownProcessExit && !options.execute)
     throw new Error("--confirm-unknown-process-exit requires --execute");
   const cwd = process.cwd();
@@ -278,6 +291,16 @@ export async function teamworkReconcile(
   );
   const ref = resolveTeamworkSession({ sessionId: plan.sessionId, cwd });
   const bucket = projectDir(ref.project);
+  if (options.wait !== undefined) {
+    await observeTeamworkBatch(
+      plan,
+      path.resolve(options.task),
+      cwd,
+      bucket,
+      Number(options.wait),
+    );
+    return;
+  }
   const lock = path.join(bucket, ".worker-guard.lock");
   await acquireLock(lock);
   try {
@@ -285,6 +308,7 @@ export async function teamworkReconcile(
       (entry) =>
         entry.sessionId === plan.sessionId && entry.batchId === plan.batchId,
     );
+    let coordinatorExited = false;
     if (reservation) {
       if (reservation.planHash !== plan.planHash)
         throw new Error("Capacity reservation does not match the frozen plan");
@@ -295,6 +319,7 @@ export async function teamworkReconcile(
         );
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+        coordinatorExited = true;
       }
     }
     const result = await reconcileTeamworkBatch({
@@ -303,6 +328,7 @@ export async function teamworkReconcile(
       execute: options.execute,
       reason: options.reason,
       confirmUnknownProcessExit: options.confirmUnknownProcessExit,
+      coordinatorExited,
     });
     if (
       options.execute &&
@@ -320,6 +346,130 @@ export async function teamworkReconcile(
     console.log(JSON.stringify(result));
   } finally {
     releaseLock(lock);
+  }
+}
+
+/** Observe durable facts; the original coordinator keeps execution and cleanup. */
+async function observeTeamworkBatch(
+  plan: TeamworkPlan,
+  taskRoot: string,
+  cwd: string,
+  bucket: string,
+  seconds: number,
+): Promise<void> {
+  const until = performance.now() + seconds * 1000;
+  while (true) {
+    const projection = await readCoordinationState({
+      sessionId: plan.sessionId,
+      cwd,
+    });
+    const batch = projection.batches.find(
+      (entry) => entry.batchId === plan.batchId,
+    );
+    if (batch && batch.planHash !== plan.planHash)
+      throw new Error("Batch does not match the frozen plan");
+    const reservation = readBatchReservations(bucket).find(
+      (entry) =>
+        entry.sessionId === plan.sessionId && entry.batchId === plan.batchId,
+    );
+    if (reservation && reservation.planHash !== plan.planHash)
+      throw new Error("Capacity reservation does not match the frozen plan");
+    const snapshot = {
+      mode: "observe",
+      sessionId: plan.sessionId,
+      batchId: plan.batchId,
+      planHash: plan.planHash,
+      deadline: plan.deadline,
+      state: batch?.state ?? null,
+    };
+    const events = await readTeamworkEvents(plan.sessionId);
+    // A terminal transition can precede its receipt append; never repair it here.
+    const recorded = events.some(
+      (event) =>
+        event.kind === "coordination" &&
+        event.batchId === plan.batchId &&
+        event.action === "receipt_recorded" &&
+        event.payload?.status === batch?.state &&
+        event.payload?.status !== "RECONCILIATION_REQUIRED",
+    );
+    if (recorded) {
+      const receipt = await readSettledTeamworkReceipt(plan, cwd);
+      if (receipt) {
+        console.log(
+          JSON.stringify({
+            ...snapshot,
+            outcome: "settled",
+            receipt,
+            result: await buildBatchResult(plan, receipt, taskRoot, cwd),
+          }),
+        );
+        return;
+      }
+    }
+    let ownerExited = false;
+    if (reservation) {
+      try {
+        process.kill(reservation.ownerPid, 0);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ESRCH")
+          ownerExited = true;
+        else {
+          console.log(
+            JSON.stringify({
+              ...snapshot,
+              outcome: "blocked",
+              blockers: ["Cannot verify the original coordinator process"],
+            }),
+          );
+          return;
+        }
+      }
+    }
+    if (ownerExited || batch?.state === "RECONCILIATION_REQUIRED") {
+      console.log(
+        JSON.stringify({
+          ...snapshot,
+          outcome: "reconciliation_required",
+          blockers: [
+            "Preview native reconcile; retain capacity until process exit is verified",
+          ],
+        }),
+      );
+      return;
+    }
+    if (projection.issues.length) {
+      console.log(
+        JSON.stringify({
+          ...snapshot,
+          outcome: "blocked",
+          blockers: projection.issues,
+        }),
+      );
+      return;
+    }
+    const remaining = until - performance.now();
+    if (remaining <= 0) {
+      console.log(
+        JSON.stringify({
+          ...snapshot,
+          outcome: "pending",
+          ...(batch &&
+          ["AWAITING_REVIEW", "ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(
+            batch.state,
+          )
+            ? {
+                blockers: [
+                  "Awaiting matching durable receipt; observation does not release capacity",
+                ],
+              }
+            : {}),
+        }),
+      );
+      return;
+    }
+    await new Promise<void>((resolve) =>
+      setTimeout(resolve, Math.min(250, remaining)),
+    );
   }
 }
 

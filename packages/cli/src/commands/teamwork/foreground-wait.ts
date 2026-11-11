@@ -23,7 +23,11 @@ export function foregroundWaitFile(
   );
 }
 
-export function recordForegroundWait(cwd: string, plan: TeamworkPlan): void {
+export function recordForegroundWait(
+  cwd: string,
+  plan: TeamworkPlan,
+  location?: { planPath: string; taskRoot: string },
+): void {
   const file = foregroundWaitFile(cwd, plan);
   if (!file) return;
   const relative = path.relative(cwd, path.dirname(file));
@@ -45,6 +49,13 @@ export function recordForegroundWait(cwd: string, plan: TeamworkPlan): void {
       planHash: plan.planHash,
       ownerPid: process.pid,
       state: "waiting",
+      ...(location
+        ? {
+            planPath: path.resolve(location.planPath),
+            taskRoot: path.resolve(location.taskRoot),
+            deadline: plan.deadline,
+          }
+        : {}),
     }),
   );
 }

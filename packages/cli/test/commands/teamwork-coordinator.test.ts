@@ -2,6 +2,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,9 +15,18 @@ import {
 import {
   buildBatchResult,
   teamworkBatch,
+  teamworkReconcile,
   cleanupTeamworkAttemptEvidence,
 } from "../../src/commands/teamwork/batch.js";
-import { writeBatchReservation } from "../../src/commands/teamwork/batch-reservation.js";
+import {
+  writeBatchReservation,
+  batchReservationPath,
+} from "../../src/commands/teamwork/batch-reservation.js";
+import {
+  recordForegroundWait,
+  clearForegroundWait,
+  foregroundWaitFile,
+} from "../../src/commands/teamwork/foreground-wait.js";
 import { projectDir } from "../../src/commands/teamwork/store/paths.js";
 import {
   runTeamworkCoordinator,
@@ -148,6 +158,7 @@ function setup(): TestEnv {
 
 function teardown(env: TestEnv): void {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   if (env.oldRoot === undefined) delete process.env.TRELLIS_TEAMWORK_ROOT;
   else process.env.TRELLIS_TEAMWORK_ROOT = env.oldRoot;
   if (env.oldProject === undefined) delete process.env.TRELLIS_TEAMWORK_PROJECT;
@@ -376,6 +387,299 @@ describe("TeamworkSession teammate coordinator", () => {
 
   afterEach(() => teardown(env));
 
+  it("observes the original live coordinator without its host handle or another dispatch", async () => {
+    const raw = createPlan(env.taskRoot, ["work-a"]);
+    const plan = validateTeamworkPlan(raw, env.taskRoot);
+    const file = path.join(env.taskRoot, "plan.json");
+    fs.writeFileSync(file, JSON.stringify(raw));
+    vi.stubEnv("CODEX_THREAD_ID", "recovery-fixture-owner");
+    recordForegroundWait(env.projectDir, plan, {
+      planPath: file,
+      taskRoot: env.taskRoot,
+    });
+    const bucket = projectDir(
+      resolveTeamworkSession({ sessionId: plan.sessionId, cwd: env.projectDir })
+        .project,
+    );
+    writeBatchReservation(bucket, {
+      schemaVersion: 1,
+      sessionId: plan.sessionId,
+      batchId: plan.batchId,
+      planHash: plan.planHash,
+      capacity: 1,
+      ownerPid: process.pid,
+    });
+    const localBin = path.join(env.tmpDir, "bin");
+    fs.mkdirSync(localBin);
+    fs.symlinkSync(
+      path.resolve(__dirname, "../../bin/trellis.js"),
+      path.join(localBin, "trellis"),
+    );
+    const nativeObserve = () => {
+      const observed = spawnSync(
+        "trellis",
+        ["teamwork", "reconcile", file, "--task", env.taskRoot, "--wait", "1"],
+        {
+          cwd: env.projectDir,
+          env: {
+            ...process.env,
+            PATH: `${localBin}${path.delimiter}${process.env.PATH ?? ""}`,
+          },
+          encoding: "utf8",
+          timeout: 10000,
+        },
+      );
+      expect(observed.status, observed.stderr).toBe(0);
+      return JSON.parse(observed.stdout) as {
+        outcome: string;
+        planHash: string;
+      };
+    };
+    let finish = (): void => {
+      throw new Error("wait not initialized");
+    };
+    let started = (): void => {
+      throw new Error("start not initialized");
+    };
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const ready = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const dispatch = vi.fn();
+    const original = runTeamworkCoordinator({
+      plan: raw,
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      host,
+      guard: {
+        acquire: guard.acquire,
+        release: async () => {
+          fs.unlinkSync(
+            batchReservationPath(bucket, plan.sessionId, plan.batchId),
+          );
+          clearForegroundWait(env.projectDir, plan);
+        },
+      },
+      config,
+      runtime: {
+        dispatch,
+        wait: async (context) => {
+          started();
+          await pending;
+          writeReport(env.taskRoot, context);
+          return { kind: "report", terminal: true };
+        },
+        continue: vi.fn(),
+      },
+    });
+    await ready;
+    const before = await readTeamworkEvents({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+    });
+    const log = vi.spyOn(console, "log").mockImplementation(vi.fn());
+    try {
+      const hook = spawnSync(
+        "python3",
+        [
+          path.resolve(
+            __dirname,
+            "../../src/templates/shared-hooks/guard-teamwork-wait.py",
+          ),
+        ],
+        {
+          encoding: "utf8",
+          input: JSON.stringify({
+            cwd: env.projectDir,
+            session_id: "recovery-fixture-owner",
+            tool_name: "Bash",
+            tool_input: {
+              command: `trellis teamwork reconcile ${file} --task ${env.taskRoot} --wait 1`,
+            },
+          }),
+        },
+      );
+      expect(hook.status, hook.stderr).toBe(0);
+      expect(hook.stdout).toBe("");
+      expect(nativeObserve()).toMatchObject({
+        outcome: "pending",
+        planHash: plan.planHash,
+      });
+      expect(
+        fs.existsSync(foregroundWaitFile(env.projectDir, plan) ?? ""),
+      ).toBe(true);
+      await Promise.all([
+        teamworkReconcile(file, { task: env.taskRoot, wait: "1" }),
+        teamworkReconcile(file, { task: env.taskRoot, wait: "1" }),
+      ]);
+      expect(JSON.parse(String(log.mock.calls.at(-1)?.[0]))).toMatchObject({
+        mode: "observe",
+        outcome: "pending",
+        state: "RUNNING",
+        planHash: plan.planHash,
+        deadline: plan.deadline,
+      });
+      expect(
+        await readTeamworkEvents({
+          sessionId: plan.sessionId,
+          cwd: env.projectDir,
+        }),
+      ).toEqual(before);
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      writeBatchReservation(bucket, {
+        schemaVersion: 1,
+        sessionId: plan.sessionId,
+        batchId: plan.batchId,
+        planHash: plan.planHash,
+        capacity: 1,
+        ownerPid: 99999999,
+      });
+      await teamworkReconcile(file, { task: env.taskRoot });
+      expect(JSON.parse(String(log.mock.calls.at(-1)?.[0]))).toMatchObject({
+        status: "blocked",
+        coordinatorRecoveryRequired: true,
+      });
+      await expect(
+        teamworkReconcile(file, {
+          task: env.taskRoot,
+          execute: true,
+          reason: "owner absent but provider exit unconfirmed",
+        }),
+      ).rejects.toThrow(/preserve its lease/);
+      expect(
+        await readTeamworkEvents({
+          sessionId: plan.sessionId,
+          cwd: env.projectDir,
+        }),
+      ).toEqual(before);
+      writeBatchReservation(bucket, {
+        schemaVersion: 1,
+        sessionId: plan.sessionId,
+        batchId: plan.batchId,
+        planHash: plan.planHash,
+        capacity: 1,
+        ownerPid: process.pid,
+      });
+      finish();
+      expect(await original).toMatchObject({ status: "AWAITING_REVIEW" });
+      expect(nativeObserve()).toMatchObject({
+        outcome: "settled",
+        planHash: plan.planHash,
+      });
+      expect(
+        fs.existsSync(foregroundWaitFile(env.projectDir, plan) ?? ""),
+      ).toBe(false);
+      await teamworkReconcile(file, { task: env.taskRoot, wait: "1" });
+      expect(JSON.parse(String(log.mock.calls.at(-1)?.[0]))).toMatchObject({
+        outcome: "settled",
+        receipt: { status: "AWAITING_REVIEW" },
+        result: {
+          semanticValidation: "not_run",
+          reports: [{ disposition: "pending" }],
+        },
+      });
+      expect(dispatch).toHaveBeenCalledTimes(1);
+    } finally {
+      finish();
+      await original;
+    }
+  });
+
+  it("previews and explicitly reconciles a dead coordinator still recorded RUNNING", async () => {
+    const raw = createPlan(env.taskRoot, ["work-a"]);
+    const plan = validateTeamworkPlan(raw, env.taskRoot);
+    const file = path.join(env.taskRoot, "plan.json");
+    fs.writeFileSync(file, JSON.stringify(raw));
+    for (const state of ["PREPARED", "VALIDATING_PLAN", "RUNNING"] as const)
+      await recordCoordinationEvent({
+        sessionId: plan.sessionId,
+        cwd: env.projectDir,
+        by: "main",
+        batchId: plan.batchId,
+        entity: "batch",
+        action: "state_transition",
+        state,
+        planHash: plan.planHash,
+        ...(state === "PREPARED" ? { payload: { effectiveCapacity: 1 } } : {}),
+      });
+    await recordCoordinationEvent({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+      by: "main",
+      batchId: plan.batchId,
+      entity: "assignment",
+      assignmentId: "work-a",
+      action: "state_transition",
+      state: "QUEUED",
+      planHash: plan.planHash,
+    });
+    const bucket = projectDir(
+      resolveTeamworkSession({ sessionId: plan.sessionId, cwd: env.projectDir })
+        .project,
+    );
+    writeBatchReservation(bucket, {
+      schemaVersion: 1,
+      sessionId: plan.sessionId,
+      batchId: plan.batchId,
+      planHash: plan.planHash,
+      capacity: 1,
+      ownerPid: 99999999,
+    });
+    const before = await readTeamworkEvents({
+      sessionId: plan.sessionId,
+      cwd: env.projectDir,
+    });
+    const log = vi.spyOn(console, "log").mockImplementation(vi.fn());
+    await teamworkReconcile(file, { task: env.taskRoot });
+    expect(JSON.parse(String(log.mock.calls.at(-1)?.[0]))).toMatchObject({
+      status: "ready",
+      coordinatorRecoveryRequired: true,
+    });
+    expect(
+      await readTeamworkEvents({
+        sessionId: plan.sessionId,
+        cwd: env.projectDir,
+      }),
+    ).toEqual(before);
+    await teamworkReconcile(file, {
+      task: env.taskRoot,
+      execute: true,
+      reason: "verified original owner exited before dispatch",
+    });
+    expect(JSON.parse(String(log.mock.calls.at(-1)?.[0]))).toMatchObject({
+      status: "SETTLED_WITH_FAILURE",
+    });
+    expect(
+      (
+        await readCoordinationState({
+          sessionId: plan.sessionId,
+          cwd: env.projectDir,
+        })
+      ).issues,
+    ).toEqual([]);
+  });
+
+  it("rejects invalid observation budgets and disposition combinations before reading a plan", async () => {
+    for (const wait of ["0", "61", "1.5", "01", "NaN", ""])
+      await expect(
+        teamworkReconcile("missing.json", { task: env.taskRoot, wait }),
+      ).rejects.toThrow(/1 to 60/);
+    for (const disposition of [
+      { execute: true },
+      { reason: "do not mutate" },
+      { confirmUnknownProcessExit: true },
+    ])
+      await expect(
+        teamworkReconcile("missing.json", {
+          task: env.taskRoot,
+          wait: "1",
+          ...disposition,
+        }),
+      ).rejects.toThrow(/cannot be combined/);
+  });
+
   it("requires associated exit evidence before retiring an uncertain batch", async () => {
     const raw = createPlan(env.taskRoot, ["work-a"], 0);
     const plan = validateTeamworkPlan(raw, env.taskRoot);
@@ -532,10 +836,12 @@ describe("TeamworkSession teammate coordinator", () => {
       execute: true,
       reason: "verified termination after recovery",
     });
-    const resolutions = (await readTeamworkEvents({
-      sessionId: plan.sessionId,
-      cwd: env.projectDir,
-    })).filter(
+    const resolutions = (
+      await readTeamworkEvents({
+        sessionId: plan.sessionId,
+        cwd: env.projectDir,
+      })
+    ).filter(
       (event) =>
         event.kind === "coordination" &&
         event.batchId === plan.batchId &&
@@ -575,10 +881,22 @@ describe("TeamworkSession teammate coordinator", () => {
         continue: vi.fn(),
       },
     });
-    const reviewedFile = path.join(env.taskRoot, "teammates/batch-1/work-a/attempts/work-a.attempt.0/report.json");
-    await reviewTeamworkReport({ plan: validateTeamworkPlan(raw, env.taskRoot), taskRoot: env.taskRoot,
-      cwd: env.projectDir, assignmentId: "work-a", decision: "accepted", reason: "Evidence accepted by main agent",
-      reportSha256: crypto.createHash("sha256").update(fs.readFileSync(reviewedFile)).digest("hex") });
+    const reviewedFile = path.join(
+      env.taskRoot,
+      "teammates/batch-1/work-a/attempts/work-a.attempt.0/report.json",
+    );
+    await reviewTeamworkReport({
+      plan: validateTeamworkPlan(raw, env.taskRoot),
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      assignmentId: "work-a",
+      decision: "accepted",
+      reason: "Evidence accepted by main agent",
+      reportSha256: crypto
+        .createHash("sha256")
+        .update(fs.readFileSync(reviewedFile))
+        .digest("hex"),
+    });
     const request = {
       planPath: file,
       cwd: env.projectDir,
@@ -1255,16 +1573,37 @@ describe("TeamworkSession teammate coordinator", () => {
     expect(dispatched.map((item) => item.attemptId)).toEqual([
       "work-a.attempt.0",
     ]);
-    const reportFile = path.join(env.taskRoot, "teammates/batch-1/work-a/attempts/work-a.attempt.0/report.json");
-    const review = { plan: validateTeamworkPlan(plan, env.taskRoot), taskRoot: env.taskRoot,
-      cwd: env.projectDir, assignmentId: "work-a", decision: "accepted" as const,
+    const reportFile = path.join(
+      env.taskRoot,
+      "teammates/batch-1/work-a/attempts/work-a.attempt.0/report.json",
+    );
+    const review = {
+      plan: validateTeamworkPlan(plan, env.taskRoot),
+      taskRoot: env.taskRoot,
+      cwd: env.projectDir,
+      assignmentId: "work-a",
+      decision: "accepted" as const,
       reason: "Main agent checked the evidence against all acceptance criteria",
-      reportSha256: crypto.createHash("sha256").update(fs.readFileSync(reportFile)).digest("hex") };
-    await expect(reviewTeamworkReport({ ...review, reportSha256: "0".repeat(64) })).rejects.toThrow(/digest/);
+      reportSha256: crypto
+        .createHash("sha256")
+        .update(fs.readFileSync(reportFile))
+        .digest("hex"),
+    };
+    await expect(
+      reviewTeamworkReport({ ...review, reportSha256: "0".repeat(64) }),
+    ).rejects.toThrow(/digest/);
     expect((await reviewTeamworkReport(review)).status).toBe("ALL_ACCEPTED");
     expect((await reviewTeamworkReport(review)).status).toBe("ALL_ACCEPTED");
-    const disposition = JSON.parse(fs.readFileSync(path.join(path.dirname(reportFile), "disposition.json"), "utf8"));
-    expect(disposition.review).toMatchObject({ plan_hash: review.plan.planHash, report_sha256: review.reportSha256 });
+    const disposition = JSON.parse(
+      fs.readFileSync(
+        path.join(path.dirname(reportFile), "disposition.json"),
+        "utf8",
+      ),
+    );
+    expect(disposition.review).toMatchObject({
+      plan_hash: review.plan.planHash,
+      report_sha256: review.reportSha256,
+    });
   });
 
   it("derives committee completion in the terminal batch receipt", async () => {
@@ -1299,12 +1638,30 @@ describe("TeamworkSession teammate coordinator", () => {
     ]);
     const validated = validateTeamworkPlan(plan, env.taskRoot);
     for (const [index, assignment] of validated.assignments.entries()) {
-      const reportFile = path.join(env.taskRoot, path.dirname(assignment.briefPath), "attempts", `${assignment.assignmentId}.attempt.0`, "report.json");
-      const reviewed = await reviewTeamworkReport({ plan: validated, taskRoot: env.taskRoot,
-        cwd: env.projectDir, assignmentId: assignment.assignmentId, decision: "accepted",
+      const reportFile = path.join(
+        env.taskRoot,
+        path.dirname(assignment.briefPath),
+        "attempts",
+        `${assignment.assignmentId}.attempt.0`,
+        "report.json",
+      );
+      const reviewed = await reviewTeamworkReport({
+        plan: validated,
+        taskRoot: env.taskRoot,
+        cwd: env.projectDir,
+        assignmentId: assignment.assignmentId,
+        decision: "accepted",
         reason: "All assigned criteria checked against report evidence",
-        reportSha256: crypto.createHash("sha256").update(fs.readFileSync(reportFile)).digest("hex") });
-      expect(reviewed.status).toBe(index === validated.assignments.length - 1 ? "ALL_ACCEPTED" : "AWAITING_REVIEW");
+        reportSha256: crypto
+          .createHash("sha256")
+          .update(fs.readFileSync(reportFile))
+          .digest("hex"),
+      });
+      expect(reviewed.status).toBe(
+        index === validated.assignments.length - 1
+          ? "ALL_ACCEPTED"
+          : "AWAITING_REVIEW",
+      );
     }
   });
 
@@ -1789,7 +2146,9 @@ describe("TeamworkSession teammate coordinator", () => {
         },
       },
     };
-    expect((await runTeamworkCoordinator(input)).status).toBe("AWAITING_REVIEW");
+    expect((await runTeamworkCoordinator(input)).status).toBe(
+      "AWAITING_REVIEW",
+    );
     await recordCoordinationEvent({
       sessionId: "parallel",
       cwd: env.projectDir,
@@ -1843,7 +2202,9 @@ describe("TeamworkSession teammate coordinator", () => {
         },
       },
     };
-    expect((await runTeamworkCoordinator(input)).status).toBe("AWAITING_REVIEW");
+    expect((await runTeamworkCoordinator(input)).status).toBe(
+      "AWAITING_REVIEW",
+    );
     await recordCoordinationEvent({
       sessionId: "parallel",
       cwd: env.projectDir,
@@ -1920,6 +2281,17 @@ describe("TeamworkSession teammate coordinator", () => {
       eventPath,
       `${lines.filter((line) => !receiptLines.includes(line)).join("\n")}\n`,
     );
+
+    const planFile = path.join(env.taskRoot, "plan.json");
+    fs.writeFileSync(planFile, JSON.stringify(plan));
+    const beforeObservation = fs.readFileSync(eventPath);
+    const log = vi.spyOn(console, "log").mockImplementation(vi.fn());
+    await teamworkReconcile(planFile, { task: env.taskRoot, wait: "1" });
+    expect(JSON.parse(String(log.mock.calls.at(-1)?.[0]))).toMatchObject({
+      outcome: "pending",
+      state: "AWAITING_REVIEW",
+    });
+    expect(fs.readFileSync(eventPath)).toEqual(beforeObservation);
 
     const recovered = await runTeamworkCoordinator(input);
 

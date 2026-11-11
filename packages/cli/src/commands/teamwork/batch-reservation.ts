@@ -34,17 +34,25 @@ export function readBatchReservations(bucket: string): BatchReservation[] {
   return fs
     .readdirSync(bucket)
     .filter((name) => name.endsWith(".batch-reservation.json"))
-    .map((name) => {
+    .flatMap((name) => {
       const file = path.join(bucket, name);
-      const stat = fs.lstatSync(file);
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096)
-        throw new Error(`invalid batch capacity reservation: ${file}`);
-      const value = schema.parse(JSON.parse(fs.readFileSync(file, "utf8")));
-      if (batchReservationPath(bucket, value.sessionId, value.batchId) !== file)
-        throw new Error(
-          `batch capacity reservation identity mismatch: ${file}`,
-        );
-      return value;
+      try {
+        const stat = fs.lstatSync(file);
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096)
+          throw new Error(`invalid batch capacity reservation: ${file}`);
+        const value = schema.parse(JSON.parse(fs.readFileSync(file, "utf8")));
+        if (
+          batchReservationPath(bucket, value.sessionId, value.batchId) !== file
+        )
+          throw new Error(
+            `batch capacity reservation identity mismatch: ${file}`,
+          );
+        return [value];
+      } catch (error) {
+        // A settling coordinator may remove its reservation after readdir.
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+        throw error;
+      }
     });
 }
 

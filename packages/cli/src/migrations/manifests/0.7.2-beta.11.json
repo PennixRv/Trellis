@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.11",
+  "description": "Project-neutral specs and safe shared AGENTS lifecycle operations",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Project-neutral spec generation and discovery; strict TRELLIS managed-block operations that preserve foreign content.",
+  "migrations": [],
+  "notes": "Historical compatibility entry added in 0.7.2-beta.12: the published beta.11 tarball and its source history contained no beta.11 manifest. This entry introduces no migration operations. Use native trellis update to refresh generated assets; preserve existing project specs and task bindings."
+}

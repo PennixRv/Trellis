@@ -1,0 +1,28 @@
+{
+  "id": "teamwork-wait-recovery-implementation",
+  "name": "teamwork-wait-recovery-implementation",
+  "title": "Teamwork 等待句柄丢失恢复实现",
+  "description": "承接根任务 teamwork-lost-wait-handle-recovery 已批准合同 v2，当前主会话直接完成原生观察、定位 Hook、异常退出桥接及连续发布部署；本地仅做组件归属记账，不另起规划或授权。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-11-11",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "root_task": "teamwork-lost-wait-handle-recovery"
+  }
+}

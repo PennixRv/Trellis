@@ -125,12 +125,32 @@ with `--confirm <preview-digest>` deletes those files; a changed preview or an
 unresolved reservation is rejected. Read and accept needed evidence before
 cleanup. Session removal alone does not delete task-owned attempt evidence.
 
+For a managed batch whose original host handle is unavailable, use
+`teamwork reconcile <original-plan> --task <task-dir> --wait 30`. The observation
+budget is an integer from 1 to 60 seconds, not an extension of the batch deadline.
+The JSON `mode: observe` result binds the original identity and deadline.
+`outcome: pending` permits another bounded observation; `settled` contains the
+durable receipt and the ordinary batch `result`, including report artifacts and
+pending semantic review. A terminal transition without its receipt stays pending.
+`reconciliation_required` directs explicit recovery; `blocked` describes missing
+proof. Observation never launches a provider, acquires execution capacity, writes
+coordination events, cancels the batch or accepts a report. Interrupting the
+observer only ends observation. Resume its own continuation if the host yields;
+if that handle is also lost, repeat the read-only observation. Do not search
+private host histories, disable hooks, replay batch or manually edit projections
+as the default recovery path. Old projections without locators still require the
+original plan/task; unknown identities cannot be reconstructed automatically.
+
 Use `teamwork reconcile <original-plan> --task <task-dir>` to preview recovery
 after coordinator loss. `--execute --reason <disposition>` only settles when
 native process-exit facts or process birth identity prove termination. A missing
 PID, absent report, or dead coordinator alone is insufficient. This command
 preserves accepted assignments and releases only the original batch's leases.
-It does not restart providers or accept task results.
+It does not restart providers or accept task results. When the original
+reservation proves the coordinator has exited, preview can describe recovery
+from RUNNING without writing a transition; explicit execute reuses the existing
+reconciliation bridge. A live or unverifiable owner cannot be taken over.
+`--wait` cannot be combined with execute, reason or unknown-exit confirmation.
 
 After a durable failed settlement and explicit bounded retry approval, construct
 `teamwork retry <original-plan> --task <task-dir> --output <new-plan> --batch <new-id>

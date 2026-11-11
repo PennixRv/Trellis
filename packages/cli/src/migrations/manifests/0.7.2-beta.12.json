@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.12",
+  "description": "Recover Teamwork observation without the original host wait handle",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Add bounded read-only reconcile --wait, guarded original-batch locators and explicit nonterminal recovery after verified coordinator exit. Preserve provider-exit proof, deadlines, capacity and report acceptance.",
+  "migrations": [],
+  "notes": "No migration operations. Upgrade the CLI and use native trellis update for managed projects so the Teamwork Skill and wait guard match the installed version. Legacy projections require explicit original plan/task inputs."
+}
