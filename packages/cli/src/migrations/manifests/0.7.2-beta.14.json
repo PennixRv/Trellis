@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.14",
+  "description": "Complete native execution retirement with same-path Reasonix replacement",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Retain the complete native execution removal and preflight owned Reasonix role-to-method replacement. Include the replacement fingerprint in the existing update and backup transaction so create-new cannot leave an active old role.",
+  "migrations": [],
+  "notes": "beta.13 was cancelled before npm publication and was not deployed. Upgrade to this fixed candidate, then use native trellis update for ownership-aware retirement. Existing modified or skipped retired assets continue to block before writes."
+}

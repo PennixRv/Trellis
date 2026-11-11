@@ -259,6 +259,18 @@ describe("update() integration", () => {
     expect(fs.existsSync(projectFile(role))).toBe(false);
   });
 
+  it("replaces the owned Reasonix native role with the ordinary check Skill", async () => {
+    await init({ yes: true, force: true, reasonix: true });
+    const check = ".reasonix/skills/trellis-check/SKILL.md";
+    stageVersionedUpgradeProject({ fromVersion: "0.7.2-beta.11", pristineTemplates: {
+      [check]: "---\nname: trellis-check\nrunAs: subagent\n---\nOld role\n",
+    } });
+    await update({ createNew: true, yes: true });
+    expect(readProjectFile(check)).not.toContain("runAs:");
+    expect(readProjectFile(check)).toContain("Quality");
+    expect(fs.existsSync(projectFile(`${check}.new`))).toBe(false);
+  });
+
   it.each(["modified", "skip"])("blocks %s retired assets before update writes", async (kind) => {
     await init({ yes: true, force: true, codex: true });
     const role = ".codex/agents/trellis-implement.toml";

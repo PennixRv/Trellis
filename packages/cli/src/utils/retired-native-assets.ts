@@ -19,6 +19,7 @@ const hookFiles = [
   ".github/copilot/hooks.json",
 ];
 const executionFiles = [
+  replacement,
   ...hookFiles,
   ".trellis/config.yaml",
   ".codex/config.toml",
@@ -162,6 +163,7 @@ export function planNativeRetirement(
       );
     }
     if (relative !== replacement) plan.deletions.push({ path: relative, hash });
+    else plan.originalHashes.set(relative, hash);
   }
   for (const relative of [
     ...hookFiles,

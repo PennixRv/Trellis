@@ -15,7 +15,7 @@ export function collectReasonixTemplates(): Map<string, string> {
   const ctx = config.templateContext;
   const files = new Map<string, string>();
 
-  // Workflow skills filtered to avoid collision with subagent skills.
+  // The ordinary check method shares its historical role path.
   const skills = resolveAllAsSkills(ctx);
 
   for (const [filePath, content] of collectSkillTemplates(

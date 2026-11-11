@@ -2259,7 +2259,10 @@ export async function update(options: UpdateOptions): Promise<void> {
       );
       for (const [relative, content] of nativeRetirement.edits) {
         templates.set(relative, content);
-        hashes[relative] = nativeRetirement.originalHashes.get(relative) ?? "";
+      }
+      for (const [relative, hash] of nativeRetirement.originalHashes) {
+        hashes[relative] = hash;
+        retirementHashes[relative] = hash;
       }
       assertNativeRetirementWrites(
         cwd,
