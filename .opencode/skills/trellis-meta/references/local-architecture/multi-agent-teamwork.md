@@ -1,5 +1,11 @@
 # Teamwork Runtime
 
+The mechanism is Trellis Teamwork (Trellis 团队协作); an executor is a Trellis
+teammate, plural Trellis teammates (Trellis 团队成员). Paseo-based-parallelism
+(Paseo 并行协作) and its Paseo delegated-agent (Paseo 委派 Agent) are separate.
+Sessions, worktrees, nodes, attempts and work packages keep their own meanings.
+Native commands, paths and protocol fields retain their exact identifiers.
+
 `trellis teamwork` provides durable coordination sessions and teammate processes. Its session lifecycle is independent of the Trellis task lifecycle and phase route. A session may be associated with a task, but it never owns task status, phase state, or phase acceptance.
 
 ## Local surfaces

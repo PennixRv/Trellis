@@ -17,6 +17,8 @@ Read the applicable spec indexes before editing code. The active phase breadcrum
 
 ## Route the current request
 
+After identifying the request and native phase, select only host-declared auxiliary Skills that fit the current problem. Direct matches need no router; unclear combinations or responsibilities may use an available workflow router. Do not preload all methods or require a particular optional collection. Reuse valid decisions and authorization, and return method results to the current request or phase.
+
 - New request: use `trellis-request-intake` to determine whether it changes the current goal, is independent work, or qualifies for the taskless route. Reuse existing authorization and evidence.
 - Task with no initialized route: inspect its current requirements, choose the applicable ordered phases with evidence for omissions, then initialize the route through task.py phase init.
 - Goal Exploration and Requirements Confirmation Phase: load `trellis-goal-exploration-and-requirements`. Do not leave until the user confirms the current requirements artifact revision.

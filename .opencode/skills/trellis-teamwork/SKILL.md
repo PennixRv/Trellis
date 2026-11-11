@@ -5,6 +5,12 @@ description: Use Trellis Teamwork for live multi-agent collaboration, Teamwork S
 
 # trellis-teamwork
 
+Mechanism: **Trellis Teamwork** (Trellis 团队协作). One executor is a
+**Trellis teammate**; plural **Trellis teammates** (Trellis 团队成员).
+**Paseo-based-parallelism** (Paseo 并行协作) and its **Paseo delegated-agent**
+(Paseo 委派 Agent) are a separate implementation mechanism and executor role.
+Sessions, worktrees, nodes and attempts retain their own object names.
+
 `trellis teamwork` is the local multi-agent collaboration runtime. A
 Teamwork Session is the persistent chat or forum object used by the runtime;
 it is independent from the Trellis task lifecycle and does not own business-phase progress.
@@ -52,6 +58,7 @@ trellis teamwork context list <session> --scope global --thread <thread>
 ## Core Rules
 
 - Teammates provide research, review, verification, evidence, and advice under a role contract; they do not implement product code. Coding tools or provider permission modes do not grant that role authority. Return results in the assigned format and let the coordinator review them.
+- Trellis teammates do not ask the user directly or require a user-question tool. Return missing input, limitations, unresolved choices or contract-valid blocked reports to the main agent; the main agent first resolves evidence and allocation before deciding whether a user choice is needed.
 - `general`, `advisor`, and `committee` are coordination modes, independent from profiles, providers, `run`, batch execution, and forum sessions. Read project defaults with `teamwork config`; construct a frozen plan with `teamwork plan` and execute it with `teamwork batch --task <task-dir>`.
 - For a managed batch, invoke one foreground `teamwork batch --json` command and wait for its receipt. The CLI owns FIFO admission, capacity, provider waits, retries, cancellation, report validation, and settlement; the main agent must not schedule per-assignment waits or retries.
 - If the host yields that call, silently continue its original handle. Do not emit repetitive progress, query status, start unrelated work, or create another batch. Host continuation is not CLI scheduling. Codex ships a native wait projection and PreToolUse guard for supported tool events; neither prevents model wake-ups or ordinary model messages. After a lost coordinator, use native `teamwork reconcile` and retain reservations until process exit is proven.

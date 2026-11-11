@@ -4,7 +4,7 @@
 
 实施阶段为 `blocked` 或 `waiting_user` 时，先解决阻塞并经原生 `phase resume` 恢复，再重新核验准入。`delegate-start` 核验父任务已有的 ownership 围栏和子任务状态；存在未消费交接、当前会话不符合已有 ownership 记录，或子任务已完成、取消时，不启动或复用委派执行。没有 ownership 记录的任务不具备默认会话独占保护。
 
-父授权有效后，用 `task.py delegate-bind <child>` 绑定子 PRD、角色、Git base、分支和结果路径，再用 `delegate-start` 启动。输入漂移须先核对是否仍在父授权范围内，再重新绑定。失联现场先用 `delegate-reconcile` 预览，证据充分时才显式 `--execute --reason ... --approval-ref ...` 核销，不能直接覆盖旧映射。
+父授权有效且本轮允许委派写入时，先加载 `trellis-worktree-delegation`，通过其原生新协议入口冻结明确目标、设置与能力要求，再准备、核验 ready、执行和观察。委派节点沿 `TRELLIS_DELEGATION_CONTEXT` 与共享节点方法执行本包，不进入主控阶段或新建任务。输入漂移先保全并核对授权；未知创建或发送只做原生 inspect 和显式 recover，不覆盖映射或重放。结果由 owner 审查并在目标分支 merge/FF，验证 ancestry 后再显式核销；idle/cancel 不替代 writer 停止证据。
 
 按合同的依赖和优先级选取当前工作包，实施满足目标的最小变更，并运行与风险和影响相称的局部验证。主工作树主代理核对来源、revision、Git 基线、差异和结果后接受工作包。多包任务按合同集成；单一交付不人为拆分。Trellis Teamwork 仅用于冻结计划下的只读比较或评议，不能改写任务状态或接受实施结果。实际写入委派依父任务规定使用 Trellis 受控入口与 Paseo；各组件源码仍在 owner 仓库内修改。
 
