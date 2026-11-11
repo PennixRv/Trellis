@@ -3,7 +3,7 @@
   "name": "remove-native-agent-dispatch",
   "title": "彻底移除旧原生子代理分发体系",
   "description": "按根任务 11-11-codex-native-subagent-policy-violations 已批准 design.md 实施；主会话直接修改源码、测试、文档、清理恢复及发布部署。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "cli",
@@ -11,7 +11,7 @@
   "creator": "penn",
   "assignee": "penn",
   "createdAt": "2026-11-11",
-  "completedAt": null,
+  "completedAt": "2026-11-11",
   "branch": "fix/remove-native-agent-dispatch",
   "base_branch": "v0.7.1",
   "worktree_path": null,
@@ -35,8 +35,8 @@
         "task_implementation",
         "delivery_review_and_closeout"
       ],
-      "current_phase_id": "task_implementation",
-      "input_revision": "5",
+      "current_phase_id": null,
+      "input_revision": "10",
       "phases": {
         "goal_exploration_and_requirements": {
           "status": "accepted",
@@ -91,28 +91,56 @@
           }
         },
         "task_implementation": {
-          "status": "active",
-          "input_revision": "5",
-          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-          "artifact_refs": [],
-          "result_revision": "0",
-          "result_ref": null,
-          "outcome_kind": null,
+          "status": "accepted",
+          "input_revision": "7",
+          "artifact_revision": "c64cf60e57cd853769b9488124a7ec5b9a62364166a575a2c26c54417aaa8d82",
+          "artifact_refs": [
+            "validation.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "validation.md",
+          "outcome_kind": "implementation_complete",
           "reason": null,
-          "evidence_refs": [],
-          "acceptance": null
+          "evidence_refs": [
+            "execution.md",
+            "validation.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "c64cf60e57cd853769b9488124a7ec5b9a62364166a575a2c26c54417aaa8d82",
+            "result_revision": "1",
+            "input_revision": "7",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "execution.md",
+              "validation.md"
+            ]
+          }
         },
         "delivery_review_and_closeout": {
-          "status": "not_started",
-          "input_revision": "1",
-          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-          "artifact_refs": [],
-          "result_revision": "0",
-          "result_ref": null,
-          "outcome_kind": null,
+          "status": "accepted",
+          "input_revision": "9",
+          "artifact_revision": "469a1931d881c7b0846dce2a1c0700da74c5a110e003a7d767f31c8edb3f15b2",
+          "artifact_refs": [
+            "closeout.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "closeout.md",
+          "outcome_kind": "delivery_ready",
           "reason": null,
-          "evidence_refs": [],
-          "acceptance": null
+          "evidence_refs": [
+            "validation.md",
+            "closeout.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "469a1931d881c7b0846dce2a1c0700da74c5a110e003a7d767f31c8edb3f15b2",
+            "result_revision": "1",
+            "input_revision": "9",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "validation.md",
+              "closeout.md"
+            ]
+          }
         }
       },
       "route_dependency_admission": null,
@@ -122,7 +150,7 @@
         "approval_ref": "execution.md",
         "task_route_revision": "1"
       },
-      "closeout_disposition": null,
+      "closeout_disposition": "delivery_ready",
       "skip_records": {
         "decision_space_construction_and_merging": {
           "reason": "根任务已完成决策并批准完整实施合同，组件记录原合同落地不重复构造决策空间",

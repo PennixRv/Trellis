@@ -166,7 +166,7 @@
     ".agents/skills/trellis-spec-bootstrap/references/spec-task-planning.md": "067935cdd0eb1b95ac58c57e0a197c6b59853c60069e6bf225344775904e32ee",
     ".agents/skills/trellis-spec-bootstrap/references/spec-writing.md": "7f0c1b6d6ea0b4010a938127cf4b69ca539313682cc1267e75ae7793685b393e",
     ".agents/skills/trellis-spec-bootstrap/SKILL.md": "97bfa68c06cebb558eb4464bc1b81f7d2d56040d75baa8de1ee5ad90cca0196a",
-    ".trellis/config.yaml": "a6fb9e06ad7d6c90c093ff4b074419be3a6c7b01452fec2af4c07ec3c78e37e2",
+    ".trellis/config.yaml": "f830232c201793f066a9acf020abdb60db63e8ab447583a49e30f26b060648af",
     ".trellis/scripts/common/cli_adapter.py": "803e11bffa01c8d28f06571cdcbc84fb5a4dfb8298cc21ab415ac6894c5f9476",
     ".claude/skills/trellis-break-loop/SKILL.md": "fa84b63c18fa4e13d9d13f7f0a20c9c0469953dde436eb97632c8c0ca3233bf3",
     ".cursor/skills/trellis-break-loop/SKILL.md": "fa84b63c18fa4e13d9d13f7f0a20c9c0469953dde436eb97632c8c0ca3233bf3",
