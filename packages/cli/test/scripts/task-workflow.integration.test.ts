@@ -977,6 +977,13 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
     fs.copyFileSync(
       path.resolve(
         __dirname,
+        "../../src/templates/trellis/agents/worktree-delegation-node.md",
+      ),
+      path.join(roleDir, "worktree-delegation-node.md"),
+    );
+    fs.copyFileSync(
+      path.resolve(
+        __dirname,
         "../../src/templates/trellis/agents/delegated-worktree-primary-agent.md",
       ),
       path.join(roleDir, "delegated-worktree-primary-agent.md"),
@@ -1014,7 +1021,8 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
         "--requirements-ref",
         "requirements.json",
       );
-    expect(bind().status).toBe(0);
+    const binding = bind();
+    expect(binding.status, binding.stderr).toBe(0);
     const bin = path.join(root, "fixture-bin");
     fs.mkdirSync(bin);
     fs.copyFileSync(
@@ -1164,6 +1172,10 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
         );
       fs.mkdirSync(path.dirname(role), { recursive: true });
       fs.writeFileSync(role, "stable role");
+      fs.writeFileSync(
+        path.join(path.dirname(role), "worktree-delegation-node.md"),
+        "stable node method",
+      );
       fs.writeFileSync(
         path.join(dir, "settings.json"),
         JSON.stringify({

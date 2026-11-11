@@ -68,7 +68,7 @@ export interface SupervisorView {
    */
   systemPromptFile?: string;
   cwd: string;
-  /** Codex-only: overrides the `thread/start` sandbox mode (default `workspace-write`). */
+  /** Codex-only: overrides the `thread/start` sandbox mode (default `danger-full-access`). */
   sandbox?: CodexSandboxMode;
 }
 

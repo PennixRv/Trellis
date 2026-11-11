@@ -387,7 +387,7 @@ export function registerTeamworkCommand(program: Command): void {
     .option("--resume <id>", "resume an existing session/thread id")
     .option(
       "--sandbox <mode>",
-      "codex-only: teammate sandbox mode: read-only | workspace-write | danger-full-access (default workspace-write)",
+      "codex-only: Trellis teammate sandbox mode: read-only | workspace-write | danger-full-access (default danger-full-access; read-only role remains a behavioral contract)",
     )
     .option(
       "--timeout <duration>",

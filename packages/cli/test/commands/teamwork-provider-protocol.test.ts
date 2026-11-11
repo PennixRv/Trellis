@@ -61,6 +61,42 @@ async function until(predicate: () => boolean): Promise<void> {
 
 describe("real provider transport contracts", () => {
   it.each(["copilot", "dsh"] as const)(
+    "%s keeps interim text in progress and only emits the terminal answer",
+    async (provider) => {
+      let completePrompt: ((result: unknown) => void) | undefined;
+      const fixture = wire((frame, reply) => {
+        if (frame.method === "initialize")
+          reply({ protocolVersion: 1, agentCapabilities: {}, authMethods: [] });
+        if (frame.method === "session/new") reply({ sessionId: "session-1", configOptions: [] });
+        if (frame.method === "session/prompt") completePrompt = reply;
+      });
+      const adapter = createAcpAdapter(provider);
+      const ctx = adapter.createCtx();
+      const results: ParseResult[] = [];
+      const lines = createInterface({ input: adapter.output?.(fixture.child, ctx) });
+      lines.on("line", (line) => results.push(adapter.parseLine(line, ctx)));
+      disposers.push(() => { ctx.connection?.close(); lines.close(); });
+      await adapter.handshake?.({ child: fixture.child, ctx, view: { cwd: "/project" } });
+      await adapter.deliverMessage?.("review", ctx, false);
+      await until(() => !!completePrompt);
+      const notify = (update: unknown): void => fixture.send({ jsonrpc: "2.0", method: "session/update",
+        params: { sessionId: "session-1", update } });
+      notify({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Checking the code." } });
+      notify({ sessionUpdate: "tool_call", toolCallId: "read-1", title: "Read source", kind: "read", status: "in_progress" });
+      notify({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: '{"answer":' } });
+      notify({ sessionUpdate: "tool_call_update", toolCallId: "read-1", status: "completed" });
+      notify({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: '"reviewed"}' } });
+      completePrompt?.({ stopReason: "end_turn" });
+      await until(() => results.some((r) => r.events.some((e) => e.kind === "done")));
+      const events = results.flatMap((r) => r.events);
+      expect(events.filter((e) => e.kind === "message")).toEqual([
+        { kind: "message", payload: { text: '{"answer":"reviewed"}' } },
+      ]);
+      expect(JSON.stringify(events.filter((e) => e.kind === "progress"))).toContain("Checking the code.");
+    },
+  );
+
+  it.each(["copilot", "dsh"] as const)(
     "%s uses SDK config negotiation and waits for cancellation confirmation",
     async (provider) => {
       let completePrompt: ((result: unknown) => void) | undefined;
@@ -125,7 +161,7 @@ describe("real provider transport contracts", () => {
         ctx,
         view: {
           cwd: "/project",
-          systemPrompt: "精确角色指令",
+          systemPrompt: "精确角色指令".repeat(60_000),
           model: "chosen",
           reasoningEffort: "xhigh",
         },
@@ -164,7 +200,7 @@ describe("real provider transport contracts", () => {
       expect(blocks).toEqual([
         {
           type: "text",
-          text: "精确角色指令",
+          text: "精确角色指令".repeat(60_000),
         },
         {
           type: "text",

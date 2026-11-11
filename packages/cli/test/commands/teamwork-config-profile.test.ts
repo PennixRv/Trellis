@@ -10,6 +10,8 @@ import {
 } from "../../src/commands/teamwork/teammate-config.js";
 import { resolveTeammateProfile } from "../../src/commands/teamwork/profiles.js";
 import { installTeammateAssets } from "../helpers/teammate-assets.js";
+import { createTeamworkSession } from "../../src/commands/teamwork/create.js";
+import { teamworkSessionSpawn } from "../../src/commands/teamwork/spawn.js";
 
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-profile-test-"));
@@ -61,6 +63,39 @@ function project() {
 }
 
 describe("TeamworkSession teammate config and profiles", () => {
+  it("rejects unsupported interactive options before creating a supervisor", async () => {
+    const root = project();
+    const previousRoot = process.env.TRELLIS_TEAMWORK_ROOT;
+    const previousProject = process.env.TRELLIS_TEAMWORK_PROJECT;
+    process.env.TRELLIS_TEAMWORK_ROOT = path.join(root, "sessions");
+    process.env.TRELLIS_TEAMWORK_PROJECT = "fixture";
+    try {
+      await createTeamworkSession("unsupported-options", { by: "main" });
+      await expect(
+        teamworkSessionSpawn("unsupported-options", {
+          cwd: root,
+          profile: "review",
+        }),
+      ).rejects.toThrow(/unsupported options: temperature, mode/);
+      const session = path.join(
+        root,
+        "sessions",
+        "fixture",
+        "unsupported-options",
+      );
+      expect(
+        fs.readdirSync(session).some((name) => name.endsWith(".pid")),
+      ).toBe(false);
+    } finally {
+      if (previousRoot === undefined) delete process.env.TRELLIS_TEAMWORK_ROOT;
+      else process.env.TRELLIS_TEAMWORK_ROOT = previousRoot;
+      if (previousProject === undefined)
+        delete process.env.TRELLIS_TEAMWORK_PROJECT;
+      else process.env.TRELLIS_TEAMWORK_PROJECT = previousProject;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("resolves one role, provider, model, profile and bounded options", () => {
     const root = project();
     const resolved = resolveTeammateProfile({ cwd: root, profile: "review" });

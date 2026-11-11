@@ -61,7 +61,7 @@ export interface SupervisorConfig {
   options?: Record<string, string | number | boolean>;
   /** Resume an existing session/thread if id is provided. */
   resume?: string;
-  /** Codex-only: overrides the `thread/start` sandbox mode (default `workspace-write`). */
+  /** Codex-only: overrides the `thread/start` sandbox mode (default `danger-full-access`). */
   sandbox?: CodexSandboxMode;
   /** Auto-kill the teammate process after this many ms (anti-zombie). */
   timeoutMs?: number;

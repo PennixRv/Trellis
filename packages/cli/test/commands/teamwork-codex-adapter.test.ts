@@ -13,6 +13,12 @@ function parse(line: Record<string, unknown>, ctx = createCodexCtx()) {
 }
 
 describe("Codex sessionId adapter", () => {
+  it("keeps a long role intact in the protocol payload", () => {
+    const role = "角色边界\n".repeat(60_000);
+    const params = buildCodexThreadStartParams("/tmp/proj", role);
+    expect(params.developerInstructions).toBe(role);
+  });
+
   it("classifies streamed commentary deltas by item phase", () => {
     const ctx = createCodexCtx();
     parse(

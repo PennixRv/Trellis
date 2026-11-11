@@ -3,7 +3,9 @@ name: trellis-worktree-delegation
 description: 在 Trellis 已授权实施阶段，把完整结果包交由同机 Paseo 独立工作树执行，管理绑定、准备、返工、恢复及 owner 集成；不用于 Teamwork 只读审查或普通研究。
 ---
 
-# 委派工作树协作
+# Paseo 并行协作（Paseo-based-parallelism）
+
+执行者称为 Paseo 委派 Agent（Paseo delegated-agent；复数 Paseo delegated-agents）。Trellis 团队协作（Trellis Teamwork）的执行者称为 Trellis 团队成员（Trellis teammate；复数 Trellis teammates）。两类机制、执行者和运行对象分别命名；本 Skill 的原生命名与 `task.py delegate-*` 命令保持不变。
 
 先读取 [操作合同](workflow.md)。此入口只编排已批准的完整工作包；任务阶段、授权和接受由主控 Trellis 维护，workspace、agent 和 provider thread 由 Paseo 维护。Teamwork 用于有界只读研究或审查，不获得源码实施权。
 

@@ -242,6 +242,8 @@ export function createAcpAdapter(
             update.sessionUpdate === "tool_call" ||
             update.sessionUpdate === "tool_call_update"
           ) {
+            // Text before a new tool call is progress, not the terminal report.
+            if (update.sessionUpdate === "tool_call") ctx.text = "";
             emit(ctx, {
               events: [{ kind: "progress", payload: { detail: update } }],
             });

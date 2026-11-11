@@ -3,7 +3,10 @@ import path from "node:path";
 import fs from "node:fs";
 
 import { getAdapter, type WorkerChild } from "./adapters/index.js";
-import type { TeammateHostCapabilities } from "./teammate-adapters.js";
+import {
+  CLI_PROVIDER_OPTIONS,
+  type TeammateHostCapabilities,
+} from "./teammate-adapters.js";
 import {
   TeamworkPolicyChangedError,
   type AttemptWaitResult,
@@ -28,7 +31,7 @@ export const CLI_TEAMMATE_HOST: TeammateHostCapabilities = {
   protectedArtifactWrites: true,
   attemptArtifactWrites: true,
   providerTransports: ["codex-app-server", "claude-cli", "acp"],
-  providerOptions: { codex: [], claude: [], copilot: [], dsh: [] },
+  providerOptions: CLI_PROVIDER_OPTIONS,
   verifiedHostCap: 32,
 };
 

@@ -10,6 +10,25 @@ paths:
 
 This spec records the current runtime contracts for `packages/cli/src/commands/teamwork/` and `packages/core/src/teamwork/`. The Core package owns reusable event, projection, storage, and coordination behavior. The CLI owns command parsing, provider adapters, process supervision, and terminal output. Keep the Core public surface in `packages/core/src/teamwork/index.ts` and the package subpath `@pennixrv/trellis-core/teamwork` aligned.
 
+## Collaboration terminology and role boundaries
+
+The mechanism is **Trellis Teamwork** (Trellis 团队协作); its executor is a
+**Trellis teammate**, plural **Trellis teammates** (Trellis 团队成员).
+**Paseo-based-parallelism** (Paseo 并行协作) is the separate worktree implementation
+mechanism; its executor is a **Paseo delegated-agent** (Paseo 委派 Agent).
+Keep mechanisms, executor instances, sessions, worktrees and attempts distinct.
+Provider names identify the execution host. Native commands, Skill names,
+paths and protocol identifiers retain their exact spelling.
+
+Trellis teammates return evidence, limitations and contract-valid unresolved or
+blocked reports to the main agent. They never ask the user directly or require
+a user-question tool. Paseo delegated-agents start from an authorized Phase 4
+implementation package; the main agent owns earlier decisions and Phase 5
+acceptance. Role restrictions are behavioral obligations, not sandbox claims.
+
+Interactive spawn/run and managed batch reject unsupported profile options
+using the same native adapter support set before starting a provider process.
+
 ## Command surface
 
 `registerTeamworkCommand` in `packages/cli/src/commands/teamwork/index.ts` registers these commands:

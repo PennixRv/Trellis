@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.10",
+  "description": "规范协作角色与宿主能力，冻结委派输入并保留安全控制",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Trellis Teamwork 与 Paseo-based-parallelism 使用一致的机制和执行者名称；委派绑定冻结准备、角色及节点方法，使用不可变 attempt 快照并拒绝输入漂移；退休后拒绝继续派发，授权失效仍允许受限安全控制；交互与 batch 共用 provider options 校验。",
+  "migrations": [],
+  "notes": "升级 CLI 后通过原生 trellis update 更新生成资产。已有不完整委派绑定不能静默续跑，须由 owner 处理旧 attempt 后重新绑定；不自动迁移运行态。角色只读义务不代表技术沙箱。"
+}

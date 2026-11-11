@@ -11,7 +11,7 @@ import subprocess
 import uuid
 from typing import NoReturn
 
-from .io import read_json_checked, write_json
+from .io import read_json_checked, write_json, write_text_atomic
 from .paths import get_repo_root
 
 MAX_BYTES = 256 * 1024
@@ -72,7 +72,7 @@ def identity(root: Path) -> dict:
     return {"checkout": str(root), "common_dir": str(Path(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir")).resolve())}
 
 
-def task_inputs(child_dir: Path):
+def task_inputs(child_dir: Path, *, require_authorization: bool = True):
     from .task_workflow import _load, _task_dir, _state, implementation_start_ready, TaskWorkflowError
     from .task_continuity import assert_task_mutation_allowed
     child, _ = _load(child_dir)
@@ -86,18 +86,20 @@ def task_inputs(child_dir: Path):
         fail("child links or lifecycle are invalid")
     assert_task_mutation_allowed(get_repo_root(), parent_dir, parent)
     assert_task_mutation_allowed(get_repo_root(), child_dir, child)
-    if parent.get("status") != "in_progress" or not implementation_start_ready(parent, parent_dir):
+    if require_authorization and (parent.get("status") != "in_progress" or not implementation_start_ready(parent, parent_dir)):
         raise TaskWorkflowError("TASK_DELEGATE_IMPLEMENTATION_NOT_AUTHORIZED", "current parent implementation authorization required")
     return child, parent, _state(meta), parent_dir
 
 
 def file_ref(task_dir: Path, ref: str) -> Path:
+    if not isinstance(ref, str) or not ref or Path(ref).is_absolute():
+        fail("metadata reference must be a nonempty relative path")
     path = task_dir / ref
     try:
         path.resolve(strict=True).relative_to(task_dir.resolve())
     except (ValueError, OSError):
         fail("metadata reference must stay in the child task")
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_BYTES:
+    if path.resolve() != path.absolute() or not path.is_file() or path.stat().st_size > MAX_BYTES:
         fail("metadata reference must be a bounded regular file")
     return path
 
@@ -121,7 +123,7 @@ def freeze(root: Path, child_dir: Path, target: Path, branch: str | None, integr
             fail(f"requirements {key} must contain nonempty strings")
     if requirements.get("teamwork_permission", "none") not in {"none", "read_only"}:
         fail("Teamwork may only be absent or read_only")
-    if requirements.get("setup_ref"):
+    if "setup_ref" in requirements:
         file_ref(child_dir, requirements["setup_ref"])
     if not isinstance(branch, str) or not branch:
         fail("child execution branch must be set through the native task interface")
@@ -133,11 +135,10 @@ def freeze(root: Path, child_dir: Path, target: Path, branch: str | None, integr
         fail("execution branch must differ from integration branch")
     base = base_commit or git(target, "rev-parse", "--verify", "--end-of-options", f"{integration}^{{commit}}")
     git(target, "merge-base", "--is-ancestor", base, integration)
-    role = root / ".trellis/agents/delegated-worktree-primary-agent.md"
-    if not role.is_file() or role.is_symlink() or role.stat().st_size > MAX_BYTES:
-        fail("current bundled stable role is missing; update project assets")
+    role = file_ref(root, ".trellis/agents/delegated-worktree-primary-agent.md")
+    node_method = file_ref(root, ".trellis/agents/worktree-delegation-node.md")
     authorization = state["implementation_authorization"]
-    binding = {"format_version": 1, "parent_task_id": parent["id"], "child_task_id": child["id"], "parent_route_revision": state["task_route_revision"], "parent_contract_revision": authorization["contract_revision"], "approval_ref": authorization["approval_ref"], "target_locator": str(target), "integration_branch": integration, "execution_branch": branch, "base_commit": base, "contract_sha256": digest(file_ref(child_dir, "prd.md").read_bytes()), "role_sha256": digest(role.read_bytes()), "settings_sha256": digest(settings_path.read_bytes()), "requirements_sha256": digest(requirements_path.read_bytes()), "settings_ref": settings_ref, "requirements_ref": requirements_ref}
+    binding = {"format_version": 2, "parent_task_id": parent["id"], "child_task_id": child["id"], "parent_route_revision": state["task_route_revision"], "parent_contract_revision": authorization["contract_revision"], "approval_ref": authorization["approval_ref"], "target_locator": str(target), "integration_branch": integration, "execution_branch": branch, "base_commit": base, "contract_sha256": digest(file_ref(child_dir, "prd.md").read_bytes()), "role_sha256": digest(role.read_bytes()), "node_method_sha256": digest(node_method.read_bytes()), "setup_sha256": digest(file_ref(child_dir, requirements["setup_ref"]).read_bytes()) if requirements.get("setup_ref") else None, "settings_sha256": digest(settings_path.read_bytes()), "requirements_sha256": digest(requirements_path.read_bytes()), "settings_ref": settings_ref, "requirements_ref": requirements_ref}
     binding["binding_revision"] = digest(binding)
     return {"binding": binding, "target_identity": target_identity, "settings": settings, "requirements": requirements}
 
@@ -167,10 +168,17 @@ def adapter(record: dict, operation: str, payload: dict):
     return observed
 
 
-def current(root: Path, child_dir: Path) -> tuple[dict, Path]:
+def current(root: Path, child_dir: Path, *, require_authorization: bool = True) -> tuple[dict, Path]:
     path = runtime_path(root, child_dir.name)
     record = read(path)
     b = record["binding"]
+    if not require_authorization:
+        child, parent, _, _ = task_inputs(child_dir, require_authorization=False)
+        if record.get("control_project_id") != digest(str(root).encode()) or b.get("parent_task_id") != parent["id"] or b.get("child_task_id") != child["id"] or b.get("binding_revision") != digest({k: v for k, v in b.items() if k != "binding_revision"}) or identity(Path(b["target_locator"])) != record.get("target_identity"):
+            fail("existing controller/target binding identity does not match; preserve resources")
+        return record, path
+    if b.get("format_version") != 2:
+        fail("incomplete legacy binding; inspect/interrupt and retain the old attempt before rebinding")
     frozen = freeze(root, child_dir, Path(b["target_locator"]), b["execution_branch"], b["integration_branch"], b["settings_ref"], b["requirements_ref"], b["base_commit"])
     if frozen != {k: record[k] for k in frozen}:
         fail("frozen input or target identity changed; preserve current attempt and rebind only after closure")
@@ -188,7 +196,28 @@ def assert_worktree(record: dict):
 
 def projection(root: Path, child_dir: Path, record: dict, path: Path):
     b = record["binding"]
-    context = {"version": 1, "control_root": str(root), "control_task": str(child_dir), "record_ref": str(path), "attempt_id": record["attempt_id"], "binding_revision": b["binding_revision"], "binding": b, "workspace_id": record.get("workspace_id"), "agent_id": record.get("agent_id"), "target": record.get("worktree_path"), "execution_permission": record.get("execution_permission", "preparation"), "role_ref": str(root / ".trellis/agents/delegated-worktree-primary-agent.md"), "contract_ref": str(child_dir / "prd.md"), "requirements": record["requirements"], "settings": record["settings"], "node_method_ref": str(root / ".trellis/agents/worktree-delegation-node.md"), "ready_path": str(Path(record["worktree_path"]) / ".trellis-delegation" / record["attempt_id"] / "ready.json"), "result_path": str(Path(record["worktree_path"]) / ".trellis-delegation" / record["attempt_id"] / "result.json")}
+    sources = {"role": file_ref(root, ".trellis/agents/delegated-worktree-primary-agent.md"), "node_method": file_ref(root, ".trellis/agents/worktree-delegation-node.md"), "contract": file_ref(child_dir, "prd.md")}
+    if record["requirements"].get("setup_ref"):
+        sources["setup"] = file_ref(child_dir, record["requirements"]["setup_ref"])
+    if b.get("format_version") != 2 or not SAFE_ID.fullmatch(record["attempt_id"]):
+        fail("complete frozen binding and safe attempt identity required")
+    snapshots = {}
+    directory = path.parent / "inputs" / record["attempt_id"]
+    if directory.resolve() != directory.absolute():
+        fail("redirected frozen input directory")
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, source in sources.items():
+        content = source.read_bytes()
+        if len(content) > MAX_BYTES or digest(content) != b[f"{name}_sha256"]:
+            fail("approved source input changed before projection; preserve the attempt")
+        snapshot = directory / f"{name}.md"
+        if snapshot.exists() or snapshot.is_symlink():
+            if snapshot.is_symlink() or not snapshot.is_file() or snapshot.stat().st_size > MAX_BYTES or digest(snapshot.read_bytes()) != b[f"{name}_sha256"]:
+                fail("frozen input snapshot changed; preserve the attempt")
+        elif not write_text_atomic(snapshot, content.decode("utf8"), newline=""):
+            fail("could not save frozen input snapshot")
+        snapshots[f"{name}_ref"] = str(snapshot)
+    context = {"version": 1, "control_root": str(root), "control_task": str(child_dir), "record_ref": str(path), "attempt_id": record["attempt_id"], "binding_revision": b["binding_revision"], "binding": b, "workspace_id": record.get("workspace_id"), "agent_id": record.get("agent_id"), "target": record.get("worktree_path"), "execution_permission": record.get("execution_permission", "preparation"), **snapshots, "requirements": record["requirements"], "settings": record["settings"], "ready_path": str(Path(record["worktree_path"]) / ".trellis-delegation" / record["attempt_id"] / "ready.json"), "result_path": str(Path(record["worktree_path"]) / ".trellis-delegation" / record["attempt_id"] / "result.json")}
     save(path.with_name("context.json"), context)
     return path.with_name("context.json")
 
@@ -239,7 +268,7 @@ def clean_result(record: dict, result: dict):
 
 def prepare_agent(root: Path, child_dir: Path, record: dict, path: Path):
     context = projection(root, child_dir, record, path)
-    role = (root / ".trellis/agents/delegated-worktree-primary-agent.md").read_text(encoding="utf8")
+    role = Path(read(context)["role_ref"]).read_text(encoding="utf8")
     if role.startswith("---\n"):
         role = role.split("\n---\n", 1)[1].lstrip("\n")
     codegraph = "codegraph" in record["requirements"].get("required_tools", [])
@@ -356,13 +385,14 @@ def run(args):
                 save(path.with_name(f"retired-{previous['attempt_id']}.json"), previous)
             save(path, record)
         else:
-            _, _, state, _ = task_inputs(child_dir)
+            safety_control = operation in {"inspect", "observe", "interrupt"} or (operation == "reconcile" and not args.recover and args.disposition == "retained")
+            _, _, state, _ = task_inputs(child_dir, require_authorization=not safety_control)
             if operation == "start":
                 admission = state.get("route_dependency_admission") or {}
                 if admission.get("admission_state") != "ready":
                     from .task_workflow import TaskWorkflowError
                     raise TaskWorkflowError("TASK_DELEGATE_ADMISSION_REQUIRED", "current route dependency admission is not ready")
-            record, path = current(root, child_dir)
+            record, path = current(root, child_dir, require_authorization=not safety_control)
             b = record["binding"]
             if operation == "start":
                 if record["status"] == "workspace_created" and not record.get("intent"):
@@ -427,6 +457,8 @@ def run(args):
                 print(json.dumps({"record": record, "observations": observations, "candidates": reports}, ensure_ascii=False))
                 return 0
             elif operation in {"execute", "followup"}:
+                if record.get("status") != "running" or not record.get("agent_id") or not record.get("workspace_id"):
+                    fail("execute/followup requires a current running attempt; retired attempts cannot send")
                 if record.get("intent"):
                     fail("prior creation/send outcome unresolved; inspect and reconcile first")
                 observed = adapter(record, "observe", {"agent_id": record["agent_id"], "cwd": record["worktree_path"]})["agent"]
@@ -508,7 +540,22 @@ def node_context() -> dict | None:
     auth = state.get("implementation_authorization") or {}
     if parent.get("status") != "in_progress" or state.get("current_phase_id") != "task_implementation" or state.get("task_route_revision") != b["parent_route_revision"] or auth.get("contract_revision") != b["parent_contract_revision"]:
         fail("parent authorization changed; stop delegated implementation")
-    for ref, key in [("prd.md", "contract_sha256"), (b["settings_ref"], "settings_sha256"), (b["requirements_ref"], "requirements_sha256")]:
-        if digest(file_ref(control, ref).read_bytes()) != b[key]:
+    from .task_workflow import implementation_start_ready
+    if not implementation_start_ready(parent, parent_dir):
+        fail("parent implementation contract is no longer current")
+    if b.get("format_version") != 2:
+        fail("incomplete legacy binding; stop and ask the controller to retain/rebind")
+    inputs = [(control, "prd.md", "contract"), (control, b["settings_ref"], "settings"), (control, b["requirements_ref"], "requirements"), (Path(context["control_root"]), ".trellis/agents/delegated-worktree-primary-agent.md", "role"), (Path(context["control_root"]), ".trellis/agents/worktree-delegation-node.md", "node_method")]
+    if record["requirements"].get("setup_ref"):
+        inputs.append((control, record["requirements"]["setup_ref"], "setup"))
+    for directory, ref, name in inputs:
+        key = f"{name}_sha256"
+        if digest(file_ref(directory, ref).read_bytes()) != b[key]:
             fail("delegated input changed; wait for controller revalidation")
+        if name not in {"settings", "requirements"}:
+            expected = Path(context["record_ref"]).parent / "inputs" / record["attempt_id"] / f"{name}.md"
+            if context.get(f"{name}_ref") != str(expected) or digest(file_ref(expected.parent, expected.name).read_bytes()) != b[key]:
+                fail("delegated frozen snapshot is missing, redirected or stale")
+    if context.get("requirements") != record["requirements"] or context.get("settings") != record["settings"]:
+        fail("delegated inline inputs are stale")
     return context

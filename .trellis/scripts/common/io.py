@@ -136,7 +136,7 @@ def write_json(path: Path, data: dict) -> bool:
     return write_text_atomic(path, json.dumps(data, indent=2, ensure_ascii=False))
 
 
-def write_text_atomic(path: Path, text: str) -> bool:
+def write_text_atomic(path: Path, text: str, *, newline: str | None = None) -> bool:
     """Write text to a file atomically (temp in same dir, then replace).
 
     The same never-truncate-in-place guarantee as :func:`write_json`, for the
@@ -155,7 +155,7 @@ def write_text_atomic(path: Path, text: str) -> bool:
 
     try:
         try:
-            f = os.fdopen(fd, "w", encoding="utf-8")
+            f = os.fdopen(fd, "w", encoding="utf-8", newline=newline)
         except OSError:
             # fdopen never took ownership of fd; close it ourselves.
             os.close(fd)

@@ -9,6 +9,7 @@ import { loadAgent } from "./agent-loader.js";
 import { resolveTeammateProfile, type ReasoningEffort } from "./profiles.js";
 import type { CodexSandboxMode } from "./adapters/codex.js";
 import type { Provider } from "./adapters/index.js";
+import { assertTeammateProviderOptions } from "./teammate-adapters.js";
 import { assembleContext } from "./context-loader.js";
 import { buildTeamworkInstructions } from "./prompt.js";
 import { resolveTrustedRoots } from "./context-trust.js";
@@ -129,6 +130,8 @@ function resolveSpawn(sessionId: string, opts: SpawnOptions): ResolvedSpawn {
   if (!as) {
     throw new Error("Missing --as (no agent name to fall back to)");
   }
+
+  assertTeammateProviderOptions(provider, options);
 
   const context = assembleContext(cwd, opts.files, opts.jsonls, trustedRoots);
   const systemPrompt = buildSystemPrompt(sessionId, as, agentBody);

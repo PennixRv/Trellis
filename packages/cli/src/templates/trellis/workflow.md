@@ -7,6 +7,17 @@
 3. 采用满足任务风险和验收需要的最小流程。可以基于证据跳过阶段；目标清楚、责任方单一、范围封闭、风险受控、已获授权、能在当前会话立即验证且不需要持久路线、协调、设计、审查、发布、安装、迁移或外部交付的请求可以不创建 Trellis task。不可逆动作还必须有精确对象核验、可接受的恢复或损失边界和停止条件；用户授权不是唯一充分条件。
 4. 在任务资产中记录决定和当前证据。不得从阶段状态、Teamwork 结果或会话交接状态推断任务状态。
 
+## 协作机制与执行者命名
+
+| 机制英文名 | 机制中文名 | 执行者英文名 | 执行者中文名 |
+| --- | --- | --- | --- |
+| Trellis Teamwork | Trellis 团队协作 | Trellis teammate；复数 Trellis teammates | Trellis 团队成员 |
+| Paseo-based-parallelism | Paseo 并行协作 | Paseo delegated-agent；复数 Paseo delegated-agents | Paseo 委派 Agent |
+
+首次出现或跨机制比较时使用全称，语境唯一时可简称“团队协作／团队成员”“并行协作／委派 Agent”。机制、执行者、session、工作树、节点、attempt 和工作包分别指其实际对象；provider 表示执行宿主，不替代机制名称。Paseo 并行协作允许只有一个执行者。命令、Skill 名称、路径、配置键和协议字段保留原生字面，例如 `trellis teamwork` 与 `trellis-worktree-delegation`。
+
+Trellis 团队成员接收主 Agent 已明确的只读工作包；Paseo 委派 Agent 接收已授权第四阶段的实施工作包，不重跑前三阶段，也不主持第五阶段的最终接受。两类执行者不直接询问用户，不以用户提问工具作为必需能力；缺项、限制、范围外选择或阻塞通过各自原生报告返回主 Agent，由主 Agent 先补证、调整分工，确有用户取舍时再提问。
+
 ## Trellis 项目上下文
 
 ### 按需采用辅助方法

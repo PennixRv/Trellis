@@ -38,6 +38,7 @@ class Delegation(unittest.TestCase):
         role = self.root / ".trellis/agents/delegated-worktree-primary-agent.md"
         role.parent.mkdir(parents=True)
         role.write_text("stable role\n")
+        role.with_name("worktree-delegation-node.md").write_text("stable node method\n")
         self.auth = {"task_route_revision": "1", "implementation_authorization": {"contract_revision": "approved", "approval_ref": "approval.md"}}
         self.inputs = patch.object(d, "task_inputs", return_value=({"id": "child"}, {"id": "parent"}, self.auth, self.child.parent))
         self.inputs.start()
@@ -50,7 +51,7 @@ class Delegation(unittest.TestCase):
         record = d.freeze(self.root, self.child, self.target, "node-branch", "main", "settings.json", "requirements.json")
         tree = self.root / "execution"
         self.git("worktree", "add", "-b", "node-branch", str(tree), "HEAD")
-        record.update({"attempt_id": "a" * 32, "workspace_id": "workspace", "agent_id": "agent", "worktree_path": str(tree), "status": "running", "control_project_id": "control", "execution_permission": "preparation"})
+        record.update({"attempt_id": "a" * 32, "workspace_id": "workspace", "agent_id": "agent", "worktree_path": str(tree), "status": "running", "control_project_id": d.digest(str(self.root).encode()), "execution_permission": "preparation"})
         return record
 
     def report(self, record, kind="result"):
@@ -82,6 +83,122 @@ class Delegation(unittest.TestCase):
         with self.assertRaises(TaskWorkflowError):
             d.candidate(record, "result")
 
+    def test_freezes_setup_role_and_node_method_and_rejects_live_drift(self):
+        setup = self.child / "setup.md"
+        setup.write_bytes(b"approved preparation\r\n")
+        requirements = json.loads((self.child / "requirements.json").read_text())
+        requirements["setup_ref"] = setup.name
+        (self.child / "requirements.json").write_text(json.dumps(requirements))
+        record = self.record()
+        path = d.runtime_path(self.root, self.child.name)
+        d.save(path, record)
+        context = d.read(d.projection(self.root, self.child, record, path))
+        self.assertEqual(Path(context["setup_ref"]).read_bytes(), setup.read_bytes())
+        for name, source in [("setup", setup), ("role", self.root / ".trellis/agents/delegated-worktree-primary-agent.md"), ("node_method", self.root / ".trellis/agents/worktree-delegation-node.md")]:
+            with self.subTest(input=name):
+                original = source.read_bytes()
+                self.assertEqual(Path(context[f"{name}_ref"]).read_bytes(), original)
+                self.assertNotEqual(context[f"{name}_ref"], str(source))
+                source.write_text("changed input\n")
+                changed = d.freeze(self.root, self.child, self.target, "node-branch", "main", "settings.json", "requirements.json")
+                self.assertNotEqual(changed["binding"]["binding_revision"], record["binding"]["binding_revision"])
+                with self.assertRaises(TaskWorkflowError):
+                    d.current(self.root, self.child)
+                with patch.object(d, "adapter") as native, self.assertRaises(TaskWorkflowError):
+                    d.prepare_agent(self.root, self.child, record, path)
+                native.assert_not_called()
+                self.assertEqual(Path(context[f"{name}_ref"]).read_bytes(), original)
+                source.write_bytes(original)
+        Path(context["node_method_ref"]).write_text("tampered snapshot")
+        with self.assertRaises(TaskWorkflowError):
+            d.projection(self.root, self.child, record, path)
+
+    def test_rejects_missing_oversized_redirected_and_legacy_inputs(self):
+        directory = self.child / "real"
+        directory.mkdir()
+        (directory / "setup.md").write_text("setup")
+        (self.child / "alias").symlink_to(directory, target_is_directory=True)
+        for ref in ["missing.md", "alias/setup.md", str(directory / "setup.md"), 42]:
+            with self.subTest(ref=ref), self.assertRaises(TaskWorkflowError):
+                d.file_ref(self.child, ref)
+        (directory / "setup.md").write_bytes(b"x" * (d.MAX_BYTES + 1))
+        with self.assertRaises(TaskWorkflowError):
+            d.file_ref(self.child, "real/setup.md")
+        record = self.record()
+        record["binding"]["format_version"] = 1
+        d.save(d.runtime_path(self.root, self.child.name), record)
+        with self.assertRaises(TaskWorkflowError):
+            d.current(self.root, self.child)
+
+    def test_retired_execute_and_followup_never_reach_adapter(self):
+        record = self.record()
+        record["status"] = "retired"
+        d.save(d.runtime_path(self.root, self.child.name), record)
+        for operation in ["execute", "followup"]:
+            args = argparse.Namespace(command=f"delegate-{operation}", child_task=str(self.child))
+            with self.subTest(operation=operation), patch.object(d, "get_repo_root", return_value=self.root), patch("common.task_workflow.get_repo_root", return_value=self.root), patch("common.task_workflow._task_dir", return_value=self.child), patch.object(d, "adapter") as native, self.assertRaises(TaskWorkflowError):
+                d.run(args)
+            native.assert_not_called()
+
+    def test_node_rechecks_live_inputs_and_frozen_snapshot_before_work(self):
+        record = self.record()
+        path = d.runtime_path(self.root, self.child.name)
+        d.save(path, record)
+        context_path = d.projection(self.root, self.child, record, path)
+        parent = self.root / ".trellis/tasks/in_progress/11-09-parent"
+        parent.mkdir(parents=True)
+        state = {**self.auth, "current_phase_id": "task_implementation"}
+        d.save(parent / "task.json", {"id": "parent", "status": "in_progress", "meta": {"task_workflow": state}})
+        d.save(self.child / "task.json", {"id": "child", "parent": str(parent)})
+        with patch.dict(os.environ, {"TRELLIS_DELEGATION_CONTEXT": str(context_path), "PASEO_AGENT_ID": "agent"}), patch.object(Path, "cwd", return_value=Path(record["worktree_path"])), patch("common.task_workflow.implementation_start_ready", return_value=True):
+            self.assertEqual(d.node_context()["attempt_id"], record["attempt_id"])
+            for name in ["role", "node_method"]:
+                source = self.root / ".trellis/agents" / ("delegated-worktree-primary-agent.md" if name == "role" else "worktree-delegation-node.md")
+                original = source.read_text()
+                source.write_text("updated project assets")
+                with self.subTest(input=name), self.assertRaises(TaskWorkflowError):
+                    d.node_context()
+                source.write_text(original)
+            context = d.read(context_path)
+            Path(context["node_method_ref"]).write_text("modified snapshot")
+            with self.assertRaises(TaskWorkflowError):
+                d.node_context()
+
+    def test_revoked_authorization_allows_only_bound_safety_controls(self):
+        record = self.record()
+        record["execution_permission"] = "implementation"
+        path = d.runtime_path(self.root, self.child.name)
+        d.save(path, record)
+        # Drift must block new work without preventing cancellation/preservation.
+        (self.child / "prd.md").write_text("revised contract")
+        (self.child / "writer.md").write_text("controller verified background writers stopped")
+        child = {"id": "child", "parent": "parent", "status": "planning"}
+        parent = {"id": "parent", "status": "in_progress", "children": [self.child.name]}
+        state = {**self.auth, "implementation_authorization": None}
+        observation = {"agent": {"id": "agent", "activeTurn": None, "status": "idle"}}
+        self.inputs.stop()
+        try:
+            with patch.object(d, "get_repo_root", return_value=self.root), patch("common.task_workflow.get_repo_root", return_value=self.root), patch("common.task_workflow._task_dir", side_effect=lambda p: self.child if str(p) == str(self.child) else self.child.parent / "parent"), patch("common.task_workflow._load", side_effect=lambda p: (child, {}) if p == self.child else (parent, {})), patch("common.task_workflow._state", return_value=state), patch("common.task_workflow.implementation_start_ready", return_value=False), patch("common.task_continuity.assert_task_mutation_allowed"), contextlib.redirect_stdout(io.StringIO()):
+                for operation in ["inspect", "interrupt", "reconcile"]:
+                    args = argparse.Namespace(command=f"delegate-{operation}", child_task=str(self.child), recover=False, disposition="retained", execute=True, reason="preserve revoked work", approval_ref="existing approval", writer_evidence_ref="writer.md")
+                    with self.subTest(operation=operation), patch.object(d, "adapter", return_value=observation) as native:
+                        self.assertEqual(d.run(args), 0)
+                        self.assertTrue(native.called)
+                self.assertEqual(d.read(path)["status"], "retired")
+                self.assertEqual(d.read(path)["execution_permission"], "implementation")
+                for operation in ["start", "execute", "followup"]:
+                    args = argparse.Namespace(command=f"delegate-{operation}", child_task=str(self.child))
+                    with self.subTest(operation=operation), patch.object(d, "adapter") as native, self.assertRaises(TaskWorkflowError):
+                        d.run(args)
+                    native.assert_not_called()
+                for recover, disposition in [(True, "retained"), (False, "integrated")]:
+                    args = argparse.Namespace(command="delegate-reconcile", child_task=str(self.child), recover=recover, disposition=disposition)
+                    with patch.object(d, "adapter") as native, self.assertRaises(TaskWorkflowError):
+                        d.run(args)
+                    native.assert_not_called()
+        finally:
+            self.inputs.start()
+
     def test_result_requires_real_commits_scope_and_clean_source(self):
         record = self.record()
         report = self.report(record)
@@ -103,7 +220,7 @@ class Delegation(unittest.TestCase):
         record = self.record()
         record.update(intent="prepare-agent", status="workspace_created")
         record.pop("agent_id")
-        observation = {"workspaces": [{"id": "workspace", "workspaceDirectory": record["worktree_path"]}], "agents": [{"id": "agent", "workspaceId": "workspace", "cwd": record["worktree_path"], "labels": {"trellis.attempt": record["attempt_id"], "trellis.control": "control"}}]}
+        observation = {"workspaces": [{"id": "workspace", "workspaceDirectory": record["worktree_path"]}], "agents": [{"id": "agent", "workspaceId": "workspace", "cwd": record["worktree_path"], "labels": {"trellis.attempt": record["attempt_id"], "trellis.control": record["control_project_id"]}}]}
         args = argparse.Namespace(workspace_id="workspace", agent_id="agent", delivery_evidence_ref=None, execute=True, reason="native exact mapping verified", approval_ref="existing approval")
         path = d.runtime_path(self.root, self.child.name)
         with patch.object(d, "adapter", return_value=observation) as native:

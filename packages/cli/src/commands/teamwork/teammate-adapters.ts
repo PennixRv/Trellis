@@ -44,6 +44,30 @@ export interface TeammateHostCapabilities {
   verifiedHostCap: number;
 }
 
+/** Options actually consumed by the native CLI adapters. */
+export const CLI_PROVIDER_OPTIONS: TeammateHostCapabilities["providerOptions"] =
+  {
+    codex: [],
+    claude: [],
+    copilot: [],
+    dsh: [],
+  };
+
+export function assertTeammateProviderOptions(
+  provider: TeammateProvider,
+  options: Record<string, string | number | boolean> = {},
+  supportedOptions: string[] = CLI_PROVIDER_OPTIONS[provider] ?? [],
+): void {
+  const unsupported = Object.keys(options).filter(
+    (key) => !supportedOptions.includes(key),
+  );
+  if (unsupported.length > 0) {
+    throw new Error(
+      `teammate provider '${provider}' has unsupported options: ${unsupported.join(", ")}`,
+    );
+  }
+}
+
 export function assertTeammateHostCapability(
   provider: TeammateProvider,
   host: TeammateHostCapabilities,
@@ -69,15 +93,11 @@ export function assertTeammateHostCapability(
       `teammate provider '${provider}' transport is not verified by the host`,
     );
   }
-  const supportedOptions = host.providerOptions[provider] ?? [];
-  const unsupportedOptions = Object.keys(options).filter(
-    (key) => !supportedOptions.includes(key),
+  assertTeammateProviderOptions(
+    provider,
+    options,
+    host.providerOptions[provider] ?? [],
   );
-  if (unsupportedOptions.length > 0) {
-    throw new Error(
-      `teammate provider '${provider}' has unsupported options: ${unsupportedOptions.join(", ")}`,
-    );
-  }
 }
 
 export function assertTeammateAdapterContract(
