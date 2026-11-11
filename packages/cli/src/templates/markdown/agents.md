@@ -3,6 +3,15 @@
 
 These instructions are for AI assistants working in this project.
 
+For a new session use `trellis-start`; for existing work use `trellis-continue`
+and resume the known unfinished action. Read `.trellis/workflow.md` for the
+native route and ownership rules. Task CLI owns task and phase state; specs
+describe engineering conventions, not implementation authorization.
+
+Without hook context, run `python3 ./.trellis/scripts/get_context.py --mode phase`
+and `python3 ./.trellis/scripts/task.py phase show <task>`, then explicitly read
+the applicable spec indexes and their referenced guidelines.
+
 This project is managed by Trellis. The working knowledge you need lives under `.trellis/`:
 
 - `.trellis/workflow.md` — development phases, when to create tasks, skill routing

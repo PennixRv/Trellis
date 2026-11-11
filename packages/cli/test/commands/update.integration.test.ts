@@ -109,17 +109,11 @@ function writeHashesV2(hashFile: string, hashes: Record<string, string>): void {
   fs.writeFileSync(hashFile, JSON.stringify({ __version: 2, hashes }, null, 2));
 }
 
-function removeSubagentsSection(content: string): string {
-  return content.replace(
-    "\n## Subagents\n\n" +
-      "- ALWAYS wait for all subagents to complete before yielding.\n" +
-      "- Spawn subagents automatically when:\n" +
-      "  - Parallelizable work (e.g., install + verify, npm test + typecheck, multiple tasks from plan)\n" +
-      "  - Long-running or blocking tasks where a worker can run independently.\n" +
-      "  - Isolation for risky changes or checks\n",
-    "",
-  );
-}
+// Captured from the verified 2026-11-08 native asset snapshot, before W1.
+const historicalAgents = fs.readFileSync(
+  path.resolve(__dirname, "../fixtures/agents-before-governance.md"),
+  "utf-8",
+);
 
 describe("update() integration", () => {
   let tmpDir: string;
@@ -760,13 +754,14 @@ describe("update() integration", () => {
     expect(fs.readFileSync(targetFull, "utf-8")).toBe(templateContent);
   });
 
-  it("#4b auto-updates legacy untracked AGENTS.md and preserves outside content", async () => {
+  it("#4b upgrades a real historical pristine AGENTS block and preserves outside content", async () => {
     await setupProject();
 
     const targetRelative = FILE_NAMES.AGENTS;
     const targetFull = path.join(tmpDir, targetRelative);
     const templateContent = fs.readFileSync(targetFull, "utf-8");
-    const oldContent = removeSubagentsSection(templateContent);
+    const oldContent = historicalAgents;
+    expect(oldContent).not.toBe(templateContent);
     const existingContent = `# Local instructions\n\n${oldContent}\n\n## Project Notes\n\nKeep this.`;
     const expectedContent = `# Local instructions\n\n${templateContent}\n\n## Project Notes\n\nKeep this.`;
 
@@ -777,10 +772,8 @@ describe("update() integration", () => {
       DIR_NAMES.WORKFLOW,
       ".template-hashes.json",
     );
-    const hashes = removeHashEntry(
-      readHashesV2(hashFile),
-      targetRelative,
-    ) as Record<string, string>;
+    const hashes = readHashesV2(hashFile);
+    hashes[targetRelative] = computeHash(existingContent);
     writeHashesV2(hashFile, hashes);
 
     await update({});
@@ -811,13 +804,46 @@ describe("update() integration", () => {
     },
   );
 
+  it("refuses an AGENTS snapshot changed during conflict resolution", async () => {
+    await setupProject();
+    const agents = path.join(tmpDir, FILE_NAMES.AGENTS);
+    fs.writeFileSync(agents, historicalAgents + "\nmanual policy\n");
+    const changed = historicalAgents + "\nexternal writer policy\n";
+    vi.mocked(inquirer.prompt).mockImplementation(async () => {
+      fs.writeFileSync(agents, changed);
+      return { proceed: true, action: "overwrite" };
+    });
+    try {
+      await expect(update({})).rejects.toThrow("changed before write");
+      expect(fs.readFileSync(agents, "utf-8")).toBe(changed);
+    } finally {
+      vi.mocked(inquirer.prompt).mockResolvedValue({ proceed: true });
+    }
+  });
+
+  it("does not claim an untracked current Trellis block during update", async () => {
+    await setupProject();
+    const agents = path.join(tmpDir, FILE_NAMES.AGENTS);
+    const before = fs.readFileSync(agents, "utf-8");
+    const hashFile = path.join(tmpDir, ".trellis/.template-hashes.json");
+    writeHashesV2(
+      hashFile,
+      removeHashEntry(readHashesV2(hashFile), FILE_NAMES.AGENTS) as Record<
+        string,
+        string
+      >,
+    );
+    await update({ skipAll: true });
+    expect(readHashesV2(hashFile)).not.toHaveProperty(FILE_NAMES.AGENTS);
+    expect(fs.readFileSync(agents, "utf-8")).toBe(before);
+  });
+
   it("#4c preserves user-modified untracked AGENTS.md managed block", async () => {
     await setupProject();
 
     const targetRelative = FILE_NAMES.AGENTS;
     const targetFull = path.join(tmpDir, targetRelative);
-    const templateContent = fs.readFileSync(targetFull, "utf-8");
-    const modifiedOldContent = removeSubagentsSection(templateContent).replace(
+    const modifiedOldContent = historicalAgents.replace(
       "# Trellis Instructions",
       "# Custom Trellis Instructions",
     );

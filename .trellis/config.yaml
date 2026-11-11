@@ -52,6 +52,19 @@ max_journal_lines: 2000
 # Monorepo / Packages
 #-------------------------------------------------------------------------------
 
+# Stable package keys match existing spec paths; historical task bindings stay unchanged.
+packages:
+  cli:
+    path: packages/cli
+  core:
+    path: packages/core
+  paseo-adapter:
+    path: packages/paseo-adapter
+  docs-site:
+    path: docs-site
+    type: submodule
+default_package: cli
+
 # Declare packages for monorepo projects.
 # Trellis auto-detects workspaces during `trellis init`, but you can also
 # configure them manually here.

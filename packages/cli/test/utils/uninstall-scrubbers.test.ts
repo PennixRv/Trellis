@@ -414,6 +414,8 @@ Also keep this.
 
 Keep this.
 
+
+
 ## Tail
 
 Also keep this.
@@ -428,20 +430,15 @@ Also keep this.
       TEST_BLOCK_END,
     );
 
-    expect(content).toBe("");
+    expect(content).toBe("\n");
     expect(fullyEmpty).toBe(true);
   });
 
-  it("leaves malformed marker pairs untouched", () => {
+  it("refuses malformed marker pairs", () => {
     const input = `${TEST_BLOCK_START}\nmanaged\n`;
-    const { content, fullyEmpty } = scrubManagedMarkdownBlock(
-      input,
-      TEST_BLOCK_START,
-      TEST_BLOCK_END,
-    );
-
-    expect(content).toBe(input);
-    expect(fullyEmpty).toBe(false);
+    expect(() =>
+      scrubManagedMarkdownBlock(input, TEST_BLOCK_START, TEST_BLOCK_END),
+    ).toThrow("Malformed");
   });
 });
 

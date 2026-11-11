@@ -122,6 +122,30 @@ def get_packages_info(repo_root: Path) -> list[dict]:
     return result
 
 
+def collect_spec_index_paths(repo_root: Path, input_data: dict | None = None, platform: str | None = None) -> list[str]:
+    """Discover root, shared, package and legacy indexes under configured scope."""
+    spec_dir = repo_root / DIR_WORKFLOW / DIR_SPEC
+    if not spec_dir.is_dir():
+        return []
+    packages = get_packages(repo_root) or {}
+    current = get_current_task(repo_root, input_data, platform=platform)
+    task = load_task(repo_root / current) if current else None
+    allowed = _resolve_scope_set(packages, get_spec_scope(repo_root), task.package if task else None, get_default_package(repo_root))
+    paths: list[Path] = []
+    for candidate in [spec_dir / "index.md", spec_dir / "guides" / "index.md"]:
+        if candidate.is_file():
+            paths.append(candidate)
+    for sub in sorted(spec_dir.iterdir()):
+        if not sub.is_dir() or sub.name.startswith(".") or sub.name == "guides":
+            continue
+        if sub.name in packages and allowed is not None and sub.name not in allowed:
+            continue
+        if (sub / "index.md").is_file():
+            paths.append(sub / "index.md")
+        paths.extend(candidate for candidate in sorted(sub.glob("*/index.md")) if candidate.is_file())
+    return [candidate.relative_to(repo_root).as_posix() for candidate in paths]
+
+
 def get_packages_section(repo_root: Path) -> str:
     """Build the PACKAGES section for text output."""
     spec_dir = repo_root / DIR_WORKFLOW / DIR_SPEC
@@ -166,6 +190,8 @@ def get_context_packages_text(repo_root: Path | None = None) -> str:
         spec_dir = repo_root / DIR_WORKFLOW / DIR_SPEC
         lines.append("Single-repo project (no packages configured)")
         lines.append("")
+        if (spec_dir / "index.md").is_file():
+            lines.append("Spec index: .trellis/spec/index.md")
         layers = _scan_spec_layers(spec_dir)
         if layers:
             lines.append(f"Spec layers: {', '.join(layers)}")
@@ -192,11 +218,13 @@ def get_context_packages_text(repo_root: Path | None = None) -> str:
 
         lines.append(f"### {pkg['name']}{default_tag}{type_tag}{git_tag}{scope_tag}")
         lines.append(f"Path: {pkg['path']}")
+        if (repo_root / DIR_WORKFLOW / DIR_SPEC / pkg["name"] / "index.md").is_file():
+            lines.append(f"Spec index: .trellis/spec/{pkg['name']}/index.md")
         if pkg["specLayers"]:
             lines.append(f"Spec layers: {', '.join(pkg['specLayers'])}")
             for layer in pkg["specLayers"]:
                 lines.append(f"  - .trellis/spec/{pkg['name']}/{layer}/index.md")
-        else:
+        elif not (repo_root / DIR_WORKFLOW / DIR_SPEC / pkg["name"] / "index.md").is_file():
             lines.append("Spec: not configured")
         lines.append("")
 

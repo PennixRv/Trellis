@@ -88,7 +88,7 @@ After collection, `collectTemplateFiles` runs two final passes:
 These two runtime-facing files have different update contracts:
 
 - **`.trellis/workflow.md`** stays on the normal whole-file template path. `collectTemplateFiles` inserts the bundled `workflowMdTemplate`; `analyzeChanges` decides whether to auto-update, prompt, skip, or create `.new` by comparing the current file hash with `.trellis/.template-hashes.json`. Do not partially merge only `[workflow-state:*]` blocks.
-- **`AGENTS.md`** (`commands/update.ts:buildAgentsMdTemplate`) merges only the `<!-- TRELLIS:START -->`…`<!-- TRELLIS:END -->` region via `commands/update.ts:replaceTrellisManagedBlock`; if no markers exist, the template managed block is appended. The legacy untracked-hash whitelist `LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES` lets a pristine pre-tracking AGENTS.md auto-update without a "modified by you" false positive (see `commands/update.ts:isKnownUntrackedTemplate`).
+- **`AGENTS.md`** (`commands/update.ts:buildAgentsMdTemplate`) uses `utils/managed-markdown.ts` to replace only the legal single Trellis block or append a missing block. Foreign text, line endings and whitespace remain intact. Malformed, duplicate, reversed or recognizably nested blocks and non-regular paths fail closed. Untracked existing blocks require explicit update consent; unchanged files without an ownership receipt are not automatically claimed. The collection snapshot and immediate pre-write check reject detectable external changes; they do not provide cross-writer locking.
 
 Why workflow is whole-file: `.trellis/workflow.md` is parsed by `get_context.py`,
 `workflow_phase.py`, SessionStart strippers, and per-turn workflow-state hooks.
@@ -110,7 +110,7 @@ as user-managed instead of auto-updating it back to bundled native workflow.
 | `newFiles` | template has it; disk doesn't; no stored hash |
 | `userDeletedFiles` | template has it; disk doesn't; **stored hash exists** → respect deletion, do not re-add |
 | `unchangedFiles` | disk content === template content |
-| `autoUpdateFiles` | disk differs from template; stored hash matches current content (or known-untracked AGENTS.md) → user did not edit; safe to write |
+| `autoUpdateFiles` | disk differs from template; stored hash matches current content, or an allowed untracked Copilot merge applies → safe to write |
 | `changedFiles` | disk differs from template; stored hash absent or stale → user edited; needs decision |
 
 This bucketing is the basis for both the printed plan and the write phase.
@@ -278,7 +278,7 @@ Update and init share the same template producers:
 What's unique to update:
 
 - Whole-file hash-gated update for bundled native `workflow.md`; non-native workflows are user-managed by removing the workflow hash entry.
-- Managed-block merge for `AGENTS.md` (init writes the bundled template directly).
+- Conflict review of managed-block updates for `AGENTS.md`; init uses the same strict parser and block boundary, with safe append and default preservation of existing legal blocks.
 - Snapshot backup at `.trellis/.backup-<timestamp>/`.
 - Migration plan + execution.
 - `configSectionsAdded` append path.
@@ -342,7 +342,7 @@ Symptom: every `trellis update` shows the same hooks/settings file as auto-updat
 
 Two failure modes here:
 
-1. The file was written before hash tracking existed for that path (legacy install). Solution for AGENTS.md is `LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES`. Adding the same escape hatch for other paths is acceptable but should be a last resort — the proper fix is to backfill hashes.
+1. The file was written before hash tracking existed for that path (legacy install). For shared `AGENTS.md`, preserve the untracked block unless the user explicitly chooses an update; content equality alone does not grant ownership. Do not backfill its receipt from a presumed historical block hash.
 2. Two writers produced byte-different content for the same path. The classic case: `.agents/skills/<skill>/SKILL.md` written by both Codex and Gemini configurators with platform-specific `{{CMD_REF:name}}` resolution. Fix: use `configurators/shared.ts:resolvePlaceholdersNeutral` for shared destinations. See `platform-integration.md > "Rule: .agents/skills/ writes use resolvePlaceholdersNeutral()"`.
 
 ### `--allow-downgrade` is a foot-gun

@@ -231,7 +231,9 @@ describe("shared-hooks capability table", () => {
     expect(content).toContain(
       "task lifecycle status and artifact presence do not identify the business phase",
     );
-    expect(content).toContain("trellis-goal-exploration-and-requirements");
+    expect(content).toContain(
+      "choose applicable ordered phases with evidence for omissions",
+    );
     expect(content).not.toContain("trellis-brainstorm");
     expect(content).not.toContain("complex task must add");
     expect(content).not.toContain("Status: READY");

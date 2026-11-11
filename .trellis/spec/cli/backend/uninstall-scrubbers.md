@@ -71,7 +71,7 @@ Every scrubber holds the following:
 - **Input may be malformed** — if `JSON.parse` (or equivalent) throws, return `{ content, fullyEmpty: false }`. The caller's outer flow then writes the file back unchanged. We never half-rewrite.
 - **Input may have unexpected shape** — if the parsed root isn't a plain object, return `{ content, fullyEmpty: false }`. Same reasoning.
 - **Output is canonicalized** — JSON-shaped scrubbers re-`stringify` with 2-space indent and a trailing newline, even if no change was made. This is intentional; user-written hand-formatting is acceptable collateral. Callers know.
-- **No throws** — scrubbers must not propagate exceptions; surface "I couldn't scrub this" via `fullyEmpty: false` plus original `content`.
+- **Structured parse failures preserve input** — JSON/TOML scrubbers surface "I couldn't scrub this" via `fullyEmpty: false` plus original `content`. Managed Markdown is stricter: malformed, duplicate, reversed or recognizably nested owner markers throw before mutation. A legal Markdown scrub removes exactly its own interval without normalizing foreign bytes or whitespace.
 - **No side effects** — no `fs.*`, no `console.*`, no network. Pure function.
 - **Idempotent** — running a scrubber on its own output must yield byte-identical content (modulo the JSON pretty-print canonicalization).
 

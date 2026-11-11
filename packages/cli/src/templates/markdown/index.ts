@@ -43,6 +43,7 @@ export const workflowGitignoreContent: string =
 // =============================================================================
 
 // Backend structure (multi-doc format)
+export const specIndexContent: string = readLocalTemplate("spec/index.md.txt");
 export const backendIndexContent: string = readLocalTemplate(
   "spec/backend/index.md.txt",
 );

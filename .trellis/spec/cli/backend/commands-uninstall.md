@@ -80,7 +80,10 @@ For every POSIX path in `hashes`:
 The shared planner also supports `strictPaths: true` for reversible ablation.
 `uninstall` deliberately uses the default compatibility mode so this extraction
 does not change its established best-effort behavior; strict containment,
-leaf-symlink, and malformed-mixed-file refusal belong to `trellis ablate`.
+leaf-symlink, and malformed-mixed-file refusal generally belong to `trellis ablate`.
+Shared `AGENTS.md` is stricter in both paths: reject non-regular files and
+ambiguous markers, remove only the owned interval, and preserve every remaining
+byte. Uninstall rechecks the planned AGENTS snapshot before rewrite or deletion.
 
 ### Structured-file dispatch table — `utils/managed-removal.ts:buildStructuredFileSpecs`
 

@@ -267,9 +267,9 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
     if task_status == "planning":
         next_action = (
             "Follow the current per-turn workflow-state. Task lifecycle status and artifact presence "
-            "do not identify the business phase. If no phase route is initialized, load "
-            "`trellis-goal-exploration-and-requirements` and confirm the requirements baseline "
-            "before initializing the route."
+            "do not identify the business phase. If no phase route is initialized, inspect recorded "
+            "requirements and authorization, choose applicable ordered phases with evidence for omissions, "
+            "then initialize through Trellis CLI and load the current phase Skill. Reuse valid confirmations."
         )
         if any(
             path.is_file() and not _has_curated_jsonl_entry(path)
@@ -324,31 +324,12 @@ def _repo_relative(repo_root: Path, path: Path) -> str:
         return str(path)
 
 
-def _collect_spec_index_paths(trellis_dir: Path) -> list[str]:
-    paths: list[str] = []
-    guides_index = trellis_dir / "spec" / "guides" / "index.md"
-    if guides_index.is_file():
-        paths.append(".trellis/spec/guides/index.md")
-
-    spec_dir = trellis_dir / "spec"
-    if not spec_dir.is_dir():
-        return paths
-
-    for sub in sorted(spec_dir.iterdir()):
-        if not sub.is_dir() or sub.name.startswith(".") or sub.name == "guides":
-            continue
-        index_file = sub / "index.md"
-        if index_file.is_file():
-            paths.append(f".trellis/spec/{sub.name}/index.md")
-            continue
-        for nested in sorted(sub.iterdir()):
-            if not nested.is_dir():
-                continue
-            nested_index = nested / "index.md"
-            if nested_index.is_file():
-                paths.append(f".trellis/spec/{sub.name}/{nested.name}/index.md")
-
-    return paths
+def _collect_spec_index_paths(trellis_dir: Path, input_data: dict | None = None) -> list[str]:
+    scripts = str(trellis_dir / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from common.packages_context import collect_spec_index_paths  # type: ignore[import-not-found]
+    return collect_spec_index_paths(trellis_dir.parent, input_data, platform="copilot")
 
 
 def _build_compact_current_state(
@@ -514,7 +495,7 @@ def main() -> None:
     configure_project_encoding(project_dir)
 
     trellis_dir = project_dir / ".trellis"
-    spec_index_paths = _collect_spec_index_paths(trellis_dir)
+    spec_index_paths = _collect_spec_index_paths(trellis_dir, hook_input)
 
     output = StringIO()
 

@@ -132,6 +132,76 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
 
   // ----- R1 → uninstall outcome: user data survives -----
 
+  it("ordinary --yes appends only Trellis guidance, preserves legal blocks, and force replaces only Trellis", async () => {
+    const agents = path.join(tmpDir, "AGENTS.md");
+    const foreign =
+      "手工正文  \r\n\r\n\r\n<!-- codegraph:start -->\r\nC\r\n<!-- codegraph:end -->\r\n";
+    fs.writeFileSync(agents, foreign);
+    if (process.platform !== "win32") fs.chmodSync(agents, 0o600);
+    await init({ yes: true, claude: true });
+    const appended = fs.readFileSync(agents, "utf-8");
+    expect(appended.startsWith(foreign)).toBe(true);
+    if (process.platform !== "win32")
+      expect(fs.statSync(agents).mode & 0o777).toBe(0o600);
+    expect(loadHashes(tmpDir)).toHaveProperty("AGENTS.md");
+    const customized = appended.replace(
+      "# Trellis Instructions",
+      "# Local Trellis customization",
+    );
+    fs.writeFileSync(agents, customized);
+    await init({ yes: true, claude: true });
+    expect(fs.readFileSync(agents, "utf-8")).toBe(customized);
+    await init({ yes: true, claude: true, force: true });
+    expect(fs.readFileSync(agents, "utf-8")).toBe(appended);
+    await uninstall({ yes: true });
+    expect(fs.readFileSync(agents, "utf-8").startsWith(foreign)).toBe(true);
+    if (process.platform !== "win32")
+      expect(fs.statSync(agents).mode & 0o777).toBe(0o600);
+  });
+
+  it("force refuses malformed AGENTS without changing it", async () => {
+    const agents = path.join(tmpDir, "AGENTS.md");
+    const malformed = "policy\n<!-- TRELLIS:START -->\nunclosed";
+    fs.writeFileSync(agents, malformed);
+    await expect(
+      init({ yes: true, claude: true, force: true }),
+    ).rejects.toThrow("Malformed");
+    expect(fs.readFileSync(agents, "utf-8")).toBe(malformed);
+  });
+
+  it("re-init --yes appends missing guidance even without platform flags", async () => {
+    await init({ yes: true, claude: true });
+    const taskDir = path.join(tmpDir, ".trellis/tasks/planning/existing");
+    fs.mkdirSync(taskDir, { recursive: true });
+    fs.writeFileSync(path.join(taskDir, "task.json"), "{}");
+    const agents = path.join(tmpDir, "AGENTS.md");
+    const foreign = "manual policy\r\n";
+    fs.writeFileSync(agents, foreign);
+    const hashes = loadHashes(tmpDir);
+    delete hashes["AGENTS.md"];
+    saveHashes(tmpDir, hashes);
+
+    await init({ yes: true });
+
+    expect(fs.readFileSync(agents, "utf-8").startsWith(foreign)).toBe(true);
+    expect(fs.readFileSync(agents, "utf-8")).toContain(
+      "<!-- TRELLIS:START -->",
+    );
+    expect(loadHashes(tmpDir)).toHaveProperty("AGENTS.md");
+  });
+
+  it("repeated force retains an existing AGENTS receipt without blessing custom content", async () => {
+    await init({ yes: true, claude: true });
+    const originalHash = loadHashes(tmpDir)["AGENTS.md"];
+    const agents = path.join(tmpDir, "AGENTS.md");
+    fs.appendFileSync(agents, "\nmanual policy\n");
+    await init({ yes: true, claude: true, force: true });
+    expect(loadHashes(tmpDir)["AGENTS.md"]).toBe(originalHash);
+    expect(fs.readFileSync(agents, "utf-8")).toContain("manual policy");
+    await init({ yes: true, claude: true, force: true });
+    expect(loadHashes(tmpDir)["AGENTS.md"]).toBe(originalHash);
+  });
+
   it("#R1.4 init → uninstall preserves user data under .codex/sessions/", async () => {
     const userSession = path.join(
       tmpDir,
@@ -225,9 +295,7 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
     await update({});
 
     // The orphan entry is silently pruned; user file is untouched.
-    expect(loadHashes(tmpDir)).not.toHaveProperty(
-      ".codex/sessions/user.jsonl",
-    );
+    expect(loadHashes(tmpDir)).not.toHaveProperty(".codex/sessions/user.jsonl");
     expect(fs.existsSync(userFile)).toBe(true);
   });
 
@@ -326,11 +394,11 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
     try {
       vi.spyOn(process, "cwd").mockReturnValue(fakeHome);
 
-      const exitSpy = vi
-        .spyOn(process, "exit")
-        .mockImplementation(((code?: number) => {
-          throw new Error(`process.exit(${code ?? 0})`);
-        }) as never);
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(((
+        code?: number,
+      ) => {
+        throw new Error(`process.exit(${code ?? 0})`);
+      }) as never);
 
       await withFakeHome(fakeHome, async () => {
         await expect(init({ yes: true, force: true })).rejects.toThrow(
@@ -350,16 +418,14 @@ describe("init + uninstall: manifest accuracy + homedir guard", () => {
     // Set up a valid trellis project, then pretend its cwd is the homedir.
     await init({ yes: true, claude: true, force: true });
 
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(((code?: number) => {
-        throw new Error(`process.exit(${code ?? 0})`);
-      }) as never);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((
+      code?: number,
+    ) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as never);
 
     await withFakeHome(tmpDir, async () => {
-      await expect(uninstall({ yes: true })).rejects.toThrow(
-        "process.exit(1)",
-      );
+      await expect(uninstall({ yes: true })).rejects.toThrow("process.exit(1)");
     });
     expect(exitSpy).toHaveBeenCalledWith(1);
 

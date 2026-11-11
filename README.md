@@ -89,6 +89,20 @@ Trellis selects an ordered route through five business phases:
 
 ## Resources
 
+New projects start with a neutral `.trellis/spec/index.md` and shared thinking
+guides; monorepos also get indexes under stable package keys. Bootstrap adds
+only conventions supported by the project's source. Existing Web/custom layers,
+explicit registry templates, and historical task bindings remain valid.
+
+Ordinary `trellis init` (including `--yes`) appends Trellis guidance to an
+existing `AGENTS.md` without a Trellis block. Existing legal blocks stay by
+default; `--skip-existing` explicitly skips the file. `--force` and explicit
+overwrite replace only the Trellis block, preserving other content. Other files
+retain their native overwrite behavior. Malformed blocks and unsafe paths are
+refused; detectable stale snapshots require a fresh preview. Asset restore may
+report a conflict when preserving later foreign edits cannot be proven safe.
+These checks do not provide a cross-writer lock or transaction.
+
 | Need                            | Link                                                                           |
 | ------------------------------- | ------------------------------------------------------------------------------ |
 | Install Trellis in a repo       | [Quick Start](https://docs.trytrellis.app/start/install-and-first-task)        |

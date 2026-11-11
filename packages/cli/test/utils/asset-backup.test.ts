@@ -65,6 +65,73 @@ describe("asset snapshots", () => {
     fs.rmSync(base, { recursive: true, force: true });
   });
 
+  it.each([null, "manual policy  \r\n"])(
+    "refuses restore over foreign additions when the original had no Trellis block: %s",
+    (before) => {
+      if (before === null) fs.unlinkSync(path.join(root, "AGENTS.md"));
+      else write("AGENTS.md", before);
+      const backup = createAssetBackup(root, "update", ["AGENTS.md"]);
+      write("AGENTS.md", mixed("installed", before ?? ""));
+      bindAssetUpdate(root, backup.id);
+      const foreign =
+        read("AGENTS.md") +
+        "<!-- codegraph:start -->C<!-- codegraph:end -->\r\n";
+      write("AGENTS.md", foreign);
+      for (const replace of [false, true]) {
+        const plan = planAssetRestore(root, backup.id, replace);
+        expect(plan.entries[0].action).toBe("conflict");
+      }
+      expect(read("AGENTS.md")).toBe(foreign);
+    },
+  );
+
+  it.each([null, "manual policy  \r\n"])(
+    "protects later foreign content in manual backups even with replacement: %s",
+    (before) => {
+      if (before === null) fs.unlinkSync(path.join(root, "AGENTS.md"));
+      else write("AGENTS.md", before);
+      const backup = createAssetBackup(root, "manual", ["AGENTS.md"]);
+      const foreign =
+        (before ?? "") + "<!-- CODEGRAPH_START -->C<!-- CODEGRAPH_END -->\r\n";
+      write("AGENTS.md", foreign);
+      for (const replaceModified of [false, true]) {
+        const plan = planAssetRestore(root, backup.id, replaceModified);
+        expect(plan.entries[0].action).toBe("conflict");
+        expect(() =>
+          restoreAssetBackup(root, backup.id, {
+            replaceModified,
+            yes: true,
+            review: plan.review,
+          }),
+        ).toThrow("conflicts");
+        expect(read("AGENTS.md")).toBe(foreign);
+      }
+    },
+  );
+
+  it.each(["create", "restore"])(
+    "rejects a literal AGENTS link during %s",
+    (operation) => {
+      const backup =
+        operation === "restore"
+          ? createAssetBackup(root, "manual", ["AGENTS.md"])
+          : null;
+      const original = read("AGENTS.md");
+      const target = path.join(root, "foreign-target.md");
+      fs.renameSync(path.join(root, "AGENTS.md"), target);
+      fs.symlinkSync(target, path.join(root, "AGENTS.md"));
+      expect(() =>
+        backup
+          ? planAssetRestore(root, backup.id)
+          : createAssetBackup(root, "manual", ["AGENTS.md"]),
+      ).toThrow("regular file");
+      expect(fs.lstatSync(path.join(root, "AGENTS.md")).isSymbolicLink()).toBe(
+        true,
+      );
+      expect(fs.readFileSync(target, "utf-8")).toBe(original);
+    },
+  );
+
   it("publishes unique verified private snapshots, with only registered asset paths", () => {
     saveHashes(root, {
       [workflow]: "hash",
@@ -153,17 +220,23 @@ describe("asset snapshots", () => {
     if (process.platform === "win32") return;
     write(".trellis/external", "keep");
     fs.symlinkSync("external", path.join(root, ".trellis/link"));
-    expect(createAssetBackup(root, "manual", [".trellis/link"]).entries).toHaveLength(1);
+    expect(
+      createAssetBackup(root, "manual", [".trellis/link"]).entries,
+    ).toHaveLength(1);
     const trellis = path.join(root, ".trellis");
     fs.renameSync(trellis, path.join(root, ".trellis-store"));
     fs.symlinkSync(".trellis-store", trellis, "dir");
-    expect(createAssetBackup(root, "manual", [".trellis/link"]).entries).toHaveLength(1);
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "asset-backup-outside-"));
+    expect(
+      createAssetBackup(root, "manual", [".trellis/link"]).entries,
+    ).toHaveLength(1);
+    const outside = fs.mkdtempSync(
+      path.join(os.tmpdir(), "asset-backup-outside-"),
+    );
     fs.writeFileSync(path.join(outside, "file.md"), "outside");
     fs.symlinkSync(outside, path.join(root, ".trellis-store", "escape"));
-    expect(() => createAssetBackup(root, "manual", [".trellis/escape/file.md"])).toThrow(
-      /escapes project root/,
-    );
+    expect(() =>
+      createAssetBackup(root, "manual", [".trellis/escape/file.md"]),
+    ).toThrow(/escapes project root/);
     expect(read(".trellis/external")).toBe("keep");
   });
 
@@ -180,6 +253,11 @@ describe("asset snapshots", () => {
     expect(fs.existsSync(path.join(root, added))).toBe(false);
     expect(read("AGENTS.md")).toBe(mixed("old managed", "new user policy"));
     expect(loadAssetBackup(root, id).restore?.status).toBe("complete");
+    expect(
+      planAssetRestore(root, id).entries.every(
+        (entry) => entry.action === "keep",
+      ),
+    ).toBe(true);
     expect(
       listAssetBackups(root).filter((item) => item.kind === "complete"),
     ).toHaveLength(2);

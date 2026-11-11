@@ -7,6 +7,17 @@ import figlet from "figlet";
 import inquirer from "inquirer";
 import { createWorkflowStructure } from "../configurators/workflow.js";
 import { withAssetMaintenance } from "../utils/asset-backup.js";
+import { writeFileAtomic } from "../utils/atomic-write.js";
+import {
+  managedBlock,
+  mergeManagedMarkdown,
+  readManagedMarkdown,
+} from "../utils/managed-markdown.js";
+import {
+  TRELLIS_BLOCK_START,
+  TRELLIS_BLOCK_END,
+} from "../utils/managed-paths.js";
+import { recordWrite } from "../utils/file-writer.js";
 import {
   getInitToolChoices,
   resolveCliFlag,
@@ -26,7 +37,6 @@ import {
   setWriteMode,
   startRecordingWrites,
   stopRecordingWrites,
-  writeFile,
   type WriteMode,
 } from "../utils/file-writer.js";
 import { emptyTaskJson, type TaskJson } from "../utils/task-json.js";
@@ -37,7 +47,12 @@ import {
   type ProjectType,
   type DetectedPackage,
 } from "../utils/project-detector.js";
-import { initializeHashes, removeHash } from "../utils/template-hash.js";
+import {
+  initializeHashes,
+  loadHashes,
+  removeHash,
+  saveHashes,
+} from "../utils/template-hash.js";
 import {
   NATIVE_WORKFLOW_ID,
   resolveWorkflowTemplate,
@@ -373,7 +388,7 @@ function writeTaskSkeleton(
  * task_store.py).
  */
 function getBootstrapChecklistItems(
-  projectType: ProjectType,
+  _projectType: ProjectType,
   packages?: DetectedPackage[],
 ): string[] {
   if (packages && packages.length > 0) {
@@ -381,33 +396,20 @@ function getBootstrapChecklistItems(
     items.push("Add code examples");
     return items;
   }
-  if (projectType === "frontend") {
-    return ["Fill frontend guidelines", "Add code examples"];
-  }
-  if (projectType === "backend") {
-    return ["Fill backend guidelines", "Add code examples"];
-  }
   return [
-    "Fill backend guidelines",
-    "Fill frontend guidelines",
-    "Add code examples",
+    "Establish applicable project guidelines",
+    "Add source-backed examples and verification",
   ];
 }
 
 function getBootstrapRelatedFiles(
-  projectType: ProjectType,
+  _projectType: ProjectType,
   packages?: DetectedPackage[],
 ): string[] {
   if (packages && packages.length > 0) {
     return packages.map((pkg) => `.trellis/spec/${sanitizePkgName(pkg.name)}/`);
   }
-  if (projectType === "frontend") {
-    return [".trellis/spec/frontend/"];
-  }
-  if (projectType === "backend") {
-    return [".trellis/spec/backend/"];
-  }
-  return [".trellis/spec/backend/", ".trellis/spec/frontend/"];
+  return [".trellis/spec/index.md"];
 }
 
 function getBootstrapPrdContent(
@@ -448,32 +450,6 @@ ${checklistMarkdown}
 ---
 
 ## Spec files to populate
-`;
-
-  const backendSection = `
-
-### Backend guidelines
-
-| File | What to document |
-|------|------------------|
-| \`.trellis/spec/backend/directory-structure.md\` | Where different file types go (routes, services, utils) |
-| \`.trellis/spec/backend/error-handling.md\` | How errors are caught, logged, and returned |
-| \`.trellis/spec/backend/logging-guidelines.md\` | Log levels, format, what to log |
-| \`.trellis/spec/backend/quality-guidelines.md\` | Code review standards, testing requirements |
-`;
-
-  const frontendSection = `
-
-### Frontend guidelines
-
-| File | What to document |
-|------|------------------|
-| \`.trellis/spec/frontend/directory-structure.md\` | Component/page/hook organization |
-| \`.trellis/spec/frontend/component-guidelines.md\` | Component patterns, props conventions |
-| \`.trellis/spec/frontend/hook-guidelines.md\` | Custom hook naming, patterns |
-| \`.trellis/spec/frontend/state-management.md\` | State library, patterns, what goes where |
-| \`.trellis/spec/frontend/type-safety.md\` | TypeScript conventions, type organization |
-| \`.trellis/spec/frontend/quality-guidelines.md\` | Linting, testing, accessibility |
 `;
 
   const footer = `
@@ -536,13 +512,13 @@ is a separate conversation, not a bootstrap concern.
 
 ## Quick explainer of the runtime (share when they ask "why do we need spec at all")
 
-- Every AI coding task spawns two sub-agents: \`trellis-implement\` (writes
-  code) and \`trellis-check\` (verifies quality).
+- On hosts that support native sub-agents, \`trellis-implement\` writes code
+  and \`trellis-check\` verifies quality under the project's authorized route.
 - Each task has \`implement.jsonl\` / \`check.jsonl\` manifests listing which
   spec files to load.
-- The platform hook auto-injects those spec files + the task's \`prd.md\`
-  into every sub-agent prompt, so the sub-agent codes/reviews per team
-  conventions without anyone pasting them manually.
+- Supported hooks inject the task manifests and artifacts. Without hook
+  context, explicitly read those references and the applicable spec indexes;
+  inspect the current phase with \`task.py phase show <task>\`.
 - Source of truth: \`.trellis/spec/\`. That's why filling it well now pays
   off forever.
 
@@ -576,24 +552,12 @@ etc.) I can pull from, or should I scan the codebase from scratch?"
   if (packages && packages.length > 0) {
     // Monorepo: generate per-package sections
     for (const pkg of packages) {
-      const pkgType = pkg.type === "unknown" ? "fullstack" : pkg.type;
       const specName = sanitizePkgName(pkg.name);
-      content += `\n### Package: ${pkg.name} (\`spec/${specName}/\`)\n`;
-      if (pkgType !== "frontend") {
-        content += `\n- Backend guidelines: \`.trellis/spec/${specName}/backend/\`\n`;
-      }
-      if (pkgType !== "backend") {
-        content += `\n- Frontend guidelines: \`.trellis/spec/${specName}/frontend/\`\n`;
-      }
+      content += `\n### Package: ${pkg.name}\n\nRead and populate \`.trellis/spec/${specName}/index.md\`.\n`;
     }
-  } else if (projectType === "frontend") {
-    content += frontendSection;
-  } else if (projectType === "backend") {
-    content += backendSection;
   } else {
-    // fullstack
-    content += backendSection;
-    content += frontendSection;
+    content +=
+      "\nRead and populate `.trellis/spec/index.md`; add only evidence-backed topics.\n";
   }
   content += footer;
 
@@ -827,35 +791,42 @@ async function handleReinit(
           "Use platform flags (e.g., --codex) or -u <name> to add platforms/developer.",
         ),
       );
-      return true;
+    } else {
+      console.log(
+        chalk.gray(`\n   Already initialized with: ${configuredNames}\n`),
+      );
+
+      const { action } = await inquirer.prompt<{ action: string }>([
+        {
+          type: "list",
+          name: "action",
+          message: "Trellis is already initialized. What would you like to do?",
+          choices: [
+            { name: "Add AI platform(s)", value: "add-platform" },
+            {
+              name: "Set up developer identity on this device",
+              value: "add-developer",
+            },
+            { name: "Full re-initialize", value: "full" },
+          ],
+        },
+      ]);
+
+      if (action === "full") {
+        return false; // Fall through to full init
+      }
+      if (action === "add-platform") doAddPlatforms = true;
+      if (action === "add-developer") doAddDeveloper = true;
     }
-
-    console.log(
-      chalk.gray(`\n   Already initialized with: ${configuredNames}\n`),
-    );
-
-    const { action } = await inquirer.prompt<{ action: string }>([
-      {
-        type: "list",
-        name: "action",
-        message: "Trellis is already initialized. What would you like to do?",
-        choices: [
-          { name: "Add AI platform(s)", value: "add-platform" },
-          {
-            name: "Set up developer identity on this device",
-            value: "add-developer",
-          },
-          { name: "Full re-initialize", value: "full" },
-        ],
-      },
-    ]);
-
-    if (action === "full") {
-      return false; // Fall through to full init
-    }
-    if (action === "add-platform") doAddPlatforms = true;
-    if (action === "add-developer") doAddDeveloper = true;
   }
+
+  const rootWritten = startRecordingWrites(cwd);
+  try {
+    await createRootFiles(cwd, options);
+  } finally {
+    stopRecordingWrites();
+  }
+  initializeHashes(cwd, { trackedPaths: rootWritten, merge: true });
 
   // --- Add platforms ---
   if (doAddPlatforms) {
@@ -1108,7 +1079,7 @@ function writeMonorepoConfig(cwd: string, packages: DetectedPackage[]): void {
   const defaultPkg =
     packages.find((p) => !p.isSubmodule)?.name ?? packages[0]?.name;
   if (defaultPkg) {
-    lines.push(`default_package: ${defaultPkg}`);
+    lines.push(`default_package: ${sanitizePkgName(defaultPkg)}`);
   }
 
   fs.writeFileSync(
@@ -1942,6 +1913,7 @@ export async function init(options: InitOptions): Promise<void> {
     // platform/root entries — replacing the previous "walk every managed dir"
     // approach that swept user-owned runtime files into the manifest
     // (.codex/sessions/, .claude/projects/, pre-existing AGENTS.md).
+    const previousAgentsHash = loadHashes(cwd)[FILE_NAMES.AGENTS];
     const writtenPaths = startRecordingWrites(cwd);
     try {
       // Create workflow structure with project type
@@ -1993,7 +1965,7 @@ export async function init(options: InitOptions): Promise<void> {
       }
 
       // Create root files (skip if exists)
-      await createRootFiles(cwd);
+      await createRootFiles(cwd, options);
     } finally {
       stopRecordingWrites();
     }
@@ -2004,6 +1976,13 @@ export async function init(options: InitOptions): Promise<void> {
 
     // Initialize template hashes for modification tracking
     const hashedCount = initializeHashes(cwd, { trackedPaths: writtenPaths });
+    // Keeping an existing block must retain its receipt without blessing edits.
+    if (previousAgentsHash && !writtenPaths.has(FILE_NAMES.AGENTS)) {
+      saveHashes(cwd, {
+        ...loadHashes(cwd),
+        [FILE_NAMES.AGENTS]: previousAgentsHash,
+      });
+    }
     if (useRemoteTemplate) {
       const specFilesToHash = new Map<string, string>();
       for (const relativePath of collectSpecPaths(cwd)) {
@@ -2101,12 +2080,56 @@ function askInput(prompt: string): Promise<string> {
   });
 }
 
-async function createRootFiles(cwd: string): Promise<void> {
+async function createRootFiles(
+  cwd: string,
+  options: InitOptions,
+): Promise<void> {
   const agentsPath = path.join(cwd, FILE_NAMES.AGENTS);
-
-  // Write AGENTS.md from template
-  const agentsWritten = await writeFile(agentsPath, agentsMdContent);
-  if (agentsWritten) {
-    console.log(chalk.blue("📄 Created AGENTS.md"));
+  const previous = readManagedMarkdown(agentsPath);
+  if (previous !== null) {
+    const block = managedBlock(
+      previous,
+      TRELLIS_BLOCK_START,
+      TRELLIS_BLOCK_END,
+    );
+    if (options.skipExisting && !options.force) {
+      console.log(
+        chalk.gray(
+          `  ○ Skipped: AGENTS.md${block ? "" : " (Trellis guidance not installed)"}`,
+        ),
+      );
+      return;
+    }
+    if (block && !options.force) {
+      if (options.yes || !process.stdin.isTTY) return;
+      const answer = await inquirer.prompt<{ action: string }>([
+        {
+          type: "list",
+          name: "action",
+          message: "AGENTS.md already has Trellis guidance.",
+          choices: [
+            { name: "Keep existing Trellis block", value: "skip" },
+            { name: "Update only Trellis block", value: "overwrite" },
+          ],
+        },
+      ]);
+      if (answer.action !== "overwrite") return;
+    }
   }
+  const next = mergeManagedMarkdown(
+    previous ?? "",
+    agentsMdContent,
+    TRELLIS_BLOCK_START,
+    TRELLIS_BLOCK_END,
+  );
+  if (next === previous) return;
+  if (readManagedMarkdown(agentsPath) !== previous)
+    throw new Error("AGENTS.md changed before write");
+  writeFileAtomic(
+    agentsPath,
+    next,
+    previous === null ? undefined : fs.statSync(agentsPath).mode,
+  );
+  recordWrite(agentsPath);
+  console.log(chalk.blue("📄 Installed Trellis guidance in AGENTS.md"));
 }

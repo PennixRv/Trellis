@@ -13,6 +13,7 @@
  */
 
 import { getConfigTemplate as getCodexConfigTemplate } from "../templates/codex/index.js";
+import { managedBlock } from "./managed-markdown.js";
 
 export interface ScrubResult {
   content: string;
@@ -453,21 +454,14 @@ export function scrubManagedMarkdownBlock(
   startMarker: string,
   endMarker: string,
 ): ScrubResult {
+  const block = managedBlock(content, startMarker, endMarker);
+  if (!block) {
+    return { content, fullyEmpty: false };
+  }
+
   const start = content.indexOf(startMarker);
-  if (start === -1) {
-    return { content, fullyEmpty: false };
-  }
-
-  const end = content.indexOf(endMarker, start);
-  if (end === -1) {
-    return { content, fullyEmpty: false };
-  }
-
-  const blockEnd = end + endMarker.length;
-  const result = (content.slice(0, start) + content.slice(blockEnd))
-    .replace(/\n{3,}/g, "\n\n")
-    .trimEnd();
-  const normalized = result.length > 0 ? `${result}\n` : "";
+  const normalized =
+    content.slice(0, start) + content.slice(start + block.length);
 
   return {
     content: normalized,

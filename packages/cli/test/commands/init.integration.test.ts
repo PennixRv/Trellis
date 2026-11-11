@@ -1111,44 +1111,19 @@ describe("init() integration", () => {
     expect(Object.keys(hashes).length).toBeGreaterThan(0);
   });
 
-  it("#10 creates spec templates for backend, frontend, and guides", async () => {
+  it.each([
+    {},
+    { "go.mod": "module example.com/app\n" },
+    { "vite.config.ts": "export default {}\n" },
+  ])("creates neutral specs regardless of detected type: %j", async (files) => {
+    for (const [name, data] of Object.entries(files))
+      fs.writeFileSync(path.join(tmpDir, name), data);
     await init({ yes: true });
-
     const specDir = path.join(tmpDir, PATHS.SPEC);
-    expect(fs.existsSync(path.join(specDir, "backend", "index.md"))).toBe(true);
-    expect(fs.existsSync(path.join(specDir, "frontend", "index.md"))).toBe(
-      true,
-    );
+    expect(fs.existsSync(path.join(specDir, "index.md"))).toBe(true);
     expect(fs.existsSync(path.join(specDir, "guides", "index.md"))).toBe(true);
-  });
-
-  it("#11 backend project init skips frontend spec templates", async () => {
-    // go.mod triggers detectProjectType → "backend"
-    fs.writeFileSync(path.join(tmpDir, "go.mod"), "module example.com/app\n");
-
-    await init({ yes: true });
-
-    const specDir = path.join(tmpDir, PATHS.SPEC);
-    expect(fs.existsSync(path.join(specDir, "backend", "index.md"))).toBe(true);
-    expect(fs.existsSync(path.join(specDir, "frontend"))).toBe(false);
-    expect(fs.existsSync(path.join(specDir, "guides", "index.md"))).toBe(true);
-  });
-
-  it("#12 frontend project init skips backend spec templates", async () => {
-    // vite.config.ts triggers detectProjectType → "frontend"
-    fs.writeFileSync(
-      path.join(tmpDir, "vite.config.ts"),
-      "export default {}\n",
-    );
-
-    await init({ yes: true });
-
-    const specDir = path.join(tmpDir, PATHS.SPEC);
-    expect(fs.existsSync(path.join(specDir, "frontend", "index.md"))).toBe(
-      true,
-    );
     expect(fs.existsSync(path.join(specDir, "backend"))).toBe(false);
-    expect(fs.existsSync(path.join(specDir, "guides", "index.md"))).toBe(true);
+    expect(fs.existsSync(path.join(specDir, "frontend"))).toBe(false);
   });
 
   // ===========================================================================
@@ -1198,19 +1173,14 @@ describe("init() integration", () => {
     expect(fs.existsSync(path.join(specDir, "web"))).toBe(true);
     expect(fs.existsSync(path.join(specDir, "api"))).toBe(true);
 
-    // web: frontend (vite.config.ts) → has frontend/, no backend/
-    expect(
-      fs.existsSync(path.join(specDir, "web", "frontend", "index.md")),
-    ).toBe(true);
-    expect(fs.existsSync(path.join(specDir, "web", "backend"))).toBe(false);
-
-    // api: fullstack (package.json + go.mod) → has both backend/ and frontend/
-    expect(
-      fs.existsSync(path.join(specDir, "api", "backend", "index.md")),
-    ).toBe(true);
-    expect(
-      fs.existsSync(path.join(specDir, "api", "frontend", "index.md")),
-    ).toBe(true);
+    for (const pkg of ["web", "api"]) {
+      expect(fs.existsSync(path.join(specDir, pkg, "index.md"))).toBe(true);
+      expect(fs.existsSync(path.join(specDir, pkg, "backend"))).toBe(false);
+      expect(fs.existsSync(path.join(specDir, pkg, "frontend"))).toBe(false);
+    }
+    const rootIndex = fs.readFileSync(path.join(specDir, "index.md"), "utf-8");
+    expect(rootIndex).toContain("./web/index.md");
+    expect(rootIndex).toContain("./api/index.md");
 
     // Guides still created (shared)
     expect(fs.existsSync(path.join(specDir, "guides", "index.md"))).toBe(true);
@@ -1238,6 +1208,7 @@ describe("init() integration", () => {
     expect(configContent).toContain("docs:");
     expect(configContent).toContain("path: packages/docs");
     expect(configContent).toContain("default_package:");
+    expect(configContent).toContain("default_package: cli");
   });
 
   it("#15 monorepo: bootstrap task references per-package spec paths", async () => {
@@ -1294,11 +1265,9 @@ describe("init() integration", () => {
     await init({ yes: true, monorepo: false });
 
     const specDir = path.join(tmpDir, PATHS.SPEC);
-    // Single-repo spec (global backend + frontend), no per-package dirs
-    expect(fs.existsSync(path.join(specDir, "backend", "index.md"))).toBe(true);
-    expect(fs.existsSync(path.join(specDir, "frontend", "index.md"))).toBe(
-      true,
-    );
+    expect(fs.existsSync(path.join(specDir, "index.md"))).toBe(true);
+    expect(fs.existsSync(path.join(specDir, "backend"))).toBe(false);
+    expect(fs.existsSync(path.join(specDir, "frontend"))).toBe(false);
     expect(fs.existsSync(path.join(specDir, "a"))).toBe(false);
 
     // config.yaml should NOT have packages: section

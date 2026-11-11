@@ -11,6 +11,7 @@ import { getAllMigrations } from "../migrations/index.js";
 import { loadHashes } from "./template-hash.js";
 import { writeFileAtomic } from "./atomic-write.js";
 import { TRELLIS_BLOCK_START, TRELLIS_BLOCK_END } from "./managed-paths.js";
+import { managedBlock, readManagedMarkdown } from "./managed-markdown.js";
 import {
   canonicalProjectRoot,
   projectKey,
@@ -93,6 +94,7 @@ const PROTECTED =
 function safePath(root: string, relative: string): string {
   validateManagedRelativePath(relative);
   root = canonicalProjectRoot(root);
+  if (relative === "AGENTS.md") readManagedMarkdown(path.join(root, relative));
   let cursor = root;
   for (const part of relative.split("/")) {
     cursor = path.join(cursor, part);
@@ -144,16 +146,9 @@ function digest(value: unknown): string {
 }
 
 function block(content: string): string | undefined {
-  const start = content.indexOf(TRELLIS_BLOCK_START);
-  const end = content.indexOf(TRELLIS_BLOCK_END);
-  if (
-    start < 0 ||
-    end < start ||
-    content.indexOf(TRELLIS_BLOCK_START, start + 1) >= 0 ||
-    content.indexOf(TRELLIS_BLOCK_END, end + 1) >= 0
-  )
-    return undefined;
-  return content.slice(start, end + TRELLIS_BLOCK_END.length);
+  return (
+    managedBlock(content, TRELLIS_BLOCK_START, TRELLIS_BLOCK_END) ?? undefined
+  );
 }
 
 function backupDir(root: string, id: string): string {
@@ -289,7 +284,7 @@ export function bindAssetUpdate(root: string, id: string): void {
     entry.after = current(root, entry.path);
     if (entry.path === "AGENTS.md" && entry.after.kind === "file") {
       const managed = block(
-        fs.readFileSync(safePath(root, entry.path), "utf-8"),
+        readManagedMarkdown(safePath(root, entry.path)) ?? "",
       );
       if (managed !== undefined) entry.afterBlock = digest(managed);
     }
@@ -538,11 +533,18 @@ function desiredContent(
   );
   if (relative !== "AGENTS.md" || current(root, relative).kind === "absent")
     return stored;
-  const previous = block(stored.toString("utf-8"));
-  const now = fs.readFileSync(safePath(root, relative), "utf-8");
+  const previous = block(
+    readManagedMarkdown(
+      safePath(backupDir(root, backup.id), `files/${relative}`),
+    ) ?? "",
+  );
+  const now = readManagedMarkdown(safePath(root, relative)) ?? "";
   const active = block(now);
+  const offset = now.indexOf(TRELLIS_BLOCK_START);
   return previous && active
-    ? Buffer.from(now.replace(active, previous))
+    ? Buffer.from(
+        now.slice(0, offset) + previous + now.slice(offset + active.length),
+      )
     : stored;
 }
 
@@ -584,9 +586,15 @@ export function planAssetRestore(
         : undefined;
     const mixedMatch =
       entry.path === "AGENTS.md" &&
+      entry.before.kind === "file" &&
+      block(
+        readManagedMarkdown(
+          safePath(backupDir(root, id), `files/${entry.path}`),
+        ) ?? "",
+      ) !== undefined &&
       entry.afterBlock !== undefined &&
       actual.kind === "file" &&
-      digest(block(fs.readFileSync(safePath(root, entry.path), "utf-8"))) ===
+      digest(block(readManagedMarkdown(safePath(root, entry.path)) ?? "")) ===
         entry.afterBlock;
     const safe = resumed
       ? fingerprintsEqual(actual, resumed.current) ||
@@ -594,13 +602,18 @@ export function planAssetRestore(
       : entry.after !== undefined &&
         (fingerprintsEqual(actual, entry.after) || mixedMatch);
     const same = fingerprintsEqual(actual, desired);
-    const action: AssetRestorePlan["entries"][number]["action"] = same
-      ? "keep"
-      : safe || (replaceModified && !resumed)
-        ? desired.kind === "absent"
-          ? "delete"
-          : "write"
-        : "conflict";
+    const unsafeMixedRestore =
+      entry.path === "AGENTS.md" && !same && !resumed && !safe;
+    const action: AssetRestorePlan["entries"][number]["action"] =
+      unsafeMixedRestore
+        ? "conflict"
+        : same
+          ? "keep"
+          : safe || (replaceModified && !resumed)
+            ? desired.kind === "absent"
+              ? "delete"
+              : "write"
+            : "conflict";
     return { path: entry.path, current: actual, desired, action };
   });
   return { id, review: digest({ id, replaceModified, entries }), entries };

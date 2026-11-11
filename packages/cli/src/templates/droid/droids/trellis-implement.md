@@ -48,7 +48,7 @@ Before implementing, read:
 
 Read relevant specs based on task type:
 
-- Spec layers: `.trellis/spec/<package>/<layer>/`
+- Read available spec indexes: `.trellis/spec/index.md`, `.trellis/spec/<package>/index.md`, and existing `.trellis/spec/<package>/<layer>/index.md` (legacy single-repo layers remain valid).
 - Shared guides: `.trellis/spec/guides/`
 
 ### 2. Understand Requirements

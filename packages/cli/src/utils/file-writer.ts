@@ -67,7 +67,7 @@ export function stopRecordingWrites(): void {
 }
 
 /** Record a successful write. Called internally by `writeFile`. */
-function recordWrite(absPath: string): void {
+export function recordWrite(absPath: string): void {
   if (!writeRecorder || !writeRecorderRoot) return;
   const rel = path.relative(writeRecorderRoot, absPath);
   // Defensive: skip writes outside cwd (no meaningful manifest key).

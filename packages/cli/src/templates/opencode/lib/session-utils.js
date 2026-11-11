@@ -100,7 +100,7 @@ function getTaskStatus(ctx, platformInput = null) {
   if (taskStatus === "planning") {
     const nextBits = [
       "Follow the current per-turn workflow-state; task lifecycle status and artifact presence do not identify the business phase",
-      "If no phase route is initialized, load `trellis-goal-exploration-and-requirements` and confirm the requirements baseline before initializing the route",
+      "If no phase route is initialized, inspect recorded requirements and authorization, choose applicable ordered phases with evidence for omissions, then initialize through Trellis CLI and load the current phase Skill; reuse valid confirmations",
     ];
     if (!jsonlReady) {
       nextBits.push(
@@ -248,7 +248,7 @@ function resolveSpecScope(config) {
   return null;
 }
 
-function collectSpecIndexPaths(directory, allowedPkgs) {
+function collectSpecIndexPaths(directory, allowedPkgs, packageNames) {
   const specDir = join(directory, ".trellis", "spec");
   const paths = [];
 
@@ -258,6 +258,8 @@ function collectSpecIndexPaths(directory, allowedPkgs) {
   }
 
   if (!existsSync(specDir)) return paths;
+  if (existsSync(join(specDir, "index.md")))
+    paths.unshift(".trellis/spec/index.md");
 
   try {
     const subs = readdirSync(specDir)
@@ -272,11 +274,17 @@ function collectSpecIndexPaths(directory, allowedPkgs) {
       .sort();
 
     for (const sub of subs) {
+      if (
+        packageNames.has(sub) &&
+        allowedPkgs !== null &&
+        !allowedPkgs.has(sub)
+      )
+        continue;
       const indexFile = join(specDir, sub, "index.md");
       if (existsSync(indexFile)) {
         paths.push(`.trellis/spec/${sub}/index.md`);
-      } else {
-        if (allowedPkgs !== null && !allowedPkgs.has(sub)) continue;
+      }
+      {
         try {
           const nested = readdirSync(join(specDir, sub))
             .filter((name) => {
@@ -433,7 +441,11 @@ export function buildSessionContext(ctx, platformInput = null) {
 
   const config = loadTrellisConfig(directory, contextKey);
   const allowedPkgs = resolveSpecScope(config);
-  const paths = collectSpecIndexPaths(directory, allowedPkgs);
+  const paths = collectSpecIndexPaths(
+    directory,
+    allowedPkgs,
+    new Set(Object.keys(config.packages)),
+  );
 
   const parts = [];
 

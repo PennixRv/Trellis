@@ -14,7 +14,9 @@ Execute these steps:
    - What type of work (backend, frontend, unit-test, docs, etc.)
    - Any spec/research paths referenced by the task artifacts
 
-4. **Read the spec index** for each relevant module:
+4. **Read the available spec indexes**: `.trellis/spec/index.md`, then
+   `.trellis/spec/<package>/index.md` for the affected configured packages,
+   and existing layer indexes where applicable. Older projects need no migration:
    ```bash
    cat .trellis/spec/<package>/<layer>/index.md
    ```

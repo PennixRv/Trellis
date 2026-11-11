@@ -13,14 +13,15 @@ load the right guidance.
 
 | Package key | Path | Package name | Spec path | Purpose |
 | --- | --- | --- | --- | --- |
-| `cli` | `packages/cli` | `@mindfoldhq/trellis` | `.trellis/spec/cli/**` | User-facing CLI, templates, migrations, release scripts, and platform configurators. |
-| `core` | `packages/core` | `@mindfoldhq/trellis-core` | `.trellis/spec/core/**` | Reusable SDK/domain primitives for Teamwork, mem, task, and testing APIs. |
+| `cli` | `packages/cli` | `@pennixrv/trellis` | `.trellis/spec/cli/**` | User-facing CLI, templates, migrations, release scripts, and platform configurators. |
+| `core` | `packages/core` | `@pennixrv/trellis-core` | `.trellis/spec/core/**` | Reusable SDK/domain primitives for Teamwork, mem, task, and testing APIs. |
+| `paseo-adapter` | `packages/paseo-adapter` | `@pennixrv/trellis-paseo-adapter` | `.trellis/spec/paseo-adapter/**` | Optional local public SDK adapter for worktree delegation. |
 | `docs-site` | `docs-site` | `trellis-docs` | `.trellis/spec/docs-site/**` | Mintlify documentation site. This directory is a git submodule, not part of `pnpm-workspace.yaml`. |
 
 ## Workspace And Submodules
 
 - `pnpm-workspace.yaml` declares `packages/*`, so the pnpm workspace packages
-  are `packages/cli` and `packages/core`.
+  are `packages/cli`, `packages/core`, and `packages/paseo-adapter`.
 - `.gitmodules` declares `docs-site` as a submodule.
 - `docs-site` has its own package manifest and Trellis specs, so it is a
   configured Trellis package with `type: submodule`.

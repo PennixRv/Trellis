@@ -3,6 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import chalk from "chalk";
 import inquirer from "inquirer";
+import {
+  managedBlock,
+  mergeManagedMarkdown,
+  readManagedMarkdown,
+} from "../utils/managed-markdown.js";
+import { writeFileAtomic } from "../utils/atomic-write.js";
 
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../constants/paths.js";
 import type { AITool } from "../types/ai-tools.js";
@@ -104,7 +110,28 @@ interface FileChange {
   path: string;
   relativePath: string;
   newContent: string;
+  previousContent?: string | null;
   status: "new" | "unchanged" | "changed";
+}
+
+function writeUpdateFile(file: FileChange): void {
+  if (file.previousContent === undefined) {
+    fs.writeFileSync(file.path, file.newContent);
+    return;
+  }
+  if (
+    file.previousContent !== undefined &&
+    readManagedMarkdown(file.path) !== file.previousContent
+  ) {
+    throw new Error(
+      `Managed Markdown changed before write: ${file.relativePath}`,
+    );
+  }
+  writeFileAtomic(
+    file.path,
+    file.newContent,
+    file.previousContent === null ? undefined : fs.statSync(file.path).mode,
+  );
 }
 
 interface ChangeAnalysis {
@@ -119,13 +146,6 @@ interface ChangeAnalysis {
 type ConflictAction = "overwrite" | "skip" | "create-new";
 
 const CLAUDE_SETTINGS_PATH = ".claude/settings.json";
-const LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES = new Set<string>([
-  // v0.5.0-beta.17 and earlier wrote AGENTS.md but did not hash-track it.
-  // This hash is the pristine Trellis-managed block before the Subagents
-  // section was added, so old untouched projects can be updated without a
-  // false "modified by you" conflict.
-  "c1f511b1cfc1902f2147da159f09cc51f380b0c9e341cdb3ac5dea5233f3e307",
-]);
 
 // Paths that should never be touched (true user data)
 // spec/ is user-customized content created during init; update should never modify it
@@ -142,21 +162,7 @@ function getManagedBlock(
   startMarker: string,
   endMarker: string,
 ): string | null {
-  const start = content.indexOf(startMarker);
-  if (start === -1) {
-    return null;
-  }
-
-  const end = content.indexOf(endMarker, start);
-  if (end === -1) {
-    return null;
-  }
-
-  return content.slice(start, end + endMarker.length);
-}
-
-function getTrellisManagedBlock(content: string): string | null {
-  return getManagedBlock(content, TRELLIS_BLOCK_START, TRELLIS_BLOCK_END);
+  return managedBlock(content, startMarker, endMarker);
 }
 
 function replaceManagedBlock(
@@ -165,15 +171,12 @@ function replaceManagedBlock(
   startMarker: string,
   endMarker: string,
 ): string | null {
+  const previous = managedBlock(existingContent, startMarker, endMarker);
+  if (!previous) {
+    return null;
+  }
   const existingStart = existingContent.indexOf(startMarker);
-  if (existingStart === -1) {
-    return null;
-  }
-
-  const existingEnd = existingContent.indexOf(endMarker, existingStart);
-  if (existingEnd === -1) {
-    return null;
-  }
+  const existingEnd = existingStart + previous.length - endMarker.length;
 
   const templateBlock = getManagedBlock(
     templateContent,
@@ -216,8 +219,12 @@ function mergeManagedBlockContent(
     return templateContent;
   }
 
-  const trimmed = existingContent.replace(/\s+$/, "");
-  return `${trimmed}\n\n${templateBlock}\n`;
+  return mergeManagedMarkdown(
+    existingContent,
+    templateContent,
+    startMarker,
+    endMarker,
+  );
 }
 
 function buildManagedBlockTemplate(
@@ -228,11 +235,10 @@ function buildManagedBlockTemplate(
   endMarker: string,
 ): string {
   const fullPath = path.join(cwd, ...relativePath.split("/"));
-  if (!fs.existsSync(fullPath)) {
+  const existingContent = readManagedMarkdown(fullPath);
+  if (existingContent === null) {
     return templateContent;
   }
-
-  const existingContent = fs.readFileSync(fullPath, "utf-8");
   return mergeManagedBlockContent(
     existingContent,
     templateContent,
@@ -259,22 +265,6 @@ function buildCopilotInstructionsTemplate(cwd: string): string {
     COPILOT_INSTRUCTIONS_BLOCK_START,
     COPILOT_INSTRUCTIONS_BLOCK_END,
   );
-}
-
-function isKnownUntrackedTemplate(
-  relativePath: string,
-  existingContent: string,
-): boolean {
-  if (relativePath !== FILE_NAMES.AGENTS) {
-    return false;
-  }
-
-  const managedBlock = getTrellisManagedBlock(existingContent);
-  if (!managedBlock) {
-    return false;
-  }
-
-  return LEGACY_UNTRACKED_AGENTS_MD_BLOCK_HASHES.has(computeHash(managedBlock));
 }
 
 function isSafeUntrackedCopilotInstructionsMerge(
@@ -1056,6 +1046,10 @@ function analyzeChanges(
       path: fullPath,
       relativePath,
       newContent,
+      previousContent:
+        relativePath === FILE_NAMES.AGENTS
+          ? readManagedMarkdown(fullPath)
+          : undefined,
       status: "new",
     };
 
@@ -1081,8 +1075,6 @@ function analyzeChanges(
 
         if (
           (storedHash && storedHash === currentHash) ||
-          (!storedHash &&
-            isKnownUntrackedTemplate(relativePath, existingContent)) ||
           (!storedHash &&
             isSafeUntrackedCopilotInstructionsMerge(
               relativePath,
@@ -1141,6 +1133,7 @@ function collectUnchangedFileHashRepairs(
     const recorded = hashes[key];
 
     if (recorded === undefined) {
+      if (key === FILE_NAMES.AGENTS) continue;
       // A missing entry is only an omission for a path the receipt is meant
       // to carry. `EXCLUDE_FROM_HASH` holds paths deliberately left out —
       // `.trellis/.gitignore` among them — and adding those here would put
@@ -2248,11 +2241,22 @@ export async function update(options: UpdateOptions): Promise<void> {
         })();
 
       // Collect templates (used for both migration classification and change analysis)
+      const agentsSnapshot = readManagedMarkdown(
+        path.join(cwd, FILE_NAMES.AGENTS),
+      );
       const templates = await collectTemplateFiles(
         cwd,
         codexUpgradeNeeded ? new Set<AITool>(["codex"]) : undefined,
         breakingBypass,
       );
+      if (
+        readManagedMarkdown(path.join(cwd, FILE_NAMES.AGENTS)) !==
+        agentsSnapshot
+      ) {
+        throw new Error(
+          "AGENTS.md changed during template collection; preview again",
+        );
+      }
 
       // Load update.skip paths (used for both safe-file-delete and template collection)
       const skipPaths = loadUpdateSkipPaths(cwd);
@@ -2679,7 +2683,7 @@ export async function update(options: UpdateOptions): Promise<void> {
         for (const file of changes.newFiles) {
           const dir = path.dirname(file.path);
           fs.mkdirSync(dir, { recursive: true });
-          fs.writeFileSync(file.path, file.newContent);
+          writeUpdateFile(file);
 
           // Make scripts executable
           if (
@@ -2698,7 +2702,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       if (changes.autoUpdateFiles.length > 0) {
         console.log(chalk.blue("\nAuto-updating template files..."));
         for (const file of changes.autoUpdateFiles) {
-          fs.writeFileSync(file.path, file.newContent);
+          writeUpdateFile(file);
 
           // Make scripts executable
           if (
@@ -2727,7 +2731,7 @@ export async function update(options: UpdateOptions): Promise<void> {
           );
 
           if (action === "overwrite") {
-            fs.writeFileSync(file.path, file.newContent);
+            writeUpdateFile(file);
             if (
               file.relativePath.endsWith(".sh") ||
               file.relativePath.endsWith(".py")

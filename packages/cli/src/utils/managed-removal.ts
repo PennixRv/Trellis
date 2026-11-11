@@ -8,6 +8,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { readManagedMarkdown } from "./managed-markdown.js";
+import { writeFileAtomic } from "./atomic-write.js";
 
 import { DIR_NAMES, FILE_NAMES } from "../constants/paths.js";
 import { ALL_MANAGED_DIRS } from "../configurators/index.js";
@@ -43,6 +45,7 @@ export interface PlannedDeletion {
   posixPath: string;
   absPath: string;
   missing: boolean;
+  originalContent?: string;
 }
 
 export interface PlannedModification {
@@ -50,6 +53,7 @@ export interface PlannedModification {
   absPath: string;
   reason: string;
   result: ScrubResult;
+  originalContent?: string;
 }
 
 export interface ManagedRemovalPlan {
@@ -246,6 +250,8 @@ export function buildManagedRemovalPlan(
   const modifications: PlannedModification[] = [];
 
   for (const posixPath of allPosixPaths) {
+    if (posixPath === FILE_NAMES.AGENTS)
+      readManagedMarkdown(path.join(cwd, FILE_NAMES.AGENTS));
     const absPath = options.strictPaths
       ? assertSafeManagedPath(cwd, posixPath)
       : path.join(cwd, ...posixPath.split("/"));
@@ -283,13 +289,19 @@ export function buildManagedRemovalPlan(
       );
     }
     if (result.fullyEmpty) {
-      deletions.push({ posixPath, absPath, missing: false });
+      deletions.push({
+        posixPath,
+        absPath,
+        missing: false,
+        originalContent: posixPath === FILE_NAMES.AGENTS ? content : undefined,
+      });
     } else {
       modifications.push({
         posixPath,
         absPath,
         reason: spec.reason,
         result,
+        originalContent: content,
       });
     }
   }
@@ -314,13 +326,34 @@ export function executeManagedRemovalPlan(
   let modifiedFiles = 0;
 
   for (const modification of plan.modifications) {
-    fs.writeFileSync(modification.absPath, modification.result.content);
+    if (
+      modification.posixPath === FILE_NAMES.AGENTS &&
+      readManagedMarkdown(modification.absPath) !== modification.originalContent
+    ) {
+      throw new Error("AGENTS.md changed before removal");
+    }
+    if (modification.posixPath === FILE_NAMES.AGENTS) {
+      writeFileAtomic(
+        modification.absPath,
+        modification.result.content,
+        fs.statSync(modification.absPath).mode,
+      );
+    } else {
+      fs.writeFileSync(modification.absPath, modification.result.content);
+    }
     modifiedFiles += 1;
   }
 
   const deletedDirCandidates = new Set<string>();
   for (const deletion of plan.deletions) {
     if (deletion.missing) continue;
+    if (
+      deletion.posixPath === FILE_NAMES.AGENTS &&
+      deletion.originalContent !== undefined &&
+      readManagedMarkdown(deletion.absPath) !== deletion.originalContent
+    ) {
+      throw new Error("AGENTS.md changed before removal");
+    }
     try {
       fs.unlinkSync(deletion.absPath);
       deletedFiles += 1;

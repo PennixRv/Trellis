@@ -40,9 +40,14 @@ import path from "node:path";
 import { collectPlatformTemplates } from "../configurators/index.js";
 import { FILE_NAMES } from "../constants/paths.js";
 import { getAllMigrations } from "../migrations/index.js";
-import { isRuntimeHashPath, saveHashes, shouldExcludeFromHash } from "./template-hash.js";
+import {
+  isRuntimeHashPath,
+  saveHashes,
+  shouldExcludeFromHash,
+} from "./template-hash.js";
 import { toPosix } from "./posix.js";
 import { TRELLIS_BLOCK_END, TRELLIS_BLOCK_START } from "./managed-paths.js";
+import { managedBlock, readManagedMarkdown } from "./managed-markdown.js";
 import type { AITool } from "../types/ai-tools.js";
 import type { TemplateHashes } from "../types/migration.js";
 
@@ -89,18 +94,11 @@ function buildKnownKeys(configuredPlatforms: readonly AITool[]): Set<string> {
  */
 function shouldKeepAgentsMd(cwd: string): boolean {
   const fullPath = path.join(cwd, FILE_NAMES.AGENTS);
-  if (!fs.existsSync(fullPath)) {
-    return true;
-  }
-  try {
-    const content = fs.readFileSync(fullPath, "utf-8");
-    return (
-      content.includes(TRELLIS_BLOCK_START) &&
-      content.includes(TRELLIS_BLOCK_END)
-    );
-  } catch {
-    return true;
-  }
+  const content = readManagedMarkdown(fullPath);
+  return (
+    content === null ||
+    managedBlock(content, TRELLIS_BLOCK_START, TRELLIS_BLOCK_END) !== null
+  );
 }
 
 export interface PruneOptions {

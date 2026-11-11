@@ -86,6 +86,10 @@ Trellis 内部运行一个 4 阶段循环，skill 与子代理均由系统自动
 
 ## 资源
 
+新项目默认获得通用的 `.trellis/spec/index.md` 和共享思考指南；多包项目还会在稳定包键下生成索引。Bootstrap 只补充有项目源码依据的约定，既有 Web／自定义层、显式 registry 模板和历史任务绑定继续有效。
+
+普通 `trellis init`（包括 `--yes`）会向已有且缺少 Trellis 块的 `AGENTS.md` 追加指引；已有合法块默认保留，`--skip-existing` 明确跳过该文件。`--force` 和显式覆盖只替换 Trellis 块，保留其他内容；其他文件维持原生覆盖行为。异常块和不安全路径会被拒绝，可检测的陈旧快照需要重新预览。资产恢复无法证明后续其他内容安全时会报告冲突。这些检查不提供跨 writer 互斥或事务保证。
+
 | 需求 | 链接 |
 | --- | --- |
 | 在仓库中安装 Trellis | [快速开始](https://docs.trytrellis.app/zh/start/install-and-first-task) |

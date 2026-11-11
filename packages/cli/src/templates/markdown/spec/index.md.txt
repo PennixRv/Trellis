@@ -1,0 +1,19 @@
+# Project Development Guidelines
+
+This index navigates the project's verified engineering conventions. Use
+`trellis-spec-bootstrap` to establish relevant topics from source, tests and
+existing project rules. No domain or layer is required by default.
+
+## Pre-Development Checklist
+
+Read this index, the applicable package index (when configured), and the topic
+guidelines for the code you will change. Read the shared `guides/index.md` at
+the spec root. Follow existing layer indexes in projects that use them.
+
+## Quality Check
+
+Review the change against the applicable guidelines and run the checks they
+require. Record actual results and any unavailable verification.
+
+Add links to real topic guidelines here as the project establishes them. For
+an empty project, leave conventions pending until implementation supplies evidence.

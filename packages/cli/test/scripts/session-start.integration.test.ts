@@ -31,6 +31,45 @@ describe.each(["shared-hooks", "codex/hooks", "copilot/hooks"])(
         env: environment,
       });
     }
+    it("discovers root and legacy indexes and applies package scope before package indexes", () => {
+      fs.cpSync(
+        path.join(templates, "trellis/scripts"),
+        path.join(repo, ".trellis/scripts"),
+        { recursive: true },
+      );
+      fs.writeFileSync(
+        path.join(repo, ".trellis/config.yaml"),
+        "packages:\n  cli:\n    path: packages/cli\n  other:\n    path: packages/other\ndefault_package: cli\nsession:\n  spec_scope: active_task\n",
+      );
+      for (const relative of [
+        "index.md",
+        "guides/index.md",
+        "cli/index.md",
+        "cli/custom/index.md",
+        "other/index.md",
+        "other/custom/index.md",
+        "legacy/index.md",
+      ]) {
+        const file = path.join(repo, ".trellis/spec", relative);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, "# Confirmed guidelines\n");
+      }
+      const result = invoke(JSON.stringify({ cwd: repo }));
+      expect(result.status, result.stderr).toBe(0);
+      for (const index of [
+        "index.md",
+        "guides/index.md",
+        "cli/index.md",
+        "cli/custom/index.md",
+        "legacy/index.md",
+      ])
+        expect(result.stdout).toContain(`.trellis/spec/${index}`);
+      expect(result.stdout).not.toContain(".trellis/spec/other/index.md");
+      expect(result.stdout).not.toContain(
+        ".trellis/spec/other/custom/index.md",
+      );
+    });
+
     it("returns safely outside a project for absent or invalid input", () => {
       for (const input of [
         "",

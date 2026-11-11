@@ -180,14 +180,18 @@ from the external ablation transaction. Use the positive template baseline
 plus actual planned file changes, never recursive project backup. Exclude
 tasks, specs, workspace, session/handoff history, runtime, credentials, caches,
 dependencies, and worktrees. Resolve canonical project identity and reject
-every symlink component. Publish private snapshots only after payload and
+paths that resolve outside the project. Mixed-owner `AGENTS.md` must be a
+literal regular file: reject its symlink before resolving any target. Other
+managed assets retain their existing in-project symlink support. Publish
+private snapshots only after payload and
 manifest verification; record snapshot completion separately from update success.
 
 Restore validates strict schema, project identity, scope, hashes, modes,
 unexpected payload files, and exact task layout/phase runtime compatibility.
 Require a current preview digest and explicit execution; modified files stay
 conflicts unless separately reviewed with replacement. Preserve mixed
-AGENTS.md user text. Save a recovery snapshot and durable restoring record
+AGENTS.md user text; replacement cannot override this ownership check, including
+manual snapshots without an update-after fingerprint. Save a recovery snapshot and durable restoring record
 before writes; resume only against recorded current/desired fingerprints.
 Retain unresolved operations and their recovery snapshots during cleanup.
 

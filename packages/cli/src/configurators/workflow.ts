@@ -17,10 +17,7 @@ import {
 // Import markdown templates
 import {
   agentProgressIndexContent,
-  // Backend structure (multi-doc)
-  backendIndexContent,
-  // Frontend structure (multi-doc)
-  frontendIndexContent,
+  specIndexContent,
   // Guides structure
   guidesIndexContent,
   guidesCrossLayerThinkingGuideContent,
@@ -116,7 +113,6 @@ export async function createWorkflowStructure(
   cwd: string,
   options?: WorkflowOptions,
 ): Promise<void> {
-  const projectType = options?.projectType ?? "fullstack";
   const skipSpecTemplates = options?.skipSpecTemplates ?? false;
   const packages = options?.packages;
   const remoteSpecPackages = options?.remoteSpecPackages;
@@ -182,66 +178,36 @@ export async function createWorkflowStructure(
   // These are NOT dogfooded - they are generic templates for new projects
   if (packages && packages.length > 0) {
     // Monorepo mode: create per-package spec directories
-    await createSpecTemplates(cwd, projectType, packages, remoteSpecPackages);
+    await createSpecTemplates(cwd, packages, remoteSpecPackages);
   } else if (!skipSpecTemplates) {
     // Single-repo mode: create global spec (skip if using remote template)
-    await createSpecTemplates(cwd, projectType);
+    await createSpecTemplates(cwd);
   }
 }
 
-/**
- * Write backend spec docs into a target spec directory.
- */
-async function writeBackendDocs(specBase: string): Promise<void> {
-  const backendDir = path.join(specBase, "backend");
-  ensureDir(backendDir);
-  const docs: DocDefinition[] = [
-    { name: "index.md", content: backendIndexContent },
-  ];
-  for (const doc of docs) {
-    const target = path.join(backendDir, doc.name);
-    if (!fs.existsSync(target)) await writeFile(target, doc.content);
-  }
-}
-
-/**
- * Write frontend spec docs into a target spec directory.
- */
-async function writeFrontendDocs(specBase: string): Promise<void> {
-  const frontendDir = path.join(specBase, "frontend");
-  ensureDir(frontendDir);
-  const docs: DocDefinition[] = [
-    { name: "index.md", content: frontendIndexContent },
-  ];
-  for (const doc of docs) {
-    const target = path.join(frontendDir, doc.name);
-    if (!fs.existsSync(target)) await writeFile(target, doc.content);
-  }
-}
-
-/**
- * Write spec docs for a given project type into a target spec directory.
- */
-async function writeSpecForType(
+async function writeSpecIndex(
   specBase: string,
-  projectType: ProjectType,
+  content = specIndexContent,
 ): Promise<void> {
-  if (projectType !== "frontend") {
-    await writeBackendDocs(specBase);
-  }
-  if (projectType !== "backend") {
-    await writeFrontendDocs(specBase);
-  }
+  ensureDir(specBase);
+  const target = path.join(specBase, "index.md");
+  if (!fs.existsSync(target)) await writeFile(target, content);
 }
 
 async function createSpecTemplates(
   cwd: string,
-  projectType: ProjectType,
   packages?: DetectedPackage[],
   remoteSpecPackages?: Set<string>,
 ): Promise<void> {
   // Ensure spec directory exists
   ensureDir(path.join(cwd, PATHS.SPEC));
+  const navigation = packages
+    ?.map((pkg) => `- [${pkg.name}](./${sanitizePkgName(pkg.name)}/index.md)`)
+    .join("\n");
+  await writeSpecIndex(
+    path.join(cwd, PATHS.SPEC),
+    specIndexContent + (navigation ? `\n## Packages\n\n${navigation}\n` : ""),
+  );
 
   // Guides - always created regardless of mode
   const guidesDir = path.join(cwd, `${PATHS.SPEC}/guides`);
@@ -269,11 +235,10 @@ async function createSpecTemplates(
       if (remoteSpecPackages?.has(dirName)) continue;
       const pkgSpecBase = path.join(cwd, `${PATHS.SPEC}/${dirName}`);
       ensureDir(pkgSpecBase);
-      const pkgType = pkg.type === "unknown" ? "fullstack" : pkg.type;
-      await writeSpecForType(pkgSpecBase, pkgType);
+      await writeSpecIndex(pkgSpecBase);
     }
   } else {
     // Single-repo mode
-    await writeSpecForType(path.join(cwd, PATHS.SPEC), projectType);
+    await writeSpecIndex(path.join(cwd, PATHS.SPEC));
   }
 }

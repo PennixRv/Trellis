@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   assertSafeManagedPath,
   buildManagedRemovalPlan,
+  executeManagedRemovalPlan,
   validateManagedRelativePath,
 } from "../../src/utils/managed-removal.js";
 
@@ -39,6 +40,41 @@ describe("managed-removal strict planning", () => {
     expect(() =>
       validateManagedRelativePath(".codex/hooks/session-start.py"),
     ).not.toThrow();
+  });
+
+  it.each(["", "\r\nmanual  \r\n"])(
+    "refuses stale AGENTS removal without losing foreign edits: %j",
+    (outside) => {
+      const agents = path.join(tmpDir, "AGENTS.md");
+      fs.writeFileSync(
+        agents,
+        `<!-- TRELLIS:START -->\nmanaged\n<!-- TRELLIS:END -->${outside}`,
+      );
+      const plan = buildManagedRemovalPlan(tmpDir, { "AGENTS.md": "hash" });
+      const changed =
+        fs.readFileSync(agents, "utf-8") + "\r\nexternal policy  \r\n";
+      fs.writeFileSync(agents, changed);
+      expect(() => executeManagedRemovalPlan(tmpDir, plan)).toThrow(
+        "changed before removal",
+      );
+      expect(fs.readFileSync(agents, "utf-8")).toBe(changed);
+    },
+  );
+
+  it("refuses tracked AGENTS symlinks and malformed ownership", () => {
+    const agents = path.join(tmpDir, "AGENTS.md");
+    fs.writeFileSync(agents, "<!-- TRELLIS:END -->\n<!-- TRELLIS:START -->");
+    expect(() =>
+      buildManagedRemovalPlan(tmpDir, { "AGENTS.md": "hash" }),
+    ).toThrow("Malformed");
+    fs.unlinkSync(agents);
+    const target = path.join(tmpDir, "target");
+    fs.writeFileSync(target, "policy");
+    fs.symlinkSync(target, agents);
+    expect(() =>
+      buildManagedRemovalPlan(tmpDir, { "AGENTS.md": "hash" }),
+    ).toThrow("regular file");
+    expect(fs.readFileSync(target, "utf-8")).toBe("policy");
   });
 
   it.skipIf(process.platform === "win32")(

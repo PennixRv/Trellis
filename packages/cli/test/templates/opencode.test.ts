@@ -1,4 +1,5 @@
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -312,6 +313,56 @@ describe("opencode session-start history detection", () => {
     contextCollector.clear("session-a");
   });
 
+  it("discovers neutral indexes without leaking excluded package indexes", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trellis-opencode-indexes-"));
+    try {
+      cpSync(
+        join(__dirname, "../../src/templates/trellis/scripts"),
+        join(dir, ".trellis/scripts"),
+        { recursive: true },
+      );
+      writeFileSync(
+        join(dir, ".trellis/config.yaml"),
+        "packages:\n  cli:\n    path: packages/cli\n  other:\n    path: packages/other\ndefault_package: cli\nsession:\n  spec_scope: active_task\n",
+      );
+      for (const index of [
+        "index.md",
+        "guides/index.md",
+        "cli/index.md",
+        "cli/custom/index.md",
+        "other/index.md",
+        "other/custom/index.md",
+        "legacy/index.md",
+      ]) {
+        const file = join(dir, ".trellis/spec", index);
+        mkdirSync(join(file, ".."), { recursive: true });
+        writeFileSync(file, "# Confirmed conventions\n");
+      }
+      const context = buildSessionContext({
+        directory: dir,
+        getActiveTask: () => ({ taskPath: null, source: "none", stale: false }),
+        getContextKey: () => null,
+        getCurrentTask: () => null,
+        readFile: () => "",
+        readProjectFile: () => "",
+        resolveTaskDir: () => null,
+        runScript: () => "",
+      });
+      for (const index of [
+        "index.md",
+        "guides/index.md",
+        "cli/index.md",
+        "cli/custom/index.md",
+        "legacy/index.md",
+      ])
+        expect(context).toContain(`.trellis/spec/${index}`);
+      expect(context).not.toContain(".trellis/spec/other/index.md");
+      expect(context).not.toContain(".trellis/spec/other/custom/index.md");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("builds compact startup context with an adaptive one-shot acknowledgment", () => {
     const context = buildSessionContext({
       directory: "/tmp/trellis-opencode-test",
@@ -380,7 +431,11 @@ describe("opencode session-start history detection", () => {
     );
     const context = buildSessionContext({
       directory: dir,
-      getActiveTask: () => ({ taskPath: ".trellis/tasks/demo-task", source: "test", stale: false }),
+      getActiveTask: () => ({
+        taskPath: ".trellis/tasks/demo-task",
+        source: "test",
+        stale: false,
+      }),
       getContextKey: () => null,
       getCurrentTask: () => null,
       readFile: () => "",
@@ -390,7 +445,9 @@ describe("opencode session-start history detection", () => {
     });
 
     try {
-      expect(context).toContain("task lifecycle status and artifact presence do not identify the business phase");
+      expect(context).toContain(
+        "task lifecycle status and artifact presence do not identify the business phase",
+      );
       expect(context).not.toContain("trellis-brainstorm");
       expect(context).not.toContain("PRD-only");
     } finally {
@@ -436,7 +493,9 @@ describe("opencode session-start history detection", () => {
     expect(laterMessages[0].parts).toBe(originalFirstParts);
     expect(originalLaterParts).toHaveLength(1);
     expect(laterMessages[2].parts[0].text).toMatch(/^<session-context>/);
-    expect(laterMessages[2].parts[0].text).not.toContain("<first-reply-notice>");
+    expect(laterMessages[2].parts[0].text).not.toContain(
+      "<first-reply-notice>",
+    );
     expect(laterMessages[2].parts[1]).toEqual(originalLaterParts[0]);
   });
 
@@ -775,17 +834,17 @@ describe("opencode persisted synthetic context parts", () => {
         );
       }
 
-      expect(parts.map(part => part.text)).toEqual([
+      expect(parts.map((part) => part.text)).toEqual([
         "session context",
         "workflow context",
         "ordinary user prompt",
       ]);
-      expect(parts.map(part => part.id)).toEqual(
+      expect(parts.map((part) => part.id)).toEqual(
         [...parts]
           .sort((left, right) =>
             left.id < right.id ? -1 : left.id > right.id ? 1 : 0,
           )
-          .map(part => part.id),
+          .map((part) => part.id),
       );
       expect(parts[0].id).not.toBe(parts[1].id);
       expect(parts[2]).toEqual(ordinary);
@@ -809,9 +868,7 @@ describe("opencode persisted synthetic context parts", () => {
         "000000000001",
       ),
     ];
-    const unsupportedIdentityBefore = structuredClone(
-      unsupportedIdentityParts,
-    );
+    const unsupportedIdentityBefore = structuredClone(unsupportedIdentityParts);
     expect(() =>
       insertSyntheticTextPart(
         unsupportedIdentityParts,
@@ -826,11 +883,7 @@ describe("opencode persisted synthetic context parts", () => {
     ];
     const missingIdentityBefore = structuredClone(missingIdentityParts);
     expect(() =>
-      insertSyntheticTextPart(
-        missingIdentityParts,
-        "context",
-        "sessionStart",
-      ),
+      insertSyntheticTextPart(missingIdentityParts, "context", "sessionStart"),
     ).toThrow("no ordinary OpenCode part with a persisted identity");
     expect(missingIdentityParts).toEqual(missingIdentityBefore);
 
@@ -1215,8 +1268,10 @@ describe("opencode messages.transform injection (issue #553)", () => {
 
   function ephemeralTexts(message: TransformMessage): string[] {
     return message.parts
-      .filter(part => part.synthetic === true && typeof part.text === "string")
-      .map(part => part.text as string);
+      .filter(
+        (part) => part.synthetic === true && typeof part.text === "string",
+      )
+      .map((part) => part.text as string);
   }
 
   it("injects both plugins onto the latest user message without mutating history", async () => {
@@ -1258,10 +1313,10 @@ describe("opencode messages.transform injection (issue #553)", () => {
       expect(originalLatestParts).toEqual([ordinary]);
       expect(messages[2]).not.toBe(latest);
       const texts = ephemeralTexts(messages[2]);
-      expect(texts.some(text => text.startsWith("<session-context>"))).toBe(
+      expect(texts.some((text) => text.startsWith("<session-context>"))).toBe(
         true,
       );
-      expect(texts.some(text => text.startsWith("<workflow-state>"))).toBe(
+      expect(texts.some((text) => text.startsWith("<workflow-state>"))).toBe(
         true,
       );
       expect(messages[2].parts.at(-1)).toEqual(ordinary);
@@ -1290,8 +1345,12 @@ describe("opencode messages.transform injection (issue #553)", () => {
 
     expect(originalParts).toEqual([attachment]);
     const texts = ephemeralTexts(messages[0]);
-    expect(texts.some(text => text.startsWith("<session-context>"))).toBe(true);
-    expect(texts.some(text => text.startsWith("<workflow-state>"))).toBe(true);
+    expect(texts.some((text) => text.startsWith("<session-context>"))).toBe(
+      true,
+    );
+    expect(texts.some((text) => text.startsWith("<workflow-state>"))).toBe(
+      true,
+    );
     expect(messages[0].parts.at(-1)).toEqual(attachment);
   });
 
@@ -1308,7 +1367,10 @@ describe("opencode messages.transform injection (issue #553)", () => {
     await workflowHooks[MESSAGES_TRANSFORM_HOOK]({}, { messages });
     expect(originalParts).toEqual([{ type: "text", text: "original" }]);
     expect(ephemeralTexts(messages[0]).length).toBe(2);
-    expect(messages[0].parts.at(-1)).toEqual({ type: "text", text: "original" });
+    expect(messages[0].parts.at(-1)).toEqual({
+      type: "text",
+      text: "original",
+    });
   });
 
   it("checks the skip keyword only in ordinary user text", async () => {
@@ -1327,9 +1389,11 @@ describe("opencode messages.transform injection (issue #553)", () => {
     };
     const messages = [latest];
     await hooks[MESSAGES_TRANSFORM_HOOK]({}, { messages });
-    expect(ephemeralTexts(messages[0]).some(text =>
-      text.startsWith("<workflow-state>"),
-    )).toBe(true);
+    expect(
+      ephemeralTexts(messages[0]).some((text) =>
+        text.startsWith("<workflow-state>"),
+      ),
+    ).toBe(true);
     expect(messages[0].parts.at(-1)).toEqual(ordinary);
   });
 

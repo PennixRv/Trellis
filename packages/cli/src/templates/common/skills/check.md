@@ -19,7 +19,9 @@ Read the current native phase, accepted contract and its actual artifact referen
 python3 ./.trellis/scripts/get_context.py --mode packages
 ```
 
-For each changed package/layer, read the spec index and follow its **Quality Check** section:
+Read the available `.trellis/spec/index.md`, affected configured package
+indexes (`.trellis/spec/<package>/index.md`), and existing layer indexes.
+Follow their **Quality Check** sections; older projects need no migration:
 
 ```bash
 cat .trellis/spec/<package>/<layer>/index.md

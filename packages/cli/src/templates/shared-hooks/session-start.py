@@ -472,7 +472,7 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
     if task_status == "planning":
         next_bits = [
             "Follow the current per-turn workflow-state; task lifecycle status and artifact presence do not identify the business phase",
-            "If no phase route is initialized, initialize it through Trellis CLI, load `trellis-goal-exploration-and-requirements`, and obtain user confirmation for the recorded requirements artifact before advancing",
+            "If no phase route is initialized, inspect recorded requirements and existing authorization, choose applicable ordered phases with evidence for omissions, then initialize through Trellis CLI and load the current phase Skill; do not repeat valid confirmations",
         ]
         if not jsonl_ready:
             next_bits.append("curate task context manifests only when a dispatched agent needs them")
@@ -639,7 +639,7 @@ def _resolve_spec_scope(
     return None  # Unknown scope type: full scan
 
 
-def _collect_spec_index_paths(trellis_dir: Path, allowed_pkgs: set | None) -> list[str]:
+def _collect_spec_index_paths(trellis_dir: Path, allowed_pkgs: set | None, package_names: set | None = None) -> list[str]:
     paths: list[str] = []
     guides_index = trellis_dir / "spec" / "guides" / "index.md"
     if guides_index.is_file():
@@ -648,16 +648,18 @@ def _collect_spec_index_paths(trellis_dir: Path, allowed_pkgs: set | None) -> li
     spec_dir = trellis_dir / "spec"
     if not spec_dir.is_dir():
         return paths
+    if (spec_dir / "index.md").is_file():
+        paths.insert(0, ".trellis/spec/index.md")
 
     for sub in sorted(spec_dir.iterdir()):
         if not sub.is_dir() or sub.name.startswith(".") or sub.name == "guides":
             continue
 
+        if package_names and sub.name in package_names and allowed_pkgs is not None and sub.name not in allowed_pkgs:
+            continue
         index_file = sub / "index.md"
         if index_file.is_file():
             paths.append(f".trellis/spec/{sub.name}/index.md")
-            continue
-
         if allowed_pkgs is not None and sub.name not in allowed_pkgs:
             continue
         for nested in sorted(sub.iterdir()):
@@ -878,7 +880,7 @@ def main():
 
     output = StringIO()
 
-    spec_index_paths = _collect_spec_index_paths(trellis_dir, allowed_pkgs)
+    spec_index_paths = _collect_spec_index_paths(trellis_dir, allowed_pkgs, set(packages))
 
     output.write("""<session-context>
 Trellis compact SessionStart context. Use it to orient the session; load details on demand.

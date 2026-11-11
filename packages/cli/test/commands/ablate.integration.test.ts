@@ -98,10 +98,16 @@ describe("ablate()/restore() integration", () => {
     fs.writeFileSync(sensitiveTask, "user-authored recovery text\n");
     const userNeighbor = path.join(projectDir, ".codex", "user-note.txt");
     fs.writeFileSync(userNeighbor, "mine\n");
-    fs.appendFileSync(path.join(projectDir, "AGENTS.md"), "\nUser footer\n");
+    const agents = path.join(projectDir, "AGENTS.md");
+    const prefix = "手工规则  \r\n\r\n\r\n";
+    const suffix =
+      "\r\n\r\n尾部  \r\n<!-- codegraph:start -->C<!-- codegraph:end -->\r\n";
+    const managed = fs.readFileSync(agents, "utf-8");
+    fs.writeFileSync(agents, prefix + managed + suffix);
     const before = projectFingerprint();
 
     await ablate({ yes: true });
+    expect(fs.readFileSync(agents, "utf-8")).toBe(prefix + "\n" + suffix);
     expect(fs.existsSync(path.join(projectDir, ".trellis"))).toBe(false);
     expect(
       fs.readFileSync(path.join(projectDir, "application.txt"), "utf-8"),
