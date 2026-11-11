@@ -1,0 +1,124 @@
+{
+  "id": "teamwork-wait-recovery-implementation",
+  "name": "teamwork-wait-recovery-implementation",
+  "title": "Teamwork 等待句柄丢失恢复实现",
+  "description": "承接根任务 teamwork-lost-wait-handle-recovery 已批准合同 v2，当前主会话直接完成原生观察、定位 Hook、异常退出桥接及连续发布部署；本地仅做组件归属记账，不另起规划或授权。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-11-11",
+  "completedAt": "2026-11-11",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "root_task": "teamwork-lost-wait-handle-recovery",
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "analysis",
+      "complexity": "simple",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "5",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "4c8e16494d47b04b24292b1af56a8ae15ea2aaed58209723ac44258a13b4d7cd",
+          "artifact_refs": [
+            "prd.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "prd.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "4c8e16494d47b04b24292b1af56a8ae15ea2aaed58209723ac44258a13b4d7cd",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "prd.md"
+            ]
+          }
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "aebf5f34a0b970a8308f8c974b27254584436e0f2fc308ffe2dd6c6763f18ce4",
+          "artifact_refs": [
+            "closeout.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "closeout.md",
+          "outcome_kind": "delivery_ready",
+          "reason": null,
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "aebf5f34a0b970a8308f8c974b27254584436e0f2fc308ffe2dd6c6763f18ce4",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "closeout.md"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": null,
+      "closeout_disposition": "delivery_ready",
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "根任务统一授权并实施；本组件仅核验交付与归属记账，不另建方案或倒填历史实施阶段",
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "solution_design_and_convergence": {
+          "reason": "根任务统一授权并实施；本组件仅核验交付与归属记账，不另建方案或倒填历史实施阶段",
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "task_implementation": {
+          "reason": "根任务统一授权并实施；本组件仅核验交付与归属记账，不另建方案或倒填历史实施阶段",
+          "evidence_refs": [
+            "prd.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": null
+    }
+  }
+}

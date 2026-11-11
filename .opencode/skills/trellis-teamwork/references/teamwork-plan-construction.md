@@ -96,6 +96,13 @@ closes admission, marks undispatched FIFO work `FINAL_FAILED`, then cancels and
 drains active attempts. Confirmed outcomes settle as `SETTLED_WITH_FAILURE`;
 unconfirmed process exit requires reconciliation.
 
+If the host handle becomes unavailable, observe only that original frozen plan
+with `trellis teamwork reconcile <plan> --task <task-dir> --wait 30`. This is
+bounded read-only recovery, not another batch or a new execution deadline.
+Only a verified durable receipt exposes a settled result; reports still need
+main-agent review. Coordinator loss follows explicit reconciliation and never
+proves provider termination by itself.
+
 A valid `blocked` report with evidence ends only that assignment as
 `FINAL_FAILED`; the CLI continues with the remaining FIFO work and preserves
 the blocker report. Missing reports may use the assignment's declared retry
