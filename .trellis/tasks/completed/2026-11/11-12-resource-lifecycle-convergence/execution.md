@@ -72,3 +72,12 @@ not a published/install completion claim. No task/history/runtime data is remove
 审查另补 ZIP 交接语义 core 的有界只读引用检查；Trellis 不复制交接存储写协议，未知/损坏/超预算容器保留。新增与既有引用、cleanup 两组 17 项通过，CLI 全量更新为 2168 passed / 2 skipped。新 Task runtime CLI 已通过真实参数解析默认预览和过期摘要拒绝回归；其实际接口是 `task.py runtime [<task>] [--confirm <digest>]`，无额外 preview/cleanup 子命令，文档已按此修正。
 
 打包 preflight 通过；全新隔离 init 安装 task_runtime.py 等四份 Python 模板，逐字与源码一致且在原生 hashes 登记，runtime 默认预览可运行，后续 update dry-run 为 already up to date。第一次 smoke 错读 hashes 的字段名及多传 preview 位置参数均为本次验证脚本错误；已读取真实格式/解析器后纠正，没有据此改动正常实现。
+# 固定发行及安装后验收
+
+源码实现提交 `c7af347717cc921e5ace1d2c42662042d027b9e2`，原生 `pnpm release:beta` 生成 `v0.7.2-beta.19`，tag 指向 `9d13904aaa88bbfaa3ed2a5282b954b27a4692cd`。Core、CLI、adapter 版本一致。完整验证最终为 Core 424 passed / 1 skipped、CLI 2168 passed / 2 skipped、adapter 4 passed，lint/typecheck/build 通过，Python 0 errors / 72 warnings；必要 release 检查及 packed CLI 精确 Core 依赖核验通过。
+
+Publish to npm run `43201970940` 首次在包已上传但公共 registry 尚未可见时耗尽等待窗口；未改 tag 或本地重发。随后原生 verify-npm 三包通过，沿既有幂等 publish plan 重跑同一 CI 成功。文档提交 `aa0c119` 已推送并由 source gitlink 固定。
+
+根侧完成 `pennix update` 精确 .19 和 CLI/adapter 原生 repair；两个 owner 均 changed，锁、receipt、实际安装 package 三者一致。根、Trellis、Skills 通过 native update --skip-all 与 bundled native 复核；分别 4222/1591/462 项保护指纹不变，27 个生成脚本/Hook 与源码逐字相等。Trellis 自定义 config.yaml 保留。自动生成的迁移提示任务已通过原生分析审查完成，未执行无条目的 --migrate。
+
+根 Node 24.16.0 full-local 55 passed / 0 failed / 0 blocked / 4 not_run；offline 11 passed，session-handoff 六模块通过。4 项是测试明确未覆盖的历史冲突、跨进程写入、远端 registry 和宿主实际加载边界，未伪称通过。真实运行资产、Teamwork 和历史迁移的安装后预览交由根任务处理；本 owner 包没有真实历史删除，也没有改变未决 provider 状态。

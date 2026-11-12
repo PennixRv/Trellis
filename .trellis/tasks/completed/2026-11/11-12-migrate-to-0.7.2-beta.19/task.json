@@ -1,0 +1,123 @@
+{
+  "id": "migrate-to-0.7.2-beta.19",
+  "name": "migrate-to-0.7.2-beta.19",
+  "title": "Migrate to v0.7.2-beta.19",
+  "description": "Breaking change migration from v0.7.2-beta.18 to v0.7.2-beta.19",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "migration",
+  "package": null,
+  "priority": "P1",
+  "creator": "trellis-update",
+  "assignee": "penn",
+  "createdAt": "2026-11-12",
+  "completedAt": "2026-11-12",
+  "branch": null,
+  "base_branch": null,
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "analysis",
+      "complexity": "simple",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "5",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "b62629b417c89acedd5fdad9c89ad73a71dcef670eddf217746f95a03faac9a7",
+          "artifact_refs": [
+            "review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "review.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "review.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "b62629b417c89acedd5fdad9c89ad73a71dcef670eddf217746f95a03faac9a7",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "review.md"
+            ]
+          }
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "b62629b417c89acedd5fdad9c89ad73a71dcef670eddf217746f95a03faac9a7",
+          "artifact_refs": [
+            "review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "review.md",
+          "outcome_kind": "delivery_ready",
+          "reason": null,
+          "evidence_refs": [
+            "review.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "b62629b417c89acedd5fdad9c89ad73a71dcef670eddf217746f95a03faac9a7",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "review.md"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": null,
+      "closeout_disposition": "delivery_ready",
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "自动更新提示复用已接受父合同和明确实施批准；仅核对已完成的生成资产更新",
+          "evidence_refs": [
+            "review.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "solution_design_and_convergence": {
+          "reason": "自动更新提示复用已接受父合同和明确实施批准；仅核对已完成的生成资产更新",
+          "evidence_refs": [
+            "review.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "task_implementation": {
+          "reason": "自动更新提示复用已接受父合同和明确实施批准；仅核对已完成的生成资产更新",
+          "evidence_refs": [
+            "review.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": null
+    }
+  }
+}
