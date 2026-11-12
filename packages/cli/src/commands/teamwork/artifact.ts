@@ -220,7 +220,7 @@ function rejectSecrets(value: unknown, field: string): void {
     throw new Error(`${field} appears to contain a credential`);
 }
 
-function attemptArtifactPath(
+export function attemptArtifactPath(
   taskRoot: string,
   briefPath: string,
   attemptId: string,

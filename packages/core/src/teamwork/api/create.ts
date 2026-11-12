@@ -1,23 +1,19 @@
 import fs from "node:fs";
-import path from "node:path";
 
 import {
   appendEvent,
   type CreateTeamworkEvent,
 } from "../internal/store/events.js";
 import {
-  sessionDir,
   ensureBucketMarker,
-  eventsPath,
 } from "../internal/store/paths.js";
 import { parseTeamworkSessionType } from "../internal/store/schema.js";
 import { resolveTeamworkSession } from "./resolve.js";
 import type { CreateTeamworkSessionOptions } from "./types.js";
 
 /**
- * Create a new Teamwork Session. Throws when it already exists unless
- * `force` is set, in which case the existing Teamwork Session directory is wiped
- * before the create event is appended.
+ * Create a new Teamwork Session. Existing evidence must first be retired by
+ * its purpose-aware owner; force is retained for input compatibility only.
  */
 export async function createTeamworkSession(
   opts: CreateTeamworkSessionOptions,
@@ -30,17 +26,12 @@ export async function createTeamworkSession(
     forCreate: true,
   });
   const sessionType = parseTeamworkSessionType(opts.type);
-  const events = eventsPath(opts.sessionId, ref.project);
   const dir = ref.dir;
 
-  if (fs.existsSync(events) && !opts.force) {
+  if (fs.existsSync(dir) && fs.readdirSync(dir).length) {
     throw new Error(
-      `Teamwork Session '${opts.sessionId}' already exists at ${dir}. Use --force to overwrite.`,
+      `Teamwork Session '${opts.sessionId}' already exists at ${dir}. Review native rm preview/confirmation before reusing its name; --force does not remove evidence.`,
     );
-  }
-
-  if (opts.force && fs.existsSync(dir)) {
-    await forceCleanTeamworkSession(opts.sessionId, ref.project);
   }
 
   ensureBucketMarker(ref.project);
@@ -69,57 +60,4 @@ export async function createTeamworkSession(
     ref.project,
   );
   return event as CreateTeamworkEvent;
-}
-
-async function forceCleanTeamworkSession(name: string, project: string): Promise<void> {
-  const dir = sessionDir(name, project);
-  let entries: string[];
-  try {
-    entries = fs.readdirSync(dir);
-  } catch {
-    return;
-  }
-  for (const f of entries) {
-    if (!f.endsWith(".pid")) continue;
-    const pidFile = path.join(dir, f);
-    let pid = 0;
-    try {
-      pid = Number(fs.readFileSync(pidFile, "utf-8").trim());
-    } catch {
-      continue;
-    }
-    if (pid && pidAlive(pid)) {
-      try {
-        process.kill(pid, "SIGTERM");
-        const deadline = Date.now() + 1500;
-        while (pidAlive(pid) && Date.now() < deadline) {
-          await sleep(50);
-        }
-        if (pidAlive(pid)) process.kill(pid, "SIGKILL");
-      } catch {
-        // already dead
-      }
-    }
-  }
-
-  try {
-    fs.rmSync(dir, { recursive: true, force: true });
-  } catch (err) {
-    process.stderr.write(
-      `[trellis teamwork create --force] warning: failed to fully clean ${dir}: ${err instanceof Error ? err.message : err}\n`,
-    );
-  }
-}
-
-function pidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }

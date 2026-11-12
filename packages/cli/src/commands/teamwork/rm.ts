@@ -1,6 +1,6 @@
 /**
- * `trellis teamwork rm <name>` — stop any live teammates, then remove the
- * Teamwork Session directory under `~/.trellis/teamwork/`.
+ * `trellis teamwork rm <name>` previews a settled, unreferenced session;
+ * its exact digest confirms removal under `~/.trellis/teamwork/`.
  *
  * `trellis teamwork prune [--all | --idle <duration> | --empty]` — bulk
  * cleanup matching criteria.
@@ -9,7 +9,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { teamworkSessionKill } from "./kill.js";
+import { readCoordinationState } from "@pennixrv/trellis-core/teamwork";
+import { safePath } from "./artifact.js";
+import {
+  evidenceDigest,
+  inspectEvidenceReferences,
+} from "./evidence-references.js";
 import { withLock } from "./store/lock.js";
 import { readBatchReservations } from "./batch-reservation.js";
 
@@ -22,6 +27,8 @@ import {
   listProjects,
   projectDir,
   resolveExistingTeamworkSession,
+  assertSafeName,
+  projectKey,
 } from "./store/paths.js";
 import {
   GLOBAL_PROJECT_KEY,
@@ -29,16 +36,152 @@ import {
 } from "./store/schema.js";
 
 export interface RmOptions {
+  /** Quiet output for the native one-shot caller; never deletion permission. */
   force?: boolean;
   /** Project bucket override. Defaults to current cwd's project. */
   project?: string;
   scope?: string;
+  confirm?: string;
+}
+
+interface SessionPreview {
+  status: "preview" | "removed";
+  name: string;
+  project: string;
+  cwd: string;
+  eligible: boolean;
+  blockers: string[];
+  files: { path: string; fingerprint: unknown[] }[];
+  references: ReturnType<typeof inspectEvidenceReferences>;
+  digest: string;
+}
+
+async function previewSession(
+  name: string,
+  project: string,
+): Promise<SessionPreview> {
+  assertSafeName(project, "project bucket");
+  const dir = safePath(teamworkRoot(), path.join(project, name));
+  const blockers: string[] = [];
+  if (
+    readBatchReservations(projectDir(project)).some(
+      (item) => item.sessionId === name,
+    )
+  )
+    blockers.push(
+      "Batch capacity reservation is unresolved; reconcile it first",
+    );
+  if (hasLiveWorker(dir))
+    blockers.push(
+      "Live, pending or unverified teammate; use native kill/reconcile independently",
+    );
+  const entries = fs.readdirSync(dir).sort();
+  if (entries.length > 2048)
+    throw new Error("Session member inspection limit exceeded");
+  let bytes = 0;
+  const files: SessionPreview["files"] = [];
+  for (const entry of entries) {
+    if (entry === `${name}.lock`) continue;
+    const file = safePath(dir, entry);
+    const info = fs.lstatSync(file);
+    if (
+      !info.isFile() ||
+      !/^(events\.jsonl|\.seq|[A-Za-z0-9._-]+\.(log|pid|worker-pid|worker-identity|inbox-cursor|session-id|thread-id|shutdown-reason|system-prompt\.md))$/.test(
+        entry,
+      )
+    ) {
+      blockers.push(`Unknown or nonregular session member: ${entry}`);
+      continue;
+    }
+    bytes += info.size;
+    if (bytes > 128 * 1024 * 1024)
+      throw new Error("Session byte inspection limit exceeded");
+    files.push({
+      path: entry,
+      fingerprint: [
+        info.dev,
+        info.ino,
+        info.size,
+        info.mtimeMs,
+        info.ctimeMs,
+        createHash("sha256").update(fs.readFileSync(file)).digest("hex"),
+      ],
+    });
+  }
+  const events = fs
+    .readFileSync(eventsPath(name, project), "utf8")
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
+  const created = events[0];
+  if (created?.kind !== "create" || typeof created.cwd !== "string")
+    throw new Error(
+      "Session creation identity is missing or invalid; preserve evidence",
+    );
+  const cwd = path.resolve(created.cwd);
+  if (project !== GLOBAL_PROJECT_KEY && projectKey(cwd) !== project)
+    blockers.push("Creation cwd does not match the session project bucket");
+  let references: ReturnType<typeof inspectEvidenceReferences>;
+  if (
+    !fs.existsSync(cwd) ||
+    !fs.lstatSync(cwd).isDirectory() ||
+    fs.realpathSync(cwd) !== cwd
+  ) {
+    references = {
+      scope: [cwd],
+      complete: false,
+      protected: [],
+      mentions: [],
+      issues: ["Owning project is unavailable or redirected"],
+    };
+  } else {
+    references = inspectEvidenceReferences(
+      cwd,
+      files.map((item) => path.join(dir, item.path)),
+      name,
+    );
+    const projection = await readCoordinationState({
+      sessionId: name,
+      cwd,
+      ...(project === GLOBAL_PROJECT_KEY ? { scope: "global" as const } : {}),
+    });
+    if (
+      projection.issues.length ||
+      projection.leases.length ||
+      projection.batches.some(
+        (batch) =>
+          !["ALL_ACCEPTED", "SETTLED_WITH_FAILURE"].includes(batch.state),
+      ) ||
+      projection.attempts.some((attempt) => !attempt.terminal) ||
+      projection.teammates.some((teammate) => !teammate.terminal)
+    )
+      blockers.push(
+        "Coordination evidence still supports review, execution or recovery",
+      );
+  }
+  if (!references.complete) blockers.push(...references.issues);
+  blockers.push(
+    ...references.protected.map(
+      (reference) => `${reference.role}: ${reference.source}`,
+    ),
+  );
+  const value = {
+    status: "preview" as const,
+    name,
+    project,
+    cwd,
+    eligible: !blockers.length,
+    blockers,
+    files,
+    references,
+  };
+  return { ...value, digest: evidenceDigest(value) };
 }
 
 export async function teamworkSessionRm(
   name: string,
   opts: RmOptions = {},
-): Promise<void> {
+): Promise<SessionPreview> {
   const project =
     opts.project ??
     resolveExistingTeamworkSession(name, {
@@ -48,46 +191,30 @@ export async function teamworkSessionRm(
   if (!fs.existsSync(dir)) {
     throw new Error(`Teamwork session '${name}' not found at ${dir}`);
   }
-  await withLock(
+  const result = await withLock(
     path.join(projectDir(project), ".worker-guard.lock"),
-    async () => {
-      if (
-        readBatchReservations(projectDir(project)).some(
-          (item) => item.sessionId === name,
-        )
-      )
-        throw new Error(
-          "Batch capacity reservation is unresolved; session evidence preserved",
-        );
-      const teammates = new Set(
-        fs
-          .readdirSync(dir)
-          .flatMap((name) =>
-            name.endsWith(".worker-pid")
-              ? [name.slice(0, -11)]
-              : name.endsWith(".pid")
-                ? [name.slice(0, -4)]
-                : [],
-          ),
-      );
-      for (const teammate of teammates) {
-        await teamworkSessionKill(name, { as: teammate, project });
-      }
-      if (
-        fs
-          .readdirSync(dir)
-          .some((entry) => /\.(spawnlock|reservation|config)$/.test(entry))
-      ) {
-        throw new Error(
-          "Pending teammate launch; session recovery files preserved",
-        );
-      }
-      fs.rmSync(dir, { recursive: true, force: true });
-    },
+    () =>
+      withLock(lockPath(name, project), async () => {
+        const preview = await previewSession(name, project);
+        if (opts.confirm !== undefined) {
+          if (opts.confirm !== preview.digest)
+            throw new Error(
+              "Session cleanup preview changed; inspect a fresh digest",
+            );
+          if (!preview.eligible)
+            throw new Error(
+              `Session evidence protected: ${preview.blockers.join("; ")}`,
+            );
+          fs.rmSync(dir, { recursive: true });
+          preview.status = "removed";
+        }
+        return preview;
+      }),
   );
   if (!opts.force) {
-    console.log(`Removed Teamwork session '${name}'`);
+    console.log(JSON.stringify(result));
   }
+  return result;
 }
 
 export interface PruneOptions {
@@ -98,11 +225,16 @@ export interface PruneOptions {
   ephemeral?: boolean;
   dryRun?: boolean;
   yes?: boolean;
+  confirm?: string;
   keep?: string[];
   scope?: string;
 }
 
-export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
+export async function teamworkSessionPrune(
+  opts: PruneOptions,
+): Promise<
+  { digest: string; removed: number; candidates: SessionPreview[] } | undefined
+> {
   // The filter flags are mutually exclusive — combining them gives a
   // silently-ignored second filter under the else-if chain below. Catch
   // that up front so the user knows which one would have applied.
@@ -132,6 +264,7 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
     reason: string;
     lastTs?: string;
     eventsDigest: string;
+    preview: SessionPreview;
   }[] = [];
 
   const projects =
@@ -153,8 +286,6 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
     for (const name of entries) {
       if (name.startsWith(".")) continue; // skip .bucket marker
       if (keep.has(name)) continue;
-      if (readBatchReservations(dir).some((item) => item.sessionId === name))
-        continue;
       const chDir = sessionDir(name, project);
       try {
         if (!fs.statSync(chDir).isDirectory()) continue;
@@ -162,7 +293,6 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
         continue;
       }
       // Preserve live, pending, or unreadable runtime evidence.
-      if (hasLiveWorker(chDir)) continue;
 
       const eventsFile = eventsPath(name, project);
       let totalEvents = 0;
@@ -199,8 +329,26 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
         const age = Date.now() - Date.parse(lastTs);
         if (age >= opts.idleMs) reason = `idle ${Math.round(age / 60_000)}m`;
       }
-      if (reason)
-        candidates.push({ name, project, reason, lastTs, eventsDigest });
+      if (reason) {
+        try {
+          const preview = await teamworkSessionRm(name, {
+            project,
+            force: true,
+          });
+          candidates.push({
+            name,
+            project,
+            reason,
+            lastTs,
+            eventsDigest,
+            preview,
+          });
+        } catch (error) {
+          console.error(
+            `Preserved ${project}/${name}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
     }
   }
 
@@ -215,49 +363,39 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
     console.log(`  ${c.name.padEnd(24)}  ${last}  (${c.reason})`);
   }
 
-  if (opts.dryRun) {
+  const digest = evidenceDigest(candidates.map((item) => item.preview));
+  console.log(
+    JSON.stringify({
+      status: "preview",
+      digest,
+      candidates: candidates.map((item) => item.preview),
+    }),
+  );
+  if (opts.dryRun || !opts.yes) {
     console.log(
       `\n(dry-run) would remove ${candidates.length} Teamwork session(s)`,
     );
-    return;
+    return {
+      digest,
+      removed: 0,
+      candidates: candidates.map((item) => item.preview),
+    };
   }
-  if (!opts.yes) {
-    console.log(
-      `\nRefusing to delete ${candidates.length} Teamwork Session(s) without --yes. ` +
-        `Re-run with --yes (or --dry-run to preview).`,
+  if (opts.confirm !== digest)
+    throw new Error(
+      "Prune requires --yes and the exact current --confirm digest",
     );
-    return;
-  }
 
   let removed = 0;
   for (const c of candidates) {
+    if (!c.preview.eligible) continue;
     try {
-      await withLock(
-        path.join(projectDir(c.project), ".worker-guard.lock"),
-        () =>
-          withLock(lockPath(c.name, c.project), () => {
-            const directory = sessionDir(c.name, c.project);
-            if (
-              readBatchReservations(projectDir(c.project)).some(
-                (item) => item.sessionId === c.name,
-              )
-            )
-              return;
-            if (hasLiveWorker(directory)) return;
-            // Do not remove a session that changed after the preview.
-            const current = fs.readFileSync(
-              eventsPath(c.name, c.project),
-              "utf-8",
-            );
-            if (
-              createHash("sha256").update(current).digest("hex") !==
-              c.eventsDigest
-            )
-              return;
-            fs.rmSync(directory, { recursive: true, force: true });
-            removed++;
-          }),
-      );
+      await teamworkSessionRm(c.name, {
+        project: c.project,
+        force: true,
+        confirm: c.preview.digest,
+      });
+      removed++;
     } catch (err) {
       console.error(
         `  failed to remove ${c.name}: ${err instanceof Error ? err.message : err}`,
@@ -265,6 +403,11 @@ export async function teamworkSessionPrune(opts: PruneOptions): Promise<void> {
     }
   }
   console.log(`\nRemoved ${removed}/${candidates.length} Teamwork session(s)`);
+  return {
+    digest,
+    removed,
+    candidates: candidates.map((item) => item.preview),
+  };
 }
 
 function hasLiveWorker(dir: string): boolean {

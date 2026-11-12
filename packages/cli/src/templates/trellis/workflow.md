@@ -180,6 +180,10 @@ flowchart LR
 
 只有交付审查与现场收尾阶段结果获接受且必需资源安全时才使用 `complete`。只有用户明确撤回并完成交付审查与现场收尾阶段中的取消审查后才使用 `cancel --reason`。正式会话交接仍是独立操作。
 
+完成或取消只退出当前任务投影，不删除任务产物、交接包或证据。需要清理退役运行资产时，使用 `python3 ./.trellis/scripts/task.py runtime [<task>]` 先预览，再以当前摘要 `--confirm <digest>` 精确执行。该入口仅处理已知空业务 session、旧更新提示及完成协议切换且无使用者或等待者的旧锁；固定 `task-layout.lock`、有效 ownership/continuity、未知字段与恢复材料始终保留。无法核验旧 writer 或文件描述符时保留对应旧锁，不以空文件、时间或任务终态推定可删。
+
+Teamwork 的报告、工作日志、事件及诊断先审查用途与引用，再使用其原生 `cleanup-artifacts`、`rm` 或 `prune`；任务完成不是删除证据的授权。正式交接包及其生命周期材料由 handoff owner 保留、压缩和恢复，不能用 Task runtime 或全目录删除代替。终态任务可通过 `delegate-inspect` 读取历史记录；历史 manifest 中缺失的引用只作诊断，不自动修改已接受产物或恢复旧授权。
+
 ## 跨组件职责
 
 | 组件 | 在任务路线中的职责 |

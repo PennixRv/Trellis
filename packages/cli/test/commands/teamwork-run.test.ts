@@ -46,7 +46,13 @@ describe("one-shot Teamwork startup barrier", () => {
     vi.spyOn(process.stdout, "write").mockReturnValue(true);
     mocks.spawn.mockReset();
     mocks.send.mockReset().mockResolvedValue(undefined);
-    mocks.rm.mockReset().mockResolvedValue(undefined);
+    mocks.rm
+      .mockReset()
+      .mockResolvedValue({
+        eligible: true,
+        digest: "verified-preview",
+        blockers: [],
+      });
     mocks.kill.mockReset().mockResolvedValue(undefined);
   });
   afterEach(() => {
@@ -86,6 +92,10 @@ describe("one-shot Teamwork startup barrier", () => {
       timeoutMs: 100,
     });
     expect(mocks.rm).toHaveBeenCalledWith("early-done", { force: true });
+    expect(mocks.rm).toHaveBeenCalledWith("early-done", {
+      force: true,
+      confirm: "verified-preview",
+    });
   });
   it("reports an early provider failure and retains the session evidence", async () => {
     mocks.spawn.mockImplementation(async (name: string) => {
@@ -206,7 +216,7 @@ describe("one-shot Teamwork startup barrier", () => {
         disposition: "not_applicable",
         reports: [{ report, validation: "passed" }],
       });
-      expect(mocks.rm).toHaveBeenCalledTimes(status === "complete" ? 1 : 0);
+      expect(mocks.rm).toHaveBeenCalledTimes(status === "complete" ? 2 : 0);
       expect(process.exitCode).toBe(
         status === "complete" ? previousExitCode : 1,
       );

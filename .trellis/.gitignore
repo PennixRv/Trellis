@@ -31,3 +31,7 @@
 # Python cache
 **/__pycache__/
 **/*.pyc
+
+# Private Trellis handoff and provider diagnostics
+session-handoffs/
+tasks/**/provider-stderr.log

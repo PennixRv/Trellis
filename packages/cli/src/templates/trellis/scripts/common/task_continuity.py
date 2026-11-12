@@ -308,6 +308,15 @@ def continuity_show(args: argparse.Namespace) -> int:
 
 
 def continuity_capture(args: argparse.Namespace) -> int:
+    from .task_move import layout_lock
+
+    with layout_lock(get_repo_root()):
+        return _continuity_capture_locked(args)
+
+
+def _continuity_capture_locked(args: argparse.Namespace) -> int:
+    from .task_move import layout_lock
+
     root = get_repo_root()
     try:
         directory, data, task_id, _ = _task(root)
@@ -315,7 +324,8 @@ def continuity_capture(args: argparse.Namespace) -> int:
         source_digest = _digest(current)
         task_path = directory.relative_to(root).as_posix()
         path = _continuity_path(root, task_path)
-        with _record_lock(path):
+        with layout_lock(root):
+            path.parent.mkdir(parents=True, exist_ok=True)
             record, _ = _read_record(path)
             actual = record.get("source_digest") if record else "absent"
             if actual != args.expected_source_digest:
@@ -380,6 +390,15 @@ def _current_projection_digest(root: Path, task_dir: Path, data: dict, task_id: 
 
 
 def transfer_task_ownership(args: argparse.Namespace) -> int:
+    from .task_move import layout_lock
+
+    with layout_lock(get_repo_root()):
+        return _transfer_task_ownership_locked(args)
+
+
+def _transfer_task_ownership_locked(args: argparse.Namespace) -> int:
+    from .task_move import layout_lock
+
     root = get_repo_root()
     operation = args.transfer_action
     try:
@@ -400,7 +419,7 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
         if operation != "status" and data.get("status") in {"completed", "cancelled"}:
             raise ContinuityError("TASK_TRANSFER_WITHHELD", "terminal tasks cannot change ownership")
         path = _ownership_path(root, task_path)
-        with _record_lock(path):
+        with layout_lock(root):
             record = _load_owner(path)
             if record and (record["task_id"] != task_id or record["task_path"] != task_path):
                 raise ContinuityError("TASK_TRANSFER_WITHHELD", "ownership record does not match the requested task")
@@ -417,6 +436,7 @@ def transfer_task_ownership(args: argparse.Namespace) -> int:
                 raise ContinuityError("TASK_TRANSFER_NOT_AUTHORIZED", "ownership changes require an explicit user request")
             if args.expected_generation is None or args.expected_generation < 0:
                 raise ContinuityError("TASK_TRANSFER_INVALID_INPUT", "a non-negative expected generation is required")
+            path.parent.mkdir(parents=True, exist_ok=True)
             if operation == "quiesce":
                 context_key, current_path = _direct_pointer(root, task_path)
                 if current_path is None:
@@ -606,10 +626,10 @@ def add_continuity_commands(subparsers) -> None:
 
 def clear_task_runtime_records(repo_root: Path, task_path: str) -> bool:
     """Remove only this task's current continuity and ownership projections."""
-    for path in (_continuity_path(repo_root, task_path), _ownership_path(repo_root, task_path)):
-        if not path.exists():
-            continue
-        with _record_lock(path):
+    from .task_move import layout_lock
+
+    with layout_lock(repo_root):
+        for path in (_continuity_path(repo_root, task_path), _ownership_path(repo_root, task_path)):
             try:
                 path.unlink(missing_ok=True)
             except OSError:
@@ -630,7 +650,7 @@ def active_task_change_guard(repo_root: Path, context_key: str, task_path: str, 
             return
         task_path = directory.relative_to(repo_root).as_posix()
         path = _ownership_path(repo_root, task_path)
-        with _record_lock(path):
+        with layout_lock(repo_root):
             try:
                 record = _load_owner(path)
             except ContinuityError:
@@ -664,9 +684,11 @@ def assert_task_mutation_allowed(repo_root: Path, task_dir: Path, data: dict) ->
 
 def assert_task_identity_change_allowed(repo_root: Path, task_dir: Path, data: dict) -> None:
     """Keep an active ownership record addressable while the task ID is fixed."""
+    from .task_move import layout_lock
+
     task_path = task_dir.relative_to(repo_root).as_posix()
     path = _ownership_path(repo_root, task_path)
-    with _record_lock(path):
+    with layout_lock(repo_root):
         try:
             record = _load_owner(path)
         except ContinuityError as error:
@@ -687,7 +709,7 @@ def task_mutation_guard(repo_root: Path, task_dir: Path, data: dict):
         require_settled_layout(repo_root)
         task_path = task_dir.relative_to(repo_root).as_posix()
         path = _ownership_path(repo_root, task_path)
-        with _record_lock(path):
+        with layout_lock(repo_root):
             try:
                 record = _load_owner(path)
             except ContinuityError:

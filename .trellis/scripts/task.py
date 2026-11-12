@@ -900,6 +900,10 @@ def main() -> int:
     migration_mode.add_argument("--apply", action="store_true", help="Recheck and apply the migration")
     migration_mode.add_argument("--recover", action="store_true", help="Roll back an interrupted relocation")
 
+    p_runtime = subparsers.add_parser("runtime", help="Preview retired Trellis task projections and anchors")
+    p_runtime.add_argument("dir", nargs="?", help="Optional existing task scope")
+    p_runtime.add_argument("--confirm", help="Exact digest from a fresh native preview")
+
     args = parser.parse_args()
 
     if os.environ.get("TRELLIS_DELEGATION_CONTEXT") and args.command not in {"current", "list", "list-context", "validate"}:
@@ -911,6 +915,7 @@ def main() -> int:
         return 1
 
     from common.task_move import cmd_migrate_layout, layout_lock, require_settled_layout
+    from common.task_runtime import cmd_runtime
 
     commands = {
         "create": cmd_create,
@@ -937,6 +942,7 @@ def main() -> int:
         "remove-subtask": cmd_remove_subtask,
         "list": cmd_list,
         "migrate-layout": cmd_migrate_layout,
+        "runtime": cmd_runtime,
     }
 
     try:

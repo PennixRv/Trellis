@@ -7,6 +7,9 @@
 # Session/window scoped runtime state
 .runtime/
 
+# Durable local handoff packages contain private conversation history
+session-handoffs/
+
 # Ralph Loop state file
 .ralph-state.json
 
@@ -18,6 +21,7 @@
 # Task directory runtime files
 .plan-log
 .task-phase.lock
+tasks/**/provider-stderr.log
 
 # Atomic update temp files
 *.tmp

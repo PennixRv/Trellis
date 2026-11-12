@@ -163,7 +163,10 @@ it("provides a native locator and only admits matching, bounded recovery command
   const projection = foregroundWaitFile(root, plan);
   if (!projection) throw new Error("missing test projection");
   fs.writeFileSync(projection, "{}");
-  expect(invoke(`${command} --wait 1`)?.permissionDecision).toBe("deny");
+  expect(invoke(`${command} --wait 1`)).toBeUndefined();
+  expect(
+    invoke(`${command} --execute --reason recovery`)?.permissionDecision,
+  ).toBe("deny");
   recordForegroundWait(root, plan, { planPath: file, taskRoot: task });
   const alternate = path.join(task, "original.json");
   fs.renameSync(file, alternate);

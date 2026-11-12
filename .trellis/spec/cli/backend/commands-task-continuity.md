@@ -69,6 +69,18 @@ Ownership errors are `TASK_TRANSFER_ABSENT`, `TASK_TRANSFER_ACTIVE`, `TASK_TRANS
 
 ## Integration boundary
 
+### 固定锁与运行态退出
+
+当前 Task 记录、所有权、阶段和会话指针写入共用固定布局锁，不再新建每任务、
+每阶段或每会话的 flock 锚点。旧版描述中的 per-task ownership lock 指该序列化
+责任，当前实现由固定布局锁承担。固定锚点即使零字节也不删除。
+
+`task.py runtime [<task>]` 默认只预览旧 update marker、已知空会话投影及退役协议锁；
+相同入口加 `--confirm <digest>` 在布局锁内复查精确指纹并退出候选。旧锁还须确认没有
+持有者和等待者，并证明 writer 已迁移；`/proc` 扫描不完整时保留。未知字段、
+非空任务或 run、符号链接、活动所有权及恢复事实均不退出。不按年龄判断失效。
+终态委派的 inspect 和历史上下文验证保持只读，不查询 provider 或恢复任务权限。
+
 Implementation authorization stores `contract_ref`, the SHA-256
 `contract_revision` produced by the phase artifact digest algorithm,
 `approval_ref`, and `task_route_revision`. Starting implementation, accepting

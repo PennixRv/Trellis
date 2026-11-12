@@ -51,6 +51,7 @@ export const commonGit = readTemplate("scripts/common/git.py");
 export const commonTypes = readTemplate("scripts/common/types.py");
 export const commonTasks = readTemplate("scripts/common/tasks.py");
 export const commonTaskContext = readTemplate("scripts/common/task_context.py");
+export const commonTaskRuntime = readTemplate("scripts/common/task_runtime.py");
 export const commonTaskStore = readTemplate("scripts/common/task_store.py");
 export const commonTaskWorkflow = readTemplate(
   "scripts/common/task_workflow.py",
@@ -128,6 +129,7 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("common/types.py", commonTypes);
   scripts.set("common/tasks.py", commonTasks);
   scripts.set("common/task_context.py", commonTaskContext);
+  scripts.set("common/task_runtime.py", commonTaskRuntime);
   scripts.set("common/task_store.py", commonTaskStore);
   scripts.set("common/task_workflow.py", commonTaskWorkflow);
   scripts.set("common/task_continuity.py", commonTaskContinuity);

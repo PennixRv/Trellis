@@ -180,10 +180,7 @@ describe("CLI Teamwork coordinator runtime", () => {
           }),
         );
       expect(child.kill).toHaveBeenCalledWith("SIGTERM");
-      const diagnostic = path.join(
-        taskRoot,
-        ".trellis/.runtime/teamwork-diagnostics/diagnostic-batch/diagnostic-attempt/provider-stderr.log",
-      );
+      const diagnostic = path.join(attemptRoot, "provider-stderr.log");
       expect(fs.statSync(diagnostic).size).toBe(64 * 1024);
       expect(fs.readFileSync(diagnostic, "utf8")).toContain(
         "provider authentication failed",

@@ -30,6 +30,7 @@ export interface CreateTeamworkSessionOptions
   description?: string;
   context?: ContextEntry[];
   ephemeral?: boolean;
+  /** Legacy input; existing session evidence must be removed through confirmed cleanup. */
   force?: boolean;
   /** Reserved free-form field allowing CLI to mark "run" mode etc. via meta. */
 }

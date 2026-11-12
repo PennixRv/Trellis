@@ -37,7 +37,7 @@ def read_record(file: Path, limit: int) -> dict:
     return value
 
 
-def recovery_arguments(command: str) -> tuple[str, str] | None:
+def recovery_arguments(command: str) -> tuple[str, str, bool] | None:
     if any(character in command for character in "$`;\n\r&|<>"):
         return None
     argv = shlex.split(command)
@@ -71,7 +71,7 @@ def recovery_arguments(command: str) -> tuple[str, str] | None:
         return None
     if "--execute" in options and not str(options.get("--reason", "")).strip():
         return None
-    return plan, task
+    return plan, task, "--execute" not in options
 
 
 def decision(payload: dict) -> dict | None:
@@ -133,12 +133,20 @@ def decision(payload: dict) -> dict | None:
         try:
             arguments = recovery_arguments(command)
             if arguments:
-                plan_path, task_path = (safe_path(value, root) for value in arguments)
+                plan_path, task_path = (safe_path(value, root) for value in arguments[:2])
                 task_path.relative_to(root / ".trellis" / "tasks")
                 plan_path.relative_to(task_path)
                 plan = read_record(plan_path, 2097152)
                 if not task_path.is_dir():
                     raise ValueError("missing owning task")
+                if arguments[2] and not unsafe_directory:
+                    session_id, batch_id = plan.get("session_id"), plan.get("batch_id")
+                    if isinstance(session_id, str) and session_id and isinstance(batch_id, str) and batch_id:
+                        expected = hashlib.sha256(f"{session_id}:{batch_id}".encode()).hexdigest() + ".json"
+                        if any(record.name == expected for record in records):
+                            # Native reconcile independently validates frozen inputs; a corrupt
+                            # projection must not prevent read-only diagnosis of that same batch.
+                            return None
                 matches = [state for state in states if state["sessionId"] == plan.get("session_id") and state["batchId"] == plan.get("batch_id") and state["planHash"] == plan.get("plan_hash")]
                 if len(matches) == 1:
                     state = matches[0]

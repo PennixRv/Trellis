@@ -52,6 +52,16 @@ describe("reduceTeamworkSessionMetadata", () => {
     expect(() => parseTeamworkSessionType("threads")).toThrow(/chat, forum/);
   });
 
+  it("force creation cannot bypass evidence retirement or signal a process", async () => {
+    await createTeamworkSession({ sessionId: "retained", by: "main" });
+    await sendMessage({ sessionId: "retained", by: "main", text: "durable evidence" });
+    const before = await readTeamworkEvents({ sessionId: "retained" });
+    const signals = vi.spyOn(process, "kill");
+    await expect(createTeamworkSession({ sessionId: "retained", by: "main", force: true })).rejects.toThrow("--force does not remove evidence");
+    expect(await readTeamworkEvents({ sessionId: "retained" })).toEqual(before);
+    expect(signals).not.toHaveBeenCalled();
+  });
+
   it("rejects legacy type values at the core create boundary", async () => {
     await expect(
       createTeamworkSession({

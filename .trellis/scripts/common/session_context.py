@@ -9,21 +9,20 @@ Provides:
     get_context_text_record   - Text for record mode
     output_json               - Print JSON
     output_text               - Print text
-    get_update_hint           - Once-per-session "update available" line
+    get_update_hint           - Once-per-version-pair "update available" line
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-from .active_task import resolve_context_key
 from .config import get_git_packages
 from .git import run_git
+from .io import read_json, write_json
 from .packages_context import get_packages_section
 from .tasks import iter_active_tasks, load_task, get_all_statuses, children_progress
 from .paths import (
@@ -419,55 +418,17 @@ def _compare_versions(left: str, right: str) -> int | None:
 
 
 def _update_marker_path(repo_root: Path, context_key: str | None = None) -> Path:
-    """Path of the once-per-session marker that throttles the update check.
-
-    `context_key` lets a caller that already resolved session identity pass it
-    in — the SessionStart hook reads the session id from hook stdin, which is
-    more reliable than this function's environment-only fallback chain. Shell
-    entry points leave it None and keep the previous behavior.
-    """
-    if not context_key:
-        context_key = resolve_context_key()
-    if not context_key:
-        terminal_key = os.environ.get("TERM_SESSION_ID", "").strip()
-        context_key = terminal_key or f"ppid-{os.getppid()}"
-    safe_key = re.sub(r"[^A-Za-z0-9._-]+", "_", context_key).strip("._-")
-    if not safe_key:
-        safe_key = "session"
-    return (
-        repo_root
-        / DIR_WORKFLOW
-        / ".runtime"
-        / f"update-check-{safe_key[:160]}.marker"
-    )
-
-
-def _mark_update_check_attempted(
-    repo_root: Path,
-    context_key: str | None = None,
-) -> bool:
-    marker_path = _update_marker_path(repo_root, context_key)
-    if marker_path.exists():
-        return False
-    try:
-        marker_path.parent.mkdir(parents=True, exist_ok=True)
-        marker_path.write_text("checked\n", encoding="utf-8")
-    except OSError:
-        pass
-    return True
+    """Keep one advisory record, independent of the number of sessions."""
+    return repo_root / DIR_WORKFLOW / ".runtime" / "update-check.json"
 
 
 def get_update_hint(repo_root: Path, context_key: str | None = None) -> str | None:
-    """Return the "update available" line for this session, at most once.
+    """Return the local CLI hint once per project/installed version pair.
 
     Public because the SessionStart hook imports it: the text-mode CLI path
     (`get_context.py`) used to be the only caller, so hook-driven platforms —
     Claude Code included — never saw the reminder at all.
     """
-    marker_path = _update_marker_path(repo_root, context_key)
-    if marker_path.exists():
-        return None
-
     current_version = _read_project_version(repo_root)
     if not current_version:
         return None
@@ -476,7 +437,19 @@ def get_update_hint(repo_root: Path, context_key: str | None = None) -> str | No
     if not latest_version:
         return None
 
-    _mark_update_check_attempted(repo_root, context_key)
+    from .task_move import layout_lock
+
+    pair = {"project_version": current_version, "installed_version": latest_version}
+    marker_path = _update_marker_path(repo_root, context_key)
+    try:
+        with layout_lock(repo_root):
+            if read_json(marker_path) == pair:
+                return None
+            marker_path.parent.mkdir(parents=True, exist_ok=True)
+            if not write_json(marker_path, pair):
+                print("Warning: could not persist the Trellis update hint.", file=sys.stderr)
+    except OSError:
+        pass
     comparison = _compare_versions(current_version, latest_version)
     if comparison is None or comparison >= 0:
         return None
@@ -527,6 +500,7 @@ def get_context_json(repo_root: Path | None = None) -> dict:
             "parent": t.parent,
         }
         for t in iter_active_tasks(tasks_dir)
+        if t.status in {"planning", "in_progress"}
     ]
 
     # Package git repos (independent sub-repositories)
@@ -652,8 +626,9 @@ def get_context_text(repo_root: Path | None = None) -> str:
     task_count = 0
 
     # Collect all task data for hierarchy display
-    all_tasks = {t.dir_name: t for t in iter_active_tasks(tasks_dir)}
-    all_statuses = {name: t.status for name, t in all_tasks.items()}
+    task_records = {t.dir_name: t for t in iter_active_tasks(tasks_dir)}
+    all_statuses = {name: t.status for name, t in task_records.items()}
+    all_tasks = {name: t for name, t in task_records.items() if t.status in {"planning", "in_progress"}}
 
     def _print_task_tree(name: str, indent: int = 0) -> None:
         nonlocal task_count
@@ -667,7 +642,7 @@ def get_context_text(repo_root: Path | None = None) -> str:
                 _print_task_tree(child, indent + 1)
 
     for dir_name in sorted(all_tasks.keys()):
-        if not all_tasks[dir_name].parent:
+        if all_tasks[dir_name].parent not in all_tasks:
             _print_task_tree(dir_name)
 
     if task_count == 0:
@@ -744,7 +719,7 @@ def get_context_record_json(repo_root: Path | None = None) -> dict:
 
     my_tasks = []
     for t in all_tasks_list:
-        if t.assignee == developer:
+        if t.assignee == developer and t.status in {"planning", "in_progress"}:
             done = sum(
                 1 for c in t.children
                 if all_statuses.get(c) in ("completed", "done")
@@ -834,7 +809,7 @@ def get_context_text_record(repo_root: Path | None = None) -> str:
     all_statuses = get_all_statuses(tasks_dir)
 
     for t in iter_active_tasks(tasks_dir):
-        if t.assignee == developer:
+        if t.assignee == developer and t.status in {"planning", "in_progress"}:
             progress = children_progress(t.children, all_statuses)
             lines.append(f"- [{t.priority}] {t.title} ({t.status}){progress} — {t.dir_name}")
             my_task_count += 1

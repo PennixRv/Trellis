@@ -158,7 +158,7 @@ export function registerTeamworkCommand(program: Command): void {
     .option("--by <agent>", "agent name recorded as the creator", "main")
     .option(
       "--force",
-      "overwrite an existing Teamwork session with the same name",
+      "legacy input; existing evidence requires native rm preview/confirmation",
     )
     .option(
       "--ephemeral",
@@ -813,12 +813,19 @@ export function registerTeamworkCommand(program: Command): void {
   teamwork
     .command("rm <name>")
     .description(
-      "Stop teammate processes and delete a Teamwork session entirely",
+      "Preview session evidence retirement; confirm only the exact eligible digest",
     )
     .option("--scope <scope>", "Teamwork session scope: project | global")
+    .option(
+      "--confirm <digest>",
+      "confirm the exact current session preview digest",
+    )
     .action(async (name: string, raw: Record<string, unknown>) => {
       try {
-        await teamworkSessionRm(name, raw as { scope?: string });
+        await teamworkSessionRm(
+          name,
+          raw as { scope?: string; confirm?: string },
+        );
       } catch (err) {
         console.error(
           chalk.red("Error:"),
@@ -851,6 +858,10 @@ export function registerTeamworkCommand(program: Command): void {
       "remove only sessions marked `--ephemeral` at create time",
     )
     .option("--yes", "actually delete (default is dry-run)")
+    .option(
+      "--confirm <digest>",
+      "confirm the exact current prune preview digest",
+    )
     .option("--dry-run", "show what would be removed without deleting", true)
     .option(
       "--keep <names>",
@@ -863,6 +874,7 @@ export function registerTeamworkCommand(program: Command): void {
         idle?: string;
         ephemeral?: boolean;
         yes?: boolean;
+        confirm?: string;
         dryRun?: boolean;
         keep?: string;
         scope?: string;
@@ -874,6 +886,7 @@ export function registerTeamworkCommand(program: Command): void {
           idleMs: parseDuration(opts.idle),
           ephemeral: opts.ephemeral,
           yes: opts.yes,
+          confirm: opts.confirm,
           dryRun: !opts.yes,
           keep: parseCsv(opts.keep),
           scope: opts.scope,

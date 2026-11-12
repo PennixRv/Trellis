@@ -2309,7 +2309,7 @@ describe("regression: agent-session Trellis update hint", () => {
     expect(output).toContain("Trellis update available: 0.5.0 -> 0.5.9");
   });
 
-  it("only attempts the default text update hint once per session", () => {
+  it("only emits the default text update hint once per version pair", () => {
     const first = runContextWithTrellisOutput("0.5.0", "0.5.9");
     const second = runContextWithTrellisOutput("0.5.0", "0.5.9");
 
@@ -2321,7 +2321,7 @@ describe("regression: agent-session Trellis update hint", () => {
           tmpDir,
           ".trellis",
           ".runtime",
-          "update-check-test-update-session.marker",
+          "update-check.json",
         ),
       ),
     ).toBe(true);
@@ -4608,12 +4608,12 @@ print(json.dumps({
     "</first-reply-notice>",
   ].join("\n");
 
-  function updateMarkerPath(sessionId: string): string {
+  function updateMarkerPath(): string {
     return path.join(
       tmpDir,
       ".trellis",
       ".runtime",
-      `update-check-claude_${sessionId}.marker`,
+      "update-check.json",
     );
   }
 
@@ -4660,7 +4660,7 @@ print(json.dumps({
   );
 
   it.skipIf(isWindows)(
-    "[session-update-hint] the once-per-session marker suppresses the second version probe",
+    "[session-update-hint] one bounded version-pair record suppresses repeated hints",
     () => {
       setupTaskRepo();
       writeClaudeSessionStartHook();
@@ -4673,12 +4673,10 @@ print(json.dumps({
 
       expect(first).toContain("Trellis update available: 0.5.0 -> 0.5.9");
       expect(second).not.toContain("Trellis update available");
-      expect(trellisCliCallCount()).toBe(1);
-      // The marker is keyed by the identity the hook resolved from stdin, not
-      // by session_context's TERM_SESSION_ID / ppid fallback — the latter is a
-      // terminal window, which would mute the reminder for every later session
-      // opened in it.
-      expect(fs.existsSync(updateMarkerPath("update-marker"))).toBe(true);
+      expect(trellisCliCallCount()).toBe(2);
+      // Probe again so a newly installed CLI changes the pair without
+      // retaining a permanent marker for every session.
+      expect(fs.existsSync(updateMarkerPath())).toBe(true);
     },
   );
 
@@ -4706,8 +4704,7 @@ print(json.dumps({
         expect(context).toContain("<task-status>");
       }
       // A probe that never produced an answer must not burn the marker.
-      expect(fs.existsSync(updateMarkerPath("update-fail"))).toBe(false);
-      expect(fs.existsSync(updateMarkerPath("update-hang"))).toBe(false);
+      expect(fs.existsSync(updateMarkerPath())).toBe(false);
     },
   );
 

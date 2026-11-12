@@ -153,6 +153,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
     task_json_path = target_dir / FILE_TASK_JSON
     if task_json_path.is_file():
         task_data = read_json(task_json_path)
+        if task_data and task_data.get("status") in {"completed", "cancelled"}:
+            print("Historical context diagnostic: missing references do not revoke accepted task history or authorize deletion.")
         stored_branch = task_data.get("branch") if task_data else None
         if stored_branch and not branch_exists_locally(stored_branch, repo_root):
             print(

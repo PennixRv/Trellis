@@ -370,6 +370,15 @@ def run(args):
     with _task_lock(child_dir):
         path = runtime_path(root, child_dir.name)
         operation = args.command.removeprefix("delegate-")
+        if operation == "inspect":
+            from .task_workflow import _load
+
+            child, _ = _load(child_dir)
+            if child.get("status") in {"completed", "cancelled"}:
+                record = resolve_record(root, child_dir, child)
+                print(json.dumps({"record": record, "historical": True,
+                                  "observations": {}, "candidates": {}}, ensure_ascii=False))
+                return 0
         if operation == "bind":
             if getattr(args, "result_path", None):
                 fail("legacy --result-path cannot start protocol v1; reconcile old attempts first")

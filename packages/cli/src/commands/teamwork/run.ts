@@ -144,7 +144,18 @@ export async function teamworkSessionRun(opts: RunOptions): Promise<void> {
     if (succeeded) {
       // Clean removal — the Teamwork Session served its purpose.
       try {
-        await teamworkSessionRm(name, { force: true });
+        const preview = await teamworkSessionRm(name, { force: true });
+        if (preview.eligible)
+          await teamworkSessionRm(name, {
+            force: true,
+            confirm: preview.digest,
+          });
+        else {
+          result.diagnosticsPath = sessionDir(name);
+          process.stderr.write(
+            `Teamwork Session retained: ${preview.blockers.join("; ")}\n`,
+          );
+        }
       } catch (error) {
         failure = error;
         succeeded = false;

@@ -1,0 +1,11 @@
+{
+  "version": "0.7.2-beta.19",
+  "description": "Converge native task runtime and Teamwork lifecycle cleanup",
+  "breaking": true,
+  "recommendMigrate": true,
+  "changelog": "Fixed task layout locks, version-aware update markers, provider-free historical inspection, default-preview exact-digest Teamwork cleanup, accepted-evidence and retained-attempt protection, attempt-local stderr, and preserving private-history ignore updates.",
+  "migrationGuide": "Use native trellis update to refresh generated assets. Task runtime cleanup is preview-first and requires an exact current digest. Teamwork rm now previews by default; pass --confirm with its fresh digest to delete. prune --yes also requires --confirm. create --force no longer wipes nonempty sessions. No private task or handoff history is deleted or migrated automatically. Incomplete process proof and unknown references retain their assets.",
+  "aiInstructions": "Preserve current task and handoff authority. Inspect native previews, accepted evidence, live processes and recovery obligations before proposing exact cleanup objects. Do not infer expiry from age, delete fixed lock anchors, hand-edit runtime state, or use create --force as a cleanup bypass. Obtain explicit approval for actual historical data deletion.",
+  "migrations": [],
+  "notes": "Refresh generated assets through native update; preserve custom configuration and spec content. Runtime cleanup and Teamwork deletion require separate specific confirmation."
+}

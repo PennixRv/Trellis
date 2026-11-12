@@ -819,6 +819,28 @@ function preserveExistingRegistryConfig(cwd: string, template: string): string {
   );
 }
 
+const RUNTIME_IGNORE_RULES = [
+  "session-handoffs/",
+  "tasks/**/provider-stderr.log",
+];
+
+function runtimeIgnoreContent(existing: string): string {
+  const lines = existing.split(/\r?\n/).map((line) => line.trim());
+  const missing = RUNTIME_IGNORE_RULES.filter((rule) => {
+    const index = lines.lastIndexOf(rule);
+    return (
+      index < 0 || lines.slice(index + 1).some((line) => line.startsWith("!"))
+    );
+  });
+  return missing.length
+    ? existing +
+        (existing.endsWith("\n") ? "\n" : "\n\n") +
+        "# Private Trellis handoff and provider diagnostics\n" +
+        missing.join("\n") +
+        "\n"
+    : existing;
+}
+
 async function collectRegistrySpecTemplates(
   cwd: string,
 ): Promise<Map<string, string>> {
@@ -952,7 +974,14 @@ async function collectTemplateFiles(
     `${DIR_NAMES.WORKFLOW}/config.yaml`,
     preserveExistingRegistryConfig(cwd, configYamlTemplate),
   );
-  files.set(`${DIR_NAMES.WORKFLOW}/.gitignore`, gitignoreTemplate);
+  const ignorePath = `${DIR_NAMES.WORKFLOW}/.gitignore`;
+  const existingIgnore = path.join(cwd, ignorePath);
+  files.set(
+    ignorePath,
+    fs.existsSync(existingIgnore)
+      ? runtimeIgnoreContent(fs.readFileSync(existingIgnore, "utf8"))
+      : gitignoreTemplate,
+  );
   // workflow.md is included here because it is runtime-parsed by
   // get_context.py and shared hooks. Keep it on the normal template update
   // path: if the installed file still matches the tracked hash, update the
@@ -1072,6 +1101,9 @@ function analyzeChanges(
 
         if (
           (storedHash && storedHash === currentHash) ||
+          (relativePath === `${DIR_NAMES.WORKFLOW}/.gitignore` &&
+            newContent.startsWith(existingContent) &&
+            newContent === runtimeIgnoreContent(existingContent)) ||
           (!storedHash &&
             isSafeUntrackedCopilotInstructionsMerge(
               relativePath,
@@ -2821,14 +2853,17 @@ export async function update(options: UpdateOptions): Promise<void> {
       // Update template hashes for new, auto-updated, and overwritten files
       const filesToHash = new Map<string, string>(unchangedFileHashRepairs);
       for (const file of changes.newFiles) {
+        if (file.relativePath === `${DIR_NAMES.WORKFLOW}/.gitignore`) continue;
         filesToHash.set(file.relativePath, file.newContent);
       }
       // Auto-updated files always get new hash
       for (const file of changes.autoUpdateFiles) {
+        if (file.relativePath === `${DIR_NAMES.WORKFLOW}/.gitignore`) continue;
         filesToHash.set(file.relativePath, file.newContent);
       }
       // Only hash overwritten files (not skipped or .new copies)
       for (const file of changes.changedFiles) {
+        if (file.relativePath === `${DIR_NAMES.WORKFLOW}/.gitignore`) continue;
         const fullPath = path.join(cwd, file.relativePath);
         if (fs.existsSync(fullPath)) {
           const content = fs.readFileSync(fullPath, "utf-8");

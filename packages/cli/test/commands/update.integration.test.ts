@@ -174,6 +174,26 @@ describe("update() integration", () => {
     }
   }
 
+  it("appends private runtime ignores without replacing custom rules or hashing them", async () => {
+    await setupProject();
+    const custom =
+      "# project rules\nprivate-cache/\n!session-handoffs/keep.json\n";
+    writeProjectFile(".trellis/.gitignore", custom);
+    const config = readProjectFile(".trellis/config.yaml");
+    await update({ skipAll: true });
+    const merged = readProjectFile(".trellis/.gitignore");
+    expect(merged.startsWith(custom)).toBe(true);
+    expect(merged).toContain("\nsession-handoffs/\n");
+    expect(merged).toContain("\ntasks/**/provider-stderr.log\n");
+    expect(readHashesV2(hashFilePath())[".trellis/.gitignore"]).toBeUndefined();
+    expect(
+      fs.existsSync(projectFile(".trellis/scripts/common/task_runtime.py")),
+    ).toBe(true);
+    await update({ skipAll: true });
+    expect(readProjectFile(".trellis/.gitignore")).toBe(merged);
+    expect(readProjectFile(".trellis/config.yaml")).toBe(config);
+  });
+
   it("replaces known beta.8 brainstorm assets with intake while preserving customized and unrelated skills", async () => {
     await init({
       yes: true,
@@ -243,8 +263,20 @@ describe("update() integration", () => {
       fromVersion: "0.7.2-beta.11",
       pristineTemplates: {
         [role]: "owned native role",
-        [hooks]: JSON.stringify({ hooks: { SubagentStart: [{ hooks: [{ command: "python .codex/hooks/inject-subagent-context.py" }] }] }, user: true }),
-        ".trellis/config.yaml": "codex:\n  dispatch_mode: auto\nsession_auto_commit: false\n",
+        [hooks]: JSON.stringify({
+          hooks: {
+            SubagentStart: [
+              {
+                hooks: [
+                  { command: "python .codex/hooks/inject-subagent-context.py" },
+                ],
+              },
+            ],
+          },
+          user: true,
+        }),
+        ".trellis/config.yaml":
+          "codex:\n  dispatch_mode: auto\nsession_auto_commit: false\n",
       },
     });
     writeProjectFile(".codex/agents/user.toml", "private user role");
@@ -252,20 +284,32 @@ describe("update() integration", () => {
     expect(fs.existsSync(projectFile(role))).toBe(false);
     expect(readProjectFile(hooks)).not.toContain("inject-subagent-context");
     expect(JSON.parse(readProjectFile(hooks)).user).toBe(true);
-    expect(readProjectFile(".trellis/config.yaml")).toContain("session_auto_commit: false");
-    expect(readProjectFile(".trellis/config.yaml")).not.toContain("dispatch_mode");
-    expect(readProjectFile(".codex/agents/user.toml")).toBe("private user role");
+    expect(readProjectFile(".trellis/config.yaml")).toContain(
+      "session_auto_commit: false",
+    );
+    expect(readProjectFile(".trellis/config.yaml")).not.toContain(
+      "dispatch_mode",
+    );
+    expect(readProjectFile(".codex/agents/user.toml")).toBe(
+      "private user role",
+    );
     await update({ yes: true });
     expect(fs.existsSync(projectFile(role))).toBe(false);
     expect(JSON.parse(readProjectFile(hooks)).user).toBe(true);
-    expect(readProjectFile(".trellis/config.yaml")).toContain("session_auto_commit: false");
+    expect(readProjectFile(".trellis/config.yaml")).toContain(
+      "session_auto_commit: false",
+    );
   });
   it("preserves mixed user content across cleanup and repeated updates", async () => {
     await init({ yes: true, force: true, codex: true });
     const config = ".codex/config.toml";
-    stageVersionedUpgradeProject({ fromVersion: "0.7.2-beta.12", pristineTemplates: {
-      [config]: "[agents]\nmax_depth = 1\nenabled = false\n\n[mcp_servers.private]\ncommand = \"private-mcp\"\n",
-    } });
+    stageVersionedUpgradeProject({
+      fromVersion: "0.7.2-beta.12",
+      pristineTemplates: {
+        [config]:
+          '[agents]\nmax_depth = 1\nenabled = false\n\n[mcp_servers.private]\ncommand = "private-mcp"\n',
+      },
+    });
     await update({ yes: true, skipAll: true });
     const cleaned = readProjectFile(config);
     expect(cleaned).not.toContain("max_depth");
@@ -277,42 +321,66 @@ describe("update() integration", () => {
   it("does not treat a mixed-content receipt as full-file ownership", async () => {
     await init({ yes: true, force: true, codex: true });
     const content = {
-      ".codex/config.toml": "[agents]\nenabled = false\n\n[mcp_servers.private]\ncommand = \"private-mcp\"\n",
-      ".trellis/config.yaml": "session_auto_commit: false\npackages:\n  private:\n    path: private\n",
-      ".codex/hooks.json": JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ command: "private-hook" }] }] } }),
+      ".codex/config.toml":
+        '[agents]\nenabled = false\n\n[mcp_servers.private]\ncommand = "private-mcp"\n',
+      ".trellis/config.yaml":
+        "session_auto_commit: false\npackages:\n  private:\n    path: private\n",
+      ".codex/hooks.json": JSON.stringify({
+        hooks: { UserPromptSubmit: [{ hooks: [{ command: "private-hook" }] }] },
+      }),
     };
-    stageVersionedUpgradeProject({ fromVersion: "0.7.2-beta.16", pristineTemplates: content });
+    stageVersionedUpgradeProject({
+      fromVersion: "0.7.2-beta.16",
+      pristineTemplates: content,
+    });
     await update({ yes: true, skipAll: true });
     for (const [relative, expected] of Object.entries(content)) {
       expect(readProjectFile(relative)).toBe(expected);
-      expect(readHashesV2(hashFilePath())[relative]).not.toBe(computeHash(expected));
+      expect(readHashesV2(hashFilePath())[relative]).not.toBe(
+        computeHash(expected),
+      );
     }
   });
 
   it("replaces the owned Reasonix native role with the ordinary check Skill", async () => {
     await init({ yes: true, force: true, reasonix: true });
     const check = ".reasonix/skills/trellis-check/SKILL.md";
-    stageVersionedUpgradeProject({ fromVersion: "0.7.2-beta.11", pristineTemplates: {
-      [check]: "---\nname: trellis-check\nrunAs: subagent\n---\nOld role\n",
-    } });
+    stageVersionedUpgradeProject({
+      fromVersion: "0.7.2-beta.11",
+      pristineTemplates: {
+        [check]: "---\nname: trellis-check\nrunAs: subagent\n---\nOld role\n",
+      },
+    });
     await update({ createNew: true, yes: true });
     expect(readProjectFile(check)).not.toContain("runAs:");
     expect(readProjectFile(check)).toContain("Quality");
     expect(fs.existsSync(projectFile(`${check}.new`))).toBe(false);
   });
 
-  it.each(["modified", "skip"])("blocks %s retired assets before update writes", async (kind) => {
-    await init({ yes: true, force: true, codex: true });
-    const role = ".codex/agents/trellis-implement.toml";
-    stageVersionedUpgradeProject({ fromVersion: "0.7.2-beta.11", pristineTemplates: { [role]: "owned role" } });
-    if (kind === "modified") writeProjectFile(role, "user changes");
-    else writeProjectFile(".trellis/config.yaml", "update:\n  skip:\n    - .codex/agents\n");
-    const before = readProjectFile(MANAGED_FILE);
-    await expect(update({ yes: true, force: true })).rejects.toThrow();
-    expect(readProjectFile(MANAGED_FILE)).toBe(before);
-    expect(readProjectFile(role)).toBe(kind === "modified" ? "user changes" : "owned role");
-    expect(readProjectFile(".trellis/.version")).toBe("0.7.2-beta.11");
-  });
+  it.each(["modified", "skip"])(
+    "blocks %s retired assets before update writes",
+    async (kind) => {
+      await init({ yes: true, force: true, codex: true });
+      const role = ".codex/agents/trellis-implement.toml";
+      stageVersionedUpgradeProject({
+        fromVersion: "0.7.2-beta.11",
+        pristineTemplates: { [role]: "owned role" },
+      });
+      if (kind === "modified") writeProjectFile(role, "user changes");
+      else
+        writeProjectFile(
+          ".trellis/config.yaml",
+          "update:\n  skip:\n    - .codex/agents\n",
+        );
+      const before = readProjectFile(MANAGED_FILE);
+      await expect(update({ yes: true, force: true })).rejects.toThrow();
+      expect(readProjectFile(MANAGED_FILE)).toBe(before);
+      expect(readProjectFile(role)).toBe(
+        kind === "modified" ? "user changes" : "owned role",
+      );
+      expect(readProjectFile(".trellis/.version")).toBe("0.7.2-beta.11");
+    },
+  );
 
   it.each([
     "planning",

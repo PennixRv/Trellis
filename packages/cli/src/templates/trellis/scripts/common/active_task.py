@@ -548,6 +548,12 @@ def _write_json(path: Path, data: dict[str, Any]) -> bool:
     truncates the target first, so a crash mid-write would leave a session
     file that reads back as no active task.
     """
+    if data.get("current_task") in (None, "") and data.get("current_run") is None and all(
+        data.get(key) is None or isinstance(data[key], str) for key in ("platform", "last_seen_at")
+    ) and set(data) <= {
+        "current_task", "current_run", "platform", "last_seen_at",
+    }:
+        return not path.exists() or _remove_file(path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
     except OSError:
@@ -624,32 +630,11 @@ def _context_path(repo_root: Path, context_key: str) -> Path:
 
 @contextlib.contextmanager
 def _session_file_lock(context_path: Path):
-    """Serialize changes to one session's active-task pointer."""
-    lock_path = context_path.with_suffix(".lock")
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a+b") as handle:
-        if os.name == "nt":
-            import msvcrt
+    """Serialize pointer changes with task moves and ownership transactions."""
+    from .task_move import layout_lock
 
-            handle.seek(0)
-            if handle.read(1) == b"":
-                handle.write(b"\0")
-                handle.flush()
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
-            try:
-                yield
-            finally:
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    with layout_lock(context_path.parents[3]):
+        yield
 
 
 def resolve_active_task(
@@ -828,7 +813,7 @@ def clear_active_task(
     platform_input: dict[str, Any] | None = None,
     platform: str | None = None,
 ) -> ActiveTask:
-    """Clear the active task by deleting its resolved session context file."""
+    """Clear the task pointer while preserving other session data."""
     context_key = resolve_context_key(platform_input, platform)
     if not context_key:
         return ActiveTask(None, "none")
@@ -844,13 +829,17 @@ def clear_active_task(
         if not allowed:
             return ActiveTask(previous.task_path, "session", previous.context_key)
         with _session_file_lock(context_path):
-            if context_path.is_file():
-                _remove_file(context_path)
+            context, _ = read_json_checked(context_path)
+            if context is not None:
+                current = _string_value(context.get("current_task"))
+                if _task_refs_match(current, previous.task_path, repo_root):
+                    context.pop("current_task", None)
+                    _write_json(context_path, context)
     return previous
 
 
 def clear_task_from_sessions(task_path: str, repo_root: Path) -> int:
-    """Delete all session runtime files that point at a task."""
+    """Clear matching task pointers, preserving runs and unknown fields."""
     target = _canonical_task_ref(task_path, repo_root) or normalize_task_ref(task_path)
     if not target:
         return 0
@@ -862,14 +851,17 @@ def clear_task_from_sessions(task_path: str, repo_root: Path) -> int:
 
     for session_path in sessions_dir.glob("*.json"):
         with _session_file_lock(session_path):
-            context = _read_json(session_path) or {}
+            context, _ = read_json_checked(session_path)
+            if context is None:
+                continue
             current = _string_value(context.get("current_task"))
             if not current:
                 continue
             current_ref = _canonical_task_ref(current, repo_root) or normalize_task_ref(current)
             if current_ref != target:
                 continue
-            if session_path.is_file() and _remove_file(session_path):
+            context.pop("current_task", None)
+            if _write_json(session_path, context):
                 cleared += 1
 
     return cleared

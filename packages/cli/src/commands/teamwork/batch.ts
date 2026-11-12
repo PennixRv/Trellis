@@ -39,6 +39,10 @@ import { projectDir } from "./store/paths.js";
 import { scanLiveWorkers } from "./guard.js";
 import { readTeamworkEvents } from "./store/events.js";
 import {
+  evidenceDigest,
+  inspectEvidenceReferences,
+} from "./evidence-references.js";
+import {
   batchReservationPath,
   readBatchReservations,
   writeBatchReservation,
@@ -479,7 +483,15 @@ export async function cleanupTeamworkAttemptEvidence(
   taskRoot: string,
   cwd: string,
   confirm?: string,
-): Promise<{ status: "preview" | "removed"; digest: string; files: string[] }> {
+): Promise<{
+  status: "preview" | "removed" | "partial";
+  digest: string;
+  files: string[];
+  runtimeFiles: string[];
+  protected: { scope: string; path: string; reasons: string[] }[];
+  references: ReturnType<typeof inspectEvidenceReferences>;
+  failed: { scope: string; path: string; reason: string }[];
+}> {
   if (!(await readSettledTeamworkReceipt(plan, cwd)))
     throw new Error("Only durably settled batch evidence can be cleaned");
   const ref = resolveTeamworkSession({ sessionId: plan.sessionId, cwd });
@@ -500,8 +512,16 @@ export async function cleanupTeamworkAttemptEvidence(
       sessionId: plan.sessionId,
       cwd,
     });
-    const files: string[] = [];
-    const fingerprints: unknown[] = [];
+    const receipt = await readSettledTeamworkReceipt(plan, cwd);
+    if (!receipt || projection.issues.length)
+      throw new Error("Settled evidence changed or requires reconciliation");
+    const candidates: {
+      scope: "task" | "project-runtime";
+      path: string;
+      absolute: string;
+      fingerprint: unknown[];
+      reasons: string[];
+    }[] = [];
     for (const attempt of projection.attempts.filter(
       (entry) => entry.batchId === plan.batchId,
     )) {
@@ -513,44 +533,225 @@ export async function cleanupTeamworkAttemptEvidence(
         !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(attempt.attemptId)
       )
         throw new Error("Invalid settled attempt identity");
-      for (const name of ["report.json", "worklog.md", "provider-stderr.log"]) {
-        const relative = path.join(
-          path.dirname(assignment.briefPath),
-          "attempts",
+      const locations: {
+        scope: "task" | "project-runtime";
+        relative: string;
+      }[] = ["report.json", "worklog.md", "provider-stderr.log"].map(
+        (name) => ({
+          scope: "task",
+          relative: path.join(
+            path.dirname(assignment.briefPath),
+            "attempts",
+            attempt.attemptId,
+            name,
+          ),
+        }),
+      );
+      locations.push({
+        scope: "project-runtime",
+        relative: path.join(
+          ".trellis/.runtime/teamwork-diagnostics",
+          plan.batchId,
           attempt.attemptId,
-          name,
-        );
-        const file = safePath(taskRoot, relative);
+          "provider-stderr.log",
+        ),
+      });
+      for (const location of locations) {
+        const { scope, relative } = location;
+        const file = safePath(scope === "task" ? taskRoot : cwd, relative);
         if (!fs.existsSync(file)) continue;
         const stat = fs.lstatSync(file);
         if (!stat.isFile())
           throw new Error("Attempt evidence must be a regular file");
-        files.push(relative);
-        fingerprints.push([
-          relative,
-          stat.dev,
-          stat.ino,
-          stat.size,
-          stat.mtimeMs,
-          stat.ctimeMs,
-        ]);
+        if (stat.size > 8 * 1024 * 1024)
+          throw new Error("Attempt evidence exceeds the bounded cleanup limit");
+        const reasons: string[] = [];
+        if (scope !== "task") {
+          try {
+            const sessions = fs
+              .readdirSync(bucket, { withFileTypes: true })
+              .filter(
+                (entry) => entry.isDirectory() && !entry.name.startsWith("."),
+              );
+            if (sessions.length > 256)
+              throw new Error("session scan limit exceeded");
+            for (const session of sessions) {
+              const events = safePath(
+                bucket,
+                path.join(session.name, "events.jsonl"),
+              );
+              if (fs.statSync(events).size > 64 * 1024 * 1024)
+                throw new Error("event scan limit exceeded");
+              const text = fs.readFileSync(events, "utf8");
+              if (
+                !text.includes(plan.batchId) ||
+                !text.includes(attempt.attemptId)
+              )
+                continue;
+              for (const line of text
+                .split("\n")
+                .filter((line) => line.trim())) {
+                const event = JSON.parse(line) as Record<string, unknown>;
+                if (
+                  session.name !== plan.sessionId &&
+                  event.kind === "coordination" &&
+                  event.batchId === plan.batchId &&
+                  event.attemptId === attempt.attemptId
+                )
+                  reasons.push(
+                    "Legacy diagnostic identity occurs in another session",
+                  );
+              }
+            }
+          } catch {
+            reasons.push(
+              "Cannot verify the legacy diagnostic's session association",
+            );
+          }
+        }
+        candidates.push({
+          scope,
+          path: relative,
+          absolute: file,
+          reasons,
+          fingerprint: [
+            stat.dev,
+            stat.ino,
+            stat.size,
+            stat.mtimeMs,
+            stat.ctimeMs,
+            crypto
+              .createHash("sha256")
+              .update(fs.readFileSync(file))
+              .digest("hex"),
+          ],
+        });
       }
     }
-    const digest = crypto
-      .createHash("sha256")
-      .update(JSON.stringify([plan.planHash, fingerprints]))
-      .digest("hex");
+    const references = inspectEvidenceReferences(
+      cwd,
+      candidates.map((item) => item.absolute),
+    );
+    for (const item of candidates) {
+      if (!references.complete) item.reasons.push(...references.issues);
+    }
+    // A referenced retained report protects its dependencies. A whole eligible
+    // attempt bundle may exit together without making its internal links permanent.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const reference of references.protected) {
+        const source = candidates.find(
+          (item) => item.absolute === path.resolve(cwd, reference.source),
+        );
+        const target = candidates.find(
+          (item) => item.absolute === reference.target,
+        );
+        if (
+          target &&
+          !target.reasons.length &&
+          (!source || source.reasons.length)
+        ) {
+          target.reasons.push(`${reference.role}: ${reference.source}`);
+          changed = true;
+        }
+      }
+    }
+    const eligible = candidates.filter((item) => !item.reasons.length);
+    const files = eligible
+      .filter((item) => item.scope === "task")
+      .map((item) => item.path);
+    const runtimeFiles = eligible
+      .filter((item) => item.scope === "project-runtime")
+      .map((item) => item.path);
+    const digest = evidenceDigest([
+      plan.planHash,
+      receipt,
+      projection,
+      candidates,
+      references,
+    ]);
+    const failed: { scope: string; path: string; reason: string }[] = [];
     if (confirm !== undefined) {
       if (confirm !== digest)
         throw new Error(
           "Cleanup preview changed; inspect a fresh preview before confirming",
         );
-      for (const file of files) fs.unlinkSync(safePath(taskRoot, file));
+      for (const item of eligible) {
+        try {
+          const file = safePath(
+            item.scope === "task" ? taskRoot : cwd,
+            item.path,
+          );
+          const stat = fs.lstatSync(file);
+          const fingerprint = [
+            stat.dev,
+            stat.ino,
+            stat.size,
+            stat.mtimeMs,
+            stat.ctimeMs,
+            crypto
+              .createHash("sha256")
+              .update(fs.readFileSync(file))
+              .digest("hex"),
+          ];
+          if (
+            !stat.isFile() ||
+            evidenceDigest(fingerprint) !== evidenceDigest(item.fingerprint)
+          )
+            throw new Error("Evidence changed after confirmation");
+          const current = inspectEvidenceReferences(cwd, [item.absolute]);
+          const external = current.protected.filter((reference) => {
+            const source = eligible.find(
+              (candidate) =>
+                candidate.absolute === path.resolve(cwd, reference.source),
+            );
+            if (!source) return true;
+            const sourceStat = fs.lstatSync(source.absolute);
+            const sourceFingerprint = [
+              sourceStat.dev,
+              sourceStat.ino,
+              sourceStat.size,
+              sourceStat.mtimeMs,
+              sourceStat.ctimeMs,
+              crypto
+                .createHash("sha256")
+                .update(fs.readFileSync(source.absolute))
+                .digest("hex"),
+            ];
+            return (
+              !sourceStat.isFile() ||
+              evidenceDigest(sourceFingerprint) !==
+                evidenceDigest(source.fingerprint)
+            );
+          });
+          if (!current.complete || external.length)
+            throw new Error("Evidence references changed after confirmation");
+          fs.unlinkSync(file);
+        } catch (error) {
+          failed.push({
+            scope: item.scope,
+            path: item.path,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
     }
     return {
-      status: confirm === undefined ? "preview" : "removed",
+      status:
+        confirm === undefined
+          ? "preview"
+          : failed.length
+            ? "partial"
+            : "removed",
       digest,
       files,
+      runtimeFiles,
+      protected: candidates
+        .filter((item) => item.reasons.length)
+        .map(({ scope, path, reasons }) => ({ scope, path, reasons })),
+      references,
+      failed,
     };
   } finally {
     releaseLock(lock);

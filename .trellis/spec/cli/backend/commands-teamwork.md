@@ -127,6 +127,16 @@ Do not make terminal status depend only on a provider process exiting: adapters 
 
 ### 清理与诊断边界
 
+`rm` 默认返回预览，只有精确 `--confirm` 摘要才退出已证明无活动、无恢复及
+无证据引用依赖的 session；`prune --yes` 同样要求当前摘要。create 的 `--force`
+保留参数兼容，但不能覆盖非空 session。run 调用相同入口，不能隐式绕过保护。
+
+attempt stderr 与 report、工作日志同归冻结 attempt 目录。旧诊断只在 ID 与
+关联可证明时由对应批次清理；未知诊断保留。空前台等待目录由 guard 内原生退出。
+`cleanup-artifacts` 从已重放并验证的终态事实预览，引用的结果、任务证据、spec
+和交接语义引用受保护；盘点路径或旧计划 locator 本身不产生永久保留义务。
+引用摘要、源指纹、进程退出或原生 receipt 不确定时保留，并逐项报告失败。
+
 `kill` 在每次向 supervisor 发信号前核验命令身份；PID 必须为正安全整数。
 supervisor 已退出而子进程仍存活时，只有 Linux birth identity 与保存的
 `worker-identity` 一致才终止孤儿进程。身份缺失、宿主不支持核验、权限错误或进程

@@ -87,5 +87,15 @@ export function clearForegroundWait(cwd: string, plan: TeamworkPlan): void {
       )
         fs.unlinkSync(file);
     }
+    try {
+      fs.rmdirSync(directory);
+    } catch (error) {
+      if (
+        !["ENOTEMPTY", "ENOENT", "EEXIST"].includes(
+          (error as NodeJS.ErrnoException).code ?? "",
+        )
+      )
+        throw error;
+    }
   }
 }

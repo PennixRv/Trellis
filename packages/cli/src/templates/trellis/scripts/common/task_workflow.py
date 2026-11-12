@@ -207,31 +207,10 @@ def _save(task_file: Path, data: dict) -> None:
 
 @contextlib.contextmanager
 def _task_lock(task_dir: Path):
-    lock_file = get_repo_root() / ".trellis/.runtime/task-phase" / f"{task_dir.name}.lock"
-    lock_file.parent.mkdir(parents=True, exist_ok=True)
-    with lock_file.open("a+b") as handle:
-        if os.name == "nt":
-            import msvcrt
+    from .task_move import layout_lock
 
-            handle.seek(0)
-            if handle.read(1) == b"":
-                handle.write(b"\0")
-                handle.flush()
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
-            try:
-                yield
-            finally:
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    with layout_lock(get_repo_root()):
+        yield
 
 
 def _expected_route(state: dict, value: str | None) -> None:

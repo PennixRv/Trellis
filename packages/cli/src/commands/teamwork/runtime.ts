@@ -23,7 +23,7 @@ import {
 import { readProcessIdentity } from "./process-identity.js";
 import { assertFrozenCoordination } from "./coordination.js";
 import { resolveTeammateRuntimeConfig } from "./teammate-config.js";
-import { safePath } from "./artifact.js";
+import { attemptArtifactPath } from "./artifact.js";
 
 /** The CLI owns foreground waiting and artifact validation; write restrictions remain role obligations. */
 export const CLI_TEAMMATE_HOST: TeammateHostCapabilities = {
@@ -198,16 +198,11 @@ export function createCliCoordinatorRuntime(
         }
         if (stderrTail.length) {
           try {
-            const diagnostic = safePath(
-              cwd,
-              path.join(
-                ".trellis",
-                ".runtime",
-                "teamwork-diagnostics",
-                context.plan.batchId,
-                context.attemptId,
-                "provider-stderr.log",
-              ),
+            const diagnostic = attemptArtifactPath(
+              taskRoot,
+              context.assignment.briefPath,
+              context.attemptId,
+              "provider-stderr.log",
             );
             const directory = path.dirname(diagnostic);
             fs.mkdirSync(directory, { recursive: true, mode: 0o700 });

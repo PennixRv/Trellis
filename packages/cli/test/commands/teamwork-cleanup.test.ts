@@ -76,9 +76,11 @@ describe("Teamwork cleanup preserves unverified process evidence", () => {
     await expect(
       teamworkSessionKill("cleanup", { as: "teammate", force: true }),
     ).rejects.toThrow("Cannot verify supervisor process identity");
-    await expect(teamworkSessionRm("cleanup")).rejects.toThrow(
-      "Cannot verify supervisor process identity",
-    );
+    const preview = await teamworkSessionRm("cleanup");
+    expect(preview.eligible).toBe(false);
+    await expect(
+      teamworkSessionRm("cleanup", { confirm: preview.digest }),
+    ).rejects.toThrow("Session evidence protected");
     expect(signal.mock.calls.every(([, value]) => value === 0)).toBe(true);
     expect(fs.existsSync(workerFile("cleanup", "teammate", "pid"))).toBe(true);
   });
@@ -165,21 +167,23 @@ describe("Teamwork cleanup preserves unverified process evidence", () => {
   );
   it("prune retains pending launches, child-only PIDs, and corrupt events", async () => {
     fs.writeFileSync(workerFile("cleanup", "teammate", "spawnlock"), "pending");
-    await teamworkSessionPrune({ all: true, yes: true });
+    await confirmPrune();
     expect(fs.existsSync(sessionDir("cleanup"))).toBe(true);
     fs.unlinkSync(workerFile("cleanup", "teammate", "spawnlock"));
     fs.writeFileSync(
       workerFile("cleanup", "teammate", "worker-pid"),
       String(process.pid),
     );
-    await teamworkSessionPrune({ all: true, yes: true });
+    await confirmPrune();
     expect(fs.existsSync(sessionDir("cleanup"))).toBe(true);
     fs.unlinkSync(workerFile("cleanup", "teammate", "worker-pid"));
     fs.appendFileSync(eventsPath("cleanup"), "invalid JSON\n");
-    await teamworkSessionPrune({ all: true, yes: true });
+    await confirmPrune();
     expect(fs.existsSync(sessionDir("cleanup"))).toBe(true);
   });
   it("prune rechecks changed event content even when its timestamp is unchanged", async () => {
+    const preview = await teamworkSessionPrune({ all: true });
+    if (!preview) throw new Error("missing prune preview");
     const file = eventsPath("cleanup");
     const first = JSON.parse(fs.readFileSync(file, "utf-8").trim()) as {
       ts: string;
@@ -196,25 +200,45 @@ describe("Teamwork cleanup preserves unverified process evidence", () => {
         }) + "\n",
       );
     });
-    await teamworkSessionPrune({ all: true, yes: true });
+    await teamworkSessionPrune({
+      all: true,
+      yes: true,
+      confirm: preview.digest,
+    });
     expect(fs.existsSync(sessionDir("cleanup"))).toBe(true);
     expect(console.log).toHaveBeenCalledWith(
       "\nRemoved 0/1 Teamwork session(s)",
     );
   });
   it("prune previews then deletes a settled session with an accurate count", async () => {
-    await teamworkSessionPrune({ all: true, dryRun: true, yes: true });
+    const preview = await teamworkSessionPrune({
+      all: true,
+      dryRun: true,
+      yes: true,
+    });
+    if (!preview) throw new Error("missing prune preview");
     expect(fs.existsSync(sessionDir("cleanup"))).toBe(true);
-    await teamworkSessionPrune({ all: true, yes: true });
+    await expect(
+      teamworkSessionPrune({ all: true, yes: true }),
+    ).rejects.toThrow("exact current");
+    await teamworkSessionPrune({
+      all: true,
+      yes: true,
+      confirm: preview.digest,
+    });
     expect(fs.existsSync(sessionDir("cleanup"))).toBe(false);
     expect(console.log).toHaveBeenCalledWith(
       "\nRemoved 1/1 Teamwork session(s)",
     );
   });
   it("prune waits for an event writer and preserves its new evidence", async () => {
+    const preview = await teamworkSessionPrune({ all: true });
+    if (!preview) throw new Error("missing prune preview");
     const lock = lockPath("cleanup");
     await acquireLock(lock);
-    const pruning = teamworkSessionPrune({ all: true, yes: true });
+    const pruning = expect(
+      teamworkSessionPrune({ all: true, yes: true, confirm: preview.digest }),
+    ).rejects.toThrow("exact current");
     try {
       await vi.waitFor(() => {
         expect(
@@ -237,8 +261,57 @@ describe("Teamwork cleanup preserves unverified process evidence", () => {
       await pruning;
     }
     expect(fs.existsSync(sessionDir("cleanup"))).toBe(true);
-    expect(console.log).toHaveBeenCalledWith(
-      "\nRemoved 0/1 Teamwork session(s)",
+  });
+
+  async function confirmPrune(): Promise<void> {
+    const preview = await teamworkSessionPrune({ all: true });
+    if (preview)
+      await teamworkSessionPrune({
+        all: true,
+        yes: true,
+        confirm: preview.digest,
+      });
+  }
+
+  it("rm defaults to preview and rejects stale or protected confirmations", async () => {
+    const preview = await teamworkSessionRm("cleanup", { force: true });
+    expect(preview.eligible).toBe(true);
+    expect(fs.existsSync(sessionDir("cleanup"))).toBe(true);
+    await expect(
+      teamworkSessionRm("cleanup", { confirm: "old" }),
+    ).rejects.toThrow("preview changed");
+    const docs = path.join(root, "docs");
+    fs.mkdirSync(docs);
+    fs.writeFileSync(
+      path.join(docs, "result.json"),
+      JSON.stringify({
+        kind: "trellis_result",
+        association: { sessionId: "cleanup" },
+        reports: [],
+      }),
     );
+    await expect(
+      teamworkSessionRm("cleanup", { confirm: preview.digest }),
+    ).rejects.toThrow("preview changed");
+    const protectedPreview = await teamworkSessionRm("cleanup");
+    expect(protectedPreview.eligible).toBe(false);
+    expect(protectedPreview.references.protected).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "result-or-control" }),
+      ]),
+    );
+    expect(fs.existsSync(sessionDir("cleanup"))).toBe(true);
+  });
+
+  it("does not turn an inventory mention into permanent retention", async () => {
+    fs.writeFileSync(
+      path.join(root, "inventory.md"),
+      `Inventory: ${eventsPath("cleanup")}\n`,
+    );
+    const preview = await teamworkSessionRm("cleanup");
+    expect(preview.references.mentions).not.toHaveLength(0);
+    expect(preview.eligible).toBe(true);
+    await teamworkSessionRm("cleanup", { confirm: preview.digest });
+    expect(fs.existsSync(sessionDir("cleanup"))).toBe(false);
   });
 });
