@@ -13,3 +13,11 @@
 GitNexus 索引落后 63 提交。局部 impact 为 LOW；新近 writeSpecIndex 不存在于索引，已用当前源码核对全部调用点。提交前 `detect-changes --scope all` 给出 HIGH、12 文件／16 符号／15 流程；以原生 `--limit 100` 重跑后 renderer 仍简略显示部分列表，不能当完整清洁结论。陈旧索引含已退休的 writeBackendDocs 等符号。当前实际 diff 已逐项复核，相关完整测试、安全反例和组合证据补足，未擅自重建索引。
 
 本候选仍待公开 CI、包身份核验、原生安装和项目现场收敛；不以本地通过宣称整体完成。
+
+## 固定候选及发布现场
+
+最终原生提交门禁在 beta.18 上完整运行：CLI 2157 通过、2 跳过，Core 423 通过、1 跳过，adapter 4 通过。固定源码为 `5f5285838adcbef13ad9ed0812c4ec8faa5a2bd3`；维护分支及 `v0.7.2-beta.18` tag 已推送并由 GitHub API 回读一致。三份 npm pack 候选已准备，CLI 精确依赖同版 core。
+
+固定 tag 推送与既有 `release.published` 入口暂未形成任何 Actions 运行记录。工作流及仓库 Actions API 均报告启用，GitHub 状态页未报告故障；不能据此断言事件投递根因。已对原生 workflow 执行幂等 enable，并在保持 tag 不变的前提下有限重建无资产的同名预发行，显式指向维护分支；未增加 dispatch、改变 workflow、重写 tag 或本地绕过 CI 发布 npm。
+
+公共 npm 三包目前均未找到 beta.18。原生安装与本项目生成资产更新仍待公开发布，不把上一版本的运行记录当成本版证据。

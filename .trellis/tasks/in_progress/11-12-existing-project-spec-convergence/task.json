@@ -87,15 +87,17 @@
           }
         },
         "task_implementation": {
-          "status": "active",
+          "status": "blocked",
           "input_revision": "8",
           "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
           "artifact_refs": [],
           "result_revision": "0",
           "result_ref": null,
           "outcome_kind": null,
-          "reason": null,
-          "evidence_refs": [],
+          "reason": "固定 beta.18 远端 tag/Release 未产生原生发布运行，公共包仍缺失",
+          "evidence_refs": [
+            "validation.md"
+          ],
           "acceptance": null
         },
         "delivery_review_and_closeout": {
