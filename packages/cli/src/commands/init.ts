@@ -6,7 +6,10 @@ import readline from "node:readline";
 import chalk from "chalk";
 import figlet from "figlet";
 import inquirer from "inquirer";
-import { createWorkflowStructure } from "../configurators/workflow.js";
+import {
+  createWorkflowStructure,
+  ensureSpecIndex,
+} from "../configurators/workflow.js";
 import { withAssetMaintenance } from "../utils/asset-backup.js";
 import { writeFileAtomic } from "../utils/atomic-write.js";
 import {
@@ -816,6 +819,12 @@ async function handleReinit(
     }
   }
 
+  const specResult = ensureSpecIndex(cwd);
+  console.log(
+    chalk.gray(
+      `Spec root index: ${specResult}. Source-backed conventions require trellis-spec-bootstrap review.`,
+    ),
+  );
   const rootWritten = startRecordingWrites(cwd);
   try {
     await createRootFiles(cwd, options);

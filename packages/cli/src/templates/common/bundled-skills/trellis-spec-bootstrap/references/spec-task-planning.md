@@ -1,6 +1,6 @@
 # Spec Task Planning
 
-Use a single agent as the default execution model. The agent may create Trellis tasks for traceability, but the skill should not require a specific platform, CLI, or parallel worker model.
+The main session performs this work under the current task's authorization. Reuse that task when applicable; this method does not start another task system or dispatch workers.
 
 ## Decomposition
 
@@ -48,14 +48,10 @@ Summarize the concrete findings from repository analysis.
 - [ ] Claims are backed by source files, tests, or project docs.
 ```
 
-## Optional Helper Agents
+## Existing Project Refresh
 
-If the host supports subagents, helpers can inspect independent packages or run verification. They are optional. The main agent still owns integration and final quality.
+Inventory the actual files before selecting changes. An old index marked `To fill` does not prove that its topic files are empty. Keep source-backed rules and their conditions, including rules mixed into placeholder headings.
 
-Helper tasks must have clear ownership:
+Use existing package keys, `default_package` and `spec_scope`; do not infer a new map from directory names. Keep valid legacy layers when they fit. Remove pure placeholders only after checking active references and explicit authorization. Preserve archived tasks and receipts; record the source commit and exact removed paths for historical lookup.
 
-- Read-only research tasks may inspect any source needed for the assigned scope.
-- Native helper write tasks require explicit project authorization and disjoint spec directories. Trellis Teamwork teammates remain in their research, review, or verification role and return findings in the assigned format; the coordinator applies accepted spec edits.
-- Verification tasks should check placeholder removal, broken links, and consistency.
-
-Do not encode helper-agent names, vendor-specific commands, or platform-specific routing in the skill. Put only the required work and acceptance criteria in the task.
+Verify navigation and real content after edits. Missing analysis tools or source evidence must remain explicit limitations, not invented conventions. A native init/update success alone is not spec completion.

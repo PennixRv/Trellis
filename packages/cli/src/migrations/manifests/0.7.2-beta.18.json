@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.18",
+  "description": "Repair missing generic spec navigation on existing-project init",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Ordinary existing-project init prepares a missing local spec root index without recreating topics, guides or package mappings. Preserve existing indexes and external sources; reject unsafe paths and publish new files without replacing concurrent content. Bundled bootstrap distinguishes file preparation from source-backed convention verification.",
+  "migrations": [],
+  "notes": "Update generated assets through the native CLI. Explicitly rerun ordinary init only when root-index preparation is intended, then use trellis-spec-bootstrap under the current task and authorization to review real content. Ordinary update does not migrate project specs or remove legacy layers; repeating default init also recreates an intentionally deleted root index."
+}

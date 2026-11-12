@@ -56,6 +56,7 @@ import {
   getCopilotInstructions,
 } from "../../src/templates/copilot/index.js";
 import { execSync } from "node:child_process";
+import { emptyTaskJson } from "../../src/utils/task-json.js";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 const noop = () => {};
@@ -171,6 +172,107 @@ describe("init() integration", () => {
         "custom source-backed conventions",
       );
       expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("repairs only the missing root spec index on ordinary legacy reinit", async () => {
+    await init({ yes: true, codex: true });
+    const legacyTask = path.join(tmpDir, PATHS.TASKS, "planning/legacy-task");
+    fs.mkdirSync(legacyTask, { recursive: true });
+    fs.writeFileSync(
+      path.join(legacyTask, "task.json"),
+      JSON.stringify(
+        emptyTaskJson({
+          id: "legacy-task",
+          name: "legacy-task",
+          title: "Legacy",
+          description: "Existing task",
+          status: "planning",
+        }),
+      ),
+    );
+    const spec = path.join(tmpDir, PATHS.SPEC);
+    fs.rmSync(spec, { recursive: true });
+    fs.mkdirSync(path.join(spec, "backend"), { recursive: true });
+    fs.writeFileSync(
+      path.join(spec, "backend/index.md"),
+      "legacy real rules\r\n",
+    );
+    const config = path.join(tmpDir, ".trellis/config.yaml");
+    fs.appendFileSync(
+      config,
+      "\npackages:\n  custom_key:\n    path: src/custom\ndefault_package: custom_key\nsession:\n  spec_scope:\n    - custom_key\n",
+    );
+    const configBefore = fs.readFileSync(config);
+    const tasksBefore = fs.readdirSync(path.join(tmpDir, PATHS.TASKS));
+    await init({ yes: true });
+    expect(fs.readFileSync(path.join(spec, "index.md"), "utf8")).toContain(
+      "Pre-Development Checklist",
+    );
+    expect(fs.readFileSync(path.join(spec, "backend/index.md"), "utf8")).toBe(
+      "legacy real rules\r\n",
+    );
+    expect(fs.existsSync(path.join(spec, "guides"))).toBe(false);
+    expect(fs.existsSync(path.join(spec, "frontend"))).toBe(false);
+    expect(fs.readFileSync(config)).toEqual(configBefore);
+    expect(fs.readdirSync(path.join(tmpDir, PATHS.TASKS))).toEqual(tasksBefore);
+    const indexBefore = fs.readFileSync(path.join(spec, "index.md"));
+    await init({ yes: true });
+    expect(fs.readFileSync(path.join(spec, "index.md"))).toEqual(indexBefore);
+    const hashes = fs.readFileSync(
+      path.join(tmpDir, ".trellis/.template-hashes.json"),
+      "utf8",
+    );
+    expect(hashes).not.toContain('".trellis/spec/');
+  });
+
+  it("does not synthesize a local root for persisted or unrecognized registry sources", async () => {
+    await init({ yes: true, codex: true });
+    const legacyTask = path.join(tmpDir, PATHS.TASKS, "planning/legacy-task");
+    fs.mkdirSync(legacyTask, { recursive: true });
+    fs.writeFileSync(
+      path.join(legacyTask, "task.json"),
+      JSON.stringify(
+        emptyTaskJson({
+          id: "legacy-task",
+          name: "legacy-task",
+          title: "Legacy",
+          description: "Existing task",
+          status: "planning",
+        }),
+      ),
+    );
+    const index = path.join(tmpDir, ".trellis/spec/index.md");
+    const config = path.join(tmpDir, ".trellis/config.yaml");
+    const original = fs.readFileSync(config, "utf8");
+    for (const declaration of [
+      "registry:\n  spec:\n    source: gh:example/spec\n",
+      "registry: {spec: {source: remote}}\n",
+    ]) {
+      fs.rmSync(index, { force: true });
+      fs.writeFileSync(config, original + "\n" + declaration);
+      if (declaration.startsWith("registry: {")) {
+        await expect(init({ yes: true })).rejects.toThrow(
+          "Cannot determine spec registry source",
+        );
+      } else {
+        await init({ yes: true });
+      }
+      expect(fs.existsSync(index)).toBe(false);
+      expect(fs.readFileSync(config, "utf8")).toBe(
+        original + "\n" + declaration,
+      );
+    }
+  });
+
+  it.each([{ force: true }, { skipExisting: true }])(
+    "keeps custom root bytes during full init: %j",
+    async (mode) => {
+      await init({ yes: true, codex: true });
+      const index = path.join(tmpDir, ".trellis/spec/index.md");
+      fs.writeFileSync(index, "自定义导航\r\n");
+      await init({ yes: true, codex: true, ...mode });
+      expect(fs.readFileSync(index, "utf8")).toBe("自定义导航\r\n");
     },
   );
 

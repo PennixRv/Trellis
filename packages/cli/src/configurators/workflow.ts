@@ -1,5 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
+import {
+  assertSafeManagedPath,
+  lstatIfPresent,
+} from "../utils/managed-removal.js";
+import { loadSpecRegistryConfig } from "../utils/registry-config.js";
 
 import { DIR_NAMES, PATHS } from "../constants/paths.js";
 import { copyTrellisDir } from "../templates/extract.js";
@@ -113,7 +119,8 @@ export async function createWorkflowStructure(
   cwd: string,
   options?: WorkflowOptions,
 ): Promise<void> {
-  const skipSpecTemplates = options?.skipSpecTemplates ?? false;
+  const skipSpecTemplates =
+    (options?.skipSpecTemplates ?? false) || specHasExternalSource(cwd);
   const packages = options?.packages;
   const remoteSpecPackages = options?.remoteSpecPackages;
   const workflowMd = options?.workflowMdOverride ?? workflowMdTemplate;
@@ -176,7 +183,7 @@ export async function createWorkflowStructure(
 
   // Create spec templates based on project type
   // These are NOT dogfooded - they are generic templates for new projects
-  if (packages && packages.length > 0) {
+  if (packages && packages.length > 0 && !skipSpecTemplates) {
     // Monorepo mode: create per-package spec directories
     await createSpecTemplates(cwd, packages, remoteSpecPackages);
   } else if (!skipSpecTemplates) {
@@ -185,13 +192,82 @@ export async function createWorkflowStructure(
   }
 }
 
-async function writeSpecIndex(
-  specBase: string,
+function safeSpecPath(cwd: string, relativePath: string): string {
+  const target = assertSafeManagedPath(cwd, relativePath);
+  let current = path.resolve(cwd);
+  const parts = relativePath.split("/");
+  for (const [index, part] of parts.entries()) {
+    current = path.join(current, part);
+    const stat = lstatIfPresent(current);
+    if (
+      stat &&
+      (stat.isSymbolicLink() ||
+        (index === parts.length - 1 ? !stat.isFile() : !stat.isDirectory()))
+    ) {
+      throw new Error(`Unsafe spec path: ${relativePath}`);
+    }
+  }
+  return target;
+}
+
+function specHasExternalSource(cwd: string): boolean {
+  const config = safeSpecPath(cwd, `${DIR_NAMES.WORKFLOW}/config.yaml`);
+  if (!lstatIfPresent(config)) return false;
+  const content = fs.readFileSync(config, "utf8");
+  if (loadSpecRegistryConfig(cwd)) return true;
+  // The native registry reader supports block syntax. Unknown declarations
+  // must not silently authorize a local replacement.
+  if (/^\s*["']?registry["']?\s*:/m.test(content)) {
+    throw new Error(
+      "Cannot determine spec registry source; no local spec files were created. Check registry.spec in .trellis/config.yaml.",
+    );
+  }
+  return false;
+}
+
+function writeMissingSpecFile(
+  cwd: string,
+  relativePath: string,
+  content: string,
+): "created" | "preserved" {
+  const target = safeSpecPath(cwd, relativePath);
+  if (lstatIfPresent(target)) {
+    fs.readFileSync(target);
+    return "preserved";
+  }
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  safeSpecPath(cwd, relativePath);
+  const temporary = path.join(
+    path.dirname(target),
+    `.${path.basename(target)}.${randomUUID()}.tmp`,
+  );
+  try {
+    fs.writeFileSync(temporary, content, { flag: "wx" });
+    try {
+      fs.linkSync(temporary, target);
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        (error as NodeJS.ErrnoException).code !== "EEXIST"
+      )
+        throw error;
+      safeSpecPath(cwd, relativePath);
+      fs.readFileSync(target);
+      return "preserved";
+    }
+    return "created";
+  } finally {
+    fs.rmSync(temporary, { force: true });
+  }
+}
+
+/** Prepare only the neutral root; existing project topics belong to bootstrap. */
+export function ensureSpecIndex(
+  cwd: string,
   content = specIndexContent,
-): Promise<void> {
-  ensureDir(specBase);
-  const target = path.join(specBase, "index.md");
-  if (!fs.existsSync(target)) await writeFile(target, content);
+): "created" | "preserved" | "external" {
+  if (specHasExternalSource(cwd)) return "external";
+  return writeMissingSpecFile(cwd, `${PATHS.SPEC}/index.md`, content);
 }
 
 async function createSpecTemplates(
@@ -200,18 +276,15 @@ async function createSpecTemplates(
   remoteSpecPackages?: Set<string>,
 ): Promise<void> {
   // Ensure spec directory exists
-  ensureDir(path.join(cwd, PATHS.SPEC));
   const navigation = packages
     ?.map((pkg) => `- [${pkg.name}](./${sanitizePkgName(pkg.name)}/index.md)`)
     .join("\n");
-  await writeSpecIndex(
-    path.join(cwd, PATHS.SPEC),
+  ensureSpecIndex(
+    cwd,
     specIndexContent + (navigation ? `\n## Packages\n\n${navigation}\n` : ""),
   );
 
   // Guides - always created regardless of mode
-  const guidesDir = path.join(cwd, `${PATHS.SPEC}/guides`);
-  ensureDir(guidesDir);
   const guidesDocs: DocDefinition[] = [
     { name: "index.md", content: guidesIndexContent },
     {
@@ -224,8 +297,7 @@ async function createSpecTemplates(
     },
   ];
   for (const doc of guidesDocs) {
-    const target = path.join(guidesDir, doc.name);
-    if (!fs.existsSync(target)) await writeFile(target, doc.content);
+    writeMissingSpecFile(cwd, `${PATHS.SPEC}/guides/${doc.name}`, doc.content);
   }
 
   if (packages && packages.length > 0) {
@@ -233,12 +305,14 @@ async function createSpecTemplates(
     for (const pkg of packages) {
       const dirName = sanitizePkgName(pkg.name);
       if (remoteSpecPackages?.has(dirName)) continue;
-      const pkgSpecBase = path.join(cwd, `${PATHS.SPEC}/${dirName}`);
-      ensureDir(pkgSpecBase);
-      await writeSpecIndex(pkgSpecBase);
+      writeMissingSpecFile(
+        cwd,
+        `${PATHS.SPEC}/${dirName}/index.md`,
+        specIndexContent,
+      );
     }
   } else {
     // Single-repo mode
-    await writeSpecIndex(path.join(cwd, PATHS.SPEC));
+    ensureSpecIndex(cwd);
   }
 }

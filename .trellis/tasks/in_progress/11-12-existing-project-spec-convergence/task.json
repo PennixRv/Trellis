@@ -1,0 +1,144 @@
+{
+  "id": "existing-project-spec-convergence",
+  "name": "existing-project-spec-convergence",
+  "title": "通用 spec 入口重入与 bootstrap 闭环",
+  "description": "按根 existing-project-spec-convergence 第2版已批准合同实现原生补缺入口、受保护创建、bundled bootstrap 与回归；用户已授权发布部署重装，主会话直接实施。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-11-12",
+  "completedAt": null,
+  "branch": "fix/existing-project-spec-convergence",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "2",
+      "task_kind": "implementation",
+      "complexity": "standard",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "solution_design_and_convergence",
+        "task_implementation",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": "task_implementation",
+      "input_revision": "8",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "6",
+          "artifact_revision": "5141bf392992054a4ea40b05d2b2d1b5a5fcfb587b54a32ffeafc0b7e61916f4",
+          "artifact_refs": [
+            "prd.md"
+          ],
+          "result_revision": "2",
+          "result_ref": "prd.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "implementation-contract.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "5141bf392992054a4ea40b05d2b2d1b5a5fcfb587b54a32ffeafc0b7e61916f4",
+            "result_revision": "2",
+            "input_revision": "6",
+            "task_route_revision": "2",
+            "evidence_refs": [
+              "implementation-contract.md"
+            ]
+          }
+        },
+        "solution_design_and_convergence": {
+          "status": "accepted",
+          "input_revision": "7",
+          "artifact_revision": "dbb2da33f0f76b9718fb9900089305c3fa268d8f933046f89dcf3b6f939849f0",
+          "artifact_refs": [
+            "implementation-contract.md"
+          ],
+          "result_revision": "2",
+          "result_ref": "implementation-contract.md",
+          "outcome_kind": "implementation_contract",
+          "reason": null,
+          "evidence_refs": [
+            "implementation-contract.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "dbb2da33f0f76b9718fb9900089305c3fa268d8f933046f89dcf3b6f939849f0",
+            "result_revision": "2",
+            "input_revision": "7",
+            "task_route_revision": "2",
+            "evidence_refs": [
+              "implementation-contract.md"
+            ]
+          }
+        },
+        "task_implementation": {
+          "status": "active",
+          "input_revision": "8",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": null,
+          "evidence_refs": [],
+          "acceptance": null
+        },
+        "delivery_review_and_closeout": {
+          "status": "not_started",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": null,
+          "evidence_refs": [],
+          "acceptance": null
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": {
+        "contract_ref": "implementation-contract.md",
+        "contract_revision": "dbb2da33f0f76b9718fb9900089305c3fa268d8f933046f89dcf3b6f939849f0",
+        "approval_ref": "implementation-contract.md",
+        "task_route_revision": "2"
+      },
+      "closeout_disposition": null,
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "修正组件接入时跨仓相对证据引用，改用本地合同承接根已存在完整授权；需求与方案不变。",
+          "evidence_refs": [
+            "implementation-contract.md"
+          ],
+          "task_route_revision": "2",
+          "input_revision": "6",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": {
+        "from": "task_implementation",
+        "to": "goal_exploration_and_requirements",
+        "reason": "修正组件接入时跨仓相对证据引用，改用本地合同承接根已存在完整授权；需求与方案不变。",
+        "evidence_refs": [
+          "implementation-contract.md"
+        ],
+        "task_route_revision": "2"
+      }
+    }
+  }
+}
