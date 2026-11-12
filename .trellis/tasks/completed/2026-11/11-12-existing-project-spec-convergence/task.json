@@ -3,7 +3,7 @@
   "name": "existing-project-spec-convergence",
   "title": "通用 spec 入口重入与 bootstrap 闭环",
   "description": "按根 existing-project-spec-convergence 第2版已批准合同实现原生补缺入口、受保护创建、bundled bootstrap 与回归；用户已授权发布部署重装，主会话直接实施。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "cli",
@@ -11,7 +11,7 @@
   "creator": "penn",
   "assignee": "penn",
   "createdAt": "2026-11-12",
-  "completedAt": null,
+  "completedAt": "2026-11-12",
   "branch": "fix/existing-project-spec-convergence",
   "base_branch": "main",
   "worktree_path": null,
@@ -35,8 +35,8 @@
         "task_implementation",
         "delivery_review_and_closeout"
       ],
-      "current_phase_id": "task_implementation",
-      "input_revision": "8",
+      "current_phase_id": null,
+      "input_revision": "12",
       "phases": {
         "goal_exploration_and_requirements": {
           "status": "accepted",
@@ -87,30 +87,52 @@
           }
         },
         "task_implementation": {
-          "status": "blocked",
-          "input_revision": "8",
-          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-          "artifact_refs": [],
-          "result_revision": "0",
-          "result_ref": null,
-          "outcome_kind": null,
-          "reason": "固定 beta.18 远端 tag/Release 未产生原生发布运行，公共包仍缺失",
+          "status": "accepted",
+          "input_revision": "9",
+          "artifact_revision": "13b65eedc6b53b82f1a13a7c31a90c8da4de1f7d9bda89b9e783775c4111cc1f",
+          "artifact_refs": [
+            "validation.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "validation.md",
+          "outcome_kind": "implementation_complete",
+          "reason": null,
           "evidence_refs": [
             "validation.md"
           ],
-          "acceptance": null
+          "acceptance": {
+            "artifact_revision": "13b65eedc6b53b82f1a13a7c31a90c8da4de1f7d9bda89b9e783775c4111cc1f",
+            "result_revision": "1",
+            "input_revision": "9",
+            "task_route_revision": "2",
+            "evidence_refs": [
+              "validation.md"
+            ]
+          }
         },
         "delivery_review_and_closeout": {
-          "status": "not_started",
-          "input_revision": "1",
-          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-          "artifact_refs": [],
-          "result_revision": "0",
-          "result_ref": null,
-          "outcome_kind": null,
+          "status": "accepted",
+          "input_revision": "11",
+          "artifact_revision": "c25e4a09600f3e52b1e4fe63f89662022af4b317e2966c5b5eb60f0ebbe08ee2",
+          "artifact_refs": [
+            "closeout.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "closeout.md",
+          "outcome_kind": "delivery_ready",
           "reason": null,
-          "evidence_refs": [],
-          "acceptance": null
+          "evidence_refs": [
+            "validation.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "c25e4a09600f3e52b1e4fe63f89662022af4b317e2966c5b5eb60f0ebbe08ee2",
+            "result_revision": "1",
+            "input_revision": "11",
+            "task_route_revision": "2",
+            "evidence_refs": [
+              "validation.md"
+            ]
+          }
         }
       },
       "route_dependency_admission": null,
@@ -120,7 +142,7 @@
         "approval_ref": "implementation-contract.md",
         "task_route_revision": "2"
       },
-      "closeout_disposition": null,
+      "closeout_disposition": "delivery_ready",
       "skip_records": {
         "decision_space_construction_and_merging": {
           "reason": "修正组件接入时跨仓相对证据引用，改用本地合同承接根已存在完整授权；需求与方案不变。",

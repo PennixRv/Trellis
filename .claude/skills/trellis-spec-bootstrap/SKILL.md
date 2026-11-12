@@ -9,11 +9,11 @@ Use this skill to create or refresh `.trellis/spec/` guidelines from the real co
 
 ## Workflow
 
-1. Confirm Trellis is initialized and inspect the current `.trellis/spec/` tree.
+1. Reuse the current task and authorization. Inspect the current `.trellis/spec/` tree, configured package keys and spec source before changing anything. This skill does not authorize initialization, installation or indexing.
 2. Analyze the repository architecture with the best available tools: GitNexus, ABCoder, language tooling, and direct source reads.
 3. Decompose the spec work by package and layer only when that reflects the actual codebase.
-4. Fill or reshape the spec files with concrete patterns, file paths, examples, and anti-patterns from the project.
-5. Verify that the final specs are internally consistent and contain no template placeholders.
+4. Classify pure placeholders, real conventions mixed into templates, and historical examples. Fill or reshape the authorized files with concrete project evidence; preserve real rules and historical task records.
+5. Verify root/package navigation, active references, applicable checks and placeholder removal. Report file preparation separately from verified conventions and remaining evidence gaps.
 
 ## Reference Routing
 
@@ -28,7 +28,8 @@ Use this skill to create or refresh `.trellis/spec/` guidelines from the real co
 
 - Treat templates as starting points, not contracts. Delete, rename, split, or add spec files when the repository calls for it.
 - Prefer source-backed rules over generic advice. Every important recommendation should point at a real file or repeated local pattern.
-- Keep execution single-owner by default. Optional helper agents are an implementation detail, not a requirement or user-visible dependency.
+- The main session owns this loop. This skill does not dispatch native helper agents or establish a collaboration route.
+- Native `init` prepares missing navigation; it does not prove that spec content is useful. Ordinary existing-project reentry only repairs the missing root index, without recreating topics, guides or package mappings. An authorized source-backed refresh may still be required.
 - Do not write platform-specific instructions unless the target project already standardizes on that platform.
 - Do not leave placeholder text, empty headings, or copied boilerplate in `.trellis/spec/`.
 
@@ -38,4 +39,5 @@ Use this skill to create or refresh `.trellis/spec/` guidelines from the real co
 - Each relevant package or layer has practical coding guidance with real examples.
 - Non-applicable template sections are removed.
 - `index.md` files match the final spec file set.
+- Active task references remain valid; historical records and acceptance evidence retain their original bytes. Record deleted paths and their source commit instead of creating empty compatibility files.
 - Any required setup or analysis assumptions are documented in the relevant spec or task notes.

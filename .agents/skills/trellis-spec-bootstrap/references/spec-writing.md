@@ -74,3 +74,5 @@ grep -R "To be filled\\|TODO: fill\\|placeholder" .trellis/spec
 ```
 
 Also check links, index files, and whether any spec still describes a template rather than this repository.
+
+Check active task bindings before moving or deleting a topic. Preserve archived examples as history, clearly distinguish them from current instructions, and do not rewrite historical acceptance evidence to make a current link check pass. Report which conventions were verified from which sources and what remains unverified.
