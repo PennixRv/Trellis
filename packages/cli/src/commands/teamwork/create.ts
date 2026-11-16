@@ -26,6 +26,7 @@ export interface CreateOptions {
   by?: string;
   force?: boolean;
   ephemeral?: boolean;
+  ownerSession?: string;
   /**
    * Optional mode marker for callers like `teamwork run` that produce
    * one-shot Teamwork Sessions. Stored as `meta.trellis.createMode` so the
@@ -46,6 +47,10 @@ export async function createTeamworkSession(
   const labels = parseCsv(opts.labels);
 
   const createMode = opts.origin;
+  const ownerSessionId =
+    opts.ownerSession ??
+    process.env.CODEX_THREAD_ID ??
+    process.env.CODEX_SESSION_ID;
 
   const event = await coreCreateTeamworkSession({
     sessionId: name,
@@ -59,6 +64,7 @@ export async function createTeamworkSession(
     ...(opts.description ? { description: opts.description } : {}),
     ...(context ? { context } : {}),
     ...(opts.ephemeral ? { ephemeral: true } : {}),
+    ...(ownerSessionId ? { ownerSessionId } : {}),
     ...(opts.force ? { force: true } : {}),
     origin: "cli",
     ...(createMode ? { meta: { trellis: { createMode } } } : {}),

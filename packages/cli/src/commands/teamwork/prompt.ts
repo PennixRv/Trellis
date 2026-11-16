@@ -5,7 +5,7 @@ export function buildTeamworkInstructions(
 ): string {
   const result = [
     "## 结果合同（schema_version: 2）",
-    "提交字段：schema_version=2；status 为 complete、blocked、incomplete 或 error；answer 为实际回答；evidence 为非空数组，每项含 id、locator、summary；limitations、unresolved、deviations 为字符串数组，无事项用 []。",
+    "提交字段：schema_version=2；status 为 complete、blocked、incomplete 或 error；answer 为非空字符串，可含 Markdown，不能使用对象或数组；evidence 为非空数组，每项只含 id、locator、summary；id 使用安全标识符（字母、数字、点、下划线、连字符，例如 finding-1），locator 和 summary 为非空字符串；limitations、unresolved、deviations 为字符串数组，无事项用 []。禁止添加本模式未声明的顶层字段。",
     "只在满足全部验收条件时使用 complete。证据必须真实；仅处理给定输入时可用 task-input 作为 locator，不编造外部来源。",
     "运行失败不要求你在退出后补写报告；CLI 自行报告执行事实。自然结束当前回复即可，done/终态由 adapter 产生，不输出控制事件或自行重试。",
   ];

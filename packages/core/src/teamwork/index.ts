@@ -1,4 +1,8 @@
 // Public Teamwork API surface.
+export {
+  listSessionDescendants,
+  type SessionDescendants,
+} from "./internal/store/session-relations.js";
 export { redactDiagnostic } from "./internal/store/diagnostics.js";
 
 export type {
@@ -43,6 +47,7 @@ export type {
   ContextTeamworkEvent,
   TeamworkMetadataEvent,
   SpawnedTeamworkEvent,
+  SessionBoundTeamworkEvent,
   KilledTeamworkEvent,
   DoneTeamworkEvent,
   ErrorTeamworkEvent,

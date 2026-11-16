@@ -6,6 +6,10 @@ import { hostname } from 'node:os';
 export const MAX_BYTES = 256 * 1024;
 const operations = new Set(['capability', 'inspect', 'prepare-workspace', 'prepare-agent', 'execute', 'followup', 'observe', 'wait', 'interrupt', 'resource-preview']);
 export function refuse(category) { throw Object.assign(new Error(category), { category }); }
+export function verifyDaemonInfo(info, serverId) {
+  if (info?.serverId !== serverId) refuse('identity_mismatch');
+  if (!['0.15.3', '0.15.4'].includes(info.version)) refuse('unsupported');
+}
 function text(value) { if (typeof value !== 'string' || !value || value.length > 65536 || value.includes('\0')) refuse('invalid_input'); return value; }
 function keys(object, allowed) {
   if (!object || typeof object !== 'object' || Array.isArray(object) || Object.keys(object).some(k => !allowed.includes(k))) refuse('invalid_input');
@@ -57,7 +61,7 @@ export async function perform(request, api, client, identity) {
   }
   if (op === 'capability') {
     const cwd = text(p.cwd);
-    return { identity, sdk_version: '0.15.3', protocol: 1, models: await api.providers.listModels('codex', { cwd }), modes: await api.providers.listModes('codex', { cwd }) };
+    return { identity, sdk_version: '0.15.3', daemon_version: client.getLastServerInfoMessage().version, protocol: 1, models: await api.providers.listModels('codex', { cwd }), modes: await api.providers.listModes('codex', { cwd }) };
   }
   if (op === 'prepare-workspace') {
     const ref = await api.workspaces.create({ source: { kind: 'worktree', cwd: realpathSync(text(p.target)), action: 'branch-off', baseBranch: text(p.base_commit), branchName: text(p.branch) }, title: text(p.title), background: true });
@@ -129,7 +133,8 @@ export async function dispatch(input) {
   let api;
   try {
     await client.connect();
-    if (client.getLastServerInfoMessage()?.serverId !== instance.serverId || !isSameDaemonInstance(instance, await readDaemonInstance(home))) refuse('identity_mismatch');
+    verifyDaemonInfo(client.getLastServerInfoMessage(), instance.serverId);
+    if (!isSameDaemonInstance(instance, await readDaemonInstance(home))) refuse('identity_mismatch');
     api = createPaseoApi(client);
     return await perform(request, api, client, { server_id: instance.serverId, home, pid: instance.pid, started_at: instance.startedAt });
   } finally { if (api) await api.dispose(); await client.close(); }

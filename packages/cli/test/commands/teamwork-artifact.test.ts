@@ -89,6 +89,15 @@ it("accepts a versioned content report under the managed mode contract", () => {
   expect(() =>
     validateTeammateReport({ ...report, answer: "" }, identity, sourceDigest),
   ).toThrow();
+  for (const invalid of [
+    { ...report, answer: { summary: "Structured answer is not a string" } },
+    { ...report, evidence: [{ ...report.evidence[0], id: "R04/finding 1" }] },
+    { ...report, findings: [] },
+  ]) {
+    expect(() =>
+      validateTeammateReport(invalid, identity, sourceDigest),
+    ).toThrow();
+  }
   expect(() =>
     validateTeammateReport(
       { ...report, accepted: true },

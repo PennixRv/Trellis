@@ -138,6 +138,13 @@ describe("CLI Teamwork coordinator runtime", () => {
       fs.mkdirSync(attemptRoot, { recursive: true });
       const runtime = createCliCoordinatorRuntime(taskRoot, taskRoot);
       await runtime.dispatch(context);
+      child.stdout.write(
+        JSON.stringify({
+          type: "system",
+          subtype: "init",
+          session_id: "provider-session",
+        }) + "\n",
+      );
       child.stderr.write("x".repeat(70000) + "provider authentication failed");
       child.stdout.write(
         JSON.stringify({
@@ -160,6 +167,15 @@ describe("CLI Teamwork coordinator runtime", () => {
       expect(await runtime.wait(context)).toMatchObject({
         kind: isError ? "failed" : "report",
         terminal: true,
+      });
+      expect(appendEventMock).toHaveBeenCalledWith("diagnostic-session", {
+        kind: "session_bound",
+        by: "diagnostic-worker",
+        worker: "diagnostic-worker",
+        sessionId: "provider-session",
+        batchId: "diagnostic-batch",
+        idempotencyKey:
+          "session:diagnostic-batch:diagnostic-worker:provider-session",
       });
       expect(appendEventMock).toHaveBeenCalledWith("diagnostic-session", {
         kind: "progress",

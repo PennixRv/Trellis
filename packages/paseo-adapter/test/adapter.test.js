@@ -3,9 +3,23 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validate, perform } from '../src/adapter.js';
+import { validate, perform, verifyDaemonInfo } from '../src/adapter.js';
 
 const request = (operation, payload) => ({ version: 1, operation, attempt_id: 'a'.repeat(32), binding_revision: 'b'.repeat(64), daemon_selector: {}, payload });
+test('admission uses the connected daemon identity and exact supported versions', async () => {
+  for (const version of ['0.15.3', '0.15.4']) {
+    const info = { serverId: 'same-host', version };
+    assert.doesNotThrow(() => verifyDaemonInfo(info, 'same-host'));
+    const api = { providers: { listModels: async () => ['model'], listModes: async () => ['mode'] } };
+    const result = await perform(request('capability', { cwd: '/fixture' }), api, { getLastServerInfoMessage: () => info }, { server_id: 'same-host' });
+    assert.equal(result.daemon_version, version);
+    assert.equal(result.sdk_version, '0.15.3');
+  }
+  for (const version of [undefined, null, '', '0.15.2', '0.15.5', '0.15.4-dev', 'unknown'])
+    assert.throws(() => verifyDaemonInfo({ serverId: 'same-host', version }, 'same-host'), { category: 'unsupported' });
+  for (const info of [undefined, { serverId: 'other', version: '0.15.4' }])
+    assert.throws(() => verifyDaemonInfo(info, 'same-host'), { category: 'identity_mismatch' });
+});
 test('rejects unsafe fields and malformed write input before native calls', () => {
   for (const input of [request('execute', { prompt: 'x', providerOptions: {} }), request('prepare-agent', { labels: { secret: 'x' } }), request('wait', { timeout_ms: -1 }), { ...request('execute', {}), attempt_id: 'prefix' }]) assert.throws(() => validate(input));
 });

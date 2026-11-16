@@ -281,8 +281,17 @@ export function createCliCoordinatorRuntime(
         adapter.output?.(child, ctx) ?? child.stdout,
         async (line) => {
           const parsed = adapter.parseLine(line, ctx);
-          if (parsed.side?.persistSessionId)
+          if (parsed.side?.persistSessionId) {
             providerSessionId = parsed.side.persistSessionId;
+            await appendEvent(context.plan.sessionId, {
+              kind: "session_bound",
+              by: context.teammateId,
+              worker: context.teammateId,
+              sessionId: providerSessionId,
+              batchId: context.plan.batchId,
+              idempotencyKey: `session:${context.plan.batchId}:${context.teammateId}:${providerSessionId}`,
+            });
+          }
           for (const reply of parsed.side?.reply ?? [])
             child.stdin.write(reply);
           for (const event of parsed.events) {

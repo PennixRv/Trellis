@@ -41,6 +41,7 @@ interface TeamworkSessionSummary {
   ephemeral: boolean;
   type: string;
   description?: string;
+  ownerSessionId?: string;
 }
 
 export interface ListOptions {
@@ -51,6 +52,7 @@ export interface ListOptions {
   /** Scan every project bucket, not just the current cwd's. */
   allProjects?: boolean;
   scope?: string;
+  ownerSession?: string;
 }
 
 export async function teamworkSessionList(
@@ -61,7 +63,7 @@ export async function teamworkSessionList(
     scope === "global"
       ? [GLOBAL_PROJECT_KEY]
       : opts.allProjects
-        ? listProjects()
+        ? listProjects().filter((project) => project !== GLOBAL_PROJECT_KEY)
         : [currentProjectKey()];
 
   const summaries: TeamworkSessionSummary[] = [];
@@ -92,6 +94,8 @@ export async function teamworkSessionList(
   let filtered = projectFilter
     ? summaries.filter((s) => s.task?.includes(projectFilter))
     : summaries;
+  if (opts.ownerSession)
+    filtered = filtered.filter((s) => s.ownerSessionId === opts.ownerSession);
   // Hide ephemeral Teamwork Sessions unless --all (keeps the default `list`
   // uncluttered after lots of one-shot CR / brainstorm sessions).
   const ephemeralHidden = opts.all
@@ -199,6 +203,7 @@ function summarize(
     lastEventKind: lastEvent?.kind,
     totalEvents,
     ephemeral: firstEvent?.ephemeral === true,
+    ownerSessionId: firstEvent?.ownerSessionId,
   };
 }
 

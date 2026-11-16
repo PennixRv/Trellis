@@ -44,6 +44,7 @@ import { teamworkSessionPrune, teamworkSessionRm } from "./rm.js";
 import { teamworkSessionSend } from "./send.js";
 import { teamworkSessionRun } from "./run.js";
 import { teamworkSessionSpawn } from "./spawn.js";
+import { teamworkWorkers } from "./workers.js";
 import {
   teamworkSessionThreadPost,
   teamworkSessionThreadRename,
@@ -55,7 +56,10 @@ import { runSupervisor } from "./supervisor.js";
 import { teamworkSessionWait, parseDuration } from "./wait.js";
 import { failedTeamworkResult } from "./result.js";
 import { parseCsv } from "./store/schema.js";
-import { parseInboxPolicy } from "@pennixrv/trellis-core/teamwork";
+import {
+  listSessionDescendants,
+  parseInboxPolicy,
+} from "@pennixrv/trellis-core/teamwork";
 
 function parseNonNegativeInteger(value: string): number {
   if (!/^\d+$/.test(value)) {
@@ -136,6 +140,10 @@ export function registerTeamworkCommand(program: Command): void {
   teamwork
     .command("create <name>")
     .description("Create a Teamwork session")
+    .option(
+      "--owner-session <id>",
+      "exact main session identity (defaults to host session env)",
+    )
     .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--type <type>", "session type: chat | forum", "chat")
     .option("--task <path>", "associated Trellis task directory")
@@ -169,6 +177,7 @@ export function registerTeamworkCommand(program: Command): void {
         name: string,
         opts: {
           task?: string;
+          ownerSession?: string;
           project?: string;
           labels?: string;
           scope?: string;
@@ -901,12 +910,64 @@ export function registerTeamworkCommand(program: Command): void {
     });
 
   teamwork
+    .command("workers <name>")
+    .description(
+      "Read durable interactive and managed-batch teammate projections",
+    )
+    .option("--scope <scope>", "project | global")
+    .option("--project-key <key>", "exact project bucket")
+    .option("--include-terminal", "include terminal teammates")
+    .option("--json", "emit JSON")
+    .action(
+      async (
+        name: string,
+        opts: {
+          scope?: string;
+          projectKey?: string;
+          includeTerminal?: boolean;
+          json?: boolean;
+        },
+      ) => {
+        try {
+          await teamworkWorkers(name, opts);
+        } catch (error) {
+          console.error(error instanceof Error ? error.message : String(error));
+          process.exitCode = 1;
+        }
+      },
+    );
+
+  teamwork
+    .command("sessions")
+    .description(
+      "Read exact historical Codex descendants, independently of session cleanup",
+    )
+    .requiredOption("--owner-session <id>", "exact main session identity")
+    .option("--json", "emit JSON with coverage")
+    .action(async (opts: { ownerSession: string; json?: boolean }) => {
+      try {
+        const history = await listSessionDescendants({
+          ownerSessionId: opts.ownerSession,
+        });
+        console.log(
+          opts.json
+            ? JSON.stringify(history)
+            : `${history.sessionCount} descendant session(s); coverage=${history.coverage}`,
+        );
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 1;
+      }
+    });
+
+  teamwork
     .command("list")
     .description(
       "List Teamwork Sessions in ~/.trellis/teamwork/ with teammate and activity summary",
     )
     .option("--scope <scope>", "Teamwork session scope: project | global")
     .option("--json", "emit JSON instead of a formatted table")
+    .option("--owner-session <id>", "filter exact main session owner")
     .option(
       "--project <slug>",
       "filter sessions whose `task` field contains this substring",
@@ -926,6 +987,7 @@ export function registerTeamworkCommand(program: Command): void {
         all?: boolean;
         allProjects?: boolean;
         scope?: string;
+        ownerSession?: string;
       };
       try {
         await teamworkSessionList(opts);

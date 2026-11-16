@@ -8,6 +8,7 @@ import {
   ensureBucketMarker,
 } from "../internal/store/paths.js";
 import { parseTeamworkSessionType } from "../internal/store/schema.js";
+import { assertSessionIdentity } from "../internal/store/session-relations.js";
 import { resolveTeamworkSession } from "./resolve.js";
 import type { CreateTeamworkSessionOptions } from "./types.js";
 
@@ -18,6 +19,7 @@ import type { CreateTeamworkSessionOptions } from "./types.js";
 export async function createTeamworkSession(
   opts: CreateTeamworkSessionOptions,
 ): Promise<CreateTeamworkEvent> {
+  if (opts.ownerSessionId !== undefined) assertSessionIdentity(opts.ownerSessionId);
   const ref = resolveTeamworkSession({
     sessionId: opts.sessionId,
     scope: opts.scope ?? "project",
@@ -54,6 +56,7 @@ export async function createTeamworkSession(
         ? { context: opts.context }
         : {}),
       ...(opts.ephemeral ? { ephemeral: true } : {}),
+      ...(opts.ownerSessionId ? { ownerSessionId: opts.ownerSessionId } : {}),
       ...(opts.origin ? { origin: opts.origin } : {}),
       ...(opts.meta ? { meta: opts.meta } : {}),
     },

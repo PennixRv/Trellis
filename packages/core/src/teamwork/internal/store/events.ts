@@ -2,6 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 
 import { withLock } from "./lock.js";
+import { recordSessionBinding } from "./session-relations.js";
 import { redactDiagnostic } from "./diagnostics.js";
 import { sessionDir, eventsPath, lockPath, seqSidecarPath } from "./paths.js";
 import { reconcileSeq, truncateIncompleteTail, writeSidecar } from "./seq.js";
@@ -27,6 +28,7 @@ export type TeamworkEventKind =
   | "spawned"
   | "killed"
   | "respawned"
+  | "session_bound"
   | "progress"
   | "done"
   | "error"
@@ -51,6 +53,7 @@ export const TEAMWORK_EVENT_KINDS: ReadonlySet<TeamworkEventKind> = new Set([
   "spawned",
   "killed",
   "respawned",
+  "session_bound",
   "progress",
   "done",
   "error",
@@ -119,6 +122,7 @@ export interface BaseTeamworkEvent<
 }
 
 export interface CreateTeamworkEvent extends BaseTeamworkEvent<"create"> {
+  ownerSessionId?: string;
   cwd?: string;
   task?: string;
   type?: TeamworkSessionType;
@@ -172,6 +176,12 @@ export interface SpawnedTeamworkEvent extends BaseTeamworkEvent<"spawned"> {
    * `explicitOnly`.
    */
   inboxPolicy?: InboxPolicy;
+}
+
+export interface SessionBoundTeamworkEvent extends BaseTeamworkEvent<"session_bound"> {
+  worker: string;
+  sessionId: string;
+  batchId?: string;
 }
 
 export interface KilledTeamworkEvent extends BaseTeamworkEvent<"killed"> {
@@ -382,6 +392,7 @@ export type GenericTeamworkEvent = BaseTeamworkEvent<
     | "context"
     | "teamwork"
     | "spawned"
+    | "session_bound"
     | "killed"
     | "done"
     | "error"
@@ -403,6 +414,7 @@ export type TeamworkEvent =
   | ContextTeamworkEvent
   | TeamworkMetadataEvent
   | SpawnedTeamworkEvent
+  | SessionBoundTeamworkEvent
   | KilledTeamworkEvent
   | DoneTeamworkEvent
   | ErrorTeamworkEvent
@@ -497,6 +509,10 @@ export async function appendEvent(
     await truncateIncompleteTail(jsonl);
     const existing = findIdempotentEvent(jsonl, partial);
     if (existing !== undefined) return existing;
+
+    if (partial.kind === "session_bound") {
+      await recordSessionBinding(readAllEvents(jsonl), partial);
+    }
 
     const lastSeq = await reconcileSeq(jsonl, sidecar);
     const event = {

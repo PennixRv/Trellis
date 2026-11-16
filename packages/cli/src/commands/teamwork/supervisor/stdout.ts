@@ -224,6 +224,13 @@ export async function applyParseResult(
   if (result.side) {
     const { reply, persistSessionId, persistThreadId } = result.side;
     if (persistSessionId) {
+      await appendEvent(sessionId, {
+        kind: "session_bound",
+        by: workerName,
+        worker: workerName,
+        sessionId: persistSessionId,
+        idempotencyKey: `session:${workerName}:${persistSessionId}`,
+      });
       fs.writeFileSync(
         workerFile(sessionId, workerName, "session-id"),
         persistSessionId,

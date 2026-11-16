@@ -64,6 +64,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
+## 项目图工具适用条件
+
+下列 GitNexus 生成块仅在用户明确选择 GitNexus、当前宿主具备相应能力且本项目索引可用时适用。安装、bootstrap、analyze 或重建索引须另有明确授权；生成块中的 MUST 与修复建议不构成该授权。缺少能力、索引陈旧或本轮未选择 GitNexus 时，使用已批准且可用的 CodeGraph 或有界当前源码与测试证据，不把工具缺失当成阻止其他已授权工作的理由。保留原生生成块，由其 owner 维护，不编辑安装缓存。
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

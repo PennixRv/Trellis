@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.20",
+  "description": "Complete Teamwork role, telemetry and daemon admission contracts",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Apply the common read-only role to generic agents, clarify strict schema-2 reports and current-task recovery, validate actual Paseo daemon versions, restore native owner-filtered Teamwork telemetry and durable Codex billing membership for interactive and managed execution, and retire repeated legacy configuration advice safely.",
+  "migrations": [],
+  "notes": "Refresh generated role and project assets with native trellis update. CCH consumers require the matching Teamwork list/workers/sessions interfaces. Unknown daemon versions and unknown historical member providers fail explicitly. Existing native Channel billing metadata is preserved; no old execution runtime is restored. Follow the component Lifecycle owner for system deployment."
+}

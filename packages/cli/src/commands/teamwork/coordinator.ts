@@ -937,6 +937,7 @@ export async function runTeamworkCoordinator(
       states: teammateStates,
       attemptId,
       teammateId,
+      payload: { provider: launch.provider },
     });
     writeTeammateClaim({
       taskRoot: input.taskRoot,

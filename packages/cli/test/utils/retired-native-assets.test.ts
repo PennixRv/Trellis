@@ -84,7 +84,7 @@ describe("native execution retirement", () => {
     const toml = ".codex/config.toml";
     const yaml = ".trellis/config.yaml";
     write(toml, retiredConfigComments[toml][0].before + "[agents]\nmax_depth = 1\n[mcp_servers.user]\ncommand = 'user'\n");
-    write(yaml, "packages:\n  cli: keep\n" + retiredConfigComments[yaml].map((entry) => entry.before).join(""));
+    write(yaml, "packages:\n  cli: keep\n" + retiredConfigComments[yaml].map((entry) => entry.before).join("").repeat(2));
     const plan = planNativeRetirement(root, {}, []);
     const config = plan.edits.get(toml) ?? "";
     expect(config).toContain("enabled = false");
@@ -93,6 +93,7 @@ describe("native execution retirement", () => {
     expect(plan.edits.get(yaml)).toContain("cli: keep");
     expect(plan.edits.get(yaml)).not.toContain("dispatch_mode");
     expect(plan.edits.get(yaml)).not.toContain("sub-agent");
+    expect(() => assertCurrentExecutionAsset(yaml, plan.edits.get(yaml) ?? "")).not.toThrow();
     expect(() => assertCurrentExecutionAsset(toml, config)).not.toThrow();
   });
 

@@ -116,7 +116,8 @@ function resolveSpawn(sessionId: string, opts: SpawnOptions): ResolvedSpawn {
     as ??= resolved.profile;
   } else if (opts.agent) {
     const agent = loadAgent(opts.agent, cwd, trustedRoots);
-    agentBody = agent.systemPrompt || undefined;
+    const common = loadAgent("teammate", cwd, trustedRoots);
+    agentBody = `${common.systemPrompt}\n\n## 补充角色（不得放宽上述共同只读、来源和委派义务）\n\n${agent.systemPrompt}`;
     provider = provider ?? agent.provider;
     model = model ?? agent.model;
     as = as ?? agent.name;

@@ -37,6 +37,9 @@ using the same native adapter support set before starting a provider process.
 | --- | --- |
 | `create <name>` | Create a project- or global-scoped Teamwork Session; accepts `chat` or `forum`, task/project metadata, labels, description, context, creator, force, and ephemeral options. |
 | `list` | List sessions in the selected scope; supports JSON, all sessions, and all project buckets. |
+| `list --owner-session <id>` | Filter exactly the main session recorded at creation; unbound historical sessions are not guessed from cwd or task. |
+| `workers <name>` | Read interactive and managed-batch projections through Core reducers; JSON includes provider, activity, terminal time and exact bound provider sessions. Unknown batch providers fail instead of becoming zero work. |
+| `sessions --owner-session <id>` | Read durable Codex descendants and explicit tracking coverage, independently of session deletion and live counts. |
 | `messages <name>` | Read or follow events with sequence, kind, author, target, thread, action, and progress filters; supports raw JSON. |
 | `send <name> [text]` | Append a message, optionally targeted to teammates and checked with a delivery mode; body may come from stdin or a file. |
 | `wait <name>` | Wait for matching events using author, kind, scope, thread, action, target, progress, all-authors, and timeout filters. |
@@ -61,12 +64,32 @@ Product-source and Git write boundaries are teammate role obligations, frozen
 in the launch `writePolicy`. They do not require host permission isolation, and
 the capability snapshot must not claim technical read-only enforcement. Every
 interactive teammate receives these role and result requirements even when
-`--agent` is omitted. Host proof still covers actual runtime capabilities such
+`--agent` is omitted. Generic `--agent` cards are supplementary to the project
+`teammate` common card; legacy implementation wording cannot relax its read-only,
+source or delegation obligations. Result instructions require a nonempty string
+answer, safe evidence IDs and exactly the declared fields; validators stay strict.
+Host proof still covers actual runtime capabilities such
 as waiting, artifact output, transport, and capacity. Native delegation and
 implicit-history restrictions remain role obligations; do not publish unproven
 memory-isolation or provider-feature claims in the host proof.
 
 ## Capacity policy
+
+Owner billing bindings come from the actual adapter session handshake, before
+generation, in both interactive supervisors and managed runtime processes.
+`session_bound` carries the exact worker and optional batch identity. Core keeps
+the existing private, locked, atomically replaced `.session-relations.json`
+metadata independently of session cleanup, checks parent conflicts and cycles,
+and tracks Codex only. The default owner may read the retired native Channel
+ledger when no current ledger exists, and carries that validated history into
+its first new binding without rewriting the old file. An explicit Teamwork root
+never reads the real HOME legacy ledger. Missing metadata is not recovered from
+rollouts or inferred from cwd. Public worker formatting must not change the
+capacity registry or count managed processes twice against reservations.
+
+The common role distinguishes mandatory current-task/tool recovery projections
+from historical dialogue retrieval. Host rules still take precedence; prompt
+obligations do not establish technical memory isolation.
 
 `.trellis/teamwork.json` schema 2 is the project capacity policy: mode defaults
 are members 1/3/3 and concurrency 8/3/3 (general/advisor/committee), with shared

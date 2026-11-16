@@ -91,7 +91,7 @@ function scrubConfig(relative: string, content: string, owned = false): string {
     (relative === ".codex/config.toml" &&
       generatedComments.some((entry) => content.includes(entry.before)));
   for (const entry of generatedComments)
-    content = content.replace(entry.before, entry.after);
+    content = content.replaceAll(entry.before, entry.after);
   if (hookFiles.includes(relative)) {
     if (
       !content.includes("inject-subagent-context.py") &&
