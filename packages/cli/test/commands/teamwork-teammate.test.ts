@@ -277,8 +277,12 @@ describe("teammate adapter contract", () => {
       launch.instructions = profile.rolePrompt;
       launch.prompt = profile.rolePrompt;
       expect(
-        parseFrozenTeammate({ profile, launch }).launch.reportVersion,
+        parseFrozenTeammate({ profile, launch }, { historical: true }).launch
+          .reportVersion,
       ).toBeUndefined();
+      expect(() => parseFrozenTeammate({ profile, launch })).toThrow(
+        /current execution policy/,
+      );
       expect(() => assertTeammateContextCurrent(launch, cwd)).not.toThrow();
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });

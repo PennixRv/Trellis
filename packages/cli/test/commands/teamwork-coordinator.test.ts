@@ -1013,38 +1013,33 @@ describe("TeamworkSession teammate coordinator", () => {
     expect(projection.attempts).toHaveLength(0);
   });
 
-  it("settles historical schema-1 reports without synthesizing schema-2 content", async () => {
+  it("reads historical schema-1 plans but never dispatches them as new work", async () => {
     const plan = createPlan(env.taskRoot, ["legacy"], 0, true);
-    const receipt = await runTeamworkCoordinator({
-      plan,
-      taskRoot: env.taskRoot,
-      cwd: env.projectDir,
-      host,
-      guard,
-      config,
-      runtime: {
-        async dispatch(context) {
-          writeReport(env.taskRoot, context);
+    expect(
+      validateTeamworkPlan(plan, env.taskRoot, undefined, { historical: true })
+        .assignments[0].execution.launch.reportVersion,
+    ).toBeUndefined();
+    const dispatch = vi.fn();
+    await expect(
+      runTeamworkCoordinator({
+        plan,
+        taskRoot: env.taskRoot,
+        cwd: env.projectDir,
+        host,
+        guard,
+        config,
+        runtime: {
+          dispatch,
+          async wait() {
+            return { kind: "report", terminal: true };
+          },
+          async continue() {
+            throw new Error("unexpected continuation");
+          },
         },
-        async wait() {
-          return { kind: "report", terminal: true };
-        },
-        async continue() {
-          throw new Error("unexpected continuation");
-        },
-      },
-    });
-    expect(receipt.status).toBe("AWAITING_REVIEW");
-    const result = await buildBatchResult(
-      validateTeamworkPlan(plan, env.taskRoot),
-      receipt,
-      env.taskRoot,
-      env.projectDir,
-    );
-    expect(result.reports[0]).toMatchObject({
-      validation: "legacy",
-      report: null,
-    });
+      }),
+    ).rejects.toThrow(/current execution policy/);
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it("rejects missing host proof before guard acquisition or runtime dispatch", async () => {

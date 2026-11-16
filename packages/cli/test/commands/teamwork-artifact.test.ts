@@ -232,6 +232,40 @@ function addPairedWork(
 }
 
 describe("TeamworkSession teammate artifacts", () => {
+  it("reads frozen historical instructions without authorizing them for a new execution", () => {
+    const { root, plan } = fixture();
+    try {
+      const work = (plan.assignments as Record<string, unknown>[])[0];
+      const briefPath = path.join(root, work.brief_path as string);
+      const brief = JSON.parse(fs.readFileSync(briefPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      const execution = work.execution as ReturnType<typeof frozenExecution>;
+      execution.launch.instructions =
+        "Historical renderer output, preserved byte for byte.";
+      brief.execution = execution;
+      fs.writeFileSync(briefPath, JSON.stringify(brief));
+      work.brief_digest = computeTeamworkPlanHash(brief);
+      plan.plan_hash = computeTeamworkPlanHash(plan);
+      const original = fs.readFileSync(briefPath);
+      expect(
+        validateTeamworkPlan(plan, root, undefined, { historical: true })
+          .assignments[0].execution.launch.instructions,
+      ).toBe(execution.launch.instructions);
+      expect(fs.readFileSync(briefPath)).toEqual(original);
+      expect(() => validateTeamworkPlan(plan, root)).toThrow(
+        /current execution policy/,
+      );
+      execution.launch.instructions = "Tampered historical instructions";
+      expect(() =>
+        validateTeamworkPlan(plan, root, undefined, { historical: true }),
+      ).toThrow(/execution|hash/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("binds the immutable plan hash to the brief source digest", () => {
     const { root, plan } = fixture();
     expect(validateTeamworkPlan(plan, root).assignments[0].sourceDigest).toBe(

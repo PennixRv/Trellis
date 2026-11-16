@@ -308,6 +308,7 @@ export function validateTeamworkPlan(
   options: {
     briefContents?: ReadonlyMap<string, string>;
     allowExpired?: boolean;
+    historical?: boolean;
   } = {},
 ): TeamworkPlan {
   if (!input || typeof input !== "object" || Array.isArray(input))
@@ -414,7 +415,9 @@ export function validateTeamworkPlan(
         throw new Error(
           `assignments[${index}].role_id is retired; teammate is an internal execution type`,
         );
-      const execution = parseFrozenTeammate(item.execution);
+      const execution = parseFrozenTeammate(item.execution, {
+        historical: options.historical,
+      });
       const selectionReason = boundedText(
         item.selection_reason,
         `assignments[${index}].selection_reason`,

@@ -8,7 +8,7 @@ const operations = new Set(['capability', 'inspect', 'prepare-workspace', 'prepa
 export function refuse(category) { throw Object.assign(new Error(category), { category }); }
 export function verifyDaemonInfo(info, serverId) {
   if (info?.serverId !== serverId) refuse('identity_mismatch');
-  if (!['0.15.3', '0.15.4'].includes(info.version)) refuse('unsupported');
+  if (typeof info.version !== 'string' || !info.version) refuse('unsupported');
 }
 function text(value) { if (typeof value !== 'string' || !value || value.length > 65536 || value.includes('\0')) refuse('invalid_input'); return value; }
 function keys(object, allowed) {
@@ -23,7 +23,7 @@ export function validate(request) {
   }
   if (request.binding_revision != null && !/^[a-f0-9]{64}$/.test(request.binding_revision)) refuse('invalid_input');
   const fields = {
-    capability: ['cwd'], inspect: ['target', 'workspace_id', 'agent_id'], 'resource-preview': ['target', 'workspace_id', 'agent_id'],
+    capability: ['cwd'], inspect: ['target', 'workspace_id', 'agent_id', 'cursor', 'page_size'], 'resource-preview': ['target', 'workspace_id', 'agent_id', 'cursor', 'page_size'],
     'prepare-workspace': ['target', 'branch', 'base_commit', 'title'],
     'prepare-agent': ['workspace_id', 'cwd', 'model', 'effort', 'role', 'context', 'prompt', 'codegraph', 'codegraph_command', 'labels'],
     execute: ['agent_id', 'cwd', 'prompt', 'client_message_id'], followup: ['agent_id', 'cwd', 'prompt', 'client_message_id'],
@@ -33,6 +33,7 @@ export function validate(request) {
   for (const [key, value] of Object.entries(request.payload ?? {})) {
     if (key === 'codegraph') { if (typeof value !== 'boolean') refuse('invalid_input'); }
     else if (key === 'timeout_ms') { if (!Number.isInteger(value) || value < 1 || value > 3600000) refuse('invalid_input'); }
+    else if (key === 'page_size') { if (!Number.isInteger(value) || value < 1 || value > 100) refuse('invalid_input'); }
     else if (key === 'labels') { keys(value, ['trellis.control', 'trellis.child', 'trellis.attempt']); Object.values(value).forEach(text); }
     else text(value);
   }
@@ -52,6 +53,16 @@ function workspace(w) {
 }
 export async function perform(request, api, client, identity) {
   const p = request.payload ?? {}, op = request.operation;
+  const methods = {
+    capability: [[api.providers, 'listModels'], [api.providers, 'listModes']],
+    'prepare-workspace': [[api.workspaces, 'create']],
+    'prepare-agent': [[api.workspaces, 'ref']],
+    execute: [[api.agents, 'ref']], followup: [[api.agents, 'ref']],
+    observe: [[api.agents, 'ref']], wait: [[api.agents, 'ref']], interrupt: [[api.agents, 'ref'], [client, 'cancelAgent']],
+    inspect: [[api.agents, p.agent_id ? 'ref' : 'list'], [api.config, 'get'], [api.projects, 'list']],
+    'resource-preview': [[api.agents, p.agent_id ? 'ref' : 'list'], [api.config, 'get'], [api.projects, 'list']],
+  };
+  if (methods[op]?.some(([object, key]) => typeof object?.[key] !== 'function')) refuse('unsupported');
   async function agent() {
     const ref = api.agents.ref(text(p.agent_id));
     await ref.refresh();
@@ -101,13 +112,33 @@ export async function perform(request, api, client, identity) {
     return { identity, agent: projectAgent(ref.current()), wait_status: waitStatus, writer_stop_proven: false };
   }
   const agents = [], workspaces = [];
-  let cursor;
-  do {
-    const page = await api.agents.list({ cursor, limit: 100, includeArchived: true, includeBackground: true });
-    agents.push(...page.entries.map(e => projectAgent(e.agent ?? e)));
-    cursor = page.pageInfo?.nextCursor;
-    if (agents.length > 1000) refuse('unsupported');
-  } while (cursor);
+  let cursor = p.cursor, bytes = 4096;
+  if (p.cursor && !p.page_size || p.agent_id && (p.cursor || p.page_size)) refuse('invalid_input');
+  if (p.agent_id) {
+    const ref = api.agents.ref(p.agent_id);
+    await ref.refresh();
+    const current = ref.current();
+    if (current && current.id !== p.agent_id) refuse('identity_mismatch');
+    if (current) agents.push(projectAgent(current));
+  } else {
+    const cursors = new Set(p.cursor ? [p.cursor] : []);
+    do {
+      const page = await api.agents.list({ cursor, limit: p.page_size ?? 100, includeArchived: true, includeBackground: true });
+      if (!Array.isArray(page.entries) || !page.pageInfo || !('nextCursor' in page.pageInfo)) refuse('invalid_response');
+      for (const entry of page.entries) {
+        const current = entry.agent ?? entry;
+        if (p.workspace_id && current.workspaceId !== p.workspace_id) continue;
+        const projected = projectAgent(current);
+        bytes += Buffer.byteLength(JSON.stringify(projected));
+        if (bytes > MAX_BYTES) refuse('response_limit');
+        agents.push(projected);
+      }
+      cursor = page.pageInfo.nextCursor;
+      if (cursor != null && (typeof cursor !== 'string' || !cursor || cursors.has(cursor))) refuse('invalid_response');
+      if (cursor != null) cursors.add(cursor);
+      if (p.page_size) break;
+    } while (cursor != null);
+  }
   if (p.workspace_id) {
     const ref = api.workspaces.ref(text(p.workspace_id));
     await ref.refresh();
@@ -116,7 +147,10 @@ export async function perform(request, api, client, identity) {
   const config = await api.config.get();
   // Only project lifecycle settings are projected. Provider env/keys never leave the client.
   const projects = await api.projects.list();
-  return { identity, agents, workspaces, projects: projects.projects?.map(x => ({ id: x.projectId, path: x.projectRootPath })), lifecycle: { autoArchiveAfterMerge: config.config?.autoArchiveAfterMerge ?? null } };
+  const result = { identity, agents, workspaces, projects: projects.projects?.map(x => ({ id: x.projectId, path: x.projectRootPath })), lifecycle: { autoArchiveAfterMerge: config.config?.autoArchiveAfterMerge ?? null },
+    ...(p.page_size ? { page_info: {next_cursor:cursor ?? null,complete:cursor == null} } : {}) };
+  if (Buffer.byteLength(JSON.stringify(result)) > MAX_BYTES - 4096) refuse('response_limit');
+  return result;
 }
 export async function dispatch(input) {
   const request = validate(input);

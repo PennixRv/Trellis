@@ -62,7 +62,7 @@ export async function teamworkBatch(
     readPlanFile(path.resolve(planPath)),
     taskRoot,
     undefined,
-    { allowExpired: true },
+    { allowExpired: true, historical: true },
   );
   const settled = await readSettledTeamworkReceipt(candidate, cwd);
   if (settled && !options.preflight) {
@@ -291,7 +291,7 @@ export async function teamworkReconcile(
     readPlanFile(path.resolve(planPath)),
     path.resolve(options.task),
     undefined,
-    { allowExpired: true },
+    { allowExpired: true, historical: true },
   );
   const ref = resolveTeamworkSession({ sessionId: plan.sessionId, cwd });
   const bucket = projectDir(ref.project);

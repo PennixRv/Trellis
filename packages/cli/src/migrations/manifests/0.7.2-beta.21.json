@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.21",
+  "description": "Use Paseo capabilities and preserve readable historical Teamwork evidence",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Admit local Paseo daemons by public operation capabilities and identity instead of version allowlists. Add explicit bounded inspection pagination and exact agent lookup, and update native controllers to check every page. Read historical frozen Teamwork instructions by their original plan and brief integrity while requiring current instructions for new execution.",
+  "migrations": [],
+  "notes": "Update CLI, Core and optional Paseo adapter together through Lifecycle. Refresh generated worktree-delegation controllers with native trellis update. Existing unpaged adapter requests still return complete results or explicit response-limit errors; paged callers must follow next_cursor until complete. Historical plans and failed reports remain unchanged and cannot authorize new work under an outdated instruction contract."
+}

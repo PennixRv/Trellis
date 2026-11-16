@@ -131,7 +131,10 @@ const frozenLaunchSchema = z
   })
   .strict();
 
-export function parseFrozenTeammate(input: unknown): {
+export function parseFrozenTeammate(
+  input: unknown,
+  options: { historical?: boolean } = {},
+): {
   profile: ResolvedTeammateProfile;
   launch: TeammateLaunchSpec;
 } {
@@ -151,14 +154,18 @@ export function parseFrozenTeammate(input: unknown): {
   ] as const)
     if (profile[field] !== launch[field])
       throw new Error(`frozen execution ${field} does not match profile`);
-  if (
-    canonical(profile.options) !== canonical(launch.options) ||
-    (launch.reportVersion === 2
-      ? buildTeamworkInstructions(profile.rolePrompt, "batch")
-      : profile.rolePrompt) !== launch.instructions
-  )
+  if (canonical(profile.options) !== canonical(launch.options))
     throw new Error(
       "frozen execution instructions or options do not match profile",
+    );
+  if (
+    !options.historical &&
+    (launch.reportVersion !== 2 ||
+      buildTeamworkInstructions(profile.rolePrompt, "batch") !==
+        launch.instructions)
+  )
+    throw new Error(
+      "frozen execution instructions require a new plan under the current execution policy",
     );
   const { digest: expected, ...capability } = launch.capability;
   if (hash(canonical(capability)) !== expected)

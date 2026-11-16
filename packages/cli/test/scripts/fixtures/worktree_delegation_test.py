@@ -18,6 +18,22 @@ from common.task_workflow import TaskWorkflowError, _assert_delegated_record_clo
 
 
 class Delegation(unittest.TestCase):
+    def test_inspection_consumes_every_page_and_rejects_incomplete_or_repeated_cursors(self):
+        record = {"settings": {}}
+        pages = [
+            {"identity": {"pid": 1}, "agents": [], "page_info": {"next_cursor": "next", "complete": False}},
+            {"identity": {"pid": 1}, "agents": [{"id": "late-writer"}], "page_info": {"next_cursor": None, "complete": True}},
+        ]
+        with patch.object(d, "adapter", side_effect=pages) as native:
+            results = list(d.inspection_pages(record, {}))
+            self.assertEqual(results[-1]["agents"][0]["id"], "late-writer")
+            self.assertEqual(native.call_args.args[2], {"page_size": 100, "cursor": "next"})
+        for invalid in ({"agents": [], "page_info": {}},
+                        {"agents": [], "page_info": {"next_cursor": "next", "complete": True}},
+                        {**pages[1], "identity": {"pid": 2}}, pages[0]):
+            with self.subTest(invalid=invalid), patch.object(d, "adapter", side_effect=[pages[0], invalid]), self.assertRaises(TaskWorkflowError):
+                list(d.inspection_pages(record, {}))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -261,7 +277,7 @@ class Delegation(unittest.TestCase):
         record = self.record()
         record.update(intent="prepare-agent", status="workspace_created")
         record.pop("agent_id")
-        observation = {"workspaces": [{"id": "workspace", "workspaceDirectory": record["worktree_path"]}], "agents": []}
+        observation = {"workspaces": [{"id": "workspace", "workspaceDirectory": record["worktree_path"]}], "agents": [], "page_info": {"next_cursor": None, "complete": True}}
         args = argparse.Namespace(workspace_id=None, agent_id=None, delivery_evidence_ref=None, execute=True, reason="native rejected before creation", approval_ref="approved")
         path = d.runtime_path(self.root, self.child.name)
         with patch.object(d, "adapter", return_value=observation), self.assertRaises(TaskWorkflowError):

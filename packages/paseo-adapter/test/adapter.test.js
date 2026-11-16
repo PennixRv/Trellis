@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { validate, perform, verifyDaemonInfo } from '../src/adapter.js';
 
 const request = (operation, payload) => ({ version: 1, operation, attempt_id: 'a'.repeat(32), binding_revision: 'b'.repeat(64), daemon_selector: {}, payload });
-test('admission uses the connected daemon identity and exact supported versions', async () => {
-  for (const version of ['0.15.3', '0.15.4']) {
+test('admission uses the connected daemon identity and operation capabilities', async () => {
+  for (const version of ['0.15.3', '0.15.4', '0.16.0', '1.0.0']) {
     const info = { serverId: 'same-host', version };
     assert.doesNotThrow(() => verifyDaemonInfo(info, 'same-host'));
     const api = { providers: { listModels: async () => ['model'], listModes: async () => ['mode'] } };
@@ -15,7 +15,7 @@ test('admission uses the connected daemon identity and exact supported versions'
     assert.equal(result.daemon_version, version);
     assert.equal(result.sdk_version, '0.15.3');
   }
-  for (const version of [undefined, null, '', '0.15.2', '0.15.5', '0.15.4-dev', 'unknown'])
+  for (const version of [undefined, null, ''])
     assert.throws(() => verifyDaemonInfo({ serverId: 'same-host', version }, 'same-host'), { category: 'unsupported' });
   for (const info of [undefined, { serverId: 'other', version: '0.15.4' }])
     assert.throws(() => verifyDaemonInfo(info, 'same-host'), { category: 'identity_mismatch' });
@@ -52,11 +52,50 @@ test('SDK create uses stable role, explicit settings, per-tree MCP and attempt i
 });
 test('native inspection includes background and archived agents for reconciliation', async () => {
   let options;
-  const api = { agents: { list: async (input) => { options = input; return { entries: [{ id: 'background-agent', cwd: '/tree', labels: { 'trellis.attempt': 'attempt' } }], pageInfo: {} }; } }, config: { get: async () => ({ config: { autoArchiveAfterMerge: false } }) }, projects: { list: async () => ({ projects: [] }) } };
+  const api = { agents: { list: async (input) => { options = input; return { entries: [{ id: 'background-agent', cwd: '/tree', labels: { 'trellis.attempt': 'attempt' } }], pageInfo: { nextCursor: null } }; } }, config: { get: async () => ({ config: { autoArchiveAfterMerge: false } }) }, projects: { list: async () => ({ projects: [] }) } };
   const result = await perform(request('inspect', {}), api, {}, {});
   assert.equal(options.includeBackground, true);
   assert.equal(options.includeArchived, true);
   assert.equal(result.agents[0].id, 'background-agent');
+});
+test('inspection pages more than 1000 historical agents without hiding the last writer', async () => {
+  let calls = 0;
+  const api = { agents: { list: async ({cursor,limit}) => {
+    calls++;
+    const offset = Number(cursor ?? 0), end = Math.min(offset + limit, 1301);
+    return { entries: Array.from({length:end-offset}, (_,i) => ({
+      id:String(offset+i), status:offset+i===1300 ? 'running' : 'closed', labels:{}
+    })), pageInfo: {nextCursor:end===1301 ? null : String(end)} };
+  } }, config: {get:async()=>({config:{autoArchiveAfterMerge:false}})}, projects:{list:async()=>({projects:[]})} };
+  let cursor, count = 0, last;
+  do {
+    const result = await perform(validate(request('inspect', { page_size:100, ...(cursor ? {cursor} : {}) })), api, {}, {});
+    assert.ok(Buffer.byteLength(JSON.stringify(result)) < 256*1024);
+    count += result.agents.length;
+    last = result.agents.at(-1);
+    cursor = result.page_info.next_cursor;
+    assert.equal(result.page_info.complete, cursor === null);
+  } while (cursor);
+  assert.equal(count, 1301);
+  assert.equal(calls, 14);
+  assert.equal(last.status, 'running');
+});
+test('exact agent inspection does not fetch unrelated history', async () => {
+  const api = { agents: {ref: id => ({refresh:async()=>{}, current:()=>({id,status:'closed',labels:{}})}) },
+    config:{get:async()=>({})},projects:{list:async()=>({projects:[]})} };
+  const result = await perform(validate(request('inspect',{agent_id:'exact'})),api,{},{});
+  assert.equal(result.agents[0].id,'exact');
+  assert.equal(result.agents.length,1);
+});
+test('missing inspection capability, bad pagination and excessive output stay explicit failures', {timeout:2000}, async () => {
+  const api = {agents:{list:async()=>({entries:[],pageInfo:{nextCursor:'repeat'}})},
+    config:{get:async()=>({})},projects:{list:async()=>({projects:[]})}};
+  await assert.rejects(perform(request('inspect',{}),api,{},{}), {category:'invalid_response'});
+  api.agents.list = async()=>({entries:[],pageInfo:{}});
+  await assert.rejects(perform(request('inspect',{}),api,{},{}), {category:'invalid_response'});
+  api.agents.list = async()=>({entries:[{id:'large',labels:{x:'x'.repeat(256*1024)}}],pageInfo:{nextCursor:null}});
+  await assert.rejects(perform(request('inspect',{}),api,{},{}), {category:'response_limit'});
+  await assert.rejects(perform(request('inspect',{}),{}, {}, {}), {category:'unsupported'});
 });
 test('unknown cwd never sends, native cancellation never claims writer stop', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'adapter-'));

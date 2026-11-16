@@ -20,6 +20,8 @@ if op == "capability":
     observed.update(models=[{"id": "fixture-model", "thinkingOptions": [{"id": "high"}]}], modes=[{"id": "full-access"}])
 elif op in {"inspect", "resource-preview"}:
     observed.update(agents=[agent] if tree.exists() else [], workspaces=[workspace] if p.get("workspace_id") else [], lifecycle={"autoArchiveAfterMerge": False})
+    if p.get("page_size"):
+        observed["page_info"] = {"next_cursor": None, "complete": True}
 elif op == "prepare-workspace":
     subprocess.run(["git", "worktree", "add", "-b", p["branch"], str(tree), p["base_commit"]], cwd=root, check=True, capture_output=True)
     observed["workspace"] = workspace

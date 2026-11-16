@@ -586,7 +586,7 @@ export function registerTeamworkCommand(program: Command): void {
           readPlanFile(path.resolve(file)),
           taskRoot,
           undefined,
-          { allowExpired: true },
+          { allowExpired: true, historical: true },
         );
         console.log(
           JSON.stringify(

@@ -168,6 +168,27 @@ def adapter(record: dict, operation: str, payload: dict):
     return observed
 
 
+def inspection_pages(record: dict, payload: dict):
+    cursor, seen, identity = None, set(), None
+    while True:
+        observed = adapter(record, "inspect", {**payload, "page_size": 100, **({"cursor": cursor} if cursor else {})})
+        page = observed.get("page_info")
+        if not isinstance(page, dict) or type(page.get("complete")) is not bool or "next_cursor" not in page:
+            fail("adapter inspection pagination is unavailable or incomplete; update the optional adapter")
+        following = page["next_cursor"]
+        if (following is not None and (not isinstance(following, str) or not following or following in seen)
+                or page["complete"] != (following is None) or not isinstance(observed.get("agents"), list)):
+            fail("adapter inspection pagination is inconsistent; preserve native resources")
+        if identity is not None and observed.get("identity") != identity:
+            fail("daemon identity changed during inspection")
+        identity = observed.get("identity")
+        yield observed
+        if following is None:
+            return
+        seen.add(following)
+        cursor = following
+
+
 def current(root: Path, child_dir: Path, *, require_authorization: bool = True) -> tuple[dict, Path]:
     path = runtime_path(root, child_dir.name)
     record = read(path)
@@ -292,7 +313,20 @@ def recover(root: Path, child_dir: Path, record: dict, path: Path, args):
     workspace_id = args.workspace_id or record.get("workspace_id")
     if not workspace_id:
         fail("explicit native workspace-id required; inspect native resources first")
-    observed = adapter(record, "inspect", {"target": record["binding"]["target_locator"], "workspace_id": workspace_id})
+    agent_id = args.agent_id or record.get("agent_id")
+    payload = {"target": record["binding"]["target_locator"], "workspace_id": workspace_id}
+    if agent_id:
+        observed = adapter(record, "inspect", {**payload, "agent_id": agent_id})
+    else:
+        observed = None
+        found = []
+        for page in inspection_pages(record, payload):
+            if observed is None:
+                observed = {key: value for key, value in page.items() if key not in {"agents", "page_info"}}
+            found.extend(a for a in page["agents"] if a and a.get("labels", {}).get("trellis.attempt") == record["attempt_id"])
+        if observed is None:
+            fail("native inspection returned no complete page")
+        observed["agents"] = found
     spaces = observed.get("workspaces", [])
     if len(spaces) != 1 or spaces[0].get("id") != workspace_id or not spaces[0].get("workspaceDirectory"):
         fail("native workspace identity is unverified")
@@ -300,7 +334,6 @@ def recover(root: Path, child_dir: Path, record: dict, path: Path, args):
     assert_worktree(adopted)
     if record.get("workspace_id") and (record["workspace_id"] != workspace_id or record["worktree_path"] != adopted["worktree_path"]):
         fail("recovery cannot switch existing workspace mappings")
-    agent_id = args.agent_id or record.get("agent_id")
     if agent_id:
         agents = [a for a in observed.get("agents", []) if a and a.get("id") == agent_id]
         if len(agents) != 1:
@@ -429,12 +462,12 @@ def run(args):
                 options = selected.get("thinkingOptions", [])
                 if not any(o.get("id") == record["settings"]["effort"] for o in options):
                     fail("requested effort is not supported by the selected model")
-                existing = adapter(record, "inspect", {"target": b["target_locator"]})
-                if existing.get("lifecycle", {}).get("autoArchiveAfterMerge") is not False:
-                    fail("native autoArchiveAfterMerge must be explicitly disabled before delegation; preserve worktrees until owner closeout")
-                for agent in existing.get("agents", []):
-                    if agent and agent.get("status") not in {"closed", "idle"} and agent.get("cwd") and Path(agent["cwd"]).exists() and identity(Path(agent["cwd"]))["common_dir"] == record["target_identity"]["common_dir"] and git(Path(agent["cwd"]), "branch", "--show-current") == b["execution_branch"]:
-                        fail("another target writer is active; reconcile before starting")
+                for existing in inspection_pages(record, {"target": b["target_locator"]}):
+                    if existing.get("lifecycle", {}).get("autoArchiveAfterMerge") is not False:
+                        fail("native autoArchiveAfterMerge must be explicitly disabled before delegation; preserve worktrees until owner closeout")
+                    for agent in existing["agents"]:
+                        if agent and agent.get("status") not in {"closed", "idle"} and agent.get("cwd") and Path(agent["cwd"]).exists() and identity(Path(agent["cwd"]))["common_dir"] == record["target_identity"]["common_dir"] and git(Path(agent["cwd"]), "branch", "--show-current") == b["execution_branch"]:
+                            fail("another target writer is active; reconcile before starting")
                 if subprocess.run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{b['execution_branch']}"], cwd=b["target_locator"]).returncode != 1:
                     fail("execution branch already exists; do not create or reset it")
                 for other in (root / ".trellis/.runtime/delegation").glob("*/record.json"):
