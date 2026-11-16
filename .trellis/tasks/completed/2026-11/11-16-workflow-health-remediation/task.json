@@ -3,7 +3,7 @@
   "name": "workflow-health-remediation",
   "title": "工作流体检：Teamwork、Paseo 准入及项目规则整改",
   "description": "实施根任务 workflow-health-remediation-release-deploy 已批准 W01：共同只读和报告合同、真实 daemon 版本、GitNexus 条件规则；沿 v0.7.1，保持严格 schema 与现有用户数据。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "cli",
@@ -11,7 +11,7 @@
   "creator": "penn",
   "assignee": "penn",
   "createdAt": "2026-11-16",
-  "completedAt": null,
+  "completedAt": "2026-11-16",
   "branch": "v0.7.1",
   "base_branch": "v0.7.1",
   "worktree_path": null,
@@ -35,8 +35,8 @@
         "task_implementation",
         "delivery_review_and_closeout"
       ],
-      "current_phase_id": "task_implementation",
-      "input_revision": "6",
+      "current_phase_id": null,
+      "input_revision": "10",
       "phases": {
         "goal_exploration_and_requirements": {
           "status": "accepted",
@@ -87,28 +87,56 @@
           }
         },
         "task_implementation": {
-          "status": "active",
-          "input_revision": "6",
-          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-          "artifact_refs": [],
-          "result_revision": "0",
-          "result_ref": null,
-          "outcome_kind": null,
+          "status": "accepted",
+          "input_revision": "7",
+          "artifact_revision": "9a45f8905a0933c4d8a1f9fcfff7f9095005ca45494ccec7272467e508b5188f",
+          "artifact_refs": [
+            "delivery-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "delivery-review.md",
+          "outcome_kind": "implementation_result",
           "reason": null,
-          "evidence_refs": [],
-          "acceptance": null
+          "evidence_refs": [
+            "execution.md",
+            "delivery-review.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "9a45f8905a0933c4d8a1f9fcfff7f9095005ca45494ccec7272467e508b5188f",
+            "result_revision": "1",
+            "input_revision": "7",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "execution.md",
+              "delivery-review.md"
+            ]
+          }
         },
         "delivery_review_and_closeout": {
-          "status": "not_started",
-          "input_revision": "1",
-          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-          "artifact_refs": [],
-          "result_revision": "0",
-          "result_ref": null,
-          "outcome_kind": null,
+          "status": "accepted",
+          "input_revision": "9",
+          "artifact_revision": "9a45f8905a0933c4d8a1f9fcfff7f9095005ca45494ccec7272467e508b5188f",
+          "artifact_refs": [
+            "delivery-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "delivery-review.md",
+          "outcome_kind": "delivery_ready",
           "reason": null,
-          "evidence_refs": [],
-          "acceptance": null
+          "evidence_refs": [
+            "execution.md",
+            "delivery-review.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "9a45f8905a0933c4d8a1f9fcfff7f9095005ca45494ccec7272467e508b5188f",
+            "result_revision": "1",
+            "input_revision": "9",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "execution.md",
+              "delivery-review.md"
+            ]
+          }
         }
       },
       "route_dependency_admission": null,
@@ -118,7 +146,7 @@
         "approval_ref": "/home/penn/devel/codex-workflow-optimization/.trellis/tasks/in_progress/11-16-workflow-health-remediation-release-deploy/approval.md",
         "task_route_revision": "1"
       },
-      "closeout_disposition": null,
+      "closeout_disposition": "delivery_ready",
       "skip_records": {
         "decision_space_construction_and_merging": {
           "reason": "承接根任务已批准 W01 需求、决策和实施合同，不重复用户取舍",
