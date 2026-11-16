@@ -35,16 +35,16 @@
         "delivery_review_and_closeout"
       ],
       "current_phase_id": null,
-      "input_revision": "7",
+      "input_revision": "14",
       "phases": {
         "goal_exploration_and_requirements": {
           "status": "accepted",
-          "input_revision": "2",
-          "artifact_revision": "ccd6c16bf157e0db93f12a24f833581d65241adb1a8968ff838633ae8bb1ca56",
+          "input_revision": "9",
+          "artifact_revision": "64468ef84d5edf615db28eb6cdf414f7e8dfe386f23c4916d91aeaf8e8860c80",
           "artifact_refs": [
             "current-closeout-review.md"
           ],
-          "result_revision": "1",
+          "result_revision": "2",
           "result_ref": "current-closeout-review.md",
           "outcome_kind": "accepted",
           "reason": null,
@@ -52,9 +52,9 @@
             "current-closeout-approval.md"
           ],
           "acceptance": {
-            "artifact_revision": "ccd6c16bf157e0db93f12a24f833581d65241adb1a8968ff838633ae8bb1ca56",
-            "result_revision": "1",
-            "input_revision": "2",
+            "artifact_revision": "64468ef84d5edf615db28eb6cdf414f7e8dfe386f23c4916d91aeaf8e8860c80",
+            "result_revision": "2",
+            "input_revision": "9",
             "task_route_revision": "1",
             "evidence_refs": [
               "current-closeout-approval.md"
@@ -63,12 +63,12 @@
         },
         "solution_design_and_convergence": {
           "status": "accepted",
-          "input_revision": "4",
-          "artifact_revision": "ccd6c16bf157e0db93f12a24f833581d65241adb1a8968ff838633ae8bb1ca56",
+          "input_revision": "11",
+          "artifact_revision": "64468ef84d5edf615db28eb6cdf414f7e8dfe386f23c4916d91aeaf8e8860c80",
           "artifact_refs": [
             "current-closeout-review.md"
           ],
-          "result_revision": "1",
+          "result_revision": "2",
           "result_ref": "current-closeout-review.md",
           "outcome_kind": "no_go",
           "reason": null,
@@ -76,9 +76,9 @@
             "current-closeout-approval.md"
           ],
           "acceptance": {
-            "artifact_revision": "ccd6c16bf157e0db93f12a24f833581d65241adb1a8968ff838633ae8bb1ca56",
-            "result_revision": "1",
-            "input_revision": "4",
+            "artifact_revision": "64468ef84d5edf615db28eb6cdf414f7e8dfe386f23c4916d91aeaf8e8860c80",
+            "result_revision": "2",
+            "input_revision": "11",
             "task_route_revision": "1",
             "evidence_refs": [
               "current-closeout-approval.md"
@@ -87,12 +87,12 @@
         },
         "delivery_review_and_closeout": {
           "status": "accepted",
-          "input_revision": "6",
-          "artifact_revision": "ccd6c16bf157e0db93f12a24f833581d65241adb1a8968ff838633ae8bb1ca56",
+          "input_revision": "13",
+          "artifact_revision": "64468ef84d5edf615db28eb6cdf414f7e8dfe386f23c4916d91aeaf8e8860c80",
           "artifact_refs": [
             "current-closeout-review.md"
           ],
-          "result_revision": "1",
+          "result_revision": "2",
           "result_ref": "current-closeout-review.md",
           "outcome_kind": "no_go",
           "reason": null,
@@ -100,9 +100,9 @@
             "current-closeout-approval.md"
           ],
           "acceptance": {
-            "artifact_revision": "ccd6c16bf157e0db93f12a24f833581d65241adb1a8968ff838633ae8bb1ca56",
-            "result_revision": "1",
-            "input_revision": "6",
+            "artifact_revision": "64468ef84d5edf615db28eb6cdf414f7e8dfe386f23c4916d91aeaf8e8860c80",
+            "result_revision": "2",
+            "input_revision": "13",
             "task_route_revision": "1",
             "evidence_refs": [
               "current-closeout-approval.md"
@@ -133,7 +133,31 @@
           "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
         }
       },
-      "return_record": null
-    }
+      "return_record": {
+        "from": "delivery_review_and_closeout",
+        "to": "goal_exploration_and_requirements",
+        "return_kind": "contract_change",
+        "authorization_retained": false,
+        "reason": "原生重开后的局部格式修正；当前批准语义不变，重新绑定正确字节和摘要。",
+        "evidence_refs": [
+          "current-closeout-review.md",
+          "current-closeout-approval.md"
+        ],
+        "task_route_revision": "1"
+      }
+    },
+    "task_lifecycle_recoveries": [
+      {
+        "from_status": "completed",
+        "to_status": "planning",
+        "reason": "当前复核文档末尾空行触发默认diff检查；按已批准合同修正文案格式并重新接受，裁决及历史原件不变。",
+        "evidence_refs": [
+          "current-closeout-review.md"
+        ],
+        "reopened_at": "2026-11-16T23:56:45.333889+00:00",
+        "terminal_completed_at": "2026-11-17",
+        "terminal_cancellation": null
+      }
+    ]
   }
 }
