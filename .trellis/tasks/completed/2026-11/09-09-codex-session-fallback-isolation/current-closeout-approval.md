@@ -1,0 +1,8 @@
+# 当前复核批准依据
+
+用户在根任务 project-historical-task-convergence 展示18项delivery_ready、6项no_go、1项保留的完整清单与实施合同后明确答复：“批准”。批准记录为根任务 implementation-approval.md，合同revision为82764147047028cd6c23fa9ef02eead421a70b18febd4ee3dfec4c66dfa381b2，裁决revision为2155881401bf568a2f7d5f81d2b968cd2818dde084f8b89138ce868fff25bdb9。
+
+本项 T14（09-09-codex-session-fallback-isolation）当前复核材料逐行复用已批准结论及固定保真边界；原生artifact绑定revision为c3ce20c7b73153ff9f1a5a4b1495146e060ba5c9fe3beb9ce6d0d349f994b426。主会话核对该当前材料与批准行一致，记录该项当前复核需求的确认和delivery_ready处置授权，不倒填原历史确认。
+
+新建的是当前时间的分析复核路线，不是重演原开发阶段；原作者、旧需求及已记录限制继续保留。
+

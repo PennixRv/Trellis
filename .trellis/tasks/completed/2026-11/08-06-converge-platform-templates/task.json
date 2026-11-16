@@ -1,0 +1,139 @@
+{
+  "id": "converge-platform-templates",
+  "name": "converge-platform-templates",
+  "title": "Derive platform template collection from a single description",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "taosu",
+  "assignee": "taosu",
+  "createdAt": "2026-08-06",
+  "completedAt": "2026-11-17",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "analysis",
+      "complexity": "simple",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "solution_design_and_convergence",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "7",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "6968b7842ccea2a385b0acf4212ace13630f47232c89f626b0ee27bb4c31cb98",
+          "artifact_refs": [
+            "current-closeout-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "current-closeout-review.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "current-closeout-approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "6968b7842ccea2a385b0acf4212ace13630f47232c89f626b0ee27bb4c31cb98",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "current-closeout-approval.md"
+            ]
+          }
+        },
+        "solution_design_and_convergence": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "6968b7842ccea2a385b0acf4212ace13630f47232c89f626b0ee27bb4c31cb98",
+          "artifact_refs": [
+            "current-closeout-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "current-closeout-review.md",
+          "outcome_kind": "analysis_conclusion",
+          "reason": null,
+          "evidence_refs": [
+            "current-closeout-approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "6968b7842ccea2a385b0acf4212ace13630f47232c89f626b0ee27bb4c31cb98",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "current-closeout-approval.md"
+            ]
+          }
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "6",
+          "artifact_revision": "6968b7842ccea2a385b0acf4212ace13630f47232c89f626b0ee27bb4c31cb98",
+          "artifact_refs": [
+            "current-closeout-review.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "current-closeout-review.md",
+          "outcome_kind": "delivery_ready",
+          "reason": null,
+          "evidence_refs": [
+            "current-closeout-approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "6968b7842ccea2a385b0acf4212ace13630f47232c89f626b0ee27bb4c31cb98",
+            "result_revision": "1",
+            "input_revision": "6",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "current-closeout-approval.md"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": null,
+      "closeout_disposition": "delivery_ready",
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "当前已批准历史任务复核，无产品实施；原历史合同和原件保留。",
+          "evidence_refs": [
+            "current-closeout-review.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "task_implementation": {
+          "reason": "当前已批准历史任务复核，无产品实施；原历史合同和原件保留。",
+          "evidence_refs": [
+            "current-closeout-review.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": null
+    }
+  }
+}
