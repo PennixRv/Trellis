@@ -1,6 +1,6 @@
 ---
 name: trellis-spec-bootstrap
-description: "Bootstrap project-specific Trellis coding specs with a platform-neutral single-agent workflow. Use when creating or refreshing .trellis/spec guidelines, analyzing a codebase with GitNexus, ABCoder, or source inspection, decomposing package/layer spec work, and writing real codebase-backed spec docs without placeholder text."
+description: "Bootstrap project-specific Trellis coding specs with a platform-neutral single-agent workflow. Use when creating or refreshing .trellis/spec guidelines, analyzing a codebase with approved available tools or source inspection, decomposing package/layer spec work, and writing real codebase-backed spec docs without placeholder text."
 ---
 
 # Trellis Spec Bootstrap
@@ -10,7 +10,7 @@ Use this skill to create or refresh `.trellis/spec/` guidelines from the real co
 ## Workflow
 
 1. Reuse the current task and authorization. Inspect the current `.trellis/spec/` tree, configured package keys and spec source before changing anything. This skill does not authorize initialization, installation or indexing.
-2. Analyze the repository architecture with the best available tools: GitNexus, ABCoder, language tooling, and direct source reads.
+2. Analyze the repository with its approved, available code tools and usable indexes, language tooling, and direct source reads. Follow the host's current tool instructions; a tool name or existing index does not authorize installation or indexing.
 3. Decompose the spec work by package and layer only when that reflects the actual codebase.
 4. Classify pure placeholders, real conventions mixed into templates, and historical examples. Fill or reshape the authorized files with concrete project evidence; preserve real rules and historical task records.
 5. Verify root/package navigation, active references, applicable checks and placeholder removal. Report file preparation separately from verified conventions and remaining evidence gaps.
@@ -22,7 +22,7 @@ Use this skill to create or refresh `.trellis/spec/` guidelines from the real co
 | Repository architecture analysis | [references/repository-analysis.md](references/repository-analysis.md) |
 | Spec work decomposition and task planning | [references/spec-task-planning.md](references/spec-task-planning.md) |
 | Writing high-signal Trellis spec files | [references/spec-writing.md](references/spec-writing.md) |
-| GitNexus and ABCoder MCP setup | [references/mcp-setup.md](references/mcp-setup.md) |
+| Approved analysis tool selection and setup boundaries | [references/mcp-setup.md](references/mcp-setup.md) |
 
 ## Operating Rules
 

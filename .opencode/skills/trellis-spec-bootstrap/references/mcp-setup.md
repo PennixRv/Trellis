@@ -1,92 +1,20 @@
-# MCP Setup
+# Analysis Tool Setup Boundaries
 
-GitNexus and ABCoder are recommended when bootstrapping Trellis specs because they expose architecture and AST context to the agent. They are tool choices, not platform requirements. Configure them through whatever MCP mechanism your agent host provides.
+Spec bootstrapping uses the tools already approved and available for the target project. It does not require a particular graph, AST, MCP server, or host.
 
-First discover the project's approved, available tools and existing indexes. Use source and tests directly when no suitable index is available; record that limit. Spec bootstrapping does not authorize installing tools, configuring MCP servers, downloading executables, or creating or refreshing indexes. The setup examples below apply only after those operations have separate authorization and the target repository is explicit. Prefer an already installed, pinned owner entry point over an unpinned download.
+## Select Existing Capabilities
 
-## GitNexus
+1. Confirm the project root, current checkout, host-exposed tools, and any existing indexes.
+2. For an approved project with a usable CodeGraph index, follow its native MCP instructions or CLI help for source and call-path exploration. Use other approved graph, AST, or language tools when they fit the question.
+3. Verify the selected tool's project binding and freshness. An ancestor index, another worktree, or a known tool name does not establish permission or coverage for this checkout.
+4. Use current source and tests directly when suitable analysis tooling is unavailable; state the limitation without blocking source-backed spec work.
 
-GitNexus builds a code knowledge graph from the repository. Use it for module boundaries, execution flows, dependency relationships, blast radius, and graph queries.
+## Setup Requires Separate Authorization
 
-### Install and Index
+This skill does not authorize downloading executables, installing packages, changing MCP configuration, or creating or refreshing indexes. When preparation is explicitly authorized, use the component's existing native owner and the host's supported configuration interface. Do not add a second installer or copy tool protocols into project instructions.
 
-```bash
-# Run from the repository root.
-npx gitnexus analyze
+## Verify the Selected Surface
 
-# Check index status.
-npx gitnexus status
+After an authorized setup change, confirm the actual host can discover and use the selected interface and that results identify the expected project. File existence or a successful setup command alone does not prove MCP connectivity, current indexing, or host loading.
 
-# Re-index only when explicitly authorized for this repository.
-npx gitnexus analyze
-```
-
-The index is written to `.gitnexus/`. Keep embeddings only if the project already uses them; otherwise a normal index is enough for spec bootstrapping.
-
-### MCP Server Command
-
-Use this server command in the host's MCP configuration:
-
-```bash
-npx -y gitnexus mcp
-```
-
-### Useful Tools
-
-| Tool | Purpose |
-|------|---------|
-| `gitnexus_query` | Find execution flows and functional areas by concept |
-| `gitnexus_context` | Inspect callers, callees, references, and process participation for a symbol |
-| `gitnexus_impact` | Understand blast radius before changing a symbol |
-| `gitnexus_detect_changes` | Check changed symbols and affected flows before finishing |
-| `gitnexus_cypher` | Run direct graph queries |
-| `gitnexus_list_repos` | List indexed repositories |
-
-## ABCoder
-
-ABCoder parses code into UniAST and gives precise package, file, and node-level structure. Use it for signatures, type shapes, implementations, dependencies, and reverse references.
-
-### Install
-
-```bash
-go install github.com/cloudwego/abcoder@latest
-abcoder --help
-```
-
-### Parse Repositories
-
-```bash
-abcoder parse /absolute/path/to/package \
-  --lang typescript \
-  --name package-name \
-  --output ~/abcoder-asts
-```
-
-For monorepos, parse each package with a stable `--name` so task notes can reference the same repository names.
-
-### MCP Server Command
-
-Use this server command in the host's MCP configuration:
-
-```bash
-abcoder mcp ~/abcoder-asts
-```
-
-### Useful Tools
-
-| Tool | Layer | Purpose |
-|------|-------|---------|
-| `list_repos` | 1 | List parsed repositories |
-| `get_repo_structure` | 2 | Inspect packages and files |
-| `get_package_structure` | 3 | Inspect nodes within a package |
-| `get_file_structure` | 3 | Inspect functions, classes, types, and signatures in a file |
-| `get_ast_node` | 4 | Retrieve code, dependencies, references, and implementations |
-
-## Verification
-
-After an authorized configuration change, verify the selected MCP server from the agent host and run a simple query. Neither server is mandatory; unavailable tooling does not block a source-backed spec pass.
-
-```bash
-ls .gitnexus/meta.json
-ls ~/abcoder-asts/*.json
-```
+Keep setup evidence separate from architectural conclusions. Record missing capabilities and continue with bounded source inspection when the task permits it.

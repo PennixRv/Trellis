@@ -29,7 +29,7 @@ The set is discovered at runtime by listing directories under `templates/common/
 | `trellis-delivery-review-and-closeout` | Reviews the delivery candidate, unresolved items, acceptance conditions, and resource disposition. |
 | `trellis-meta` | This skill. Explains the local Trellis architecture and customization entry points to an AI working inside a user project. |
 | `trellis-session-insight` | Wraps the `trellis mem` CLI so an AI knows when and how to reach into past Claude Code / Codex / Pi Agent conversation logs. |
-| `trellis-spec-bootstrap` | Platform-neutral workflow for creating or refreshing `.trellis/spec/` from the real codebase (with optional GitNexus / ABCoder integration). |
+| `trellis-spec-bootstrap` | Platform-neutral workflow for creating or refreshing `.trellis/spec/` from current source, tests, and approved available analysis tools. |
 | `trellis-teamwork`        | Capability skill teaching an AI when to reach for `trellis teamwork` for multi-agent collaboration, forum/thread persistent boards, and dispatcher-wait patterns. |
 
 This inventory reflects the directories currently in the source tree. The CLI discovers them at runtime, so adding a directory under `bundled-skills/` makes it available to the shared loader (see "Adding a New Bundled Skill" below).
