@@ -1,0 +1,136 @@
+{
+  "id": "project-agents-injection-optimization",
+  "name": "project-agents-injection-optimization",
+  "title": "Reduce project instruction overhead and retire GitNexus defaults",
+  "description": "Implement the approved root contract: shorten the native AGENTS block, retire this checkout GitNexus instructions and vendored skills, make spec bootstrap use approved available tools, verify and publish synchronized packages, refresh this checkout through the public CLI. Root owns deployment and integration; branch v0.7.1 is preserved.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-11-17",
+  "completedAt": null,
+  "branch": "v0.7.1",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "1",
+      "task_kind": "implementation",
+      "complexity": "standard",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "solution_design_and_convergence",
+        "task_implementation",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": "task_implementation",
+      "input_revision": "5",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "accepted",
+          "input_revision": "2",
+          "artifact_revision": "414ca81c8859fba8840379b5e13ec19e4fa7ab291b830da55bf5fd14dfac927c",
+          "artifact_refs": [
+            "prd.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "prd.md",
+          "outcome_kind": "accepted",
+          "reason": null,
+          "evidence_refs": [
+            "approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "414ca81c8859fba8840379b5e13ec19e4fa7ab291b830da55bf5fd14dfac927c",
+            "result_revision": "1",
+            "input_revision": "2",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "approval.md"
+            ]
+          }
+        },
+        "solution_design_and_convergence": {
+          "status": "accepted",
+          "input_revision": "4",
+          "artifact_revision": "414ca81c8859fba8840379b5e13ec19e4fa7ab291b830da55bf5fd14dfac927c",
+          "artifact_refs": [
+            "prd.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "prd.md",
+          "outcome_kind": "implementation_contract",
+          "reason": null,
+          "evidence_refs": [
+            "approval.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "414ca81c8859fba8840379b5e13ec19e4fa7ab291b830da55bf5fd14dfac927c",
+            "result_revision": "1",
+            "input_revision": "4",
+            "task_route_revision": "1",
+            "evidence_refs": [
+              "approval.md"
+            ]
+          }
+        },
+        "task_implementation": {
+          "status": "active",
+          "input_revision": "5",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": null,
+          "evidence_refs": [],
+          "acceptance": null
+        },
+        "delivery_review_and_closeout": {
+          "status": "not_started",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": null,
+          "evidence_refs": [],
+          "acceptance": null
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": {
+        "contract_ref": "prd.md",
+        "contract_revision": "414ca81c8859fba8840379b5e13ec19e4fa7ab291b830da55bf5fd14dfac927c",
+        "approval_ref": "approval.md",
+        "task_route_revision": "1"
+      },
+      "closeout_disposition": null,
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "The parent task has accepted the decision space and the user approved the complete owner scope.",
+          "evidence_refs": [
+            "approval.md"
+          ],
+          "task_route_revision": "1",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": null
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.22",
+  "description": "Reduce resident project instructions and use approved analysis tools",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Shorten the native AGENTS block while preserving startup/resume, workflow and Task CLI ownership, spec navigation and no-hook fallback. Remove default GitNexus recommendations and installation recipes from spec bootstrapping; use approved available analysis tools or current source and tests.",
+  "migrations": [],
+  "notes": "Update CLI, Core and the optional Paseo adapter together. Refresh initialized projects with native trellis update and review modified-file conflicts individually. Preserve manual text, other instruction owners and local configuration. This release does not remove unmanaged third-party instructions, install analysis tools or create indexes; project-specific retirement requires separate explicit authorization."
+}
