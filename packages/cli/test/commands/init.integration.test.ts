@@ -21,6 +21,7 @@ vi.mock("inquirer", () => ({
 }));
 
 vi.mock("node:child_process", () => ({
+  execFileSync: vi.fn().mockReturnValue(""),
   execSync: vi.fn().mockReturnValue(""),
 }));
 
@@ -55,7 +56,7 @@ import {
   COPILOT_INSTRUCTIONS_PATH,
   getCopilotInstructions,
 } from "../../src/templates/copilot/index.js";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { emptyTaskJson } from "../../src/utils/task-json.js";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -1118,16 +1119,13 @@ describe("init() integration", () => {
   it("#7 passes developer name to init_developer script", async () => {
     await init({ yes: true, user: "testdev" });
 
-    const calls = vi.mocked(execSync).mock.calls;
-    const match = calls.find(
-      ([cmd]) => typeof cmd === "string" && cmd.includes("init_developer.py"),
-    );
-    expect(match).toBeDefined();
-    const command = String((match as [unknown])[0]);
     const expectedPythonCmd =
       process.platform === "win32" ? "python" : "python3";
-    expect(command).toContain(`${expectedPythonCmd} "`);
-    expect(command).toContain('"testdev"');
+    expect(execFileSync).toHaveBeenCalledWith(
+      expectedPythonCmd,
+      [path.join(tmpDir, ".trellis/scripts/init_developer.py"), "testdev"],
+      { cwd: tmpDir, stdio: "pipe" },
+    );
   });
 
   it("#7b throws when the selected Python command is below 3.9", async () => {

@@ -8,6 +8,8 @@ const maintenanceRoot = fs.mkdtempSync(
   path.join(os.tmpdir(), "trellis-test-maintenance-"),
 );
 process.env.TRELLIS_ABLATION_STATE_ROOT = maintenanceRoot;
+// Project init must never consume the developer's Lifecycle authorization.
+process.env.XDG_CONFIG_HOME = path.join(maintenanceRoot, "config");
 afterAll(() => fs.rmSync(maintenanceRoot, { recursive: true, force: true }));
 
 // Strip host-shell session env vars so the OpenCode / Trellis context

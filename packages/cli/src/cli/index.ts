@@ -79,6 +79,16 @@ program
   .option("--claude", "Include Claude Code commands")
   .option("--opencode", "Include OpenCode commands")
   .option("--codex", "Include Codex skills")
+  .option(
+    "--trust-codex",
+    "Trust this project and verified Trellis Hooks through native Codex configuration",
+  )
+  .option("--no-trust-codex", "Keep project and Hook trust unchanged")
+  .option(
+    "--codegraph",
+    "Connect local CodeGraph and initialize this project's index",
+  )
+  .option("--no-codegraph", "Keep CodeGraph project integration unchanged")
   .option("--kilo", "Include Kilo CLI commands")
   .option("--kiro", "Include Kiro Code skills")
   .option("--gemini", "Include Gemini CLI commands")

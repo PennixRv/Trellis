@@ -1,0 +1,9 @@
+{
+  "version": "0.7.2-beta.23",
+  "description": "按显式策略接入 Codex 信任及 CodeGraph 项目初始化",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Trellis 首次和重入初始化可承接 Lifecycle 一次策略，委托 CodeGraph 精确项目接入及首次或恢复索引，并通过 Codex 原生接口核验和写入目录及受管 Hook 信任。保留显式拒绝、修改资产、未知配置和其他 owner；开发者初始化使用参数数组处理含引号路径。",
+  "migrations": [],
+  "notes": "同时更新 CLI、Core 及可选 Paseo adapter。自动化须明确选择，普通 --yes 和 --force 不增加授权；要求 Lifecycle policy 和 CodeGraph project-only 能力，缺失时不隐式安装。不自动改造既有业务项目，不安装 Git 同步 Hook；新 MCP 及持续同步须由新宿主会话验证。"
+}

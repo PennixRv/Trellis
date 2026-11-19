@@ -88,8 +88,8 @@ export async function configureCodex(cwd: string): Promise<void> {
     process.stderr.write(
       "⚠️  Codex hooks require `features.hooks = true` in your " +
         "~/.codex/config.toml (Codex 0.129+; older versions: `codex_hooks = true`). " +
-        "On Codex 0.129+ also run `/hooks` once to approve the Trellis " +
-        "hooks. Without these the workflow breadcrumb will not auto-inject. " +
+        "When automatic project setup is unselected, review the project " +
+        "and its Trellis hooks in Codex before use. Init reports automatic setup separately. " +
         "See Trellis docs for details.\n",
     );
   }

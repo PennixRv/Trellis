@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import { assertCurrentExecutionTree } from "../utils/retired-native-assets.js";
 import path from "node:path";
@@ -11,6 +11,11 @@ import {
   ensureSpecIndex,
 } from "../configurators/workflow.js";
 import { withAssetMaintenance } from "../utils/asset-backup.js";
+import {
+  resolveProjectPolicy,
+  preflightProjectInit,
+  completeProjectInit,
+} from "../utils/project-init.js";
 import { writeFileAtomic } from "../utils/atomic-write.js";
 import {
   managedBlock,
@@ -96,6 +101,17 @@ function tasksAreEmpty(cwd: string): boolean {
       progress.cancelled ===
       0
   );
+}
+
+function initializeDeveloper(
+  cwd: string,
+  pythonCmd: string,
+  name: string,
+): void {
+  const script = path.join(cwd, PATHS.SCRIPTS, "init_developer.py");
+  const [command, ...prefix] =
+    pythonCmd === "py -3" ? ["py", "-3"] : [pythonCmd];
+  execFileSync(command, [...prefix, script, name], { cwd, stdio: "pipe" });
 }
 
 const MIN_PYTHON_MAJOR = 3;
@@ -936,11 +952,7 @@ async function handleReinit(
     );
 
     try {
-      const scriptPath = path.join(cwd, PATHS.SCRIPTS, "init_developer.py");
-      execSync(`${pythonCmd} "${scriptPath}" "${devName}"`, {
-        cwd,
-        stdio: "pipe",
-      });
+      initializeDeveloper(cwd, pythonCmd, devName);
       console.log(chalk.green(`✓ Developer "${devName}" initialized`));
     } catch {
       console.log(
@@ -1002,6 +1014,8 @@ async function maybePromptStatuslineOptIn(
 }
 
 interface InitOptions {
+  trustCodex?: boolean;
+  codegraph?: boolean;
   cursor?: boolean;
   claude?: boolean;
   opencode?: boolean;
@@ -1103,6 +1117,22 @@ interface InitAnswers {
 export async function init(options: InitOptions): Promise<void> {
   // Existing legacy projects must use the ownership-aware update transaction.
   assertCurrentExecutionTree(process.cwd());
+  const projectRoot = fs.realpathSync(process.cwd());
+  const otherPlatformSelected =
+    !options.codex &&
+    Object.values(AI_TOOLS).some((tool) => options[tool.cliFlag] === true);
+  if (otherPlatformSelected && (options.trustCodex || options.codegraph))
+    throw new Error(
+      "Codex project automation requires selecting the Codex platform",
+    );
+  const projectPlan = otherPlatformSelected
+    ? { trustCodex: false, codegraph: false }
+    : resolveProjectPolicy(projectRoot, options);
+  if (
+    options.codex ||
+    fs.existsSync(path.join(projectRoot, ".codex/config.toml"))
+  )
+    await preflightProjectInit(projectRoot, projectPlan);
   return withAssetMaintenance(process.cwd(), async () => {
     // Refuse to run in $HOME — running here would scoop platform runtime data
     // (Claude/Codex/OpenCode session histories etc.) into the trellis hash
@@ -1207,7 +1237,10 @@ export async function init(options: InitOptions): Promise<void> {
         developerName,
         pythonCmd,
       );
-      if (reinitDone) return;
+      if (reinitDone) {
+        await completeProjectInit(projectRoot, projectPlan);
+        return;
+      }
       // reinitDone === false means user chose "full re-initialize" → fall through
     }
 
@@ -1353,7 +1386,10 @@ export async function init(options: InitOptions): Promise<void> {
                   name: "specSource",
                   message: `Spec source for ${pkg.name} (${pkg.path}):`,
                   choices: [
-                    { name: "From scratch (Trellis default)", value: "blank" },
+                    {
+                      name: "From scratch (Trellis default)",
+                      value: "blank",
+                    },
                     { name: "Download remote template", value: "remote" },
                   ],
                   default: "blank",
@@ -2017,11 +2053,7 @@ export async function init(options: InitOptions): Promise<void> {
     // Initialize developer identity (silent - no output)
     if (developerName) {
       try {
-        const scriptPath = path.join(cwd, PATHS.SCRIPTS, "init_developer.py");
-        execSync(`${pythonCmd} "${scriptPath}" "${developerName}"`, {
-          cwd,
-          stdio: "pipe", // Silent
-        });
+        initializeDeveloper(cwd, pythonCmd, developerName);
       } catch {
         // Silent failure - user can run init_developer.py manually
       }
@@ -2067,6 +2099,7 @@ export async function init(options: InitOptions): Promise<void> {
         }
       }
     }
+    await completeProjectInit(projectRoot, projectPlan);
   });
 }
 
