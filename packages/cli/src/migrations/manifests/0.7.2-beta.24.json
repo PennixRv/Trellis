@@ -1,0 +1,8 @@
+{
+  "version": "0.7.2-beta.24",
+  "description": "修正进行中任务的请求接入与阶段收敛指引",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "决策空间和方案阶段将补充输入交给请求接入；补证不回退，实质变化才回流。明确可比较才移交、草案未收敛不请求批准的条件。",
+  "migrations": []
+}

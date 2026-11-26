@@ -127,10 +127,12 @@ flowchart LR
 [/workflow-state:goal_exploration_and_requirements]
 
 [workflow-state:decision_space_construction_and_merging]
+有补充或变更输入时，先用 `trellis-request-intake` 判断影响。
 读取 `trellis-decision-space-construction-and-merging` 及其 `workflow.md`。只有条件依赖会改变下游选择时才使用决策树；本阶段无实质价值时，记录有证据支持的跳过理由。
 [/workflow-state:decision_space_construction_and_merging]
 
 [workflow-state:solution_design_and_convergence]
+有补充或变更输入时，先用 `trellis-request-intake` 判断影响。
 读取 `trellis-solution-design-and-convergence` 及其 `workflow.md`。接受阶段前解决保留给用户决定的事项；已接受的实施合同不等同于实施授权。
 [/workflow-state:solution_design_and_convergence]
 

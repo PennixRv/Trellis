@@ -162,6 +162,14 @@ describe("trellis template constants", () => {
     expect(implementationState).toContain("可使用 `trellis-check`");
   });
 
+  it.each([
+    "decision_space_construction_and_merging",
+    "solution_design_and_convergence",
+  ])("routes new input from the %s phase breadcrumb to a shipped intake skill", (phase) => {
+    expect(getSkillTemplates().some(({ name }) => name === "request-intake")).toBe(true);
+    expect(workflowStateBreadcrumb(phase)).toContain("有补充或变更输入时，先用 `trellis-request-intake`");
+  });
+
   it("phase entries preserve confirmation, conditional decision trees, and closeout", () => {
     expect(stepSection("1.1")).toContain("当前资产 revision 的用户明确确认");
     expect(stepSection("2.1")).toContain("读取决策空间构造与归并阶段 Skill");

@@ -1,6 +1,12 @@
 # Trellis Request Intake
 
-Use this entry skill to route a new request. First check its relationship to the active task: a change to the same goal returns to the earliest affected phase; independent work needs its own intake. Do not put unrelated work into the active task or bypass its ownership and acceptance gates. To resume existing work, use trellis-continue and the current native task facts.
+Use this entry skill to route new input. Check it against the active task and its accepted artifacts:
+
+- Supporting evidence that leaves the goal, constraints, acceptance criteria, basis for comparing candidates, and authorization intact belongs in the current phase's evidence records. Preserve accepted artifacts and continue the phase; do not stop at acknowledging the evidence.
+- A material change to any of those facts returns to the earliest affected phase. Pause only actions that depend on what changed. If the user also requests work whose scope is still clear and authorized, complete it before waiting for clarification about the change, unless workflow dependencies or explicit user instructions require waiting. Do not infer a pause from new evidence.
+- Independent work needs its own intake. Do not put it into the active task, abandon that task, or bypass its ownership and acceptance gates.
+
+To resume without new input, use trellis-continue and the current native task facts.
 
 Reuse verified evidence and existing authorization. Follow the taskless route in workflow.md only when all of these are true: the goal is clear; the scope and owner are bounded; risk is controlled; the user has authorized the actual action; success can be verified in the current session; and the work needs no persistent route, coordination, design, review, release, installation, migration, external delivery, or dedicated rollback plan. A bounded irreversible action additionally needs exact target verification, an acceptable recovery or loss boundary, and a stop condition. User authorization alone is not sufficient. Read-only inspection, bounded diagnosis, low-impact native-owner maintenance or cleanup, small single-surface edits, and rerunning existing checks are examples, not an allowlist. Intake ends when the request reaches its appropriate phase; do not repeat session initialization or conduct a second requirements or planning workflow here.
 
