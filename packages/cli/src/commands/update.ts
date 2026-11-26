@@ -9,6 +9,12 @@ import {
   readManagedMarkdown,
 } from "../utils/managed-markdown.js";
 import { writeFileAtomic } from "../utils/atomic-write.js";
+import {
+  CODEX_CONFIG_PATH,
+  ownedCodexConfig,
+  readCodexConfig,
+  splitCodexConfig,
+} from "../utils/codex-config-ownership.js";
 
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../constants/paths.js";
 import type { AITool } from "../types/ai-tools.js";
@@ -117,13 +123,37 @@ interface FileChange {
   relativePath: string;
   newContent: string;
   previousContent?: string | null;
+  templateContent?: string;
   status: "new" | "unchanged" | "changed";
 }
 
-function writeUpdateFile(file: FileChange): void {
+function writeUpdateFile(file: FileChange): boolean {
+  if (file.relativePath === CODEX_CONFIG_PATH) {
+    if (readCodexConfig(file.path) === file.previousContent) {
+      try {
+        writeFileAtomic(
+          file.path,
+          file.newContent,
+          file.previousContent === null
+            ? undefined
+            : fs.statSync(file.path).mode,
+          file.previousContent === null,
+        );
+        return true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
+    }
+    console.log(
+      chalk.yellow(
+        "  ○ Preserved shared Codex configuration: changed after preview",
+      ),
+    );
+    return false;
+  }
   if (file.previousContent === undefined) {
     fs.writeFileSync(file.path, file.newContent);
-    return;
+    return true;
   }
   if (
     file.previousContent !== undefined &&
@@ -138,6 +168,7 @@ function writeUpdateFile(file: FileChange): void {
     file.newContent,
     file.previousContent === null ? undefined : fs.statSync(file.path).mode,
   );
+  return true;
 }
 
 interface ChangeAnalysis {
@@ -1066,6 +1097,44 @@ function analyzeChanges(
 
   for (const [relativePath, newContent] of templates) {
     const fullPath = path.join(cwd, relativePath);
+    if (relativePath === CODEX_CONFIG_PATH) {
+      const current = readCodexConfig(fullPath);
+      const seed = splitCodexConfig(newContent);
+      if (!seed || seed.suffix)
+        throw new Error("Invalid bundled Codex configuration prefix");
+      const stored = hashes[relativePath];
+      if (current === null && !stored) {
+        result.newFiles.push({
+          path: fullPath,
+          relativePath,
+          newContent,
+          previousContent: null,
+          status: "new",
+        });
+      } else if (current !== null) {
+        const owned =
+          typeof current === "string"
+            ? ownedCodexConfig(current, stored)
+            : undefined;
+        if (!owned) {
+          console.log(
+            chalk.gray(
+              `  ○ Preserved shared ${relativePath}: no matching Trellis ownership receipt`,
+            ),
+          );
+        } else if (owned.prefix !== newContent) {
+          result.autoUpdateFiles.push({
+            path: fullPath,
+            relativePath,
+            newContent: newContent + owned.suffix,
+            previousContent: current,
+            templateContent: newContent,
+            status: "changed",
+          });
+        }
+      }
+      continue;
+    }
     const exists = fs.existsSync(fullPath);
 
     const change: FileChange = {
@@ -2471,6 +2540,13 @@ export async function update(options: UpdateOptions): Promise<void> {
 
       // Analyze changes (pass hashes for modification detection)
       const changes = analyzeChanges(cwd, hashes, templates);
+      const sharedCodex = templates.has(CODEX_CONFIG_PATH)
+        ? readCodexConfig(path.join(cwd, CODEX_CONFIG_PATH))
+        : undefined;
+      const discardMixedCodexReceipt =
+        typeof sharedCodex === "string" &&
+        hashes[CODEX_CONFIG_PATH] === computeHash(sharedCodex) &&
+        !ownedCodexConfig(sharedCodex, hashes[CODEX_CONFIG_PATH]);
       const unchangedFileHashRepairs = collectUnchangedFileHashRepairs(
         changes,
         hashes,
@@ -2530,11 +2606,13 @@ export async function update(options: UpdateOptions): Promise<void> {
           updateHashes(cwd, unchangedFileHashRepairs);
         }
 
+        if (!options.dryRun && discardMixedCodexReceipt)
+          removeHash(cwd, CODEX_CONFIG_PATH);
         if (isSameVersion) {
           console.log(chalk.green("✓ Already up to date!"));
         } else {
           // Version changed but no file changes needed — still update the version stamp
-          updateVersionFile(cwd);
+          if (!options.dryRun) updateVersionFile(cwd);
           if (isUpgrade) {
             console.log(
               chalk.green(
@@ -2751,6 +2829,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       let updated = 0;
       let skipped = 0;
       let createdNew = 0;
+      const skippedWrites = new Set<string>();
 
       // Add new files
       if (changes.newFiles.length > 0) {
@@ -2758,7 +2837,11 @@ export async function update(options: UpdateOptions): Promise<void> {
         for (const file of changes.newFiles) {
           const dir = path.dirname(file.path);
           fs.mkdirSync(dir, { recursive: true });
-          writeUpdateFile(file);
+          if (!writeUpdateFile(file)) {
+            skippedWrites.add(file.relativePath);
+            skipped++;
+            continue;
+          }
 
           // Make scripts executable
           if (
@@ -2777,7 +2860,11 @@ export async function update(options: UpdateOptions): Promise<void> {
       if (changes.autoUpdateFiles.length > 0) {
         console.log(chalk.blue("\nAuto-updating template files..."));
         for (const file of changes.autoUpdateFiles) {
-          writeUpdateFile(file);
+          if (!writeUpdateFile(file)) {
+            skippedWrites.add(file.relativePath);
+            skipped++;
+            continue;
+          }
 
           // Make scripts executable
           if (
@@ -2853,13 +2940,24 @@ export async function update(options: UpdateOptions): Promise<void> {
       // Update template hashes for new, auto-updated, and overwritten files
       const filesToHash = new Map<string, string>(unchangedFileHashRepairs);
       for (const file of changes.newFiles) {
-        if (file.relativePath === `${DIR_NAMES.WORKFLOW}/.gitignore`) continue;
+        if (
+          file.relativePath === `${DIR_NAMES.WORKFLOW}/.gitignore` ||
+          skippedWrites.has(file.relativePath)
+        )
+          continue;
         filesToHash.set(file.relativePath, file.newContent);
       }
       // Auto-updated files always get new hash
       for (const file of changes.autoUpdateFiles) {
-        if (file.relativePath === `${DIR_NAMES.WORKFLOW}/.gitignore`) continue;
-        filesToHash.set(file.relativePath, file.newContent);
+        if (
+          file.relativePath === `${DIR_NAMES.WORKFLOW}/.gitignore` ||
+          skippedWrites.has(file.relativePath)
+        )
+          continue;
+        filesToHash.set(
+          file.relativePath,
+          file.templateContent ?? file.newContent,
+        );
       }
       // Only hash overwritten files (not skipped or .new copies)
       for (const file of changes.changedFiles) {
@@ -2878,6 +2976,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       if (filesToHash.size > 0) {
         updateHashes(cwd, filesToHash);
       }
+      if (discardMixedCodexReceipt) removeHash(cwd, CODEX_CONFIG_PATH);
 
       // Print summary
       console.log(chalk.cyan("\n--- Summary ---\n"));

@@ -10,6 +10,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { readManagedMarkdown } from "./managed-markdown.js";
 import { writeFileAtomic } from "./atomic-write.js";
+import {
+  CODEX_CONFIG_PATH,
+  ownedCodexConfig,
+  readCodexConfig,
+  stripCodexConfigPrefix,
+} from "./codex-config-ownership.js";
 
 import { DIR_NAMES, FILE_NAMES } from "../constants/paths.js";
 import { ALL_MANAGED_DIRS } from "../configurators/index.js";
@@ -19,7 +25,6 @@ import {
   COPILOT_INSTRUCTIONS_PATH,
 } from "../templates/copilot/index.js";
 import {
-  scrubCodexConfigToml,
   scrubHooksJson,
   scrubManagedMarkdownBlock,
   scrubOpencodePackageJson,
@@ -205,11 +210,6 @@ export function buildStructuredFileSpecs(): Map<string, StructuredFileSpec> {
       scrub: (content) => scrubPiSettings(content),
     },
     {
-      posixPath: ".codex/config.toml",
-      reason: "Remove trellis project_doc_fallback_filenames and notes",
-      scrub: (content) => scrubCodexConfigToml(content),
-    },
-    {
       posixPath: COPILOT_INSTRUCTIONS_PATH,
       reason: "Remove Trellis Copilot guidance; preserve repo instructions",
       scrub: (content) =>
@@ -250,6 +250,33 @@ export function buildManagedRemovalPlan(
   const modifications: PlannedModification[] = [];
 
   for (const posixPath of allPosixPaths) {
+    if (posixPath === CODEX_CONFIG_PATH) {
+      const absPath = path.join(cwd, posixPath);
+      const originalContent = readCodexConfig(absPath);
+      const owned =
+        typeof originalContent === "string"
+          ? ownedCodexConfig(originalContent, hashes[posixPath])
+          : undefined;
+      if (!owned || typeof originalContent !== "string") {
+        if (originalContent !== null)
+          console.log(
+            `  ○ Preserved shared ${posixPath}: no matching Trellis ownership receipt`,
+          );
+        continue;
+      }
+      const content = stripCodexConfigPrefix(owned.suffix);
+      if (content === "")
+        deletions.push({ posixPath, absPath, missing: false, originalContent });
+      else
+        modifications.push({
+          posixPath,
+          absPath,
+          originalContent,
+          reason: "Remove the attributed Trellis prefix",
+          result: { content, fullyEmpty: false },
+        });
+      continue;
+    }
     if (posixPath === FILE_NAMES.AGENTS)
       readManagedMarkdown(path.join(cwd, FILE_NAMES.AGENTS));
     const absPath = options.strictPaths
@@ -326,6 +353,21 @@ export function executeManagedRemovalPlan(
   let modifiedFiles = 0;
 
   for (const modification of plan.modifications) {
+    if (modification.posixPath === CODEX_CONFIG_PATH) {
+      if (
+        readCodexConfig(modification.absPath) !== modification.originalContent
+      )
+        throw new Error(
+          "Shared Codex configuration changed after preview; preview again",
+        );
+      writeFileAtomic(
+        modification.absPath,
+        modification.result.content,
+        fs.statSync(modification.absPath).mode,
+      );
+      modifiedFiles += 1;
+      continue;
+    }
     if (
       modification.posixPath === FILE_NAMES.AGENTS &&
       readManagedMarkdown(modification.absPath) !== modification.originalContent
@@ -347,6 +389,13 @@ export function executeManagedRemovalPlan(
   const deletedDirCandidates = new Set<string>();
   for (const deletion of plan.deletions) {
     if (deletion.missing) continue;
+    if (
+      deletion.posixPath === CODEX_CONFIG_PATH &&
+      readCodexConfig(deletion.absPath) !== deletion.originalContent
+    )
+      throw new Error(
+        "Shared Codex configuration changed after preview; preview again",
+      );
     if (
       deletion.posixPath === FILE_NAMES.AGENTS &&
       deletion.originalContent !== undefined &&

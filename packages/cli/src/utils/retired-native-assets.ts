@@ -20,16 +20,11 @@ const hookFiles = [
   ".trae/hooks.json",
   ".github/copilot/hooks.json",
 ];
-export const mixedNativeAssets = [
-  ...hookFiles,
-  ".trellis/config.yaml",
-  ".codex/config.toml",
-];
+export const mixedNativeAssets = [...hookFiles, ".trellis/config.yaml"];
 const executionFiles = [
   replacement,
   ...hookFiles,
   ".trellis/config.yaml",
-  ".codex/config.toml",
   ".trellis/workflow.md",
   ...["config.py", "workflow_phase.py", "task_store.py"].map(
     (name) => `.trellis/scripts/common/${name}`,
@@ -84,12 +79,9 @@ function scrubHooks(value: unknown): unknown {
 }
 
 /** Deletion-only metadata never interprets old modes as execution policy. */
-function scrubConfig(relative: string, content: string, owned = false): string {
+function scrubConfig(relative: string, content: string): string {
+  if (relative === ".codex/config.toml") return content;
   const generatedComments = retiredConfigComments[relative] ?? [];
-  const knownDefaults =
-    owned ||
-    (relative === ".codex/config.toml" &&
-      generatedComments.some((entry) => content.includes(entry.before)));
   for (const entry of generatedComments)
     content = content.replaceAll(entry.before, entry.after);
   if (hookFiles.includes(relative)) {
@@ -114,22 +106,6 @@ function scrubConfig(relative: string, content: string, owned = false): string {
         return remaining.slice(1).some((line) => /^\s+[^#\s][^:]*:/.test(line))
           ? remaining.join("\n")
           : "";
-      },
-    );
-  }
-  if (relative === ".codex/config.toml" && knownDefaults) {
-    return content.replace(
-      /^(\[agents\][^\n]*\n)([\s\S]*?)(?=^\[|(?![\s\S]))/gm,
-      (_all, heading: string, body: string) => {
-        const cleaned = body.replace(
-          /^\s*max_depth\s*=\s*1\s*(?:#[^\n]*)?\n/gm,
-          "",
-        );
-        return (
-          heading +
-          (/^\s*enabled\s*=/m.test(cleaned) ? "" : "enabled = false\n") +
-          cleaned
-        );
       },
     );
   }
@@ -191,11 +167,7 @@ export function planNativeRetirement(
   for (const relative of mixedNativeAssets) {
     const content = read(relative);
     if (content === undefined) continue;
-    const cleaned = scrubConfig(
-      relative,
-      content,
-      hashes[relative] === computeHash(content),
-    );
+    const cleaned = scrubConfig(relative, content);
     if (cleaned !== content) {
       protectedPath(relative);
       plan.edits.set(relative, cleaned);

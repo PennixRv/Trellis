@@ -10,6 +10,12 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
+import {
+  CODEX_CONFIG_PATH,
+  readCodexConfig,
+  splitCodexConfig,
+  stripCodexConfigPrefix,
+} from "./codex-config-ownership.js";
 import { assertCurrentExecutionAsset } from "./retired-native-assets.js";
 import os from "node:os";
 import path from "node:path";
@@ -947,7 +953,22 @@ export function restoreTransactionFiles(
       right.relativePath.split("/").length,
   );
   for (const entry of ordered) {
-    restoreEntry(transaction, entry, options.verifyExpectedState ?? false);
+    if (
+      entry.relativePath === CODEX_CONFIG_PATH &&
+      fingerprintsEqual(
+        fingerprintPath(
+          currentPathForEntry(transaction.state.projectRoot, entry),
+        ),
+        entry.pre,
+      )
+    )
+      continue;
+    restoreEntry(
+      transaction,
+      entry,
+      entry.relativePath === CODEX_CONFIG_PATH ||
+        (options.verifyExpectedState ?? false),
+    );
   }
 }
 
@@ -972,6 +993,27 @@ function assertRestorableExecutionAssets(
     }
   }
   for (const entry of transaction.state.entries) {
+    if (entry.backupPath && entry.relativePath === CODEX_CONFIG_PATH) {
+      const text = readCodexConfig(
+        path.join(transaction.paths.transactionDir, entry.backupPath),
+      );
+      const parts =
+        typeof text === "string" ? splitCodexConfig(text) : undefined;
+      const retained = parts && stripCodexConfigPrefix(parts.suffix);
+      if (
+        !parts ||
+        entry.pre.kind !== "file" ||
+        !fingerprintsEqual(
+          entry.expectedAblated,
+          retained
+            ? expectedFileFingerprint(retained, entry.pre.mode)
+            : { kind: "absent" },
+        )
+      )
+        throw new Error(
+          "Ablation cannot prove ownership of shared Codex configuration; no shared file was restored",
+        );
+    }
     if (entry.backupPath)
       visit(
         path.join(transaction.paths.transactionDir, entry.backupPath),

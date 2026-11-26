@@ -14,6 +14,13 @@ import { writeFileAtomic } from "./atomic-write.js";
 import { TRELLIS_BLOCK_START, TRELLIS_BLOCK_END } from "./managed-paths.js";
 import { managedBlock, readManagedMarkdown } from "./managed-markdown.js";
 import {
+  CODEX_CONFIG_PATH,
+  ownedCodexConfig,
+  readCodexConfig,
+  splitCodexConfig,
+  stripCodexConfigPrefix,
+} from "./codex-config-ownership.js";
+import {
   canonicalProjectRoot,
   projectKey,
   fingerprintPath,
@@ -42,6 +49,7 @@ const entrySchema = z
     before: fingerprintSchema,
     after: fingerprintSchema.optional(),
     afterBlock: z.string().optional(),
+    codexPrefix: z.literal(true).optional(),
   })
   .strict();
 const manifestSchema = z
@@ -96,6 +104,11 @@ function safePath(root: string, relative: string): string {
   validateManagedRelativePath(relative);
   root = canonicalProjectRoot(root);
   if (relative === "AGENTS.md") readManagedMarkdown(path.join(root, relative));
+  if (
+    relative === CODEX_CONFIG_PATH &&
+    readCodexConfig(path.join(root, relative)) === undefined
+  )
+    throw new Error(`Unsafe shared configuration: ${relative}`);
   let cursor = root;
   for (const part of relative.split("/")) {
     cursor = path.join(cursor, part);
@@ -183,6 +196,8 @@ export function loadAssetBackup(root: string, id: string): AssetBackup {
   for (const entry of result.entries) {
     if (!assetPath(entry.path) || paths.has(entry.path))
       throw new Error(`Invalid or duplicate asset scope: ${entry.path}`);
+    if (entry.codexPrefix && entry.path !== CODEX_CONFIG_PATH)
+      throw new Error(`Invalid scoped backup: ${entry.path}`);
     paths.add(entry.path);
     const stored = current(dir, `files/${entry.path}`);
     if (!fingerprintsEqual(stored, entry.before))
@@ -209,7 +224,16 @@ export function assetBackupScope(
   extra: Iterable<string> = [],
 ): string[] {
   return [...new Set([...Object.keys(loadHashes(root)), ...META, ...extra])]
-    .filter(assetPath)
+    .filter((relative) => {
+      if (!assetPath(relative)) return false;
+      if (relative !== CODEX_CONFIG_PATH) return true;
+      const content = readCodexConfig(path.join(root, relative));
+      return (
+        content === null ||
+        (typeof content === "string" &&
+          !!ownedCodexConfig(content, loadHashes(root)[relative]))
+      );
+    })
     .sort();
 }
 
@@ -224,9 +248,36 @@ export function createAssetBackup(
   const dir = backupDir(root, id);
   const staging = safePath(root, `.trellis/.backup-preparing-${randomUUID()}`);
   const scope = [...new Set(paths)].sort();
-  const entries = scope.map((relative) => {
+  const codexFile = path.join(root, CODEX_CONFIG_PATH);
+  const codexBefore = scope.includes(CODEX_CONFIG_PATH)
+    ? readCodexConfig(codexFile)
+    : null;
+  const codexPrefix =
+    typeof codexBefore === "string"
+      ? ownedCodexConfig(codexBefore, loadHashes(root)[CODEX_CONFIG_PATH])
+          ?.prefix
+      : undefined;
+  const entries: AssetBackup["entries"] = scope.map((relative) => {
     if (!assetPath(relative))
       throw new Error(`Protected or unmanaged asset: ${relative}`);
+    if (relative === CODEX_CONFIG_PATH && codexBefore !== null) {
+      if (codexPrefix === undefined)
+        throw new Error(
+          `Shared config ownership changed before backup: ${relative}`,
+        );
+      return {
+        path: relative,
+        codexPrefix: true,
+        before: {
+          kind: "file",
+          sha256: createHash("sha256").update(codexPrefix).digest("hex"),
+          size: Buffer.byteLength(codexPrefix),
+          mode: fs.statSync(codexFile).mode & 0o7777,
+        },
+      };
+    }
+    if (relative === CODEX_CONFIG_PATH)
+      return { path: relative, codexPrefix: true, before: { kind: "absent" } };
     return { path: relative, before: current(root, relative) };
   });
   fs.mkdirSync(staging, { mode: 0o700 });
@@ -235,14 +286,21 @@ export function createAssetBackup(
     const source = safePath(root, entry.path);
     const target = safePath(staging, `files/${entry.path}`);
     fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
-    fs.copyFileSync(source, target, fs.constants.COPYFILE_EXCL);
+    if (entry.codexPrefix && codexPrefix !== undefined)
+      fs.writeFileSync(target, codexPrefix, {
+        flag: "wx",
+        mode: entry.before.mode,
+      });
+    else fs.copyFileSync(source, target, fs.constants.COPYFILE_EXCL);
     if (process.platform !== "win32") fs.chmodSync(target, entry.before.mode);
     if (
       !fingerprintsEqual(
         current(staging, `files/${entry.path}`),
         entry.before,
       ) ||
-      !fingerprintsEqual(current(root, entry.path), entry.before)
+      (entry.codexPrefix
+        ? readCodexConfig(codexFile) !== codexBefore
+        : !fingerprintsEqual(current(root, entry.path), entry.before))
     )
       throw new Error(`Asset changed during backup: ${entry.path}`);
   }
@@ -287,6 +345,12 @@ export function bindAssetUpdate(root: string, id: string): void {
       const managed = block(
         readManagedMarkdown(safePath(root, entry.path)) ?? "",
       );
+      if (managed !== undefined) entry.afterBlock = digest(managed);
+    }
+    if (entry.codexPrefix && entry.after.kind === "file") {
+      const text = readCodexConfig(path.join(root, entry.path));
+      const managed =
+        typeof text === "string" ? splitCodexConfig(text)?.prefix : undefined;
       if (managed !== undefined) entry.afterBlock = digest(managed);
     }
   }
@@ -528,7 +592,25 @@ function desiredContent(
   relative: string,
 ): Buffer | undefined {
   const entry = backup.entries.find((item) => item.path === relative);
-  if (!entry || entry.before.kind === "absent") return undefined;
+  if (!entry) return undefined;
+  if (entry.codexPrefix) {
+    const active = readCodexConfig(path.join(root, relative));
+    const suffix =
+      typeof active === "string"
+        ? (splitCodexConfig(active)?.suffix ?? "")
+        : "";
+    if (entry.before.kind === "absent") {
+      const retained = stripCodexConfigPrefix(suffix);
+      return retained ? Buffer.from(retained) : undefined;
+    }
+    const stored = fs.readFileSync(
+      safePath(backupDir(root, backup.id), `files/${relative}`),
+    );
+    if (splitCodexConfig(stored.toString("utf8"))?.suffix !== "")
+      throw new Error(`Invalid scoped Codex backup: ${relative}`);
+    return Buffer.concat([stored, Buffer.from(suffix)]);
+  }
+  if (entry.before.kind === "absent") return undefined;
   const stored = fs.readFileSync(
     safePath(backupDir(root, backup.id), `files/${relative}`),
   );
@@ -571,6 +653,21 @@ export function planAssetRestore(
     );
   const entries = backup.entries.map((entry) => {
     const actual = current(root, entry.path);
+    const resumed =
+      backup.restore?.status === "restoring"
+        ? backup.restore.entries.find((item) => item.path === entry.path)
+        : undefined;
+    if (
+      entry.codexPrefix &&
+      resumed &&
+      fingerprintsEqual(actual, resumed.desired)
+    )
+      return {
+        path: entry.path,
+        current: actual,
+        desired: actual,
+        action: "keep" as const,
+      };
     const data = desiredContent(root, backup, entry.path);
     if (data !== undefined)
       assertCurrentExecutionAsset(entry.path, data.toString("utf8"));
@@ -581,24 +678,32 @@ export function planAssetRestore(
             kind: "file",
             sha256: createHash("sha256").update(data).digest("hex"),
             size: data.length,
-            mode: entry.before.kind === "file" ? entry.before.mode : 0o644,
+            mode:
+              entry.codexPrefix && actual.kind === "file"
+                ? actual.mode
+                : entry.before.kind === "file"
+                  ? entry.before.mode
+                  : 0o644,
           };
-    const resumed =
-      backup.restore?.status === "restoring"
-        ? backup.restore.entries.find((item) => item.path === entry.path)
-        : undefined;
-    const mixedMatch =
-      entry.path === "AGENTS.md" &&
-      entry.before.kind === "file" &&
-      block(
-        readManagedMarkdown(
-          safePath(backupDir(root, id), `files/${entry.path}`),
-        ) ?? "",
-      ) !== undefined &&
-      entry.afterBlock !== undefined &&
-      actual.kind === "file" &&
-      digest(block(readManagedMarkdown(safePath(root, entry.path)) ?? "")) ===
-        entry.afterBlock;
+    const codexText = entry.codexPrefix
+      ? readCodexConfig(path.join(root, entry.path))
+      : undefined;
+    const codexActive =
+      typeof codexText === "string" ? splitCodexConfig(codexText) : undefined;
+    const mixedMatch = entry.codexPrefix
+      ? codexActive !== undefined &&
+        digest(codexActive.prefix) === entry.afterBlock
+      : entry.path === "AGENTS.md" &&
+        entry.before.kind === "file" &&
+        block(
+          readManagedMarkdown(
+            safePath(backupDir(root, id), `files/${entry.path}`),
+          ) ?? "",
+        ) !== undefined &&
+        entry.afterBlock !== undefined &&
+        actual.kind === "file" &&
+        digest(block(readManagedMarkdown(safePath(root, entry.path)) ?? "")) ===
+          entry.afterBlock;
     const safe = resumed
       ? fingerprintsEqual(actual, resumed.current) ||
         fingerprintsEqual(actual, resumed.desired)
@@ -606,7 +711,12 @@ export function planAssetRestore(
         (fingerprintsEqual(actual, entry.after) || mixedMatch);
     const same = fingerprintsEqual(actual, desired);
     const unsafeMixedRestore =
-      entry.path === "AGENTS.md" && !same && !resumed && !safe;
+      !same &&
+      ((entry.path === "AGENTS.md" && !resumed && !safe) ||
+        (entry.path === CODEX_CONFIG_PATH &&
+          (!entry.codexPrefix ||
+            !safe ||
+            (actual.kind === "file" && !codexActive))));
     const action: AssetRestorePlan["entries"][number]["action"] =
       unsafeMixedRestore
         ? "conflict"

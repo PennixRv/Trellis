@@ -16,6 +16,7 @@ export function writeFileAtomic(
   filePath: string,
   data: string | Uint8Array,
   mode?: number,
+  createOnly = false,
 ): void {
   const dir = path.dirname(filePath);
   const tmp = path.join(
@@ -26,7 +27,12 @@ export function writeFileAtomic(
     fs.writeFileSync(tmp, data, { flag: "wx", mode });
     if (mode !== undefined && process.platform !== "win32")
       fs.chmodSync(tmp, mode);
-    fs.renameSync(tmp, filePath);
+    if (createOnly) {
+      fs.linkSync(tmp, filePath);
+      fs.unlinkSync(tmp);
+    } else {
+      fs.renameSync(tmp, filePath);
+    }
   } catch (err) {
     try {
       fs.rmSync(tmp, { force: true });

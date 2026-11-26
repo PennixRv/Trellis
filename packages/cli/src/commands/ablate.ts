@@ -1,6 +1,10 @@
 /** Full, reversible project-level Trellis ablation and exact restoration. */
 
 import fs from "node:fs";
+import {
+  CODEX_CONFIG_PATH,
+  readCodexConfig,
+} from "../utils/codex-config-ownership.js";
 import path from "node:path";
 import readline from "node:readline";
 import chalk from "chalk";
@@ -246,6 +250,13 @@ function buildAblationEntries(
 
   for (const deletion of plan.deletions) {
     if (isTrellisPath(deletion.posixPath)) continue;
+    if (
+      deletion.posixPath === CODEX_CONFIG_PATH &&
+      readCodexConfig(deletion.absPath) !== deletion.originalContent
+    )
+      throw new Error(
+        "Shared Codex configuration changed after preview; preview again",
+      );
     const pre = fingerprintPath(deletion.absPath);
     if (pre.kind === "directory") {
       throw new Error(
@@ -256,6 +267,13 @@ function buildAblationEntries(
   }
 
   for (const modification of plan.modifications) {
+    if (
+      modification.posixPath === CODEX_CONFIG_PATH &&
+      readCodexConfig(modification.absPath) !== modification.originalContent
+    )
+      throw new Error(
+        "Shared Codex configuration changed after preview; preview again",
+      );
     const pre = fingerprintPath(modification.absPath);
     if (pre.kind !== "file") {
       throw new Error(
@@ -298,6 +316,13 @@ function applyAblationPlan(
     transaction.state.entries.map((entry) => [entry.relativePath, entry.pre]),
   );
   for (const modification of plan.modifications) {
+    if (
+      modification.posixPath === CODEX_CONFIG_PATH &&
+      readCodexConfig(modification.absPath) !== modification.originalContent
+    )
+      throw new Error(
+        "Shared Codex configuration changed after staging; preview again",
+      );
     writeFileAtomic(modification.absPath, modification.result.content);
     const pre = preByPath.get(modification.posixPath);
     if (process.platform !== "win32" && pre?.kind === "file") {
@@ -307,6 +332,13 @@ function applyAblationPlan(
 
   for (const deletion of plan.deletions) {
     if (deletion.missing || isTrellisPath(deletion.posixPath)) continue;
+    if (
+      deletion.posixPath === CODEX_CONFIG_PATH &&
+      readCodexConfig(deletion.absPath) !== deletion.originalContent
+    )
+      throw new Error(
+        "Shared Codex configuration changed after staging; preview again",
+      );
     const stat = fs.lstatSync(deletion.absPath);
     if (stat.isDirectory() && !stat.isSymbolicLink()) {
       throw new Error(

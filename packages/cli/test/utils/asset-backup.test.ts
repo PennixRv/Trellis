@@ -19,7 +19,8 @@ import {
   TRELLIS_BLOCK_START,
   TRELLIS_BLOCK_END,
 } from "../../src/utils/managed-paths.js";
-import { saveHashes } from "../../src/utils/template-hash.js";
+import { computeHash, saveHashes } from "../../src/utils/template-hash.js";
+import { getConfigTemplate } from "../../src/templates/codex/index.js";
 import { registerBackupCommand } from "../../src/commands/backup.js";
 
 describe("asset snapshots", () => {
@@ -49,6 +50,25 @@ describe("asset snapshots", () => {
     bindAssetUpdate(root, backup.id);
     return backup.id;
   };
+
+  it("stores only the owned Codex prefix and restores it without changing another writer's suffix", () => {
+    const config = ".codex/config.toml";
+    const old = getConfigTemplate().content;
+    const newer = old.replace("enabled = false", "enabled = true");
+    const external = '\n[mcp_servers.fixture]\ncommand = "private-fixture"\n';
+    saveHashes(root, { [config]: computeHash(old) });
+    write(config, old + external);
+    const backup = createAssetBackup(root, "update", [config]);
+    expect(read(`.trellis/${backup.id}/files/${config}`)).toBe(old);
+    write(config, newer + external);
+    saveHashes(root, { [config]: computeHash(newer) });
+    bindAssetUpdate(root, backup.id);
+    const drift = external.replace("private-fixture", "updated-by-owner");
+    write(config, newer + drift);
+    const plan = planAssetRestore(root, backup.id);
+    restoreAssetBackup(root, backup.id, { yes: true, review: plan.review });
+    expect(read(config)).toBe(old + drift);
+  });
 
   beforeEach(() => {
     base = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-assets-"));

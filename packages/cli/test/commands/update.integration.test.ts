@@ -300,7 +300,7 @@ describe("update() integration", () => {
       "session_auto_commit: false",
     );
   });
-  it("preserves mixed user content across cleanup and repeated updates", async () => {
+  it("retains all bytes of an unmarked mixed Codex config under forced update and init", async () => {
     await init({ yes: true, force: true, codex: true });
     const config = ".codex/config.toml";
     stageVersionedUpgradeProject({
@@ -310,13 +310,25 @@ describe("update() integration", () => {
           '[agents]\nmax_depth = 1\nenabled = false\n\n[mcp_servers.private]\ncommand = "private-mcp"\n',
       },
     });
-    await update({ yes: true, skipAll: true });
-    const cleaned = readProjectFile(config);
-    expect(cleaned).not.toContain("max_depth");
-    expect(cleaned).toContain("private-mcp");
-    expect(readHashesV2(hashFilePath())[config]).not.toBe(computeHash(cleaned));
-    await update({ yes: true, skipAll: true });
-    expect(readProjectFile(config)).toBe(cleaned);
+    const original = readProjectFile(config);
+    await update({ yes: true, createNew: true });
+    expect(fs.existsSync(projectFile(`${config}.new`))).toBe(false);
+    await update({ yes: true, force: true });
+    await init({ yes: true, force: true, codex: true });
+    expect(readProjectFile(config)).toBe(original);
+    expect(readHashesV2(hashFilePath())[config]).toBeUndefined();
+  });
+  it("updates the attributed Codex prefix without taking ownership of appended settings", async () => {
+    await init({ yes: true, force: true, codex: true });
+    const config = ".codex/config.toml";
+    const original = readProjectFile(config);
+    const older = original.replace("enabled = false", "enabled = true");
+    const suffix = '\r\nuser_agents_option = 7\r\n[mcp_servers.external]\r\ncommand = "fixture"\r\n';
+    fs.writeFileSync(projectFile(config), older + suffix);
+    writeHashesV2(hashFilePath(), {...readHashesV2(hashFilePath()), [config]: computeHash(older)});
+    await update({ yes: true, force: true });
+    expect(readProjectFile(config)).toBe(original + suffix);
+    expect(readHashesV2(hashFilePath())[config]).toBe(computeHash(original));
   });
   it("does not treat a mixed-content receipt as full-file ownership", async () => {
     await init({ yes: true, force: true, codex: true });

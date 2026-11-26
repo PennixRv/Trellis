@@ -17,6 +17,8 @@ import {
   completeProjectInit,
 } from "../utils/project-init.js";
 import { writeFileAtomic } from "../utils/atomic-write.js";
+import { CODEX_CONFIG_PATH } from "../utils/codex-config-ownership.js";
+import { getConfigTemplate as getCodexConfigTemplate } from "../templates/codex/index.js";
 import {
   managedBlock,
   mergeManagedMarkdown,
@@ -57,6 +59,7 @@ import {
   type DetectedPackage,
 } from "../utils/project-detector.js";
 import {
+  computeHash,
   initializeHashes,
   loadHashes,
   removeHash,
@@ -1956,7 +1959,7 @@ export async function init(options: InitOptions): Promise<void> {
     // platform/root entries — replacing the previous "walk every managed dir"
     // approach that swept user-owned runtime files into the manifest
     // (.codex/sessions/, .claude/projects/, pre-existing AGENTS.md).
-    const previousAgentsHash = loadHashes(cwd)[FILE_NAMES.AGENTS];
+    const previousHashes = loadHashes(cwd);
     const writtenPaths = startRecordingWrites(cwd);
     try {
       // Create workflow structure with project type
@@ -2019,13 +2022,19 @@ export async function init(options: InitOptions): Promise<void> {
 
     // Initialize template hashes for modification tracking
     const hashedCount = initializeHashes(cwd, { trackedPaths: writtenPaths });
-    // Keeping an existing block must retain its receipt without blessing edits.
-    if (previousAgentsHash && !writtenPaths.has(FILE_NAMES.AGENTS)) {
-      saveHashes(cwd, {
-        ...loadHashes(cwd),
-        [FILE_NAMES.AGENTS]: previousAgentsHash,
-      });
-    }
+    const nextHashes = loadHashes(cwd);
+    if (
+      previousHashes[FILE_NAMES.AGENTS] &&
+      !writtenPaths.has(FILE_NAMES.AGENTS)
+    )
+      nextHashes[FILE_NAMES.AGENTS] = previousHashes[FILE_NAMES.AGENTS];
+    if (writtenPaths.has(CODEX_CONFIG_PATH))
+      nextHashes[CODEX_CONFIG_PATH] = computeHash(
+        getCodexConfigTemplate().content,
+      );
+    else if (previousHashes[CODEX_CONFIG_PATH])
+      nextHashes[CODEX_CONFIG_PATH] = previousHashes[CODEX_CONFIG_PATH];
+    saveHashes(cwd, nextHashes);
     if (useRemoteTemplate) {
       const specFilesToHash = new Map<string, string>();
       for (const relativePath of collectSpecPaths(cwd)) {

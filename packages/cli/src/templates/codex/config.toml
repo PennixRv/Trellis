@@ -1,3 +1,4 @@
+# TRELLIS:CODEX-CONFIG:START
 # Project-scoped Codex defaults for Trellis workflows.
 # Codex merges this layer after the user-level config when the project
 # is marked as a trusted project. To trust this project, add it under
@@ -20,3 +21,4 @@ project_doc_fallback_filenames = ["AGENTS.md"]
 # Native role dispatch is not part of the Trellis execution model.
 [agents]
 enabled = false
+# TRELLIS:CODEX-CONFIG:END

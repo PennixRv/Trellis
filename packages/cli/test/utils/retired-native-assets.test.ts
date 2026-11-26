@@ -77,7 +77,7 @@ describe("native execution retirement", () => {
     const plan = planNativeRetirement(root, { [config]: computeHash(fs.readFileSync(path.join(root, config), "utf8")) }, []);
     expect(JSON.parse(plan.edits.get(hooks) ?? "{}")).toEqual({ user: 7, hooks: { SubagentStart: [{ hooks: [{ command: "user-hook" }] }] } });
     expect(plan.edits.get(".trellis/config.yaml")).toBe("codex:\n  user_option: keep\nother: true\n");
-    expect(plan.edits.get(".codex/config.toml")).toBe("[agents]\nenabled = false\nuser = true\n[mcp_servers.user]\ncommand = 'user'\n");
+    expect(plan.edits.has(config)).toBe(false);
   });
 
   it("retires exact generated advice while preserving customized project settings", () => {
@@ -86,15 +86,12 @@ describe("native execution retirement", () => {
     write(toml, retiredConfigComments[toml][0].before + "[agents]\nmax_depth = 1\n[mcp_servers.user]\ncommand = 'user'\n");
     write(yaml, "packages:\n  cli: keep\n" + retiredConfigComments[yaml].map((entry) => entry.before).join("").repeat(2));
     const plan = planNativeRetirement(root, {}, []);
-    const config = plan.edits.get(toml) ?? "";
-    expect(config).toContain("enabled = false");
-    expect(config).toContain("[mcp_servers.user]");
-    expect(config).not.toContain("max_depth");
+    expect(plan.edits.has(toml)).toBe(false);
     expect(plan.edits.get(yaml)).toContain("cli: keep");
     expect(plan.edits.get(yaml)).not.toContain("dispatch_mode");
     expect(plan.edits.get(yaml)).not.toContain("sub-agent");
     expect(() => assertCurrentExecutionAsset(yaml, plan.edits.get(yaml) ?? "")).not.toThrow();
-    expect(() => assertCurrentExecutionAsset(toml, config)).not.toThrow();
+    expect(() => assertCurrentExecutionAsset(toml, fs.readFileSync(path.join(root, toml), "utf8"))).not.toThrow();
   });
 
   it("preserves the ordinary Reasonix check method", () => {

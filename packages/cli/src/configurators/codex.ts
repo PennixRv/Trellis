@@ -5,7 +5,12 @@ import {
   getConfigTemplate,
   getHooksConfig,
 } from "../templates/codex/index.js";
-import { ensureDir } from "../utils/file-writer.js";
+import { ensureDir, recordWrite } from "../utils/file-writer.js";
+import { writeFileAtomic } from "../utils/atomic-write.js";
+import {
+  CODEX_CONFIG_PATH,
+  readCodexConfig,
+} from "../utils/codex-config-ownership.js";
 import {
   resolvePlaceholders,
   resolveAllAsSkillsNeutral,
@@ -60,13 +65,15 @@ export function collectCodexTemplates(): Map<string, string> {
  * behavior a `Map<path, content>` cannot carry.
  */
 export async function configureCodex(cwd: string): Promise<void> {
-  // Build map → post-process map → write. Rendered up front so the preserved
-  // user keys are grafted onto exactly the bytes `trellis update` compares
-  // against — update.ts runs preserveCodexAgentModelKeys over its already
-  // rendered map too, and the two must agree. writeTemplateMap re-renders,
-  // which is a no-op (replacePythonCommandLiterals is idempotent).
   const files = renderTemplateMap(collectCodexTemplates());
+  const config = files.get(CODEX_CONFIG_PATH);
+  const configPath = path.join(cwd, CODEX_CONFIG_PATH);
+  files.delete(CODEX_CONFIG_PATH);
   await writeTemplateMap(cwd, files);
+  if (config !== undefined && readCodexConfig(configPath) === null) {
+    writeFileAtomic(configPath, config, undefined, true);
+    recordWrite(configPath);
+  }
 
   // RESIDUAL — not expressible as a path→content pair: a directory with no
   // files in it. Trellis ships no Codex-specific skills (the workflow skills

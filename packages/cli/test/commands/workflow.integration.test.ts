@@ -118,6 +118,7 @@ describe("trellis workflow integration", () => {
     expect(fs.readFileSync(wfPath, "utf-8")).toBe(
       replacePythonCommandLiterals(workflowMdTemplate),
     );
+    expect(fs.readFileSync(wfPath, "utf-8")).toContain("验收通过不等于已获准写入");
     const hashes = loadHashes(tmpDir);
     expect(hashes[PATHS.WORKFLOW_GUIDE_FILE]).toBeTruthy();
   });

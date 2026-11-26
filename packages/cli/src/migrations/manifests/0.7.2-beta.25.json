@@ -1,0 +1,8 @@
+{
+  "version": "0.7.2-beta.25",
+  "description": "保护共享 Codex 配置并统一实施与验收清单",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "初始化不覆盖现有 Codex 配置。更新、移除和恢复只处理可归属的 Trellis 配置前缀，保留其他组件和用户内容。实施合同采用有证据和停止点的编号步骤，阶段批准不替代原生写入确认。",
+  "migrations": []
+}
