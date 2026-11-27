@@ -1,0 +1,137 @@
+{
+  "id": "session-routing-implementation",
+  "name": "session-routing-implementation",
+  "title": "修复请求续行与两阶段退出条件",
+  "description": "根任务 11-26-session-routing-behavior-convergence 已授权的 WP1 与 Trellis 发布；根任务持有阶段、实施合同与组合验收。",
+  "status": "cancelled",
+  "dev_type": null,
+  "scope": null,
+  "package": "cli",
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-11-26",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "task_workflow": {
+      "schema_version": 1,
+      "task_route_revision": "2",
+      "task_kind": "analysis",
+      "complexity": "simple",
+      "project_context": "existing",
+      "phase_ids": [
+        "goal_exploration_and_requirements",
+        "delivery_review_and_closeout"
+      ],
+      "current_phase_id": null,
+      "input_revision": "4",
+      "phases": {
+        "goal_exploration_and_requirements": {
+          "status": "skipped",
+          "input_revision": "1",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "artifact_refs": [],
+          "result_revision": "0",
+          "result_ref": null,
+          "outcome_kind": null,
+          "reason": "用户要求关闭全部在途任务；停止本跟踪项并保留现有证据，不标记为完成。",
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "acceptance": null
+        },
+        "delivery_review_and_closeout": {
+          "status": "accepted",
+          "input_revision": "3",
+          "artifact_revision": "b8bd7551bcd399448a5c2e9b82ec99296f7afdbae69642d4c1323bb6a13da0fe",
+          "artifact_refs": [
+            "closeout.md"
+          ],
+          "result_revision": "1",
+          "result_ref": "closeout.md",
+          "outcome_kind": "cancelled",
+          "reason": null,
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "acceptance": {
+            "artifact_revision": "b8bd7551bcd399448a5c2e9b82ec99296f7afdbae69642d4c1323bb6a13da0fe",
+            "result_revision": "1",
+            "input_revision": "3",
+            "task_route_revision": "2",
+            "evidence_refs": [
+              "closeout.md"
+            ]
+          }
+        }
+      },
+      "route_dependency_admission": null,
+      "implementation_authorization": null,
+      "closeout_disposition": "cancelled",
+      "skip_records": {
+        "decision_space_construction_and_merging": {
+          "reason": "用户要求关闭全部在途任务；停止本跟踪项并保留现有证据，不标记为完成。",
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "task_route_revision": "2",
+          "input_revision": "2",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "solution_design_and_convergence": {
+          "reason": "用户要求关闭全部在途任务；停止本跟踪项并保留现有证据，不标记为完成。",
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "task_route_revision": "2",
+          "input_revision": "2",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "task_implementation": {
+          "reason": "用户要求关闭全部在途任务；停止本跟踪项并保留现有证据，不标记为完成。",
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "task_route_revision": "2",
+          "input_revision": "2",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "goal_exploration_and_requirements": {
+          "reason": "用户要求关闭全部在途任务；停止本跟踪项并保留现有证据，不标记为完成。",
+          "evidence_refs": [
+            "closeout.md"
+          ],
+          "task_route_revision": "2",
+          "input_revision": "2",
+          "artifact_revision": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      "return_record": {
+        "from": "goal_exploration_and_requirements",
+        "to": "delivery_review_and_closeout",
+        "return_kind": "withdrawal",
+        "reason": "用户要求关闭全部在途任务；停止本跟踪项并保留现有证据，不标记为完成。",
+        "evidence_refs": [
+          "closeout.md"
+        ],
+        "task_route_revision": "2"
+      }
+    },
+    "task_cancellation": {
+      "reason": "用户要求关闭全部在途任务；停止本跟踪项并保留现有证据，不标记为完成。",
+      "evidence_refs": [
+        "closeout.md"
+      ]
+    }
+  }
+}
