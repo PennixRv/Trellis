@@ -935,6 +935,47 @@ describe.skipIf(!hasPython())("task.py phase workflow", () => {
   );
 
   it.each(["block", "wait"])(
+    "requires explicit resume before accepting every phase after %s",
+    (action) => {
+      const phases = [
+        GOAL_EXPLORATION_AND_REQUIREMENTS,
+        DECISION_SPACE_CONSTRUCTION_AND_MERGING,
+        SOLUTION_DESIGN_AND_CONVERGENCE,
+        TASK_IMPLEMENTATION,
+        DELIVERY_REVIEW_AND_CLOSEOUT,
+      ];
+      runOk(root, "phase", "init", TASK, "--task-kind", "combined",
+        "--complexity", "standard", "--project-context", "existing",
+        "--phase-ids", phases.join(","));
+      for (const phase of phases) {
+        const revision = setArtifact(root, phase);
+        runOk(root, "phase", action, TASK, "--expected-route-revision", "1",
+          "--reason", "Synthetic input pending", "--evidence-ref", "fixture:pending");
+        const outcome = phase === SOLUTION_DESIGN_AND_CONVERGENCE
+          ? "implementation_contract"
+          : phase === DELIVERY_REVIEW_AND_CLOSEOUT ? "delivery_ready" : "accepted";
+        const args = ["phase", "accept", TASK, "--expected-route-revision", "1",
+          "--artifact-revision", revision, "--result-ref", "prd.md",
+          "--outcome-kind", outcome, "--evidence-ref", "fixture:actual-answer",
+          ...(phase === DELIVERY_REVIEW_AND_CLOSEOUT
+            ? ["--closeout-disposition", "delivery_ready"] : [])];
+        const taskPath = path.join(taskDirectory(root), "task.json");
+        const before = fs.readFileSync(taskPath, "utf-8");
+        const rejected = runTask(root, ...args);
+        expect(rejected.status).toBe(1);
+        expect(rejected.stderr).toContain("TASK_PHASE_INVALID_TRANSITION");
+        expect(fs.readFileSync(taskPath, "utf-8")).toBe(before);
+        runOk(root, "phase", "resume", TASK, "--expected-route-revision", "1");
+        runOk(root, ...args);
+        if (phase === SOLUTION_DESIGN_AND_CONVERGENCE) {
+          authorizeImplementation(root, "prd.md", "fixture:implementation-approved");
+        }
+      }
+      expect(readState(root).current_phase_id).toBeNull();
+    },
+  );
+
+  it.each(["block", "wait"])(
     "withholds implementation start during %s",
     (action) => {
       const taskPath = planFixture(root);

@@ -69,7 +69,7 @@ describe.skipIf(!hasCodex)("native Codex project initialization", () => {
     await init({ ...options, trustCodex: true });
     const config = fs.readFileSync(path.join(home, "config.toml"), "utf8");
     expect(config).toContain('trust_level = "trusted"');
-    expect(config.match(/trusted_hash/g)).toHaveLength(4);
+    expect(config.match(/trusted_hash/g)).toHaveLength(10);
     expect(fs.existsSync(path.join(root, ".trellis/.developer"))).toBe(true);
     const hooks = fs.readFileSync(path.join(root, ".codex/hooks.json"), "utf8");
     await init({ ...options, trustCodex: true });

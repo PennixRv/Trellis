@@ -156,9 +156,15 @@ def _plan(root: Path, moves: list[tuple[Path, Path]], updates: dict[Path, dict])
     for folder in ("sessions", "continuity", "task-ownership"):
         for path in sorted((runtime / folder).glob("*.json")):
             record = _read(path)
-            if (folder == "sessions" and record.get("current_task") in terminal_refs) or (
-                folder != "sessions" and path.stem in terminal_hashes
-            ):
+            if folder == "sessions" and record.get("current_task") in terminal_refs:
+                if "turn" in record:
+                    updated = {key: _rewrite(value, rewrites) for key, value in record.items()
+                               if key != "current_task"}
+                    change(path, _json(updated))
+                else:
+                    change(path, None)
+                continue
+            if folder != "sessions" and path.stem in terminal_hashes:
                 change(path, None)
                 continue
             updated = _rewrite(record, rewrites)

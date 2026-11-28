@@ -131,3 +131,61 @@ parent transfer and terminal children cannot launch or reuse delegated work.
 错误做法是先 `start` 伪造接管现场，或把当前 Git 投影写回来源摘要；正确做法是通过
 原生只读投影核对与显式 claim 恢复 sealed 来源。consume 后直接按当前任务继续工作；
 再次交接必须由当前 owner 在新的明确授权下创建新包，不同步或重新消费旧包。
+
+## Native Codex turn exit evidence
+
+`common/task_turn.py` owns the shared CLI/Hook decoder and exit checks. It
+stores one `turn` object in the existing direct session file, preserving
+pointer and run fields. It never writes task lifecycle, phase acceptance or
+implementation authorization.
+
+On the verified POSIX Codex 0.172.0 interface:
+
+```text
+python3 .trellis/scripts/task.py turn show
+python3 .trellis/scripts/task.py turn record --kind bounded_reply \
+  --scope inspection --evidence-ref research.md
+```
+
+Run one direct Python command from the project root. Python's `-X utf8` is
+supported; shell expansion, pipelines, backgrounding and nested scripts are
+not. PreToolUse on the existing shell bridge injects an exact
+`--invocation-ticket` through native `updatedInput.command`. The CLI consumes
+that ticket once under the layout lock, checking native session/turn, tool
+invocation arguments, TTL, task record and current artifact digests. No recent
+ticket lookup or `allow` decision substitutes for that reference. Codex 0.172.0
+requires `permissionDecision: allow` alongside `updatedInput`; return this pair
+only for the validated ticket rewrite, preserving every other tool argument.
+Native approval and sandbox restrictions must remain independently effective,
+as verified by real-host denial tests before release. Unticketed
+`show` can report absent identity; it cannot grant exit evidence.
+
+Exit kinds are `bounded_reply`, `task_complete`, `waiting_authorization`,
+`waiting_input`, `external_block` and `user_stop`. Bounded replies require an
+explicit inspection/explanation/handoff-admission scope. Native completion
+or delivery facts are required for task completion. Waits require accounting
+for independent work, matching native phase state where applicable and an
+explicit final question; Stop checks the question digest against the final
+assistant message. User-stop evidence binds the actual submitted prompt
+digest, not Hook feedback. Evidence references and classification remain
+reviewable claims, not proof of natural-language correctness or permission.
+
+PreToolUse marks native questions pending and invalidates old exit evidence
+before dispatch, including cancellation paths without a successful
+PostToolUse. PostToolUse checks the same invocation and question IDs, records
+only digests/status, rejects conflicting repeats and never fabricates answers.
+Pointer changes preserve the turn object; task moves or artifact changes
+invalidate old exit evidence. Runtime cleanup retains this control-bearing
+session instead of classifying it as an empty pointer.
+
+Stop rechecks evidence and can request at most two corrections in the same
+native turn. `stop_hook_active` is not completion evidence. Interrupt keeps
+the user interruption; malformed state, missing identity or a spent correction
+budget produces a visible finite failure, not an infinite loop or successful
+completion. New user input invalidates old evidence; repeated identical prompt
+delivery and compaction do not reset the current counter. Disabled, untrusted,
+unloaded or incompatible hooks are not functioning protection.
+
+`test/scripts/task-turn.integration.test.ts` exercises real Python CLI and
+Hook processes in temporary projects. Native model/transport behavior and
+actual installed trust/loading remain separate acceptance evidence.

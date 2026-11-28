@@ -58,6 +58,7 @@ export const SHARED_HOOKS_BY_PLATFORM: Record<
   cursor: ["session-start.py", "inject-shell-session-context.py"],
   codex: [
     "guard-teamwork-wait.py",
+    "inject-shell-session-context.py",
     "inject-workflow-state.py",
     "inject-spec-context.py",
   ],

@@ -25,3 +25,10 @@ Task lifecycle status and business phase are separate. A planning task may remai
 Resume the known unfinished action first. Reassess auxiliary methods only when the problem, phase, or available capabilities have changed; reuse still-valid Skill bodies and decisions. Select relevant host-declared methods directly, or use an available workflow router for unclear combinations. Do not restart discovery, preload a collection, infer paths from old summaries, or repeat settled questions. Auxiliary methods do not change task state or action permissions.
 
 Use the native task CLI for phase artifact revisions, acceptance, evidence-backed skips, waiting, blocking, resuming, returning to an earlier phase, route changes, implementation authorization, completion, and cancellation. Read task.py help for current arguments. Do not create a second status record or use formal session handoff to resume task work.
+
+When a real answer arrives or a blocker clears, record that evidence first. If
+the current phase is `waiting_user` or `blocked`, run native `phase resume`
+before refreshing artifacts or accepting results; then recheck the current
+revision and authorization. An answered question, a passing local test or a
+progress update is not a request-completion boundary. Continue independent
+authorized work; pause only actions that depend on the unresolved input.

@@ -1,0 +1,8 @@
+{
+  "version": "0.7.2-beta.26",
+  "description": "原生回合退出依据与连续执行保护",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "Codex 项目新增回合退出依据、精确调用票据及最多两次 Stop 纠偏；同步问答和中断不构成批准。等待解除后先恢复阶段再接受，停止扩展候选不等于结束已授权请求。",
+  "migrations": []
+}

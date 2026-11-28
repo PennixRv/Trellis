@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shlex
 import sys
 import time
@@ -187,6 +188,8 @@ def _cleanup_expired_tickets(ticket_dir: Path, now: float) -> None:
     if not ticket_dir.is_dir():
         return
     for ticket_path in ticket_dir.glob("*.json"):
+        if ticket_path.name.startswith("turn-"):
+            continue  # Native turn tickets have their own versioned expiry check.
         try:
             data = json.loads(ticket_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
@@ -261,6 +264,27 @@ def main() -> int:
         hook_input = {}
 
     command, response = _pending_shell_command(hook_input)
+    platform_name = _host_platform_name()
+    if platform_name == "codex" and re.search(r"task\.py\s+turn\b", command):
+        if hook_input.get("agent_id") is not None:
+            return 0
+        root = _resolve_trellis_root(hook_input)
+        if root is None:
+            return 0
+        _load_active_task_resolver(root)
+        try:
+            from common.task_turn import ticket_input  # type: ignore[import-not-found]
+            updated = ticket_input(root, hook_input)
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse", "permissionDecision": "allow",
+                "updatedInput": updated,
+            }}, ensure_ascii=False))
+        except Exception as error:
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse", "permissionDecision": "deny",
+                "permissionDecisionReason": "TASK_TURN_WITHHELD: " + str(error),
+            }}, ensure_ascii=False))
+        return 0
     subcommands = _extract_task_subcommands(command)
     if not subcommands:
         return 0
@@ -272,7 +296,6 @@ def main() -> int:
     if not _has_context_identity(hook_input):
         return 0
 
-    platform_name = _host_platform_name()
     resolve_context_key = _load_active_task_resolver(root)
     context_key = resolve_context_key(hook_input, platform=platform_name)
     if not context_key:

@@ -42,8 +42,11 @@ describe("codex native sub-agent hooks", () => {
       >;
     };
 
-    expect(config.hooks.UserPromptSubmit).toHaveLength(1);
+    expect(config.hooks.UserPromptSubmit).toHaveLength(2);
     expect(config.hooks.UserPromptSubmit[0]?.hooks[0]?.command).toContain(
+      ".codex/hooks/turn-guard.py",
+    );
+    expect(config.hooks.UserPromptSubmit[1]?.hooks[0]?.command).toContain(
       ".codex/hooks/inject-workflow-state.py",
     );
 
@@ -55,18 +58,28 @@ describe("codex native sub-agent hooks", () => {
       ".codex/hooks/inject-spec-context.py",
     );
 
-    expect(config.hooks.PreToolUse).toHaveLength(2);
-    expect(config.hooks.PreToolUse[0]?.hooks[0]?.command).toContain(
+    expect(config.hooks.PreToolUse).toHaveLength(4);
+    expect(config.hooks.PreToolUse[0]?.matcher).toBe("^request_user_input$");
+    expect(config.hooks.PreToolUse[0]?.hooks[0]?.command).toContain("turn-guard.py");
+    expect(config.hooks.PreToolUse[1]?.matcher).toBe("Bash");
+    expect(config.hooks.PreToolUse[1]?.hooks[0]?.command).toContain(
+      "inject-shell-session-context.py",
+    );
+    expect(config.hooks.PreToolUse[2]?.hooks[0]?.command).toContain(
       "guard-teamwork-wait.py",
     );
-    expect(config.hooks.PreToolUse[1]?.matcher).toBe("Edit|Write");
-    expect(config.hooks.PreToolUse[1]?.hooks[0]).toMatchObject({
+    expect(config.hooks.PreToolUse[3]?.matcher).toBe("Edit|Write");
+    expect(config.hooks.PreToolUse[3]?.hooks[0]).toMatchObject({
       timeout: 15,
       additionalContextLimit: 0,
     });
-    expect(config.hooks.PreToolUse[1]?.hooks[0]?.command).toContain(
+    expect(config.hooks.PreToolUse[3]?.hooks[0]?.command).toContain(
       ".codex/hooks/inject-spec-context.py",
     );
+    for (const event of ["PostToolUse", "Stop", "Interrupt"]) {
+      expect(config.hooks[event]).toHaveLength(1);
+      expect(config.hooks[event]?.[0]?.hooks[0]?.command).toContain("turn-guard.py");
+    }
   });
 });
 

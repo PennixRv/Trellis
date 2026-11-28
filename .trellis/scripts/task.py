@@ -96,6 +96,7 @@ from common.task_continuity import (
     continuity_show,
     transfer_task_ownership,
 )
+from common.task_turn import TurnError, add_turn_commands, cli as turn_cli
 
 
 # =============================================================================
@@ -904,6 +905,7 @@ def main() -> int:
     p_runtime.add_argument("dir", nargs="?", help="Optional existing task scope")
     p_runtime.add_argument("--confirm", help="Exact digest from a fresh native preview")
 
+    add_turn_commands(subparsers)
     args = parser.parse_args()
 
     if os.environ.get("TRELLIS_DELEGATION_CONTEXT") and args.command not in {"current", "list", "list-context", "validate"}:
@@ -956,6 +958,12 @@ def main() -> int:
                 return continuity_show(args) if args.continuity_action == "show" else continuity_capture(args)
             if args.command == "transfer":
                 return transfer_task_ownership(args)
+            if args.command == "turn":
+                turn_argv = sys.argv[2:]
+                if len(turn_argv) >= 2 and turn_argv[-2] == "--invocation-ticket":
+                    turn_argv = turn_argv[:-2]
+                print(json.dumps(turn_cli(get_repo_root(), args, turn_argv), ensure_ascii=False))
+                return 0
             if args.command in commands:
                 if args.command.startswith("delegate-"):
                     from common.worktree_delegation import run, runtime_path
@@ -968,6 +976,9 @@ def main() -> int:
                 return run(args)
             show_usage()
             return 1
+    except TurnError as error:
+        print(str(error), file=sys.stderr)
+        return 1
     except TaskWorkflowError as error:
         print(f"{error.code}: {error}", file=sys.stderr)
         return 1
